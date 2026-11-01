@@ -163,6 +163,8 @@ describe('W5 private scene browser', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
     rerender(<TableScenesToggle open onToggle={onToggle} />);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('data-selected', 'true');
+    expect(toggle).toHaveAttribute('data-variant', 'outline');
   });
 
   it('says when the workspace has no scenes yet', () => {

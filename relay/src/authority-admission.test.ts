@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { createShape } from '@fieldnotes/core';
 import { MemoryHubBackend } from '@fieldnotes/sync-server';
+import { createCurrentCapabilities } from '@fieldnotes/sync';
 
 import { startRelay, type RelayHandle } from './server.js';
 import { signBattleMapToken } from './token.js';
@@ -92,7 +93,9 @@ describe('authority admission without an authority runtime', () => {
     );
 
     await new Promise(resolve => setTimeout(resolve, 100));
-    expect(await backend.get(AUTHORITY_ROOM, forbidden.id)).toBeUndefined();
+    expect(
+      await backend.getRecord(AUTHORITY_ROOM, forbidden.id)
+    ).toBeUndefined();
     expect(
       v1.messages.some(message =>
         message.op.elements?.some(element => element.id === forbidden.id)
@@ -119,10 +122,19 @@ describe('authority admission without an authority runtime', () => {
     const legacy = connect(port, LEGACY_ROOM, legacyToken);
     sockets.push(legacy.ws);
     await legacy.opened;
-    const retained = createShape({
-      position: { x: 3, y: 4 },
-      size: { w: 10, h: 10 },
-    });
+    legacy.ws.send(
+      JSON.stringify({
+        from: 'legacy-probe',
+        op: {
+          kind: 'capabilities',
+          capabilities: createCurrentCapabilities([]),
+        },
+      })
+    );
+    const retained = {
+      ...createShape({ position: { x: 3, y: 4 }, size: { w: 10, h: 10 } }),
+      index: 'a0',
+    };
     legacy.ws.send(
       JSON.stringify({
         from: 'legacy-probe',
@@ -143,8 +155,9 @@ describe('authority admission without an authority runtime', () => {
           message.op.elements?.some(element => element.id === retained.id)
       )
     );
-    expect(await backend.get(LEGACY_ROOM, retained.id)).toMatchObject({
-      id: retained.id,
+    expect(await backend.getRecord(LEGACY_ROOM, retained.id)).toMatchObject({
+      kind: 'element',
+      element: { id: retained.id },
     });
   }, 10_000);
 });

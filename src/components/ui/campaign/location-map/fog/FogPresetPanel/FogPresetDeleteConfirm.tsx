@@ -25,7 +25,7 @@ export function FogPresetDeleteConfirm({
         </div>
       </div>
       <Button
-        variant="danger"
+        variant="danger-solid"
         className="min-h-[44px] px-3 text-xs"
         onClick={controls.confirmDelete}
       >

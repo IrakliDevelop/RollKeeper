@@ -8,20 +8,32 @@ import {
   cleanup,
 } from '@testing-library/react';
 import { AddCombatantDialog } from '@/components/ui/encounter/combat-screen/AddCombatantDialog';
+import userEvent from '@testing-library/user-event';
 import type { CampaignNPC } from '@/types/encounter';
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  queryConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
 
-vi.mock('@/store/npcStore', () => ({
-  useNPCStore: () => ({
+vi.mock('@/store/npcStore', () => {
+  const store = {
+    npcsByCampaign: {},
     getNPCsForCampaign: vi.fn().mockReturnValue([]),
     createNPC: vi.fn(),
     deleteNPC: vi.fn(),
-  }),
-}));
+  };
+  return {
+    useNPCStore: (selector?: (state: typeof store) => unknown) =>
+      selector ? selector(store) : store,
+  };
+});
 
 const campaignPlayers = [
   {
@@ -117,21 +129,42 @@ const mockMonster = {
 };
 
 describe('AddCombatantDialog', () => {
+  it('has one sentence-case title and keyboard tabs with stable panel ids', async () => {
+    const user = userEvent.setup();
+    render(<AddCombatantDialog {...defaultProps} />);
+    expect(
+      screen.getByRole('dialog', { name: 'Add combatant' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('heading', { name: 'Add combatant' })
+    ).toHaveLength(1);
+    expect(screen.queryByText('Encounter Roster')).not.toBeInTheDocument();
+    const monsterTab = screen.getByRole('tab', { name: 'Monster' });
+    monsterTab.focus();
+    await user.keyboard('{ArrowRight}');
+    const customTab = screen.getByRole('tab', { name: 'Custom' });
+    expect(customTab).toHaveFocus();
+    expect(customTab).toHaveAttribute('aria-selected', 'true');
+    expect(
+      document.getElementById(customTab.getAttribute('aria-controls')!)
+    ).toBeInTheDocument();
+  });
   it('renders all four tabs', () => {
     render(<AddCombatantDialog {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /player/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /npc/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /monster/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /custom/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /player/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /npc/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /monster/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /custom/i })).toBeInTheDocument();
   });
 
   it('player row click calls onAddEntity with type player and playerCharacterId', () => {
     const onAddEntity = vi.fn();
     render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /player/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /player/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
 
     // Thorin row should appear
     const thorinRow = screen.getByText('Thorin').closest('button');
@@ -155,7 +188,9 @@ describe('AddCombatantDialog', () => {
     render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
 
     // Monster tab is default — type in search
-    const searchInput = screen.getByPlaceholderText(/search the bestiary/i);
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search the bestiary',
+    });
     fireEvent.change(searchInput, { target: { value: 'goblin' } });
 
     // waitFor retries until Goblin appears (after 300ms debounce + fetch resolves)
@@ -169,10 +204,9 @@ describe('AddCombatantDialog', () => {
     // Click Goblin result to enter detail view
     fireEvent.click(screen.getByText('Goblin'));
 
-    // Increment count twice (1 → 2 → 3)
-    const plusBtn = screen.getByRole('button', { name: /increase count/i });
-    fireEvent.click(plusBtn);
-    fireEvent.click(plusBtn);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Count' }), {
+      target: { value: '3' },
+    });
 
     // Click Add button (now in anchored footer)
     fireEvent.click(screen.getByRole('button', { name: /add goblin/i }));
@@ -187,11 +221,57 @@ describe('AddCombatantDialog', () => {
     expect(calls[1].color).toBe(calls[2].color);
   }, 10000);
 
+  it('clamps an unblurred monster count in both footer and added entities', async () => {
+    const onAddEntity = vi.fn();
+    render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Search the bestiary' }),
+      { target: { value: 'goblin' } }
+    );
+    await screen.findByText('Goblin');
+    fireEvent.click(screen.getByText('Goblin'));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Count' }), {
+      target: { value: '50' },
+    });
+    expect(
+      screen.getByRole('button', { name: 'Add Goblin ×20' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Goblin ×20' }));
+    expect(onAddEntity).toHaveBeenCalledTimes(20);
+  });
+
+  it('exposes selected Custom type and disposition with visible group names', () => {
+    render(<AddCombatantDialog {...defaultProps} />);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Custom' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(screen.getByRole('group', { name: 'Type' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'NPC' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Monster' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(
+      screen.getByRole('group', { name: 'Player sees as' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enemy' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
   it('custom add carries isHidden, playerAlias, and playerDisposition', () => {
     const onAddEntity = vi.fn();
     render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /custom/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
 
     // Fill name
     const nameInput = screen.getByPlaceholderText(/cursed statue/i);
@@ -222,7 +302,10 @@ describe('AddCombatantDialog', () => {
     const onAddEntity = vi.fn();
     render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /custom/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
     fireEvent.change(screen.getByPlaceholderText(/cursed statue/i), {
       target: { value: 'Clockwork Sentry' },
     });
@@ -234,7 +317,10 @@ describe('AddCombatantDialog', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /^type$/i }), {
       target: { value: 'construct' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /actions & traits/i }));
+    fireEvent.mouseDown(
+      screen.getByRole('tab', { name: /actions and traits/i }),
+      { button: 0, ctrlKey: false }
+    );
     fireEvent.click(screen.getByRole('button', { name: /add actions entry/i }));
     fireEvent.change(
       screen.getByRole('textbox', { name: /actions entry name/i }),
@@ -257,11 +343,14 @@ describe('AddCombatantDialog', () => {
     expect(entity.abilities).toEqual([]);
   });
 
-  it('NPC delete button triggers confirmation dialog', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('NPC delete button triggers confirmation dialog', async () => {
+    renderConfirmDialogHost();
     render(<AddCombatantDialog {...defaultProps} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /npc/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /npc/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
 
     // Town Guard should appear
     const deleteBtn = screen.getByRole('button', {
@@ -269,15 +358,35 @@ describe('AddCombatantDialog', () => {
     });
     fireEvent.click(deleteBtn);
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Town Guard')
+    expect(await findConfirmDialog()).toHaveAccessibleName(
+      'Delete Town Guard?'
     );
+    await clickConfirmDialogButton('Cancel');
+  });
+
+  it('does not ask to delete an NPC when no campaign is loaded', async () => {
+    const nativeConfirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderConfirmDialogHost();
+    render(<AddCombatantDialog {...defaultProps} campaignCode="" />);
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /npc/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(screen.getByRole('button', { name: /delete town guard/i }));
+
+    await Promise.resolve();
+    expect(queryConfirmDialog()).toBeNull();
+    expect(nativeConfirm).not.toHaveBeenCalled();
   });
 
   it('searches saved NPCs by name, group, or tag and excludes custom monsters', () => {
     render(<AddCombatantDialog {...defaultProps} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /^npc$/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /^npc$/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
     const search = screen.getByRole('textbox', {
       name: /search saved creatures by name, group, or tag/i,
     });
@@ -294,7 +403,10 @@ describe('AddCombatantDialog', () => {
     const onAddEntity = vi.fn();
     render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /^custom$/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /^custom$/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
     fireEvent.click(screen.getByText('Bone Colossus'));
 
     expect(onAddEntity).toHaveBeenCalledOnce();
@@ -314,7 +426,9 @@ describe('AddCombatantDialog', () => {
 
     render(<AddCombatantDialog {...defaultProps} />);
 
-    const searchInput = screen.getByPlaceholderText(/search the bestiary/i);
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search the bestiary',
+    });
     fireEvent.change(searchInput, { target: { value: 'goblin' } });
 
     await waitFor(
@@ -330,7 +444,7 @@ describe('AddCombatantDialog', () => {
     const addBtn = screen.getByRole('button', { name: /add goblin/i });
     expect(footer).toContainElement(addBtn);
 
-    const body = screen.getByTestId('dialog-body');
+    const body = screen.getByRole('tabpanel');
     expect(body).not.toContainElement(addBtn);
   }, 10000);
 
@@ -347,7 +461,10 @@ describe('AddCombatantDialog', () => {
     );
 
     // Switch to Custom tab and fill name
-    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /custom/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
     const nameInput = screen.getByPlaceholderText(/cursed statue/i);
     fireEvent.change(nameInput, { target: { value: 'Shadow Wraith' } });
     expect((nameInput as HTMLInputElement).value).toBe('Shadow Wraith');
@@ -378,7 +495,10 @@ describe('AddCombatantDialog', () => {
     );
 
     // Switch back to Custom tab — name field must be empty
-    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /custom/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
     const nameInputAfterReopen = screen.getByPlaceholderText(
       /cursed statue/i
     ) as HTMLInputElement;
@@ -396,7 +516,10 @@ describe('AddCombatantDialog', () => {
     );
 
     // Switch to Custom tab
-    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /custom/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
 
     // Type a name into the Name field
     const nameInput = screen.getByPlaceholderText(/cursed statue/i);
@@ -420,7 +543,10 @@ describe('AddCombatantDialog', () => {
     );
 
     // Switch to Custom tab again
-    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /custom/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
 
     // Verify name field is now empty (state was reset when X was clicked)
     const nameInputAfterReopen = screen.getByPlaceholderText(

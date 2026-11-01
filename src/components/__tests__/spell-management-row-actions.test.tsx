@@ -1,0 +1,219 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { SpellManagement } from '@/components/SpellManagement';
+import { useCharacterStore } from '@/store/characterStore';
+import { makeWizard } from '@/utils/__tests__/test-utils';
+import type { Spell } from '@/types/character';
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+const spell: Spell = {
+  id: 'shield',
+  name: 'Shield',
+  level: 1,
+  school: 'Abjuration',
+  castingTime: '1 reaction',
+  range: 'Self',
+  components: { verbal: true, somatic: true, material: false },
+  duration: '1 round',
+  description: 'A protective barrier.',
+  createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z',
+};
+
+describe('SpellManagement row actions', () => {
+  it('keeps always-prepared spells highlighted and labelled in both densities', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [{ ...spell, isPrepared: false, isAlwaysPrepared: true }],
+      }),
+    });
+    render(<SpellManagement />);
+    for (const detailed of [false, true]) {
+      if (detailed)
+        fireEvent.click(screen.getByTitle('Switch to detailed view'));
+      const row = screen.getByText('Shield').closest('[data-prepared]');
+      expect(row).toHaveClass('border-brass-border', 'bg-brass-bg');
+      const prepared = screen.getByRole('button', { name: 'Always prepared' });
+      expect(prepared).toBeDisabled();
+      expect(prepared).toHaveAttribute('aria-pressed', 'true');
+    }
+  });
+  it('moves spells in edit mode and preserves their level order after remount', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [spell, { ...spell, id: 'ward', name: 'Ward' }],
+        spellbook: { ...makeWizard().spellbook, favoriteSpells: [] },
+      }),
+    });
+    const { unmount, rerender } = render(<SpellManagement />);
+    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
+    rerender(<SpellManagement editing />);
+
+    const moveUp = screen.getAllByRole('button', { name: 'Move up' })[0];
+    expect(moveUp).toBeDisabled();
+    expect(moveUp).toHaveAccessibleDescription('Shield');
+    const moveDown = screen.getAllByRole('button', { name: 'Move down' })[0];
+    expect(moveDown).toHaveAccessibleDescription('Shield');
+    expect(moveDown).toHaveClass('pointer-coarse:min-h-11');
+    fireEvent.click(moveDown);
+    expect(
+      useCharacterStore.getState().character.spells.map(s => s.name)
+    ).toEqual(['Ward', 'Shield']);
+
+    unmount();
+    render(<SpellManagement editing />);
+    const names = screen
+      .getAllByText(/^(Ward|Shield)$/)
+      .map(node => node.textContent);
+    expect(names).toEqual(['Ward', 'Shield']);
+  });
+
+  it('moves within a level when other levels are interleaved in storage', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [
+          spell,
+          { ...spell, id: 'fireball', name: 'Fireball', level: 3 },
+          { ...spell, id: 'ward', name: 'Ward' },
+        ],
+      }),
+    });
+    render(<SpellManagement editing />);
+    const firstMoveDown = screen.getAllByRole('button', {
+      name: 'Move down',
+    })[0];
+    fireEvent.click(firstMoveDown);
+    expect(
+      useCharacterStore.getState().character.spells.map(s => s.name)
+    ).toEqual(['Fireball', 'Ward', 'Shield']);
+    expect(firstMoveDown).toHaveAccessibleDescription('Shield');
+  });
+
+  it('keeps favorite and preparation actions accessible beside a secondary Cast', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [spell],
+        spellbook: {
+          ...makeWizard().spellbook,
+          favoriteSpells: [],
+        },
+      }),
+    });
+    render(<SpellManagement />);
+
+    const favorite = screen.getByRole('button', { name: 'Favorite' });
+    const row = screen.getByText('Shield').closest('[data-prepared]');
+    expect(row).toHaveAttribute('data-prepared', 'false');
+    expect(favorite).toHaveAttribute('aria-pressed', 'false');
+    expect(favorite).toHaveClass('pointer-coarse:min-h-11');
+    fireEvent.click(favorite);
+    expect(favorite).toHaveAttribute('aria-pressed', 'true');
+    expect(row).not.toHaveClass('bg-brass-bg');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare' }));
+    expect(
+      screen.getByRole('button', { name: 'Prepared' })
+    ).toBeInTheDocument();
+    expect(row).toHaveClass('border-brass-border', 'bg-brass-bg');
+    expect(screen.getByRole('button', { name: 'Prepared' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    fireEvent.click(screen.getByTitle('Switch to detailed view'));
+    const detailed = screen.getByText('Shield').closest('[data-prepared]');
+    expect(detailed).toHaveClass('border-brass-border', 'bg-brass-bg');
+    fireEvent.click(screen.getByRole('button', { name: 'Prepared' }));
+    expect(detailed).not.toHaveClass('bg-brass-bg');
+    fireEvent.click(screen.getByTitle('Switch to compact view'));
+    expect(screen.getByTitle('Cast spell')).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+  });
+
+  it('keeps compact spell names from collapsing on narrow screens', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({ character: makeWizard({ spells: [spell] }) });
+    render(<SpellManagement />);
+
+    // jsdom has no layout. A flex-basis of 0 (flex-1) inside the wrapping
+    // row let the name shrink to 0px below ~500px; flex-auto wraps instead.
+    const name = screen.getByText('Shield');
+    const nameGroup = name.parentElement!;
+    const leftGroup = nameGroup.parentElement!;
+    for (const group of [nameGroup, leftGroup]) {
+      expect(group).toHaveClass('flex-auto');
+      expect(group).not.toHaveClass('flex-1');
+    }
+  });
+
+  it('announces the view toggle by its label alone, without a pressed state', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({ character: makeWizard({ spells: [spell] }) });
+    render(<SpellManagement />);
+
+    const toggle = screen.getByTitle('Switch to detailed view');
+    expect(toggle).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(toggle);
+    expect(screen.getByTitle('Switch to compact view')).not.toHaveAttribute(
+      'aria-pressed'
+    );
+  });
+
+  it('shows the search icon inside the search field', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({ character: makeWizard({ spells: [spell] }) });
+    render(<SpellManagement />);
+
+    // The icon must be drawn by Input itself: a sibling placed before
+    // Input sits under the field's background and can't be seen.
+    const search = screen.getByPlaceholderText(/^Search spells by name/);
+    expect(
+      search.parentElement!.querySelector('.lucide-search')
+    ).not.toBeNull();
+  });
+});

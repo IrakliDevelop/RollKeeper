@@ -16,6 +16,7 @@ export interface InitiativeRollPromptProps {
   /** Resolve false to show the inline error and keep the prompt open. */
   onSubmit: (value: number) => Promise<boolean>;
   onDismiss: () => void;
+  embedded?: boolean;
 }
 
 /** Floating "roll for initiative" card — mounted on the sheet and the VTT. */
@@ -24,6 +25,7 @@ export function InitiativeRollPrompt({
   modifier,
   onSubmit,
   onDismiss,
+  embedded = false,
 }: InitiativeRollPromptProps) {
   const [value, setValue] = useState('');
   const [breakdown, setBreakdown] = useState<string | null>(null);
@@ -50,7 +52,13 @@ export function InitiativeRollPrompt({
   };
 
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed bottom-4 left-1/2 z-40 w-[min(92vw,380px)] -translate-x-1/2 rounded-2xl border p-3 shadow-xl">
+    <div
+      className={
+        embedded
+          ? 'bg-surface-raised border-divider pointer-events-auto w-full rounded-md border p-3'
+          : 'bg-surface-raised border-divider pointer-events-auto fixed bottom-4 left-1/2 z-40 w-[min(92vw,380px)] -translate-x-1/2 rounded-2xl border p-3 shadow-xl'
+      }
+    >
       <div className="mb-2 flex items-start justify-between gap-2">
         <p className="text-heading text-sm font-semibold">
           {request.encounterName}: roll for initiative!

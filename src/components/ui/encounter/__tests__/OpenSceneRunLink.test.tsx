@@ -76,10 +76,9 @@ describe('"Open scene run" library affordance (D10)', () => {
       '/dm/campaign/CAMP/table?scene=scene-1&run=run-0'
     );
     // The original encounter link is unchanged (never redirected).
-    expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute(
-      'href',
-      '/dm/campaign/CAMP/encounters/enc-1'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Open Old fight' })
+    ).toHaveAttribute('href', '/dm/campaign/CAMP/encounters/enc-1');
   });
 
   it('keeps an imported workspace selection in the link', () => {

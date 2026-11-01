@@ -20,6 +20,34 @@ const initiative = {
 };
 
 describe('Table command validation', () => {
+  it('accepts optional public combat generations and rejects invalid values', () => {
+    for (const combatGeneration of [0, 1, 99]) {
+      expect(
+        parseTableCommand({
+          ...base,
+          type: 'publishInitiative',
+          runId: 'run-1',
+          initiative: { ...initiative, combatGeneration },
+        })
+      ).not.toBeNull();
+    }
+    for (const combatGeneration of [
+      -1,
+      1.5,
+      '1',
+      Number.MAX_SAFE_INTEGER + 1,
+    ]) {
+      expect(
+        parseTableCommand({
+          ...base,
+          type: 'publishInitiative',
+          runId: 'run-1',
+          initiative: { ...initiative, combatGeneration },
+        })
+      ).toBeNull();
+    }
+  });
+
   it('accepts masked initiative and rejects private or unmasked fields', () => {
     expect(
       parseTableCommand({

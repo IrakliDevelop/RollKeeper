@@ -46,7 +46,7 @@ describe('custom combat statuses', () => {
     const user = userEvent.setup();
     render(<CombatConfigDialog open onOpenChange={vi.fn()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Custom conditions' }));
+    await user.click(screen.getByRole('tab', { name: 'Custom conditions' }));
     await user.click(screen.getByRole('button', { name: 'Add condition' }));
     await user.type(screen.getByLabelText('Condition name'), 'Cursed Blood');
     await user.type(
@@ -71,6 +71,43 @@ describe('custom combat statuses', () => {
         kind: 'debuff',
       },
     ]);
+  });
+
+  it('switches config tabs with the arrow key and returns to visibility on reopen', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <CombatConfigDialog open onOpenChange={vi.fn()} />
+    );
+    const visibility = screen.getByRole('tab', { name: 'Player visibility' });
+    visibility.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(
+      screen.getByRole('tab', { name: 'Custom conditions' })
+    ).toHaveFocus();
+    expect(
+      screen.getByRole('tab', { name: 'Custom conditions' })
+    ).toHaveAttribute('data-state', 'active');
+    rerender(<CombatConfigDialog open={false} onOpenChange={vi.fn()} />);
+    rerender(<CombatConfigDialog open onOpenChange={vi.fn()} />);
+    expect(
+      screen.getByRole('tab', { name: 'Player visibility' })
+    ).toHaveAttribute('data-state', 'active');
+  });
+
+  it('names each editable HP band and removes the chosen row without losing focus', async () => {
+    const user = userEvent.setup();
+    render(<CombatConfigDialog open onOpenChange={vi.fn()} />);
+    await user.click(screen.getByRole('radio', { name: /State label/i }));
+    expect(
+      screen.getByRole('textbox', { name: 'Band 1 threshold (%)' })
+    ).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Band 1 label' })).toHaveValue(
+      'Healthy'
+    );
+    const remove = screen.getByRole('button', { name: 'Remove Healthy band' });
+    await user.click(remove);
+    expect(screen.queryByDisplayValue('Healthy')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add band' })).toHaveFocus();
   });
 
   it('offers saved conditions in the combatant palette and applies icon + description', async () => {

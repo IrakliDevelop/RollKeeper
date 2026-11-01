@@ -31,3 +31,11 @@ Claude Code specifically:
 Run this gate (`/rollkeeper-manual-browser`,
 `.claude/skills/rollkeeper-manual-browser/SKILL.md`) after automated checks
 pass and before calling the PR complete or ready to merge.
+
+## Copy review gate — Claude-specific rules
+
+Before opening a PR that adds or changes user-visible text, dispatch the
+`rollkeeper-copy-reviewer` subagent with the PR's base branch, and apply its
+rewrites to strings this branch introduced. Use `/rollkeeper-copy` whenever
+you write UI text, not only at review time. Report the verdict in the final
+summary and the PR body.

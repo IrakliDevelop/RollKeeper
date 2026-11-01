@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { ArmorItem } from '@/types/character';
-import { ChevronDown, ChevronRight, Edit2, Trash2, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 
@@ -24,58 +24,53 @@ export function ArmorRow({
   const totalAC = armor.baseAC + (armor.enhancementBonus || 0);
 
   return (
-    <div
-      className={`rounded-lg border-2 transition-all ${
-        armor.isEquipped
-          ? 'border-accent-blue-border-strong bg-surface-raised'
-          : 'border-divider bg-surface-raised hover:border-divider-strong'
-      }`}
-    >
-      {/* Collapsed summary */}
+    <div className="border-divider border-b py-2" data-inventory-row={armor.id}>
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-3 p-3 text-left"
+        aria-label={`Details: ${armor.name}`}
+        aria-expanded={isExpanded}
+        className="flex w-full min-w-0 items-start gap-2 px-3 py-2 text-left pointer-coarse:min-h-11"
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-muted shrink-0">
-            {isExpanded ? (
-              <ChevronDown size={16} />
-            ) : (
-              <ChevronRight size={16} />
+        <span className="text-muted mt-1 shrink-0" aria-hidden="true">
+          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="text-heading block font-semibold break-words">
+            {armor.name}
+          </span>
+          <div className="text-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span>AC {totalAC}</span>
+            <span className="capitalize">{armor.category}</span>
+            {armor.enhancementBonus > 0 && (
+              <span>+{armor.enhancementBonus}</span>
             )}
-          </span>
-          <h4 className="text-heading truncate font-semibold">{armor.name}</h4>
-          {armor.enhancementBonus > 0 && (
-            <Badge variant="warning" size="sm">
-              +{armor.enhancementBonus}
-            </Badge>
-          )}
-          {armor.isEquipped && (
-            <Badge variant="success" size="sm">
-              Equipped
-            </Badge>
-          )}
-          {armor.requiresAttunement && (
-            <Badge
-              variant={armor.isAttuned ? 'primary' : 'secondary'}
-              size="sm"
-            >
-              {armor.isAttuned ? 'Attuned' : 'Attune'}
-            </Badge>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="text-heading text-sm font-bold">AC {totalAC}</span>
-          <span className="text-muted hidden text-xs capitalize sm:inline">
-            {armor.category}
-          </span>
+            {armor.isEquipped && (
+              <Badge variant="neutral" size="sm">
+                Equipped
+              </Badge>
+            )}
+            {armor.requiresAttunement && (
+              <Badge variant="neutral" size="sm">
+                {armor.isAttuned ? 'Attuned' : 'Not attuned'}
+              </Badge>
+            )}
+          </div>
         </div>
       </button>
 
-      {/* Expanded detail */}
+      <div className="px-3 pb-2">
+        <Button
+          onClick={() => onToggleEquip(armor.id, !armor.isEquipped)}
+          variant="outline"
+          size="sm"
+        >
+          {armor.isEquipped ? 'Unequip' : 'Equip'}
+        </Button>
+      </div>
+
       {isExpanded && (
-        <div className="border-divider space-y-3 border-t px-4 pt-3 pb-4">
+        <div className="border-divider space-y-3 border-t px-3 pt-3 pb-4">
           <div className="text-muted flex flex-wrap gap-3 text-sm">
             <span>Base AC: {armor.baseAC}</span>
             {armor.enhancementBonus > 0 && (
@@ -89,22 +84,22 @@ export function ArmorRow({
 
           <div className="flex flex-wrap gap-2">
             {armor.stealthDisadvantage && (
-              <Badge variant="danger" size="sm">
-                Stealth Disadvantage
+              <Badge variant="warning" size="sm">
+                Stealth disadvantage
               </Badge>
             )}
             {armor.strengthRequirement && (
-              <Badge variant="warning" size="sm">
+              <Badge variant="neutral" size="sm">
                 Str {armor.strengthRequirement}
               </Badge>
             )}
             {armor.maxDexBonus !== undefined && armor.maxDexBonus !== null && (
-              <Badge variant="info" size="sm">
+              <Badge variant="neutral" size="sm">
                 Max Dex +{armor.maxDexBonus}
               </Badge>
             )}
             {armor.weight && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="neutral" size="sm">
                 {armor.weight} lb
               </Badge>
             )}
@@ -119,14 +114,11 @@ export function ArmorRow({
 
           <div className="border-divider flex flex-wrap items-center gap-2 border-t pt-3">
             <Button
-              onClick={() => onToggleEquip(armor.id, !armor.isEquipped)}
-              variant={armor.isEquipped ? 'success' : 'outline'}
+              onClick={() => onEdit(armor)}
+              variant="outline"
               size="sm"
+              aria-label={`Edit ${armor.name}`}
             >
-              <Shield size={14} className="mr-1" />
-              {armor.isEquipped ? 'Equipped' : 'Equip'}
-            </Button>
-            <Button onClick={() => onEdit(armor)} variant="outline" size="sm">
               <Edit2 size={14} className="mr-1" />
               Edit
             </Button>
@@ -134,9 +126,10 @@ export function ArmorRow({
               onClick={() => onDelete(armor.id)}
               variant="danger"
               size="sm"
+              aria-label={`Delete ${armor.name}`}
             >
               <Trash2 size={14} className="mr-1" />
-              Delete
+              Delete item
             </Button>
           </div>
         </div>

@@ -126,6 +126,21 @@ function renderControls(options: {
 const status = () => screen.getByRole('status', { name: 'What players see' });
 
 describe('Table presentation controls (PR04 P4)', () => {
+  it('prioritizes showing the selected scene over revealing a different blanked scene', async () => {
+    renderControls({ current: descriptor('scene-tavern', true) });
+    const reveal = await screen.findByRole('button', { name: 'Reveal Tavern' });
+    const show = screen.getByRole('button', { name: 'Show this scene' });
+    expect(show).toHaveAttribute('data-variant', 'primary');
+    expect(reveal).toHaveAttribute('data-variant', 'secondary');
+    expect(document.querySelectorAll('[data-variant="primary"]')).toHaveLength(
+      1
+    );
+    expect(
+      show.compareDocumentPosition(
+        screen.getByRole('button', { name: 'Open display' })
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
   it('separates the public audience from private preparation', async () => {
     renderControls({});
     expect(await screen.findByText('Players see: Tavern')).toBeVisible();

@@ -652,3 +652,23 @@ describe('hasPlayerDataChanged', () => {
     ).toBe(false);
   });
 });
+
+it('syncs walking-speed changes so DM and player movement budgets agree', () => {
+  const entity = createMockEncounterEntity({
+    type: 'player',
+    walkingSpeed: 30,
+  });
+  const updates = mergePlayerSyncData(
+    entity,
+    createMockPlayerData({
+      characterData: createMockCharacterState({ speed: 40 }),
+    })
+  );
+  expect(updates?.walkingSpeed).toBe(40);
+  expect(
+    hasPlayerDataChanged(
+      { ...entity, ...updates, walkingSpeed: 30 },
+      updates ?? {}
+    )
+  ).toBe(true);
+});

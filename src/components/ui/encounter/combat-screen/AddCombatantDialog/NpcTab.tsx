@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import type {
   CampaignNPC,
   EncounterEntity,
@@ -13,6 +14,7 @@ import { useNPCStore } from '@/store/npcStore';
 import { buildNpcEntity } from './buildEntity';
 import { SharedOptions } from './SharedOptions';
 import { SavedCreaturePicker } from './SavedCreaturePicker';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface NpcTabProps {
   npcs: CampaignNPC[];
@@ -22,6 +24,7 @@ interface NpcTabProps {
 
 export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
   const [creatingNpc, setCreatingNpc] = useState(false);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
   const [npcName, setNpcName] = useState('');
   const [npcHp, setNpcHp] = useState('10');
   const [npcAc, setNpcAc] = useState('10');
@@ -31,18 +34,15 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
   const [playerAlias, setPlayerAlias] = useState('');
   const [disposition, setDisposition] = useState<PlayerDisposition>('enemy');
 
-  const { getNPCsForCampaign, createNPC, deleteNPC } = useNPCStore();
-  const storedNpcs = useMemo(
-    () => (campaignCode ? getNPCsForCampaign(campaignCode) : []),
-    [campaignCode, getNPCsForCampaign]
+  const { createNPC, deleteNPC } = useNPCStore();
+  // Subscribe to the campaign's list itself so deletes and new NPCs show up
+  // while the tab is open. No `?? []` here: a fresh array would re-render forever.
+  const campaignNpcs = useNPCStore(state =>
+    campaignCode ? state.npcsByCampaign[campaignCode] : undefined
   );
   const allNpcs = useMemo(
-    () =>
-      [
-        ...npcs,
-        ...storedNpcs.filter(sn => !npcs.some(n => n.id === sn.id)),
-      ].filter(npc => (npc.kind ?? 'npc') === 'npc'),
-    [npcs, storedNpcs]
+    () => (campaignNpcs ?? npcs).filter(npc => (npc.kind ?? 'npc') === 'npc'),
+    [campaignNpcs, npcs]
   );
 
   const handleCreateNpc = () => {
@@ -74,20 +74,24 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
     );
   };
 
-  const handleDelete = (npc: CampaignNPC) => {
-    if (confirm(`Delete "${npc.name}"?`) && campaignCode) {
-      deleteNPC(campaignCode, npc.id);
-    }
+  const handleDelete = async (npc: CampaignNPC) => {
+    if (!campaignCode) return false;
+    const confirmed = await confirmDialog({
+      title: `Delete ${npc.name}?`,
+      message: "This can't be undone.",
+      confirmLabel: 'Delete NPC',
+      tone: 'danger',
+    });
+    if (confirmed) deleteNPC(campaignCode, npc.id);
+    return confirmed;
   };
 
   return (
     <div className="space-y-3 pb-4">
       {/* Create NPC toggle / form */}
       {creatingNpc ? (
-        <div className="border-accent-amber-border bg-surface-raised space-y-3 rounded-[13px] border-[1.5px] p-3">
-          <p className="text-heading text-sm font-semibold">
-            Create Permanent NPC
-          </p>
+        <div className="border-divider space-y-3 border-t pt-4">
+          <p className="text-heading text-sm font-semibold">Create NPC</p>
           <Input
             value={npcName}
             onChange={e => setNpcName(e.target.value)}
@@ -96,11 +100,14 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
             autoFocus
           />
           <div className="grid grid-cols-3 gap-3">
-            <Input
-              value={npcHp}
-              onChange={e => setNpcHp(e.target.value)}
+            <NumberInput
+              value={npcHp === '' ? undefined : Number(npcHp)}
+              onChange={value =>
+                setNpcHp(value === undefined ? '' : String(value))
+              }
               label="HP"
-              type="number"
+              allowEmpty
+              min={0}
             />
             <Input
               value={npcAc}
@@ -140,13 +147,15 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
           </div>
         </div>
       ) : (
-        <button
+        <Button
+          ref={createButtonRef}
+          variant="secondary"
+          fullWidth
           onClick={() => setCreatingNpc(true)}
-          className="border-accent-amber-border-strong bg-accent-amber-bg text-accent-amber-text flex w-full items-center justify-center gap-1.5 rounded-[13px] border-[1.5px] border-dashed py-3 text-sm font-extrabold"
+          leftIcon={<Plus size={16} />}
         >
-          <Plus size={14} />
-          Create New NPC
-        </button>
+          Create NPC
+        </Button>
       )}
 
       {/* SharedOptions (when not creating) */}
@@ -167,6 +176,7 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
           emptyMessage="No NPCs yet. Create one to reuse across encounters."
           onSelect={handleAddNpc}
           onDelete={handleDelete}
+          onDeleteFallbackFocus={() => createButtonRef.current?.focus()}
         />
       )}
     </div>

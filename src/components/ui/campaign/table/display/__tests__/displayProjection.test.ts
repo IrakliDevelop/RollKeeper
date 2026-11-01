@@ -1,7 +1,7 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ElementStore, type CanvasElement } from '@fieldnotes/core';
-import { SyncClient } from '@fieldnotes/sync';
+import { SyncClient, createCurrentCapabilities } from '@fieldnotes/sync';
 import { createGrid } from '@fieldnotes/vtt';
 
 import {
@@ -25,7 +25,8 @@ function shape(id: string, extra: Record<string, unknown> = {}) {
     shape: 'rectangle',
     position: { x: 0, y: 0 },
     size: { w: 10, h: 10 },
-    zIndex: 0,
+    index: 'a0',
+    version: 1,
     locked: false,
     layerId: 'annotations',
     ...extra,
@@ -33,6 +34,7 @@ function shape(id: string, extra: Record<string, unknown> = {}) {
 }
 const token = (id: string, physical: boolean) =>
   shape(id, {
+    index: 'a1',
     tokenKind: 'combatant',
     entityId: `member-${id}`,
     sceneMemberId: `member-${id}`,
@@ -143,17 +145,28 @@ describe('display projection (M2)', () => {
 
   it('never writes back: viewport-store writes are not observed by the sync client', () => {
     const sent: string[] = [];
+    let receive: (message: string) => void = () => {};
     const client = new SyncClient({
       store: source,
       transport: {
         send: message => sent.push(message),
-        onMessage: () => () => {},
+        onMessage: handler => {
+          receive = handler;
+          return () => {};
+        },
         close: () => {},
       },
       clientId: 'display-CAMP1',
+      flushIntervalMs: 0,
       elementRegistry: fieldnotesElementRegistry,
     });
     client.start();
+    receive(
+      JSON.stringify({
+        from: 'hub',
+        op: { kind: 'capabilities', capabilities: createCurrentCapabilities([]) },
+      })
+    );
     sent.length = 0;
     // Positive control: a local write to the source store is sent.
     source.add(shape('local-source'));

@@ -34,6 +34,8 @@ export default function InventoryManager({
         onSendItem={onSendItem}
         overrideTotalWeight={calculateTotalWeight(character)}
         overrideTotalValue={calculateTotalValue(character)}
+        sheetSummary
+        locationScopeId={character.id}
         readonly={false}
         compact={false}
         hideAddButton={false}

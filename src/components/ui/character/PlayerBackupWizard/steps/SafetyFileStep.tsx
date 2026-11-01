@@ -56,7 +56,7 @@ export function SafetyFileStep({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase">
+          <p className="text-muted mb-0.5 text-[11px] font-bold">
             <span className="lg:hidden">{view.compactStepLabel}</span>
             <span className="hidden lg:inline">{COPY.safety.eyebrow}</span>
           </p>
@@ -88,12 +88,12 @@ export function SafetyFileStep({
       {safety.receipt === 'still-matches' ? (
         <div
           role="status"
-          className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4"
+          className="border-verdigris-border bg-verdigris-bg rounded-md border p-4"
         >
-          <p className="text-accent-emerald-text text-sm font-semibold">
+          <p className="text-verdigris-text text-sm font-semibold">
             {COPY.safety.verifiedTitle}
           </p>
-          <p className="text-accent-emerald-text mt-1 text-[13px]">
+          <p className="text-verdigris-text mt-1 text-[13px]">
             {COPY.safety.stillMatches}
           </p>
         </div>
@@ -102,12 +102,12 @@ export function SafetyFileStep({
       {safety.receipt === 'checked' ? (
         <div
           role="status"
-          className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4"
+          className="border-verdigris-border bg-verdigris-bg rounded-md border p-4"
         >
-          <p className="text-accent-emerald-text text-sm font-semibold">
+          <p className="text-verdigris-text text-sm font-semibold">
             {COPY.safety.verifiedTitle}
           </p>
-          <p className="text-accent-emerald-text mt-1 text-[13px]">
+          <p className="text-verdigris-text mt-1 text-[13px]">
             {COPY.safety.verifiedDescription}
           </p>
         </div>
@@ -118,18 +118,18 @@ export function SafetyFileStep({
           ref={alertRef}
           role="alert"
           tabIndex={-1}
-          className="border-accent-red-border bg-accent-red-bg flex items-start gap-3 rounded-lg border p-4"
+          className="border-blood-border bg-blood-bg flex items-start gap-3 rounded-md border p-4"
         >
           <AlertTriangle
             size={18}
-            className="text-accent-red-text mt-px shrink-0"
+            className="text-blood-text mt-px shrink-0"
             aria-hidden="true"
           />
           <div>
-            <p className="text-accent-red-text text-sm font-semibold">
+            <p className="text-blood-text text-sm font-semibold">
               {COPY.safety.mismatchTitle}
             </p>
-            <p className="text-accent-red-text mt-1 text-[13px]">
+            <p className="text-blood-text mt-1 text-[13px]">
               {COPY.safety.mismatchDescription}
             </p>
             <Button
@@ -144,7 +144,7 @@ export function SafetyFileStep({
       ) : null}
 
       {pending ? (
-        <div className="border-divider bg-surface flex flex-col gap-3.5 rounded-lg border p-4">
+        <div className="border-divider flex flex-col gap-3.5 border-b py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-heading text-sm font-medium">
@@ -179,7 +179,7 @@ export function SafetyFileStep({
                 aria-label={COPY.safety.fileInput}
                 type="file"
                 accept="application/json,.json"
-                className="text-muted border-divider bg-surface-secondary block w-full rounded-lg border-2 border-dashed px-3 py-2 text-sm"
+                className="text-muted border-divider bg-surface-secondary block w-full rounded-md border-2 border-dashed px-3 py-2 text-sm"
                 onChange={event => {
                   const file = event.target.files?.[0];
                   if (file) onChooseSafetyFile(file);
@@ -214,7 +214,7 @@ export function SafetyFileStep({
                 aria-label={COPY.safety.extraFileInput}
                 type="file"
                 accept="application/json,.json"
-                className="text-muted border-divider bg-surface-secondary block w-full rounded-lg border-2 border-dashed px-3 py-2 text-sm"
+                className="text-muted border-divider bg-surface-secondary block w-full rounded-md border-2 border-dashed px-3 py-2 text-sm"
                 onChange={event => {
                   const file = event.target.files?.[0];
                   if (file) onChooseCurrentCharacterFile(file);

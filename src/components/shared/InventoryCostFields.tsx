@@ -24,15 +24,16 @@ export function InventoryCostFields({
   const linked = value && items.find(item => item.id === value.inventoryItemId);
 
   return (
-    <div className="border-divider bg-surface-secondary space-y-2 rounded-lg border p-3">
+    <div className="border-divider min-w-0 space-y-2 border-t pt-3">
       <div>
         <p className="text-heading text-sm font-medium">Inventory cost</p>
         <p className="text-muted text-xs">
-          Automatically consume an inventory item when this is used.
+          Uses up an inventory item each time.
         </p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="grid min-w-0 grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto] [&>*]:min-w-0">
         <SelectField
+          triggerProps={{ 'aria-label': 'Inventory cost' }}
           value={value?.inventoryItemId ?? NONE}
           onValueChange={itemId =>
             onChange(
@@ -56,14 +57,14 @@ export function InventoryCostFields({
             onChange={quantity =>
               onChange({ ...value, quantity: Math.max(1, quantity ?? 1) })
             }
-            className="w-20"
+            wrapperClassName="w-24 max-w-full"
             aria-label="Inventory quantity consumed per use"
             title="Quantity consumed per use"
           />
         )}
       </div>
       {value && !linked && (
-        <p className="text-accent-red-text-muted text-xs">
+        <p className="text-ember-text text-xs">
           The linked inventory item is missing. Choose another item or remove
           the cost.
         </p>

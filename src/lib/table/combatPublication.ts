@@ -44,6 +44,7 @@ export function buildScenePublication(
     { ...model.encounter, name: '' },
     config
   );
+  initiative.combatGeneration = model.run.combatGeneration ?? 0;
   // N1: loaded snapshot without this player's data → broadcast the entry
   // with NO HP fields (never 0 HP / dead derived from missing data).
   const unavailable = new Set(

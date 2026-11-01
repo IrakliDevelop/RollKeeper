@@ -11,7 +11,11 @@ import * as React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { inputVariants, type InputVariants } from '../primitives/variants';
+import {
+  inputVariants,
+  OVERLAY_SURFACE,
+  type InputVariants,
+} from '../primitives/variants';
 
 const Select = SelectPrimitive.Root;
 
@@ -31,6 +35,7 @@ const SelectTrigger = React.forwardRef<
 >(({ className, children, variant, size = 'md', ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
+    aria-invalid={variant === 'error' || undefined}
     className={cn(
       inputVariants({ variant, size }),
       'flex items-center justify-between [&>span]:line-clamp-1',
@@ -54,8 +59,9 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'border-divider-strong bg-surface-raised text-heading relative z-50 min-w-[8rem] overflow-hidden rounded-lg border-2 shadow-lg',
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        OVERLAY_SURFACE,
+        'text-heading relative z-50 min-w-[8rem] overflow-hidden',
+        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-180 ease-out',
         position === 'popper' &&
           'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
         className
@@ -108,8 +114,12 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-default items-center rounded-md py-2 pr-2 pl-8 text-sm outline-none select-none',
-      'focus:bg-surface-hover focus:text-heading',
+      'relative flex w-full cursor-default items-center rounded-sm py-2 pr-2 pl-8 text-sm outline-hidden select-none',
+      // The highlighted row (arrow keys or pointer) gets the hover surface and
+      // a brass inset outline: on felt, surface-hover alone barely shows on
+      // the elevated menu. outline-hidden turns the outline style off, so the
+      // highlighted state turns it back on with outline-solid.
+      'data-[highlighted]:bg-surface-hover data-[highlighted]:text-heading data-[highlighted]:outline-ring data-[highlighted]:outline-2 data-[highlighted]:-outline-offset-2 data-[highlighted]:outline-solid',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
@@ -117,7 +127,7 @@ const SelectItem = React.forwardRef<
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4 text-emerald-600" />
+        <Check className="text-brass-text h-4 w-4" />
       </SelectPrimitive.ItemIndicator>
     </span>
 
@@ -212,15 +222,26 @@ const SelectField = React.forwardRef<
     },
     ref
   ) => {
+    const generatedId = React.useId();
+    const triggerId = triggerProps?.id ?? `${generatedId}-trigger`;
+    const messageId = `${generatedId}-message`;
+    const message = error || helperText;
     const triggerVariant = error ? 'error' : triggerProps?.variant;
+    const describedBy =
+      [triggerProps?.['aria-describedby'], message ? messageId : undefined]
+        .filter(Boolean)
+        .join(' ') || undefined;
 
     return (
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
-          <label className="text-heading mb-1.5 block text-sm font-medium">
+          <label
+            className="text-heading mb-1.5 block text-sm font-medium"
+            htmlFor={triggerId}
+          >
             {label}
             {required && (
-              <span className="ml-1 text-red-500" aria-label="required">
+              <span className="text-blood-text ml-1" aria-label="required">
                 *
               </span>
             )}
@@ -228,20 +249,27 @@ const SelectField = React.forwardRef<
         )}
 
         <Select {...props}>
-          <SelectTrigger {...triggerProps} variant={triggerVariant} ref={ref}>
+          <SelectTrigger
+            {...triggerProps}
+            id={triggerId}
+            variant={triggerVariant}
+            aria-describedby={describedBy}
+            ref={ref}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent {...contentProps}>{children}</SelectContent>
         </Select>
 
-        {(error || helperText) && (
+        {message && (
           <p
+            id={messageId}
             className={cn(
               'mt-1.5 text-sm',
-              error ? 'text-red-600 dark:text-red-400' : 'text-body'
+              error ? 'text-blood-text' : 'text-body'
             )}
           >
-            {error || helperText}
+            {message}
           </p>
         )}
       </div>

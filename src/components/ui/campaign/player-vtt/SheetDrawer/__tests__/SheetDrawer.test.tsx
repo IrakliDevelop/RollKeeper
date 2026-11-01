@@ -38,14 +38,30 @@ const props = () => ({
     onCancelPlacement: vi.fn(),
   },
 });
+const INITIAL_CHARACTER = useCharacterStore.getState().character;
+
 beforeEach(() => {
   window.localStorage.clear();
-  const base = useCharacterStore.getState().character;
-  useCharacterStore
-    .getState()
-    .loadCharacterState({ ...base, name: 'Kaelen Voss' } as CharacterState);
+  // The abilities' score editor asks for (min-width: 640px); jsdom has no
+  // matchMedia.
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+  );
+  useCharacterStore.getState().loadCharacterState({
+    ...INITIAL_CHARACTER,
+    name: 'Kaelen Voss',
+  } as CharacterState);
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('SheetDrawer', () => {
   it('opens as a dialog named after the character, locked', () => {
@@ -53,15 +69,24 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: /kaelen voss/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('shows and dismisses the editing banner', () => {
     render(<SheetDrawer {...props()} />);
-    fireEvent.click(screen.getByRole('button', { name: /locked/i }));
-    expect(screen.getByText(/editing unlocked/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
+    expect(
+      screen.getByText(/changes save and sync to the dm/i)
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^done$/i }));
-    expect(screen.queryByText(/editing unlocked/i)).toBeNull();
+    expect(screen.queryByText(/changes save and sync to the dm/i)).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('confirms a long rest through RestDialog and reports it', () => {
@@ -69,17 +94,40 @@ describe('SheetDrawer', () => {
     render(<SheetDrawer {...p} />);
     fireEvent.click(screen.getByRole('button', { name: /long rest/i }));
     // RestDialog confirm button label — check REST_CONFIG in RestDialog.tsx and match it here.
-    fireEvent.click(screen.getByRole('button', { name: /take long rest/i }));
+    fireEvent.click(screen.getByRole('button', { name: /take a long rest/i }));
     expect(p.onRested).toHaveBeenCalledWith('long');
+  });
+
+  it('promises Pact Magic on a short rest only when the character has it', () => {
+    const { rerender } = render(<SheetDrawer {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: /short rest/i }));
+    expect(
+      screen.getByRole('dialog', { name: /^short rest$/i })
+    ).not.toHaveAccessibleDescription(/Pact Magic/);
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    const base = useCharacterStore.getState().character;
+    useCharacterStore.getState().loadCharacterState({
+      ...base,
+      pactMagic: { slots: { max: 1, used: 0 }, level: 1 },
+    } as CharacterState);
+    rerender(<SheetDrawer {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: /short rest/i }));
+    expect(
+      screen.getByRole('dialog', { name: /^short rest$/i })
+    ).toHaveAccessibleDescription(/restore Pact Magic slots/);
   });
 
   it('resets to locked when reopened', () => {
     const p = props();
     const { rerender } = render(<SheetDrawer {...p} />);
-    fireEvent.click(screen.getByRole('button', { name: /locked/i }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
     rerender(<SheetDrawer {...p} open={false} />);
     rerender(<SheetDrawer {...p} open />);
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('closes via the close button', () => {
@@ -185,7 +233,10 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('renders PartySheet for a party target, resolved from partyMembers', () => {
@@ -203,7 +254,7 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByText(/limited view.*played by sam/i)
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /locked/i })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Edit sheet' })).toBeNull();
   });
 
   it('falls back to a generic party title and missing-member state when the id has no match', () => {
@@ -234,7 +285,10 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
 
     rerender(
       <SheetDrawer
@@ -251,7 +305,7 @@ describe('SheetDrawer', () => {
       screen.getByText(/limited view.*played by sam/i)
     ).toBeInTheDocument();
     expect(screen.getByText('Mace')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /locked/i })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Edit sheet' })).toBeNull();
     expect(p.onClose).not.toHaveBeenCalled();
 
     rerender(
@@ -265,7 +319,10 @@ describe('SheetDrawer', () => {
       screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
     ).toBeInTheDocument();
     expect(screen.queryByText(/played by sam/i)).toBeNull();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
     expect(p.onClose).not.toHaveBeenCalled();
   });
 });

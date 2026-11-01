@@ -2,7 +2,11 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createClient } from 'redis';
-import { createSyncServer, readBearerToken } from '@fieldnotes/sync-server';
+import {
+  createSyncServer,
+  MemoryHubBackend,
+  readBearerToken,
+} from '@fieldnotes/sync-server';
 import type {
   Authenticate,
   AuthContext,
@@ -17,10 +21,16 @@ import { RedisHubFanout, type RedisHashClient } from '@fieldnotes/sync-redis';
 import {
   createFogAuthorityServerExtension,
   createFogServerPlugin,
+  withMovementAuthorize,
+  getMovementVisibility,
 } from '@fieldnotes/vtt/server';
 import { makePolicies } from './policies.js';
 import { TableAccessBatcher } from './authority-access.js';
 import { RedisAuthorityDriver } from './authority-driver.js';
+import {
+  validMovementEnvelope,
+  MOVEMENT_ID_PREFIX,
+} from './authority-validation.js';
 import { verifyBattleMapToken } from './token.js';
 import { tableAuthorityChallengeKey } from './authority-keys.js';
 import { BufferedRedisBackend } from './backend.js';
@@ -323,10 +333,33 @@ export async function startRelay(
     extensions: [createFogAuthorityServerExtension()],
     project(context, state) {
       if (context.role === 'dm') return state;
+      const elementsById = new Map(
+        state.elements.map(element => [element.id, element])
+      );
       return {
         ...state,
         // The SDK strips ownerId after validating this is a true subset.
-        elements: state.elements.filter(element => element.audience !== 'dm'),
+        elements: state.elements.filter(element => {
+          if (
+            element.audience === 'dm' ||
+            getMovementVisibility(element) === 'dm'
+          )
+            return false;
+          const reservedMovement =
+            element.id.startsWith(MOVEMENT_ID_PREFIX) ||
+            (element.type === 'extension' &&
+              element.extensionType === 'vtt:movement');
+          if (!reservedMovement) return true;
+          if (!validMovementEnvelope(element)) return false;
+          const data = (element as { data?: Record<string, unknown> }).data;
+          const target =
+            typeof data?.targetId === 'string'
+              ? elementsById.get(data.targetId)
+              : undefined;
+          // Recompute from this same authoritative state, so hiding or removing
+          // the target retracts its public trail without another client write.
+          return target !== undefined && target.audience !== 'dm';
+        }),
       };
     },
     canReadOwnerId: context => context.role === 'dm',
@@ -335,9 +368,19 @@ export async function startRelay(
     ? new RedisAuthorityDriver(opts.authorityRedis)
     : null;
 
+  const backend = opts.backend ?? new MemoryHubBackend();
+  const authorizeMovement = withMovementAuthorize(policies.authorize, {
+    async getElement(room, id) {
+      const record = await backend.getRecord(room, id);
+      return record?.kind === 'element' ? record.element : undefined;
+    },
+  });
   const { hub, wss, close } = createSyncServer({
     server,
     ...policies,
+    authorize: authorizeMovement,
+    resolveAudience: ({ element }) =>
+      getMovementVisibility(element) === 'dm' ? 'dm' : element.audience,
     authenticate,
     ...(access ? { framePolicy: { authorize: access.authorizeFrame } } : {}),
     ...(authorityDriver
@@ -361,7 +404,7 @@ export async function startRelay(
         }
       : {}),
     plugins,
-    ...(opts.backend ? { backend: opts.backend } : {}),
+    backend,
     ...(opts.fanout ? { fanout: opts.fanout } : {}),
     ...(opts.presenceThrottleMs !== undefined
       ? { presenceThrottleMs: opts.presenceThrottleMs }

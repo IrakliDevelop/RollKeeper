@@ -32,6 +32,10 @@ import { useDmStore } from '@/store/dmStore';
 import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CampaignInfo } from '@/types/campaign';
 import { CampaignSettingsSyncControls } from './CampaignSettingsSyncControls';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-22T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -655,7 +659,8 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     await completeLocalCutover();
 
@@ -818,7 +823,8 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     const { container } = render(<CampaignSettingsHarness />);
     fireEvent.click(
@@ -904,7 +910,8 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     render(<CampaignSettingsHarness />);
     fireEvent.click(
@@ -1040,7 +1047,8 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     render(<CampaignSettingsHarness />);
     fireEvent.click(

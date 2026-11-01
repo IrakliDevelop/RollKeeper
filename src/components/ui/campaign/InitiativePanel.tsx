@@ -27,6 +27,7 @@ interface InitiativePanelProps {
   /** When a battle map is live, link to it from the panel (replaces the
    * bottom banner once the player has joined the map). */
   battleMapHref?: string;
+  bottomReservedHeight?: number;
 }
 
 /** The entity whose turn comes after `fromId` in the turn order (wraps). */
@@ -51,12 +52,23 @@ export function InitiativePanel({
   characterId,
   onEndTurn,
   battleMapHref,
+  bottomReservedHeight = 0,
 }: InitiativePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   // Optimistic end-turn: the entity whose turn we locally advanced past while
   // waiting for the DM's synced state to catch up.
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
-  const { topPx, containerRef, startDrag } = useDraggableY(POS_KEY);
+  const { topPx, containerRef, startDrag } = useDraggableY(
+    POS_KEY,
+    bottomReservedHeight + 120
+  );
+  const [viewportHeight, setViewportHeight] = useState(0);
+  useEffect(() => {
+    const updateHeight = () => setViewportHeight(window.innerHeight);
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
 
   // Load persisted open state (default open).
   useEffect(() => {
@@ -114,11 +126,25 @@ export function InitiativePanel({
     setPendingFrom(state.currentEntityId);
   };
 
+  const maxTop = viewportHeight
+    ? Math.max(8, viewportHeight - bottomReservedHeight - 120)
+    : DEFAULT_TOP;
+  const renderedTop = Math.min(topPx ?? DEFAULT_TOP, maxTop);
+  const panelMaxHeight = viewportHeight
+    ? Math.max(
+        0,
+        Math.min(
+          viewportHeight * 0.7,
+          viewportHeight - bottomReservedHeight - renderedTop - 8
+        )
+      )
+    : undefined;
+
   return (
     <div
       ref={containerRef}
       className="fixed right-0 z-[55] flex"
-      style={{ top: topPx ?? DEFAULT_TOP }}
+      style={{ top: renderedTop }}
     >
       {/* Toggle tab — sticks out to the left of the panel */}
       <button
@@ -127,15 +153,15 @@ export function InitiativePanel({
         title={isOpen ? 'Hide initiative' : 'Show initiative'}
         className={`relative self-center rounded-l-lg border-y-2 border-l-2 px-2.5 py-5 shadow-md transition-colors ${
           isMyTurn
-            ? 'border-accent-amber-border bg-accent-amber-bg text-accent-amber-text animate-pulse'
+            ? 'border-brass-border bg-brass-bg text-brass-text'
             : isOpen
-              ? 'border-accent-red-border bg-accent-red-bg text-accent-red-text'
+              ? 'border-divider-strong bg-surface-elevated text-heading'
               : 'border-divider bg-surface-raised text-muted hover:text-body hover:bg-surface-secondary'
         }`}
       >
         <Swords size={20} />
         {!isOpen && (
-          <span className="bg-accent-red-bg text-accent-red-text border-accent-red-border absolute -top-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border px-1 text-[10px] font-bold">
+          <span className="bg-surface-elevated text-heading border-divider absolute -top-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border px-1 text-[10px] font-bold">
             {state.round}
           </span>
         )}
@@ -146,13 +172,16 @@ export function InitiativePanel({
         className="overflow-hidden transition-[width] duration-300 ease-in-out"
         style={{ width: isOpen ? '240px' : '0px' }}
       >
-        <div className="border-divider bg-surface-raised flex max-h-[70vh] w-[240px] flex-col overflow-hidden rounded-l-xl border-y-2 border-l-2 shadow-lg">
+        <div
+          className="border-divider bg-surface-raised flex w-[240px] flex-col overflow-hidden rounded-l-xl border-y-2 border-l-2 shadow-lg"
+          style={{ maxHeight: panelMaxHeight }}
+        >
           {/* Header — also the vertical drag handle */}
           <div
             onPointerDown={startDrag}
             className="border-divider flex flex-shrink-0 cursor-grab touch-none items-center gap-2 border-b px-3 py-2.5 select-none active:cursor-grabbing"
           >
-            <Swords size={14} className="text-accent-red-text" />
+            <Swords size={14} className="text-muted" />
             <span className="text-heading text-sm font-semibold">
               Combat · Round {state.round}
             </span>

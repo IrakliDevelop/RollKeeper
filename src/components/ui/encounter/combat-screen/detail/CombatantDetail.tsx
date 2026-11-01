@@ -16,18 +16,17 @@ export interface CombatantDetailProps {
   onOpenSheet?: () => void;
   /** Table scene runs: restrict to supported controls (legacy when omitted). */
   capabilities?: CombatantDetailCapabilities;
+  hideNameHeading?: boolean;
 }
 
 export function RegionalEffects({ effects }: { effects: string[] }) {
   if (effects.length === 0) return null;
   return (
     <div className="border-divider space-y-1 border-t p-4">
-      <h4 className="text-heading text-xs font-semibold tracking-wider uppercase">
-        Regional Effects
-      </h4>
+      <h4 className="type-label-heading text-heading">Regional effects</h4>
       <ul className="space-y-1">
         {effects.map((effect, i) => (
-          <li key={i} className="text-body text-xs">
+          <li key={`${effect}-${i}`} className="text-body text-xs">
             {effect}
           </li>
         ))}
@@ -41,6 +40,7 @@ export function CombatantDetail({
   actions,
   onOpenSheet,
   capabilities,
+  hideNameHeading = false,
 }: CombatantDetailProps) {
   const isLair = entity.type === 'lair';
 
@@ -55,7 +55,7 @@ export function CombatantDetail({
           capabilities={capabilities}
         />
         {capabilities.readOnlyNote && (
-          <p className="text-accent-amber-text px-4 pb-2 text-xs font-medium">
+          <p className="text-ember-text px-4 pb-2 text-xs font-medium">
             {capabilities.readOnlyNote}
           </p>
         )}
@@ -69,7 +69,7 @@ export function CombatantDetail({
           actions={actions}
           capabilities={capabilities}
         />
-        <p className="text-faint border-divider border-t px-4 py-2 text-xs">
+        <p className="text-muted border-divider border-t px-4 py-2 text-xs">
           Abilities, resources, rests, inventory and stat blocks are not
           available in scene runs.
         </p>
@@ -84,6 +84,7 @@ export function CombatantDetail({
           entity={entity}
           actions={actions}
           onOpenSheet={onOpenSheet}
+          hideNameHeading={hideNameHeading}
         />
         <DetailActions entity={entity} actions={actions} />
         {entity.regionalEffects && (
@@ -99,6 +100,7 @@ export function CombatantDetail({
         entity={entity}
         actions={actions}
         onOpenSheet={onOpenSheet}
+        hideNameHeading={hideNameHeading}
       />
       <DetailVitals entity={entity} actions={actions} />
       <DetailAbilityScores entity={entity} actions={actions} />

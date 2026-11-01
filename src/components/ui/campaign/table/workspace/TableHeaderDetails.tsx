@@ -9,6 +9,8 @@ import {
 import * as Popover from '@radix-ui/react-popover';
 
 import { Button } from '@/components/ui/forms/button';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { cn } from '@/utils/cn';
 import type {
   TableOfflineForkV1,
   TableSceneRecordV1,
@@ -201,7 +203,10 @@ export function TableHeaderDetails(props: {
           sideOffset={4}
           collisionPadding={8}
           style={{ maxWidth: 'calc(100vw - 16px)' }}
-          className="bg-surface-raised text-body border-divider z-50 flex w-80 flex-col gap-2 rounded-lg border p-3 text-xs shadow-md outline-none"
+          className={cn(
+            OVERLAY_SURFACE,
+            'type-small text-body z-50 flex w-80 flex-col gap-2 p-3 outline-none'
+          )}
           onOpenAutoFocus={event => {
             event.preventDefault();
             focusables(contentRef.current)[0]?.focus();

@@ -42,7 +42,7 @@ function addImageOn(vp: ViewportLike, layerId: string, zIndex = 0): string {
     size: { w: 10, h: 10 },
     src: 'test.png',
     layerId,
-    zIndex,
+    index: zIndex === 0 ? 'a0' : 'a1',
   });
   vp.store.add(el);
   return el.id;
@@ -261,7 +261,7 @@ describe('migrateCanvasToContract', () => {
       size: { w: 10, h: 10 },
       src: 'bg.png',
       layerId: '',
-      zIndex: 0,
+      index: 'a0',
     });
     vp.store.add(strayEmpty);
     vp.store.update(strayEmpty.id, { locked: true });
@@ -270,7 +270,7 @@ describe('migrateCanvasToContract', () => {
       size: { w: 10, h: 10 },
       src: 'bg2.png',
       layerId: 'layer-deleted-legacy',
-      zIndex: 0,
+      index: 'a0',
     });
     vp.store.add(strayDangling);
     vp.store.update(strayDangling.id, { locked: true });
@@ -280,7 +280,7 @@ describe('migrateCanvasToContract', () => {
       size: { w: 10, h: 10 },
       src: 'note.png',
       layerId: '',
-      zIndex: 0,
+      index: 'a0',
     });
     vp.store.add(unlockedStray);
 
@@ -300,7 +300,7 @@ describe('migrateCanvasToContract', () => {
       size: { w: 100, h: 100 },
       src: 'map.png',
       layerId: ANNOTATIONS_LAYER_ID,
-      zIndex: 0,
+      index: 'a0',
     });
     vp.store.add(strandedBg);
     vp.store.update(strandedBg.id, { locked: true });
@@ -310,7 +310,7 @@ describe('migrateCanvasToContract', () => {
       size: { w: 10, h: 10 },
       src: 'trap.png',
       layerId: custom.id,
-      zIndex: 0,
+      index: 'a0',
     });
     vp.store.add(customLocked);
     vp.store.update(customLocked.id, { locked: true });
@@ -319,7 +319,7 @@ describe('migrateCanvasToContract', () => {
       size: { w: 10, h: 10 },
       src: 'sketch.png',
       layerId: ANNOTATIONS_LAYER_ID,
-      zIndex: 0,
+      index: 'a0',
     });
     vp.store.add(plainAnnotation);
 

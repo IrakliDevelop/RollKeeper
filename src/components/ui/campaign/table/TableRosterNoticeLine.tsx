@@ -6,8 +6,8 @@ import type { TableRosterNotice } from './useTableRosterActions';
 
 const TONE_CLASS: Record<TableRosterNotice['tone'], string> = {
   info: 'text-muted',
-  success: 'text-accent-emerald-text',
-  error: 'text-accent-red-text',
+  success: 'text-verdigris-text',
+  error: 'text-blood-text',
 };
 
 /** Polite live region for roster command outcomes (one per visible layer). */

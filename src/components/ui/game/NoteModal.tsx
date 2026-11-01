@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button, RichTextEditor } from '@/components/ui/forms';
 import { ToastData } from '@/components/ui/feedback/Toast';
+import { confirmNoteDeletion } from './confirmNoteDeletion';
 
 interface NoteModalProps {
   note: RichTextContent | null;
@@ -91,12 +92,12 @@ export default function NoteModal({
     onClose();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!note || !onDelete) return;
-    if (window.confirm('Are you sure you want to delete this note?')) {
-      onDelete(note.id);
-      onClose();
-    }
+    const confirmed = await confirmNoteDeletion(note.title);
+    if (!confirmed) return;
+    onDelete(note.id);
+    onClose();
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -124,6 +125,7 @@ export default function NoteModal({
 
           {/* Content */}
           <RichTextEditor
+            ariaLabel="Note content"
             content={editContent}
             onChange={setEditContent}
             placeholder="Write your note here..."

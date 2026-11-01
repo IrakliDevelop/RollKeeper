@@ -35,6 +35,38 @@ const creatures: CampaignNPC[] = [
 afterEach(cleanup);
 
 describe('SavedCreaturePicker', () => {
+  it('shows a clamped plain-text description for saved creatures', () => {
+    render(
+      <SavedCreaturePicker
+        creatures={[
+          {
+            ...creatures[0],
+            description: '<strong>Guard</strong> **at the gate**',
+          },
+        ]}
+        emptyMessage="No creatures"
+        onSelect={vi.fn()}
+      />
+    );
+
+    const preview = screen.getByText('Guard at the gate');
+    expect(preview).toHaveClass('line-clamp-1');
+    expect(preview.textContent).not.toMatch(/<|\*\*/);
+  });
+
+  it('decodes entities in a plain description preview', () => {
+    render(
+      <SavedCreaturePicker
+        creatures={[
+          { ...creatures[0], description: 'Smith &amp; Wesson&nbsp;Guard' },
+        ]}
+        emptyMessage="No creatures"
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Smith & Wesson Guard')).toBeInTheDocument();
+  });
+
   it('advertises name, group, and tag search', () => {
     render(
       <SavedCreaturePicker

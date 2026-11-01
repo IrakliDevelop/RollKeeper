@@ -3,7 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import { AppIcon, type IconName } from '@/components/ui/icons';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import type { RestSlots } from '@/utils/calculations';
+import { cn } from '@/utils/cn';
 
 export interface ToastDetail {
   text: string;
@@ -25,15 +29,65 @@ interface ToastProps {
   onDismiss: (id: string) => void;
 }
 
+/** Enter and exit time; matches duration-180 on the toast. */
+const TOAST_MOTION_MS = 180;
+
+/**
+ * How long a toast's text stays in the live region: long enough for a screen
+ * reader to queue it, short enough that reading the page doesn't meet it
+ * twice.
+ */
+const ANNOUNCE_MS = 1000;
+
+interface ToastRole {
+  /** The 3px left rule. */
+  rule: string;
+  icon: string;
+  /** The countdown bar. */
+  bar: string;
+}
+
+const VERDIGRIS: ToastRole = {
+  rule: 'border-l-verdigris-border',
+  icon: 'text-verdigris-text',
+  bar: 'bg-verdigris-fill',
+};
+const BLOOD: ToastRole = {
+  rule: 'border-l-blood-border',
+  icon: 'text-blood-text',
+  bar: 'bg-blood-fill',
+};
+const NEUTRAL: ToastRole = {
+  rule: 'border-l-input-border',
+  icon: 'text-muted',
+  bar: 'bg-input-border',
+};
+
+/**
+ * Colour carries meaning: healing and success are verdigris, harm and
+ * errors are blood, and rolls and information stay neutral.
+ */
+const TOAST_ROLES: Record<ToastData['type'], ToastRole> = {
+  success: VERDIGRIS,
+  rest: VERDIGRIS,
+  error: BLOOD,
+  damage: BLOOD,
+  attack: NEUTRAL,
+  save: NEUTRAL,
+  info: NEUTRAL,
+};
+
 const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
+  const duration = toast.duration || 5000;
+  const role = TOAST_ROLES[toast.type] ?? NEUTRAL;
 
   const handleDismiss = useCallback(() => {
     setIsExiting(true);
     setTimeout(() => {
       onDismiss(toast.id);
-    }, 300);
+    }, TOAST_MOTION_MS);
   }, [toast.id, onDismiss]);
 
   useEffect(() => {
@@ -43,32 +97,13 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
     // Auto dismiss
     const timer = setTimeout(() => {
       handleDismiss();
-    }, toast.duration || 5000);
+    }, duration);
 
     return () => {
       clearTimeout(visibilityTimer);
       clearTimeout(timer);
     };
-  }, [toast.duration, handleDismiss]);
-
-  const getToastStyles = () => {
-    switch (toast.type) {
-      case 'attack':
-        return 'bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 text-white border-slate-600 shadow-slate-900/50';
-      case 'save':
-        return 'bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white border-blue-500 shadow-blue-900/50';
-      case 'damage':
-        return 'bg-gradient-to-br from-amber-600 via-orange-600 to-orange-700 text-white border-amber-500 shadow-orange-900/50';
-      case 'success':
-        return 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-green-700 text-white border-emerald-400 shadow-emerald-900/50';
-      case 'error':
-        return 'bg-gradient-to-br from-red-600 via-red-700 to-red-800 text-white border-red-500 shadow-red-900/50';
-      case 'rest':
-        return 'bg-gradient-to-br from-indigo-600 via-purple-600 to-violet-700 text-white border-indigo-500 shadow-purple-900/50';
-      default:
-        return 'bg-gradient-to-br from-gray-600 via-gray-700 to-gray-800 text-white border-gray-500 shadow-gray-900/50';
-    }
-  };
+  }, [duration, handleDismiss]);
 
   const getIconName = (): IconName => {
     if (toast.icon) return toast.icon;
@@ -92,103 +127,106 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
     }
   };
 
+  const shown = isVisible && !isExiting;
+
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border-2 shadow-2xl backdrop-blur-sm transition-all duration-300 ease-out ${getToastStyles()} ${isVisible && !isExiting ? 'translate-x-0 scale-100 transform opacity-100' : 'translate-x-full scale-95 transform opacity-0'} ${isExiting ? 'translate-x-full scale-95 transform opacity-0' : ''} max-w-[420px] min-w-[320px]`}
+      data-toast-type={toast.type}
+      className={cn(
+        OVERLAY_SURFACE,
+        'relative max-w-[420px] min-w-[320px] overflow-hidden border-l-[3px] transition-[opacity,translate] duration-180 ease-out',
+        role.rule,
+        shown ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+      )}
     >
-      {/* Animated background pattern */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.3),transparent)]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.2),transparent)]"></div>
-      </div>
-
-      {/* Shimmer effect */}
-      <div className="absolute inset-0 opacity-30">
-        <div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-          style={{
-            animation: 'shimmer 2s ease-in-out infinite',
-            transform: 'translateX(-100%)',
-          }}
+      <div className="flex items-start gap-3 py-3 pr-2 pl-4">
+        <AppIcon
+          name={getIconName()}
+          className={cn('mt-1 h-5 w-5 shrink-0', role.icon)}
         />
-      </div>
 
-      <div className="relative px-5 py-4">
-        <div className="flex items-start gap-3">
-          {/* Icon with glowing effect */}
-          <div className="flex-shrink-0 rounded-lg bg-white/20 p-2 ring-1 ring-white/30 backdrop-blur-sm">
-            <AppIcon
-              name={getIconName()}
-              className="h-[22px] w-[22px] text-white drop-shadow-lg"
-            />
+        <div className="min-w-0 flex-1 pt-0.5">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="text-heading truncate text-lg font-bold tracking-tight">
+              {toast.title}
+            </h4>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={handleDismiss}
+              aria-label="Dismiss notification"
+              className="text-muted hover:text-heading -mt-0.5 size-8 shrink-0 p-0"
+            >
+              <X size={16} aria-hidden />
+            </Button>
           </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <h4 className="truncate text-lg font-bold tracking-tight text-white drop-shadow-md">
-                {toast.title}
-              </h4>
-              <button
-                onClick={handleDismiss}
-                className="flex-shrink-0 rounded-lg p-1.5 text-white/70 ring-1 ring-white/20 transition-all hover:bg-white/20 hover:text-white hover:ring-white/40 active:scale-95"
-                aria-label="Dismiss notification"
-              >
-                <X size={16} />
-              </button>
-            </div>
+          <p className="text-body mt-0.5 text-sm leading-relaxed">
+            {toast.message}
+          </p>
 
-            <p className="mb-2 text-sm leading-relaxed font-medium text-white/95 drop-shadow-sm">
-              {toast.message}
-            </p>
-
-            {toast.details && toast.details.length > 0 && (
-              <div className="mt-3 space-y-1.5 rounded-lg bg-black/20 px-3 py-2 backdrop-blur-sm">
-                {toast.details.map((detail, index) => {
-                  const item =
-                    typeof detail === 'string' ? { text: detail } : detail;
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-start gap-2 text-xs font-medium text-white/90"
-                    >
-                      {item.icon ? (
-                        <AppIcon
-                          name={item.icon}
-                          className="mt-0.5 h-3 w-3 shrink-0 text-white/70"
-                        />
-                      ) : (
-                        <span className="mt-0.5 text-white/60">•</span>
-                      )}
-                      <span>{item.text}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {toast.details && toast.details.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {toast.details.map((detail, index) => {
+                const item =
+                  typeof detail === 'string' ? { text: detail } : detail;
+                return (
+                  <li
+                    key={`${item.text}-${index}`}
+                    className="text-muted flex items-start gap-2 text-xs"
+                  >
+                    {item.icon ? (
+                      <AppIcon
+                        name={item.icon}
+                        className="mt-0.5 h-3 w-3 shrink-0"
+                      />
+                    ) : (
+                      <span className="text-faint mt-0.5" aria-hidden>
+                        •
+                      </span>
+                    )}
+                    <span>{item.text}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
 
-      <div className="absolute right-0 bottom-0 left-0 h-1.5 overflow-hidden bg-black/30">
+      {/* Countdown: a thin role bar, hidden when motion is reduced. */}
+      <div
+        aria-hidden
+        data-toast-countdown
+        className="absolute right-0 bottom-0 left-0 h-0.5 motion-reduce:hidden"
+      >
         <div
-          className="h-full bg-gradient-to-r from-white/80 via-white/60 to-white/80 shadow-lg transition-all ease-linear"
-          style={{
-            width: '100%',
-            animation: `toast-progress ${toast.duration || 5000}ms linear forwards`,
-          }}
+          className={cn('h-full origin-left', role.bar)}
+          style={{ animation: `toast-countdown ${duration}ms linear forwards` }}
         />
       </div>
+    </div>
+  );
+};
 
-      <style>{`
-        @keyframes toast-progress {
-          from { width: 100%; }
-          to { width: 0%; }
-        }
-        @keyframes shimmer {
-          0%, 100% { transform: translateX(-100%); }
-          50% { transform: translateX(100%); }
-        }
-      `}</style>
+/** A text-only copy of a toast for the live region; removes itself. */
+const ToastAnnouncement: React.FC<{ toast: ToastData }> = ({ toast }) => {
+  const [announced, setAnnounced] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnnounced(true), ANNOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (announced) return null;
+  return (
+    <div>
+      <p>{toast.title}</p>
+      <p>{toast.message}</p>
+      {toast.details?.map((detail, index) => {
+        const text = typeof detail === 'string' ? detail : detail.text;
+        return <p key={`${text}-${index}`}>{text}</p>;
+      })}
     </div>
   );
 };
@@ -196,25 +234,70 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 interface ToastContainerProps {
   toasts: ToastData[];
   onDismiss: (id: string) => void;
+  embedded?: boolean;
 }
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({
   toasts,
   onDismiss,
+  embedded = false,
 }) => {
+  // The status region stays mounted, so screen readers announce each toast
+  // as it is added (politely, and only the new one). It holds a text-only
+  // copy, so they hear the title, message and details without the dismiss
+  // button, which stays in the visible toast.
   const content = (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-[100] space-y-2">
+    <div
+      className={
+        embedded
+          ? 'pointer-events-none'
+          : 'pointer-events-none fixed right-4 bottom-4 z-[100]'
+      }
+    >
       <div className="pointer-events-auto space-y-2">
         {toasts.map(toast => (
           <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
         ))}
       </div>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+        className="sr-only"
+      >
+        {toasts.map(toast => (
+          <ToastAnnouncement key={toast.id} toast={toast} />
+        ))}
+      </div>
     </div>
   );
 
-  if (typeof document === 'undefined') return content;
+  if (embedded || typeof document === 'undefined') return content;
   return createPortal(content, document.body);
 };
+
+/**
+ * The long-rest toast, shared by the rest dialog and the calendar (which
+ * adds a line when it advances the day). Slot lines only appear for
+ * characters who have those slots.
+ */
+export function longRestToast(
+  slots: RestSlots,
+  extraDetails: string[] = []
+): Omit<ToastData, 'id'> {
+  return {
+    type: 'rest',
+    title: 'Long rest taken',
+    icon: 'restLong',
+    message: 'Hit points are full and abilities are back',
+    details: [
+      ...(slots.spellSlots ? ['All spell slots restored'] : []),
+      'Hit dice partially restored',
+      ...extraDetails,
+    ],
+    duration: 6000,
+  };
+}
 
 // Hook for managing toasts
 export const useToast = () => {
@@ -334,38 +417,30 @@ export const useToast = () => {
     [addToast]
   );
 
-  const showShortRest = useCallback(() => {
-    addToast({
-      type: 'rest',
-      title: 'Short Rest Complete',
-      icon: 'restShort',
-      message: 'Your character has taken a short rest',
-      details: [
-        'Short rest abilities restored',
-        'Pact Magic slots restored',
-        'Reaction reset',
-        'Ready to continue your adventure!',
-      ],
-      duration: 5000,
-    });
-  }, [addToast]);
+  // Slot lines only appear for characters who have those slots.
+  const showShortRest = useCallback(
+    (slots: RestSlots) => {
+      addToast({
+        type: 'rest',
+        title: 'Short rest taken',
+        icon: 'restShort',
+        message: 'Abilities that recharge on a short rest are back',
+        details: [
+          ...(slots.pactMagic ? ['Pact Magic slots restored'] : []),
+          'Reaction reset',
+        ],
+        duration: 5000,
+      });
+    },
+    [addToast]
+  );
 
-  const showLongRest = useCallback(() => {
-    addToast({
-      type: 'rest',
-      title: 'Long Rest Complete',
-      icon: 'restLong',
-      message: 'Your character has taken a long rest',
-      details: [
-        'All abilities restored',
-        'All spell slots restored',
-        'Hit points fully restored',
-        'Hit dice partially restored',
-        'Ready for new challenges!',
-      ],
-      duration: 6000,
-    });
-  }, [addToast]);
+  const showLongRest = useCallback(
+    (slots: RestSlots) => {
+      addToast(longRestToast(slots));
+    },
+    [addToast]
+  );
 
   return {
     toasts,

@@ -1,12 +1,14 @@
 import { useCallback } from 'react';
 import type { SkinRef } from 'pollyroll';
 import { useDiceRoller } from './useDiceRoller';
+import type { DicePreferences } from '@/types/dice';
 import { RollSummary } from '@/types/dice';
 
 export interface UseSimpleDiceRollOptions {
   containerId?: string;
   skin?: SkinRef;
   dieScale?: number;
+  trayOptions?: DicePreferences;
   autoClearDelay?: number;
   onRollComplete?: (summary: RollSummary) => void;
   onError?: (error: string) => void;
@@ -27,6 +29,7 @@ export function useSimpleDiceRoll({
   containerId = 'main-dice-container',
   skin,
   dieScale,
+  trayOptions,
   autoClearDelay = 1000,
   onRollComplete,
   onError,
@@ -35,6 +38,7 @@ export function useSimpleDiceRoll({
     containerId,
     skin,
     dieScale,
+    trayOptions,
     autoClearDelay,
     onRollComplete,
     onError,

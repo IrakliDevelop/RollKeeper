@@ -91,9 +91,8 @@ describe('CharacterAutomaticSyncControls', () => {
       screen.getByRole('heading', { name: 'Automatic character sync' })
     ).toBeVisible();
     expect(screen.getByText('Cloud: local only')).toBeVisible();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Enable automatic sync for Aster' })
-    );
+    const enable = screen.getByRole('button', { name: 'Enable Aster' });
+    fireEvent.click(enable);
     await waitFor(() =>
       expect(actions.enable).toHaveBeenCalledWith(characters[0])
     );
@@ -111,14 +110,14 @@ describe('CharacterAutomaticSyncControls', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Preview enable all eligible characters',
+        name: 'Preview enable all',
       })
     );
     expect(await screen.findByText('1 eligible character')).toBeVisible();
     expect(actions.confirmAccountEnable).not.toHaveBeenCalled();
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Confirm current and future automatic sync',
+        name: 'Enable automatic sync',
       })
     );
     await waitFor(() =>
@@ -142,6 +141,9 @@ describe('CharacterAutomaticSyncControls', () => {
       />
     );
     expect(screen.getByText(label)).toBeVisible();
+    if (['offline', 'auth-required', 'failed'].includes(status)) {
+      expect(screen.getByRole('button', { name: 'Retry Aster' })).toBeVisible();
+    }
   });
 
   it('offers all explicit conflict actions and quarantine export', () => {
@@ -154,11 +156,9 @@ describe('CharacterAutomaticSyncControls', () => {
       />
     );
     expect(screen.getByText('Cloud: conflict')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Keep my Aster' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep mine Aster' }));
     fireEvent.click(screen.getByRole('button', { name: 'Use cloud Aster' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Keep both Aster versions' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Keep both Aster' }));
     expect(conflict.resolveConflict).toHaveBeenCalledTimes(3);
 
     const quarantined = controller('quarantined');
@@ -171,7 +171,7 @@ describe('CharacterAutomaticSyncControls', () => {
     expect(screen.getByText('Cloud: quarantined')).toBeVisible();
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Download quarantined Aster candidate',
+        name: 'Download quarantined data Aster',
       })
     );
     expect(quarantined.downloadQuarantine).toHaveBeenCalledWith('character-a');

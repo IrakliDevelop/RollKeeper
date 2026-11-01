@@ -23,6 +23,34 @@ function res(overrides: Partial<NpcResource> = {}): NpcResource {
 }
 
 describe('NpcResourceList', () => {
+  it('names pip actions and exposes read-only pips as images', () => {
+    render(
+      <NpcResourceList
+        resources={[res()]}
+        onSpend={vi.fn()}
+        onRestore={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Spend Wild Shape use 1' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Restore Wild Shape use 3' })
+    ).toBeVisible();
+    cleanup();
+    render(
+      <NpcResourceList
+        resources={[res()]}
+        onSpend={vi.fn()}
+        onRestore={vi.fn()}
+        readOnly
+      />
+    );
+    expect(
+      screen.getByRole('img', { name: 'Wild Shape use 1, available' })
+    ).toBeVisible();
+  });
+
   it('pips: clicking an available pip spends 1, a spent pip restores 1', async () => {
     const onSpend = vi.fn();
     const onRestore = vi.fn();
@@ -35,13 +63,29 @@ describe('NpcResourceList', () => {
       />
     );
     await user.click(
-      screen.getByRole('button', { name: 'Wild Shape use 1 (spent)' })
+      screen.getByRole('button', { name: 'Restore Wild Shape use 3' })
     );
     expect(onRestore).toHaveBeenCalledWith('res-1', 1);
     await user.click(
-      screen.getByRole('button', { name: 'Wild Shape use 2 (available)' })
+      screen.getByRole('button', { name: 'Spend Wild Shape use 1' })
     );
     expect(onSpend).toHaveBeenCalledWith('res-1', 1);
+  });
+
+  it('pips: renders one pip per use, even past 20', () => {
+    render(
+      <NpcResourceList
+        resources={[res({ name: 'Sorcery', maxUses: 25, usesExpended: 3 })]}
+        onSpend={vi.fn()}
+        onRestore={vi.fn()}
+      />
+    );
+    expect(screen.getAllByRole('button', { name: /Sorcery use/ })).toHaveLength(
+      25
+    );
+    expect(
+      screen.getByRole('button', { name: 'Restore Sorcery use 23' })
+    ).toBeInTheDocument();
   });
 
   it('pool: renders remaining/max with −/+ and handles large values', async () => {
@@ -102,5 +146,22 @@ describe('NpcResourceList', () => {
       screen.getByRole('button', { name: 'Spend Wild Shape' })
     ).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Restore Ki' })).toBeDisabled();
+  });
+
+  it('keeps NPC resource actions beside the name with coarse targets', () => {
+    render(
+      <NpcResourceList
+        resources={[res()]}
+        onSpend={vi.fn()}
+        onRestore={vi.fn()}
+      />
+    );
+    const pip = screen.getByRole('button', {
+      name: 'Spend Wild Shape use 2',
+    });
+    expect(pip).toHaveClass('pointer-coarse:min-h-11');
+    expect(pip.closest('[data-resource-row]')).toContainElement(
+      screen.getByText('Wild Shape')
+    );
   });
 });

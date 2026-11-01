@@ -52,7 +52,7 @@ export function RecoveryPanel({ view, actions }: RecoveryPanelProps) {
           <h3 className="text-heading text-base font-semibold">
             {COPY.recovery.onlineCopiesTitle}
           </h3>
-          <div className="border-divider mt-3 overflow-hidden rounded-lg border">
+          <div className="border-divider mt-3 overflow-hidden rounded-md border">
             {rows.map(row => (
               <div
                 key={row.id}

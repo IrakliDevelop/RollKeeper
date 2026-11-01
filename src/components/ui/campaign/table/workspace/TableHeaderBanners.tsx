@@ -15,8 +15,8 @@ export interface TableHeaderNotice {
 
 const SAVE_TONE: Record<Exclude<SaveMessageTone, 'routine'>, string> = {
   progress: 'text-muted',
-  success: 'text-accent-emerald-text',
-  failure: 'text-accent-red-text',
+  success: 'text-verdigris-text',
+  failure: 'text-blood-text',
 };
 
 /** O7-3: plain names for the scene fields a conflicted edit touched. */
@@ -72,7 +72,7 @@ export function TableHeaderBanners(props: {
           key={notice.id}
           className="flex flex-wrap items-center gap-x-2 gap-y-1"
         >
-          <p role={notice.tone} className="text-accent-amber-text text-xs">
+          <p role={notice.tone} className="type-small text-ember-text">
             {notice.text}
           </p>
           {notice.action && (
@@ -86,17 +86,20 @@ export function TableHeaderBanners(props: {
       {/* HR-1: one polite region for every non-routine save/scene message. */}
       <div role="status" aria-live="polite" className="empty:hidden">
         {save && save.tone !== 'routine' && (
-          <p className={`text-xs ${SAVE_TONE[save.tone]}`} title={save.detail}>
+          <p
+            className={`type-small ${SAVE_TONE[save.tone]}`}
+            title={save.detail}
+          >
             {save.message}
           </p>
         )}
       </div>
       {conflict && (
         <div
-          className="border-accent-orange-text flex flex-wrap items-center gap-x-2 gap-y-1 rounded border px-2 py-1"
+          className="border-ember-border flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm border px-2 py-1"
           role="alert"
         >
-          <p className="text-accent-orange-text text-xs">
+          <p className="type-small text-ember-text">
             {`This scene changed in another tab or device, so your edit wasn't applied. Your edit changed: ${fieldLabels(conflict.fields)}. Check the newer version, then try your edit again or discard it.`}
           </p>
           <Button

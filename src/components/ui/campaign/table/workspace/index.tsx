@@ -179,6 +179,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
           repository={repository}
           adapter={adapter}
           header={header}
+          sceneBrowserOpen={workspace.browser.open}
           relayStatus={workspace.relayStatus}
           relayLive={workspace.relayLive}
           presentedHere={workspace.presentedHere}
@@ -199,25 +200,27 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
         />
         {/* Outside the keyed canvas: an explicit acquire remounts the canvas
           only, so open dialogs and the command queue survive (F6). */}
-        <TableCombatPanel
-          key={mountedScene.sceneId}
-          repository={repository}
-          sceneId={mountedScene.sceneId}
-          campaignCode={campaignCode}
-          dmId={workspace.dmId}
-          controlSession={authority.session}
-          controlEpoch={authority.controlEpoch}
-          liveUnavailable={
-            (authority.state.phase === 'failed' ||
-              authority.state.phase === 'lost') &&
-            authority.state.reason === 'live-unavailable'
-          }
-          requestedRunId={workspace.requestedRunId}
-          tableWorkspaceId={workspace.query.tableWorkspace}
-          presentation={authority.descriptor?.presentation ?? null}
-          publication={workspace.combat.publication}
-          onCombatBridge={workspace.combat.onCombatBridge}
-        />
+        <div className={workspace.browser.open ? 'max-lg:hidden' : undefined}>
+          <TableCombatPanel
+            key={mountedScene.sceneId}
+            repository={repository}
+            sceneId={mountedScene.sceneId}
+            campaignCode={campaignCode}
+            dmId={workspace.dmId}
+            controlSession={authority.session}
+            controlEpoch={authority.controlEpoch}
+            liveUnavailable={
+              (authority.state.phase === 'failed' ||
+                authority.state.phase === 'lost') &&
+              authority.state.reason === 'live-unavailable'
+            }
+            requestedRunId={workspace.requestedRunId}
+            tableWorkspaceId={workspace.query.tableWorkspace}
+            presentation={authority.descriptor?.presentation ?? null}
+            publication={workspace.combat.publication}
+            onCombatBridge={workspace.combat.onCombatBridge}
+          />
+        </div>
       </TablePlayersCacheProvider>
     ) : null;
 
@@ -290,9 +293,35 @@ function useShownScene(
 }
 
 function WorkspaceShell(props: { header: ReactNode; children: ReactNode }) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  // Before a canvas exists there is no command dock to position overlays.
+  // Hand ownership back to DmVttToolbar when the stage replaces this shell.
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () =>
+      document.documentElement.style.setProperty(
+        '--dm-vtt-panel-top',
+        `${Math.ceil(header.getBoundingClientRect().bottom + 12)}px`
+      );
+    measure();
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(measure);
+    observer?.observe(header);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      document.documentElement.style.removeProperty('--dm-vtt-panel-top');
+    };
+  }, []);
   return (
     <main className="bg-surface flex min-h-screen flex-col">
-      <div className="border-divider border-b">{props.header}</div>
+      <div ref={headerRef} className="border-divider border-b">
+        {props.header}
+      </div>
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         {props.children}
       </div>

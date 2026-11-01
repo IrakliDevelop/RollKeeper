@@ -37,7 +37,7 @@ export function CustomConditionFields({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <ConditionIconPicker
           value={value.icon}
           onChange={icon => onChange({ icon })}
@@ -48,7 +48,7 @@ export function CustomConditionFields({
           aria-label="Condition name"
           placeholder="Condition name"
           maxLength={CUSTOM_CONDITION_NAME_MAX}
-          wrapperClassName="flex-1"
+          wrapperClassName="min-w-36 flex-1"
         />
         <SelectField
           value={value.kind}
@@ -65,7 +65,7 @@ export function CustomConditionFields({
         value={value.description}
         onChange={e => onChange({ description: e.target.value })}
         aria-label="Condition description"
-        placeholder="What it does — players read this on hover."
+        placeholder="Disadvantage on Wisdom checks"
         maxLength={CUSTOM_CONDITION_DESCRIPTION_MAX}
         size="sm"
       />

@@ -6,6 +6,7 @@ import type {
   Skin,
 } from 'pollyroll';
 import { classic } from 'pollyroll/render';
+import { parseDicePreferences } from '@/utils/dicePreferences';
 import type { CharacterDiceSet } from '@/types/dice';
 
 export const MIN_DIE_SCALE = 0.75;
@@ -41,7 +42,7 @@ const PARAMS = [
 /** Pollyroll's classic preset: white plastic, black printed labels. */
 export const DEFAULT_DICE_SET: CharacterDiceSet = {
   skin: classic,
-  dieScale: 2,
+  dieScale: 1.35,
 };
 
 export function clampDieScale(value: number): number {
@@ -125,5 +126,7 @@ export function parseDiceSet(input: unknown): CharacterDiceSet | null {
     typeof record.dieScale === 'number' && Number.isFinite(record.dieScale)
       ? clampDieScale(record.dieScale)
       : DEFAULT_DICE_SET.dieScale;
-  return { skin, dieScale };
+  const options = parseDicePreferences(record.options);
+  if (options === null) return null;
+  return { skin, dieScale, ...(options ? { options } : {}) };
 }

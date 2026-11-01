@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { createShape } from '@fieldnotes/core';
 import { prepareFogAuthorityIntent } from '@fieldnotes/vtt/server';
 
-import { validateAuthorityRequest } from './authority-validation.js';
+import {
+  validateAuthorityRequest,
+  validMovementEnvelope,
+} from './authority-validation.js';
 
 const context = {
   room: '123e4567-e89b-42d3-a456-426614174000',
@@ -41,6 +44,118 @@ const element = {
   ...createShape({ position: { x: 1, y: 2 }, size: { w: 10, h: 10 } }),
   id: 'element-1',
 };
+const movement = {
+  ...element,
+  id: 'vtt-movement:element-1',
+  type: 'extension',
+  extensionType: 'vtt:movement',
+  data: {
+    targetId: 'element-1',
+    epoch: 'epoch-1',
+    feet: 10,
+    diagonals: 1,
+    visibility: 'all',
+    trail: [
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 2 },
+      ],
+    ],
+  },
+};
+
+describe('authority movement envelope validation', () => {
+  it('accepts SDK movement envelopes and reset records', () => {
+    expect(validMovementEnvelope(movement)).toBe(true);
+    expect(
+      validMovementEnvelope({
+        ...movement,
+        tokenKind: null,
+        characterId: null,
+        sceneMemberId: null,
+        entityId: null,
+      })
+    ).toBe(true);
+    expect(
+      validMovementEnvelope({
+        ...movement,
+        data: { ...movement.data, feet: 0, diagonals: 0, trail: [] },
+      })
+    ).toBe(true);
+    expect(
+      validateAuthorityRequest(
+        context,
+        request(
+          { kind: 'upsert', element: movement },
+          { schema: 1, kind: 'element-upsert', element: movement }
+        )
+      )
+    ).not.toBeNull();
+  });
+
+  it.each([
+    ['reserved id with ordinary type', { ...element, id: movement.id }],
+    ['movement type without reserved id', { ...movement, id: 'ordinary' }],
+    ['wrong extension type', { ...movement, extensionType: 'other' }],
+    ['wrong element type', { ...movement, type: 'shape' }],
+    [
+      'target mismatch',
+      { ...movement, data: { ...movement.data, targetId: 'other' } },
+    ],
+    [
+      'nested movement target',
+      {
+        ...movement,
+        id: `vtt-movement:${movement.id}`,
+        data: { ...movement.data, targetId: movement.id },
+      },
+    ],
+    [
+      'empty target',
+      {
+        ...movement,
+        id: 'vtt-movement:',
+        data: { ...movement.data, targetId: '' },
+      },
+    ],
+    ['null data', { ...movement, data: null }],
+    ...['tokenKind', 'characterId', 'sceneMemberId', 'entityId'].map(field => [
+      `token control field ${field}`,
+      { ...movement, [field]: 'forged-identity' },
+    ]),
+    ...Object.entries({
+      negativeFeet: { feet: -1 },
+      infiniteFeet: { feet: Infinity },
+      nanFeet: { feet: NaN },
+      fractionalDiagonals: { diagonals: 1.5 },
+      negativeDiagonals: { diagonals: -1 },
+      unsafeDiagonals: { diagonals: Number.MAX_SAFE_INTEGER + 1 },
+      badVisibility: { visibility: 'public' },
+      badEpoch: { epoch: 7 },
+      nonArrayTrail: { trail: {} },
+      emptyRun: { trail: [[]] },
+      tooManyPoints: {
+        trail: [Array.from({ length: 65 }, () => ({ x: 1, y: 1 }))],
+      },
+      infinitePoint: { trail: [[{ x: Infinity, y: 1 }]] },
+      badPoint: { trail: [[{ x: 1 }]] },
+    }).map(([label, data]) => [
+      label,
+      { ...movement, data: { ...movement.data, ...data } },
+    ]),
+  ])('rejects %s before a driver may touch Redis', (_label, invalid) => {
+    expect(validMovementEnvelope(invalid)).toBe(false);
+    expect(
+      validateAuthorityRequest(
+        context,
+        request(
+          { kind: 'upsert', element: invalid },
+          { schema: 1, kind: 'element-upsert', element: invalid }
+        )
+      )
+    ).toBeNull();
+  });
+});
 const layer = {
   id: 'layer-1',
   name: 'Layer 1',

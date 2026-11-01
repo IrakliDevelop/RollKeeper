@@ -258,7 +258,7 @@ export default function CampaignBattleMapsPage() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <TableScenePanel campaignCode={code} battleMaps={battleMaps} />
         {deleteError && (
-          <p className="text-accent-red-text mb-4" role="alert">
+          <p className="text-blood-text mb-4" role="alert">
             {deleteError}
           </p>
         )}

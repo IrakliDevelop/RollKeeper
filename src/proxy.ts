@@ -5,7 +5,6 @@ import { refreshAuthSession } from '@/lib/supabase/proxy';
 const DEV_ONLY_PREFIXES = [
   '/dice-test',
   '/dice-components-demo',
-  '/design-system',
   '/test-error',
 ];
 

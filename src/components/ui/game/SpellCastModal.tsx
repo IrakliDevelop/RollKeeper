@@ -1,21 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  AlertTriangle,
-  Sparkles,
-  Zap,
-  ClockAlert,
-  Infinity,
-  BookOpen,
-  Moon,
-} from 'lucide-react';
-import {
+import { ClockAlert } from 'lucide-react';
+import type {
   Spell,
   SpellSlots,
   ConcentrationState,
   PactMagic,
 } from '@/types/character';
+import { Button } from '@/components/ui/forms/button';
+import {
+  RadioGroupField,
+  RadioGroupItem,
+} from '@/components/ui/forms/radio-group';
+import { Badge } from '@/components/ui/layout/badge';
+import { SlotPips } from '@/components/ui/game/SlotPips';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +23,16 @@ import {
   DialogBody,
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
+
+/** Slot levels at or above the spell's level with a slot left, as "1,3". */
+function availableLevelsKey(spellLevel: number, spellSlots: SpellSlots) {
+  const levels: number[] = [];
+  for (let level = Math.max(1, spellLevel); level <= 9; level++) {
+    const slot = spellSlots[level as keyof SpellSlots];
+    if (slot.max > 0 && slot.used < slot.max) levels.push(level);
+  }
+  return levels.join(',');
+}
 
 interface SpellCastModalProps {
   isOpen: boolean;
@@ -69,7 +78,6 @@ export function SpellCastModal({
     : 0;
   const canFreecast = isAtWill || (isInnate && freeCastsRemaining > 0);
   const canRitual = spell.ritual === true && spell.level > 0;
-
   const pactAvailable =
     !!pactMagic && pactMagic.slots.max > 0 && pactMagic.level >= spell.level;
   const pactRemaining = pactMagic
@@ -77,13 +85,13 @@ export function SpellCastModal({
     : 0;
   const canPact = pactAvailable && pactRemaining > 0;
 
-  const availableLevels = [];
-  for (let level = Math.max(1, spell.level); level <= 9; level++) {
-    const slot = spellSlots[level as keyof SpellSlots];
-    if (slot.max > 0 && slot.used < slot.max) {
-      availableLevels.push(level);
-    }
-  }
+  // Keyed on the level list, not the spellSlots object: a sync from another
+  // tab replaces that object and must not reset the player's choice.
+  const levelsKey = availableLevelsKey(spell.level, spellSlots);
+  const availableLevels = React.useMemo(
+    () => (levelsKey ? levelsKey.split(',').map(Number) : []),
+    [levelsKey]
+  );
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -96,76 +104,20 @@ export function SpellCastModal({
       setSelectedLevel(spell.level);
       setUseFreecast(true);
     } else if (availableLevels.length > 0) {
-      setSelectedLevel(spell.level);
+      setSelectedLevel(
+        availableLevels.includes(spell.level) ? spell.level : availableLevels[0]
+      );
       setUseFreecast(false);
     } else {
       setSelectedLevel(null);
       setUseFreecast(false);
     }
-  }, [
-    isOpen,
-    spell.level,
-    spell.freeCastMax,
-    canFreecast,
-    availableLevels.length,
-  ]);
+  }, [isOpen, spell.level, spell.freeCastMax, canFreecast, availableLevels]);
 
-  const isConcentrationSpell = spell.concentration;
-  const alreadyConcentrating = concentration.isConcentrating;
-  const concentrationWarning = isConcentrationSpell && alreadyConcentrating;
   const isReactionSpell = spell.castingTime?.toLowerCase().includes('reaction');
   const reactionWarning = isReactionSpell && hasUsedReaction;
-
-  const handleCast = () => {
-    if (selectedLevel !== null) {
-      onCastSpell(selectedLevel, useFreecast, useRitual, usePact);
-      if (isReactionSpell && !hasUsedReaction && onReactionSpellCast) {
-        onReactionSpellCast();
-      }
-      onClose();
-      setSelectedLevel(null);
-      setUseFreecast(false);
-      setUseRitual(false);
-      setUsePact(false);
-    }
-  };
-
-  const handleClose = () => {
-    onClose();
-    setSelectedLevel(null);
-    setUseFreecast(false);
-    setUseRitual(false);
-    setUsePact(false);
-  };
-
-  const handleSelectFreecast = () => {
-    setUseFreecast(true);
-    setUseRitual(false);
-    setUsePact(false);
-    setSelectedLevel(spell.level);
-  };
-
-  const handleSelectSlot = (level: number) => {
-    setUseFreecast(false);
-    setUseRitual(false);
-    setUsePact(false);
-    setSelectedLevel(level);
-  };
-
-  const handleSelectRitual = () => {
-    setUseRitual(true);
-    setUseFreecast(false);
-    setUsePact(false);
-    setSelectedLevel(spell.level);
-  };
-
-  const handleSelectPact = () => {
-    setUsePact(true);
-    setUseRitual(false);
-    setUseFreecast(false);
-    setSelectedLevel(pactMagic!.level);
-  };
-
+  const concentrationWarning =
+    spell.concentration && concentration.isConcentrating;
   const canCast =
     selectedLevel !== null &&
     (spell.level === 0 ||
@@ -173,6 +125,55 @@ export function SpellCastModal({
       useRitual ||
       usePact ||
       availableLevels.includes(selectedLevel));
+  const selectedChoice = useFreecast
+    ? 'free'
+    : useRitual
+      ? 'ritual'
+      : usePact
+        ? 'pact'
+        : selectedLevel !== null
+          ? `slot-${selectedLevel}`
+          : '';
+
+  const handleSelectFreecast = () => {
+    setUseFreecast(true);
+    setUseRitual(false);
+    setUsePact(false);
+    setSelectedLevel(spell.level);
+  };
+  const handleSelectSlot = (level: number) => {
+    setUseFreecast(false);
+    setUseRitual(false);
+    setUsePact(false);
+    setSelectedLevel(level);
+  };
+  const handleSelectRitual = () => {
+    setUseRitual(true);
+    setUseFreecast(false);
+    setUsePact(false);
+    setSelectedLevel(spell.level);
+  };
+  const handleSelectPact = () => {
+    setUsePact(true);
+    setUseRitual(false);
+    setUseFreecast(false);
+    setSelectedLevel(pactMagic!.level);
+  };
+  const handleClose = () => {
+    onClose();
+    setSelectedLevel(null);
+    setUseFreecast(false);
+    setUseRitual(false);
+    setUsePact(false);
+  };
+  const handleCast = () => {
+    if (!canCast || selectedLevel === null) return;
+    onCastSpell(selectedLevel, useFreecast, useRitual, usePact);
+    if (isReactionSpell && !hasUsedReaction && onReactionSpellCast) {
+      onReactionSpellCast();
+    }
+    handleClose();
+  };
 
   return (
     <Dialog
@@ -183,409 +184,202 @@ export function SpellCastModal({
     >
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Cast Spell</DialogTitle>
+          <DialogTitle>Cast {spell.name}</DialogTitle>
         </DialogHeader>
         <DialogBody>
-          <div className="space-y-4">
-            {/* Spell Info */}
-            <div className="text-center">
-              <div className="mb-2 flex items-center justify-center gap-2">
-                <Sparkles className="text-purple-600" size={20} />
-              </div>
-              <h3 className="mb-1 text-xl font-bold text-purple-900">
-                {spell.name}
-              </h3>
-              <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
-                <span>{spell.school}</span>
-                <span>&bull;</span>
-                <span>
-                  {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
-                </span>
-                {spell.concentration && (
-                  <>
-                    <span>&bull;</span>
-                    <span className="font-medium text-orange-600">
-                      Concentration
-                    </span>
-                  </>
-                )}
-                {spell.ritual && (
-                  <>
-                    <span>&bull;</span>
-                    <span className="font-medium text-blue-600">Ritual</span>
-                  </>
-                )}
-              </div>
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="type-ui text-muted">{spell.school}</span>
+              <Badge variant="neutral" size="sm">
+                {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
+              </Badge>
+              {spell.concentration && (
+                <Badge variant="magic" size="sm">
+                  Concentration
+                </Badge>
+              )}
+              {spell.ritual && (
+                <Badge variant="neutral" size="sm">
+                  Ritual
+                </Badge>
+              )}
               {spell.castingSource && (
-                <div className="mt-1 text-xs text-purple-500">
+                <span className="type-small text-muted">
                   Source: {spell.castingSource}
-                </div>
+                </span>
               )}
             </div>
 
-            {/* Concentration Warning */}
-            {concentrationWarning && (
-              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <AlertTriangle
-                  className="mt-0.5 flex-shrink-0 text-amber-600"
-                  size={16}
-                />
-                <div className="text-sm">
-                  <p className="mb-1 font-medium text-amber-800">
-                    Concentration Warning
-                  </p>
-                  <p className="text-amber-700">
-                    You are currently concentrating on{' '}
-                    <span className="font-medium">
-                      {concentration.spellName}
-                    </span>
-                    . Casting this spell will end your concentration on the
-                    previous spell.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Reaction Warning */}
             {reactionWarning && (
-              <div className="bg-accent-red-bg border-accent-red-border-strong flex items-start gap-3 rounded-lg border-2 p-3">
-                <ClockAlert
-                  className="text-accent-red-text mt-0.5 flex-shrink-0"
-                  size={16}
-                />
-                <div className="flex-1 text-sm">
-                  <p className="text-accent-red-text mb-1 font-medium">
-                    Reaction Already Used
-                  </p>
-                  <p className="text-accent-red-text">
-                    You&apos;ve already used your reaction this round. You
-                    typically can&apos;t cast this spell until your reaction
-                    resets on your next turn.
-                  </p>
-                  {onResetReaction && (
-                    <button
-                      onClick={onResetReaction}
-                      className="border-accent-red-border-strong text-accent-red-text hover:bg-accent-red-text mt-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:text-white"
-                    >
-                      Reset Reaction
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Cantrip Cast */}
-            {spell.level === 0 ? (
-              <div className="text-center">
-                <p className="mb-4 text-sm text-gray-600">
-                  Cantrips don&apos;t use spell slots.
-                </p>
-                <div className="mb-4 rounded-lg border-2 border-purple-300 bg-purple-50 p-3">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-purple-500"></div>
-                    <span className="font-medium text-purple-900">
-                      Cantrip Selected
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Free Cast Option */}
-                {hasFreeCasting && (
+              <div className="border-ember-border border-l-2 pl-3">
+                <div className="flex items-start gap-2">
+                  <ClockAlert
+                    className="text-ember-text mt-0.5 size-4 shrink-0"
+                    aria-hidden="true"
+                  />
                   <div>
-                    <h4 className="mb-3 font-medium text-gray-900">
-                      {isAtWill ? 'At-Will Casting:' : 'Innate Casting:'}
-                    </h4>
-                    <button
-                      onClick={handleSelectFreecast}
-                      disabled={!canFreecast}
-                      className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
-                        useFreecast
-                          ? 'border-emerald-500 bg-emerald-100 shadow-md'
-                          : canFreecast
-                            ? 'border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100'
-                            : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                            useFreecast
-                              ? 'bg-emerald-600 text-white'
-                              : canFreecast
-                                ? 'bg-emerald-400 text-white'
-                                : 'bg-gray-300 text-gray-500'
-                          }`}
-                        >
-                          {isAtWill ? (
-                            <Infinity size={14} />
-                          ) : (
-                            <Zap size={14} />
-                          )}
-                        </div>
-                        <span
-                          className={`font-medium ${
-                            useFreecast
-                              ? 'text-emerald-900'
-                              : canFreecast
-                                ? 'text-emerald-800'
-                                : 'text-gray-500'
-                          }`}
-                        >
-                          Cast free (no slot)
-                          {isAtWill && (
-                            <span className="ml-1 text-emerald-600">
-                              &mdash; At Will
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <span
-                        className={`text-sm ${
-                          useFreecast
-                            ? 'text-emerald-700'
-                            : canFreecast
-                              ? 'text-emerald-600'
-                              : 'text-gray-400'
-                        }`}
+                    <p className="type-ui text-ember-text font-semibold">
+                      Reaction already used
+                    </p>
+                    <p className="type-ui text-body mt-1">
+                      You&apos;ve already used your reaction this round. You
+                      typically can&apos;t cast this spell until your reaction
+                      resets on your next turn.
+                    </p>
+                    {onResetReaction && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => onResetReaction()}
                       >
-                        {isAtWill
-                          ? 'Unlimited'
-                          : `${freeCastsRemaining}/${spell.freeCastMax} remaining`}
-                      </span>
-                    </button>
-                    {isInnate && freeCastsRemaining <= 0 && (
-                      <p className="mt-1.5 text-xs text-gray-500">
-                        Free casts exhausted. Use a spell slot or take a long
-                        rest.
-                      </p>
+                        Reset reaction
+                      </Button>
                     )}
                   </div>
-                )}
+                </div>
+              </div>
+            )}
 
-                {/* Ritual Casting Option */}
-                {canRitual && (
-                  <div>
-                    <h4 className="mb-3 font-medium text-gray-900">
-                      Ritual Casting:
-                    </h4>
-                    <button
-                      onClick={handleSelectRitual}
-                      className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
-                        useRitual
-                          ? 'border-blue-500 bg-blue-100 shadow-md'
-                          : 'border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                            useRitual
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-blue-400 text-white'
-                          }`}
-                        >
-                          <BookOpen size={14} />
-                        </div>
-                        <span
-                          className={`font-medium ${
-                            useRitual ? 'text-blue-900' : 'text-blue-800'
-                          }`}
-                        >
-                          Cast as Ritual (no slot)
-                        </span>
-                      </div>
-                      <span
-                        className={`text-sm ${
-                          useRitual ? 'text-blue-700' : 'text-blue-600'
-                        }`}
-                      >
-                        +10 min casting time
-                      </span>
-                    </button>
-                  </div>
+            {spell.level === 0 ? (
+              <p className="type-body text-muted">
+                Cantrips don&apos;t use spell slots.
+              </p>
+            ) : (
+              <>
+                {(hasFreeCasting ||
+                  canRitual ||
+                  pactAvailable ||
+                  availableLevels.length > 0) && (
+                  <RadioGroupField
+                    aria-label={`Cast ${spell.name}`}
+                    value={selectedChoice}
+                    onValueChange={value => {
+                      if (value === 'free') handleSelectFreecast();
+                      else if (value === 'ritual') handleSelectRitual();
+                      else if (value === 'pact') handleSelectPact();
+                      else if (value.startsWith('slot-'))
+                        handleSelectSlot(Number(value.slice(5)));
+                    }}
+                    className="grid-cols-1 gap-0"
+                  >
+                    {hasFreeCasting && (
+                      <RadioGroupItem
+                        value="free"
+                        wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
+                        disabled={!canFreecast}
+                        label={
+                          isAtWill
+                            ? 'Cast at will (no slot)'
+                            : 'Cast free (no slot)'
+                        }
+                        description={
+                          isAtWill
+                            ? 'Unlimited'
+                            : `${freeCastsRemaining}/${spell.freeCastMax} remaining`
+                        }
+                      />
+                    )}
+                    {canRitual && (
+                      <RadioGroupItem
+                        value="ritual"
+                        wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
+                        label="Cast as a ritual (no slot)"
+                        description="+10 min casting time"
+                      />
+                    )}
+                    {pactAvailable && (
+                      <RadioGroupItem
+                        value="pact"
+                        wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
+                        disabled={!canPact}
+                        label={`Pact slot (level ${pactMagic!.level})`}
+                        description={`${pactRemaining}/${pactMagic!.slots.max} remaining`}
+                      />
+                    )}
+                    {availableLevels.map(level => {
+                      const slot = spellSlots[level as keyof SpellSlots];
+                      return (
+                        <RadioGroupItem
+                          key={level}
+                          value={`slot-${level}`}
+                          wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
+                          label={`Level ${level}${level === spell.level ? ' (base level)' : ''}`}
+                          description={`${slot.max - slot.used}/${slot.max} available`}
+                          icon={
+                            <SlotPips
+                              level={level}
+                              total={slot.max}
+                              available={slot.max - slot.used}
+                            />
+                          }
+                        />
+                      );
+                    })}
+                  </RadioGroupField>
                 )}
-
-                {/* Pact Magic Option */}
-                {pactAvailable && (
-                  <div>
-                    <h4 className="text-heading mb-3 font-medium">
-                      Pact Magic:
-                    </h4>
-                    <button
-                      onClick={handleSelectPact}
-                      disabled={!canPact}
-                      className={`border-accent-purple-border flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
-                        usePact
-                          ? 'bg-accent-purple-bg shadow-md'
-                          : canPact
-                            ? 'bg-surface-raised hover:bg-accent-purple-bg'
-                            : 'bg-surface-secondary cursor-not-allowed opacity-50'
-                      }`}
-                    >
-                      <span className="text-accent-purple-text flex items-center gap-3 font-medium">
-                        <Moon size={16} />
-                        Pact slot (level {pactMagic!.level})
-                      </span>
-                      <span className="text-accent-purple-text text-sm">
-                        {pactRemaining}/{pactMagic!.slots.max} remaining
-                      </span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Slot-Based Casting */}
                 {availableLevels.length === 0 &&
-                !canFreecast &&
-                !canRitual &&
-                !canPact ? (
-                  <div className="py-4 text-center">
-                    <p className="mb-2 text-gray-600">
-                      No available spell slots to cast this spell.
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      You need at least a level {spell.level} spell slot.
-                    </p>
-                  </div>
-                ) : (
-                  availableLevels.length > 0 && (
-                    <div>
-                      <h4 className="mb-3 font-medium text-gray-900">
-                        {hasFreeCasting || canRitual
-                          ? 'Or use a spell slot:'
-                          : 'Choose spell slot level:'}
-                      </h4>
-                      <div className="space-y-2">
-                        {availableLevels.map(level => {
-                          const slot = spellSlots[level as keyof SpellSlots];
-                          const available = slot.max - slot.used;
-                          const isMinLevel = level === spell.level;
-                          const isSelected =
-                            !useFreecast &&
-                            !useRitual &&
-                            !usePact &&
-                            selectedLevel === level;
-
-                          return (
-                            <button
-                              key={level}
-                              onClick={() => handleSelectSlot(level)}
-                              className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
-                                isSelected
-                                  ? 'border-purple-500 bg-purple-100 shadow-md'
-                                  : isMinLevel
-                                    ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:bg-purple-100'
-                                    : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`h-3 w-3 rounded-full ${
-                                    isSelected
-                                      ? 'bg-purple-600'
-                                      : isMinLevel
-                                        ? 'bg-purple-400'
-                                        : 'bg-slate-400'
-                                  }`}
-                                ></div>
-                                <span
-                                  className={`font-medium ${
-                                    isSelected
-                                      ? 'text-purple-900'
-                                      : isMinLevel
-                                        ? 'text-purple-800'
-                                        : 'text-slate-700'
-                                  }`}
-                                >
-                                  Level {level}
-                                  {isMinLevel && (
-                                    <span
-                                      className={
-                                        isSelected
-                                          ? 'text-purple-700'
-                                          : 'text-purple-600'
-                                      }
-                                    >
-                                      {' '}
-                                      (Base Level)
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
-                              <span
-                                className={`text-sm ${
-                                  isSelected
-                                    ? 'text-purple-700'
-                                    : isMinLevel
-                                      ? 'text-purple-600'
-                                      : 'text-slate-600'
-                                }`}
-                              >
-                                {available}/{slot.max} available
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                  !canFreecast &&
+                  !canRitual &&
+                  !canPact && (
+                    <div className="space-y-1">
+                      <p className="type-body text-body">
+                        No available spell slots to cast this spell.
+                      </p>
+                      <p className="type-ui text-muted">
+                        You need at least a level {spell.level} spell slot.
+                      </p>
                     </div>
-                  )
+                  )}
+                {isInnate && freeCastsRemaining <= 0 && (
+                  <p className="type-ui text-muted">
+                    Free casts exhausted. Use a spell slot or take a long rest.
+                  </p>
                 )}
-
-                {/* Higher Level Effects */}
                 {spell.higherLevel &&
-                  selectedLevel &&
+                  selectedLevel !== null &&
                   !useFreecast &&
                   selectedLevel > spell.level && (
-                    <div className="bg-accent-blue-bg border-accent-blue-border rounded-lg border p-3">
-                      <h5 className="text-accent-blue-text mb-2 font-medium">
+                    <div className="border-divider border-t pt-3">
+                      <h3 className="type-subheading text-heading">
                         At Higher Levels
-                      </h5>
-                      <p
-                        className="text-accent-blue-text text-sm opacity-90"
-                        dangerouslySetInnerHTML={{
-                          __html: spell.higherLevel,
-                        }}
+                      </h3>
+                      <div
+                        className="type-body text-body mt-2"
+                        dangerouslySetInnerHTML={{ __html: spell.higherLevel }}
                       />
                     </div>
                   )}
               </>
             )}
+
+            {concentrationWarning && (
+              <p className="border-lapis-border type-ui text-body border-l-2 pl-3">
+                Casting this ends your concentration on{' '}
+                <span className="font-medium">{concentration.spellName}</span>.
+              </p>
+            )}
           </div>
         </DialogBody>
-        <DialogFooter className="flex items-center justify-between gap-3 border-t border-gray-200 p-4">
-          <button
+        <DialogFooter className="border-divider flex items-center justify-end gap-3 border-t p-4">
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
             onClick={handleClose}
-            className="px-4 py-2 text-gray-600 transition-colors hover:text-gray-800"
           >
             Cancel
-          </button>
-
+          </Button>
           {canCast && (
-            <button
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
               onClick={handleCast}
-              className={`rounded-lg px-6 py-2 font-medium text-white shadow-md transition-all duration-200 hover:shadow-lg ${
-                useRitual
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-                  : useFreecast
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                    : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
-              }`}
             >
-              {useRitual
-                ? `Cast ${spell.name} as Ritual`
-                : useFreecast
-                  ? `Cast Free ${spell.name}`
-                  : `Cast ${spell.name}`}
-              {selectedLevel !== null &&
-                selectedLevel > 0 &&
-                !useFreecast &&
-                !useRitual && (
-                  <span className="ml-1 text-purple-200">
-                    (Level {selectedLevel})
-                  </span>
-                )}
-            </button>
+              Cast {spell.name}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

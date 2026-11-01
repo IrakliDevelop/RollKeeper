@@ -24,6 +24,8 @@ interface MonsterStatBlockPanelProps {
   onUseAbilityEntry?: (entry: StatBlockEntry) => void;
   onRestoreAbilityEntry?: (entry: StatBlockEntry) => void;
   readOnly?: boolean;
+  /** Omit the outer frame when the panel is nested in a discrete object. */
+  bare?: boolean;
 }
 
 const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
@@ -73,7 +75,7 @@ function TraitBlock({
   if (!entries || entries.length === 0) return null;
   return (
     <div className="space-y-2">
-      <h5 className="text-heading border-divider border-b pb-1 text-xs font-semibold tracking-wider uppercase">
+      <h5 className="type-label-heading text-heading border-divider border-b pb-1">
         {title}
       </h5>
       {entries.map((entry, i) => {
@@ -122,9 +124,18 @@ export function MonsterStatBlockPanel({
   onUseAbilityEntry,
   onRestoreAbilityEntry,
   readOnly,
+  bare = false,
 }: MonsterStatBlockPanelProps) {
+  const conditionImmunities = statBlock.conditionImmunities ?? [];
   return (
-    <div className="border-accent-red-border bg-surface space-y-3 rounded-lg border p-3">
+    <div
+      data-stat-block-panel
+      className={
+        bare
+          ? 'space-y-3'
+          : 'border-divider bg-surface space-y-3 rounded-md border p-3'
+      }
+    >
       {/* Header: type, size, alignment */}
       <div className="text-muted text-xs italic">
         {statBlock.size} {statBlock.type}
@@ -136,8 +147,8 @@ export function MonsterStatBlockPanel({
       <div className="grid grid-cols-6 gap-1 text-center">
         {ABILITIES.map(ability => (
           <div key={ability}>
-            <span className="text-heading block text-[10px] font-bold uppercase">
-              {ability}
+            <span className="text-heading block text-xs font-semibold">
+              {ability.toUpperCase()}
             </span>
             {onUpdate ? (
               <NumberField
@@ -146,7 +157,8 @@ export function MonsterStatBlockPanel({
                   if (v !== undefined) onUpdate({ [ability]: v });
                 }}
                 allowEmpty
-                className="bg-surface-secondary text-heading mx-auto w-full rounded px-0.5 py-0.5 text-center text-sm font-medium"
+                aria-label={`${ability.toUpperCase()} score`}
+                className="bg-surface-secondary text-heading mx-auto w-full rounded-sm px-0.5 py-0.5 text-center text-sm font-medium pointer-coarse:min-h-11"
               />
             ) : (
               <span className="text-heading block text-sm font-medium">
@@ -163,7 +175,7 @@ export function MonsterStatBlockPanel({
       {/* Core stats */}
       <div className="border-divider space-y-0.5 border-t pt-2">
         <StatRow label="Speed" value={statBlock.speed} />
-        <StatRow label="HP Formula" value={statBlock.hpFormula} />
+        <StatRow label="HP formula" value={statBlock.hpFormula} />
         <StatRow label="Saves" value={statBlock.saves} />
         <StatRow label="Skills" value={statBlock.skills} />
       </div>
@@ -172,15 +184,15 @@ export function MonsterStatBlockPanel({
       {(statBlock.resistances ||
         statBlock.immunities ||
         statBlock.vulnerabilities ||
-        statBlock.conditionImmunities.length > 0) && (
+        conditionImmunities.length > 0) && (
         <div className="border-divider space-y-0.5 border-t pt-2">
           <StatRow label="Resistances" value={statBlock.resistances} />
           <StatRow label="Immunities" value={statBlock.immunities} />
           <StatRow label="Vulnerabilities" value={statBlock.vulnerabilities} />
-          {statBlock.conditionImmunities.length > 0 && (
+          {conditionImmunities.length > 0 && (
             <StatRow
-              label="Condition Immunities"
-              value={statBlock.conditionImmunities.join(', ')}
+              label="Condition immunities"
+              value={conditionImmunities.join(', ')}
             />
           )}
         </div>
@@ -205,7 +217,7 @@ export function MonsterStatBlockPanel({
       {/* Traits */}
       <TraitBlock
         title="Traits"
-        entries={statBlock.traits}
+        entries={statBlock.traits ?? []}
         resources={resources}
         inventory={inventory}
         abilityUsage={abilityUsage}
@@ -218,7 +230,7 @@ export function MonsterStatBlockPanel({
       {/* Actions */}
       <TraitBlock
         title="Actions"
-        entries={statBlock.actions}
+        entries={statBlock.actions ?? []}
         resources={resources}
         inventory={inventory}
         abilityUsage={abilityUsage}
@@ -230,8 +242,8 @@ export function MonsterStatBlockPanel({
 
       {/* Bonus Actions */}
       <TraitBlock
-        title="Bonus Actions"
-        entries={statBlock.bonusActions}
+        title="Bonus actions"
+        entries={statBlock.bonusActions ?? []}
         resources={resources}
         inventory={inventory}
         abilityUsage={abilityUsage}
@@ -244,7 +256,7 @@ export function MonsterStatBlockPanel({
       {/* Reactions */}
       <TraitBlock
         title="Reactions"
-        entries={statBlock.reactions}
+        entries={statBlock.reactions ?? []}
         resources={resources}
         inventory={inventory}
         abilityUsage={abilityUsage}
@@ -256,8 +268,8 @@ export function MonsterStatBlockPanel({
 
       {/* Lair Actions */}
       <TraitBlock
-        title="Lair Actions"
-        entries={statBlock.lairActions}
+        title="Lair actions"
+        entries={statBlock.lairActions ?? []}
         resources={resources}
         inventory={inventory}
         abilityUsage={abilityUsage}

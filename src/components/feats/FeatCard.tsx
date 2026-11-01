@@ -23,7 +23,7 @@ export default function FeatCard({ feat, displayMode }: FeatCardProps) {
           padding="md"
           interactive
           onClick={() => setIsModalOpen(true)}
-          className="cursor-pointer transition-all hover:shadow-md"
+          className="cursor-pointer"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -88,7 +88,7 @@ export default function FeatCard({ feat, displayMode }: FeatCardProps) {
         padding="md"
         interactive
         onClick={() => setIsModalOpen(true)}
-        className="flex h-full cursor-pointer flex-col transition-all hover:shadow-md"
+        className="flex h-full cursor-pointer flex-col"
       >
         <div className="mb-3 flex items-start justify-between">
           <div className="bg-accent-amber-bg flex h-10 w-10 items-center justify-center rounded-lg">

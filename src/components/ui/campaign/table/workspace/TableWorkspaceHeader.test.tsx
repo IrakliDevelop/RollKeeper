@@ -272,7 +272,7 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
       const line = screen.getByText(message);
       expect(collapsing(line)).toBeNull();
       expect(line.closest('[role="status"]')).not.toBeNull();
-      expect(line.className).toMatch(/text-accent-red-text/u);
+      expect(line.className).toMatch(/text-blood-text/u);
     }
   );
 
@@ -365,6 +365,7 @@ describe('header bar (O7-2 H1, H2, HR-8)', () => {
     const bar = screen.getByTestId('table-header-bar');
     expect(header.firstElementChild).toBe(bar);
     expect(bar.className).toMatch(/flex-wrap/u);
+    expect(within(bar).getByText('DM view')).toBeVisible();
     expect(
       within(bar).getByRole('link', { name: 'Back to campaign' })
     ).toHaveTextContent('Back to campaign');

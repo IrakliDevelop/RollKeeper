@@ -77,7 +77,7 @@ export function TableParticipantRow(props: {
         inputMode="decimal"
         size="sm"
         wrapperClassName="w-16 shrink-0"
-        className={missing ? 'border-accent-amber-border' : undefined}
+        className={missing ? 'border-ember-border' : undefined}
         placeholder="None"
         value={draft}
         onChange={event => setDraft(event.target.value)}

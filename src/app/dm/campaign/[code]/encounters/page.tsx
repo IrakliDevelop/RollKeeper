@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Swords } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { CombatLogArchiveSyncControls } from '@/components/ui/campaign/CombatLogArchiveSyncControls';
@@ -22,18 +22,17 @@ export default function CampaignEncountersPage() {
   if (!hasHydrated) {
     return (
       <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+        <div className="text-muted">Loading encounters…</div>
       </div>
     );
   }
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
+      <header className="border-divider bg-surface-secondary border-b">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            {/* C3: fits 360 px; the title truncates, actions never shrink. */}
-            <div className="flex min-w-0 items-center">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
               <Button
                 asChild
                 variant="ghost"
@@ -44,19 +43,13 @@ export default function CampaignEncountersPage() {
                 <Link
                   href={`/dm/campaign/${code}`}
                   aria-label={`Back to ${campaign?.name ?? 'Campaign'}`}
-                  title={campaign?.name}
                 >
-                  <span className="hidden max-w-48 truncate sm:inline lg:max-w-none">
+                  <span className="max-w-48 truncate sm:inline lg:max-w-none">
                     {campaign?.name ?? 'Campaign'}
                   </span>
                 </Link>
               </Button>
-              <div className="ml-2 flex min-w-0 items-center sm:ml-6">
-                <Swords className="text-accent-red-text mr-2 h-6 w-6 shrink-0 sm:mr-3" />
-                <h1 className="text-heading truncate text-xl font-bold">
-                  Encounters
-                </h1>
-              </div>
+              <h1 className="type-heading text-heading">Encounters</h1>
             </div>
             <div className="shrink-0">
               <HeaderTrailing showSystemOption />

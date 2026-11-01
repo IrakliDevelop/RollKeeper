@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 
+import { keepOpenForInPlaceEdit } from '@/components/ui/forms/InPlaceField/keepOpenForInPlaceEdit';
 import { cn } from '@/utils/cn';
 
 export interface SideDrawerProps {
@@ -21,7 +22,8 @@ export interface SideDrawerProps {
   onCloseAutoFocus?: (event: Event) => void;
   /**
    * Runs on Escape before the drawer closes. Call `event.preventDefault()`
-   * to keep it open (e.g. while the user is editing a field).
+   * to keep it open (e.g. while the user is editing a field). An
+   * `InPlaceField` with a draft keeps the drawer open on its first Escape.
    */
   onEscapeKeyDown?: (event: KeyboardEvent) => void;
 }
@@ -70,10 +72,14 @@ export function SideDrawer({
           onInteractOutside={e => e.preventDefault()}
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
-          onEscapeKeyDown={onEscapeKeyDown}
+          onEscapeKeyDown={event => {
+            keepOpenForInPlaceEdit(event);
+            onEscapeKeyDown?.(event);
+          }}
           aria-describedby={undefined}
           className={cn(
-            'bg-surface-raised border-divider text-body fixed top-0 right-0 bottom-0 z-40 flex w-[min(580px,100vw)] flex-col border-l shadow-2xl xl:w-[min(640px,100vw)]',
+            // Edge-attached, so no radius; otherwise the floating-layer look.
+            'bg-surface-elevated border-divider text-body shadow-overlay fixed top-0 right-0 bottom-0 z-40 flex w-[min(580px,100vw)] flex-col border-l xl:w-[min(640px,100vw)]',
             className
           )}
         >

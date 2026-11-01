@@ -79,7 +79,17 @@ describe('square-grid geometry gate (P4)', () => {
     ['negative', 'square', -50],
   ] as const)('%s grid → unsupported', (_name, gridType, cellSize) => {
     const viewport = mount();
-    addGrid(viewport, gridType, cellSize);
+    if (!Number.isFinite(cellSize)) {
+      // Current SDK rejects non-finite extension data before it reaches a
+      // viewport; the geometry gate must also remain safe for a raw value.
+      expect(() => addGrid(viewport, gridType, cellSize)).toThrow(
+        'Invalid extension envelope'
+      );
+      expect(sceneGeometry({ gridType, cellSize } as never, 96)).toEqual({
+        kind: 'unsupported',
+        reason: 'grid',
+      });
+    } else addGrid(viewport, gridType, cellSize);
     expect(readSceneGeometry(viewport, 96)).toEqual({
       kind: 'unsupported',
       reason: 'grid',

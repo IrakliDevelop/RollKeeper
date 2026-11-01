@@ -125,6 +125,27 @@ Chromium via Storybook Component Tests), Playwright (general e2e plus several
 purpose-specific configs), and Node's built-in test runner for Supabase/DB
 integration tests. `npm run test` only runs the jsdom `unit` project.
 
+## Copy review gate
+
+Every PR that adds or changes user-visible text (headings, buttons, labels,
+empty states, toasts, errors, confirmations, placeholders, aria-labels,
+tooltips) gets a copy review after automated checks pass and before the
+manual browser gate. The rubric is the `rollkeeper-copy` skill: plain,
+specific, table-side wording in the game's own terms, with no generic
+LLM-style copy ("X, not Y" slogans, "everything you need", "seamlessly",
+hype or fantasy filler).
+
+- **Claude Code** — dispatch the `rollkeeper-copy-reviewer` subagent
+  (`.claude/agents/rollkeeper-copy-reviewer.md`) with the PR's base branch.
+- **Codex and other agents** — follow "Reviewing a branch" in
+  `.agents/skills/rollkeeper-copy/SKILL.md`.
+
+`npm run copy:changed -- --base <base>` lists the strings to review. Fix every
+new string the review flags before opening the PR. Rewording an existing
+string is a visible change and needs the owner's approval. Record the verdict
+in the PR. A PR that changes no user-visible text marks the gate not
+applicable.
+
 ## Manual browser acceptance gate
 
 For PRs that affect browser-visible UI, navigation, authentication, local
@@ -158,17 +179,19 @@ The character page (`/player/characters/[characterId]`) uses `TabbedCharacterShe
 |---|---|
 | Actions | Weapon/spell attacks, compact spell slot tracker |
 | Stats | Basic info, ability scores, saving throws, skills, XP |
-| Combat | AC, initiative, speed, HP manager, hit dice, conditions |
+| Combat | Sub-tabs: Player (AC, initiative, speed, HP manager, hit dice, conditions) · Defenses & Buffs · Summons |
 | Spells | Spellcasting stats, spell slots, spell list (hidden for non-casters) |
-| Inventory | Sub-tabs: Weapons · Magic Items · Armor · Items · Currency |
+| Inventory | Sub-tabs: Weapons · Magic items · Armor · Items · Currency |
 | Features | Sub-tabs: Abilities (extended features) · Inspiration · Proficiencies |
-| Character | Features/traits editors, character background, session notes |
+| Character | Sub-tabs: Session Notes · Features & Background · Dice |
+| Calendar | The campaign's shared calendar when the DM syncs one, otherwise the character's own |
+| Map | The campaign's synced locations (only shown when the campaign has at least one) |
 
 **UX principles to follow when adding or changing content in this page:**
 - Keep each tab focused — don't pile unrelated sections into an existing tab; add a new tab instead
 - Prefer sub-tabs (like Inventory and Features do) over long vertical scrolling within a tab
 - The `CharacterHUD` at the top always shows HP, AC, and key vitals — don't duplicate those stats inline in tabs
-- Use `lg:grid-cols-2` two-column layouts for dense-but-related pairs (e.g., Abilities + Skills); full-width for detail-heavy content (e.g., spells, notes)
+- Use `lg:grid-cols-2` two-column layouts for dense-but-related pairs (e.g., Character information + Quick stats); full-width for detail-heavy content (e.g., spells, notes)
 
 ## Frontend Guidelines
 
@@ -179,14 +202,19 @@ The app supports light and dark themes via a `data-theme="dark"` attribute on `<
 **Always use semantic CSS custom-property tokens — never raw Tailwind color classes like `bg-gray-800` or `text-white`.** The tokens automatically resolve to the correct value for each theme:
 
 ```
-Backgrounds:  bg-surface, bg-surface-raised, bg-surface-secondary, bg-surface-elevated
-Text:         text-heading, text-body, text-muted, text-faint
-Borders:      border-divider
-Accents:      text-accent-{color}-text, bg-accent-{color}-bg, border-accent-{color}-border
-              (colors: red, blue, purple, amber, emerald, orange)
+Backgrounds:  bg-surface, bg-surface-secondary, bg-surface-raised, bg-surface-elevated, bg-surface-inset
+Text:         text-heading, text-body, text-muted (text-faint is decorative/disabled only)
+Borders:      border-divider, border-divider-strong, border-input-border
+Roles:        text-{role}-text, bg-{role}-fill, border-{role}-border, bg-{role}-bg,
+              text-on-brass, text-on-blood
+              brass = primary action/focus/proficiency, blood = harm/destructive,
+              verdigris = healing/success, lapis = magic, ember = conditions/warnings,
+              frost = temporary HP
+Deprecated:   text-accent-{hue}-*, bg-accent-{hue}-*, --gradient-* (bridged to roles;
+              existing uses only, never add new ones)
 ```
 
-When building or reviewing UI, verify it looks correct in both themes. If hardcoded colors appear, replace them with the appropriate semantic token.
+When building or reviewing UI, verify it looks correct in both themes. `npm run design:contrast` (CI) fails if any role or neutral pairing drops below WCAG AA. If hardcoded colors appear, replace them with the appropriate semantic token.
 
 ### Design system — always use existing components
 
@@ -206,17 +234,23 @@ import { Autocomplete } from '@/components/ui/forms/Autocomplete';
 // Layout
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section'; // heading + rule; Card is only for discrete objects
 
 // Feedback / overlays
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';
+import { confirmDialog, alertDialog, promptDialog } from '@/components/ui/feedback/confirm-dialog'; // never window.confirm/alert/prompt (ESLint no-alert)
 
-// Design tokens
-import { colors, spacing, typography, shadows, borderRadius } from '@/components/ui/primitives';
+// Design tokens are CSS variables in src/app/globals.css, used through Tailwind
+// utilities (bg-surface, text-heading, type-heading). See Storybook → Foundations.
 ```
 
-Use `Button` with `variant`: `primary | secondary | success | danger | warning | outline | ghost | link`.
+Use `Button` with `variant`: `primary` (brass fill, the view's one main action) · `secondary` (the default, an outline) · `outline` · `ghost` · `danger` (blood outline) · `danger-solid` (blood fill, only the confirm button of a destructive dialog) · `link`. `success` and `warning` are deprecated aliases of `secondary`. A toggle button's on state is the `selected` prop, not a different variant.
 
-**Design ratchet.** `npm run design:ci` (run in CI) counts retired visual patterns per file — gradients, hover scale/translate, large shadows, backdrop blur, hue-named `accent-*` tokens, raw Tailwind hue classes, uppercase labels, `Sparkles`, and `type="number"` — and fails if any file's count rises. Existing `accent-*` tokens may be reused where a file already uses them, but don't add new uses; see `docs/wiki/09-design-system-ui.md`.
+Use `Badge` with `variant`: `primary` (brass) · `success` (verdigris) · `warning` (ember) · `danger` (blood) · `neutral` (the default). `secondary`, `info` and `outline` render as `neutral`.
+
+**Design skill.** Before building or reviewing UI, load the `rollkeeper-design` skill (`.claude/skills/rollkeeper-design/SKILL.md`; Codex and other agents: `.agents/skills/rollkeeper-design/SKILL.md`). It holds the recipes and the review checklist. The written rules are in [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md); Storybook → Foundations shows the tokens.
+
+**Design ratchet.** `npm run design:ci` (run in CI) counts retired visual patterns per file — gradients, hover scale/translate, large shadows, backdrop blur, hue-named `accent-*` tokens, raw Tailwind hue classes, uppercase labels, `Sparkles`, `type="number"`, and `shadow-overlay` outside the floating-layer primitives (`variants.ts` and `SideDrawer.tsx` are allow-listed) — and fails if any file's count rises. Existing `accent-*` uses can stay until their area's sweep (restyling one is a visible change), but don't write new ones, even in a file that already has some; see `docs/wiki/09-design-system-ui.md`.
 
 ### Naming conventions
 
@@ -258,4 +292,4 @@ Use `Button` with `variant`: `primary | secondary | success | danger | warning |
 - Direct state mutation — always use immutable updates
 - `useEffect` data fetching without cleanup
 - Hardcoded colors/spacing — use design tokens
-- The legacy `Modal` component — use `Dialog` from `@/components/ui/feedback/dialog`
+- Hand-built modal overlays — use `Dialog` from `@/components/ui/feedback/dialog`, or `confirmDialog` for a yes/no question

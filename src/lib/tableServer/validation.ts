@@ -86,6 +86,7 @@ const BASE_ONLY_TYPES: readonly string[] = [
 
 const INITIATIVE_KEYS = [
   'encounterId',
+  'combatGeneration',
   'isActive',
   'round',
   'currentEntityId',
@@ -242,6 +243,8 @@ function validInitiative(
   if (
     value.encounterId !== runId ||
     value.isActive !== true ||
+    (value.combatGeneration !== undefined &&
+      !isRevision(value.combatGeneration)) ||
     !isRevision(value.round) ||
     (value.currentEntityId !== null && !isId(value.currentEntityId)) ||
     !HP_MODES.includes(String(value.enemyHpMode)) ||

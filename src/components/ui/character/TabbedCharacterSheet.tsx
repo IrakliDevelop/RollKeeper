@@ -2,6 +2,7 @@
 
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import BookmarkTabs from '@/components/ui/layout/BookmarkTabs';
+import { SectionFramesProvider } from '@/components/ui/layout/section';
 import type { BookmarkTabsRef } from '@/components/ui/layout/BookmarkTabs';
 import {
   createTabbedSheetConfig,
@@ -9,7 +10,7 @@ import {
 } from './tabbedSheetConfig';
 
 export interface TabbedCharacterSheetRef {
-  switchToTab: (tabId: string) => void;
+  switchToTab: (tabId: string, options?: { scroll?: boolean }) => void;
   getCurrentTab: () => string;
 }
 
@@ -35,9 +36,9 @@ const TabbedCharacterSheet = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      switchToTab: (tabId: string) => {
+      switchToTab: (tabId: string, options?: { scroll?: boolean }) => {
         const mappedId = TAB_ID_MAP[tabId] || tabId;
-        tabsRef.current?.switchToTab(mappedId);
+        tabsRef.current?.switchToTab(mappedId, options);
       },
       getCurrentTab: () => tabsRef.current?.getCurrentTab() || 'actions',
     }),
@@ -45,12 +46,16 @@ const TabbedCharacterSheet = forwardRef<
   );
 
   return (
-    <BookmarkTabs
-      ref={tabsRef}
-      tabs={tabs}
-      defaultTab="actions"
-      persistKey="tabbed-layout-active-tab"
-    />
+    <SectionFramesProvider value={true}>
+      <BookmarkTabs
+        ref={tabsRef}
+        tabs={tabs}
+        defaultTab="actions"
+        persistKey="tabbed-layout-active-tab"
+        // Tab jumps scroll the tabs to the top; keep them below the sticky bar.
+        className="scroll-mt-[calc(var(--app-header-height,4rem)+1rem)]"
+      />
+    </SectionFramesProvider>
   );
 });
 

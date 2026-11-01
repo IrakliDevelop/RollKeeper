@@ -11,28 +11,34 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 
 /**
- * Common button variants - used by Button and button-like components
+ * Common button variants - used by Button and button-like components.
+ *
+ * Felt and Brass: primary is the one brass action per view, danger-solid is
+ * only for the confirm button of a destructive dialog, and everything else
+ * is an outline or plain text. success and warning are deprecated aliases
+ * of secondary. `selected` marks the on state of an outline or text toggle.
  */
+const OUTLINE_BUTTON =
+  'border border-input-border bg-transparent text-heading hover:bg-surface-hover';
+
 export const buttonVariants = cva(
   // Base styles
-  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-sm font-medium transition-colors duration-120 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
   {
     variants: {
       variant: {
-        primary:
-          'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md hover:from-emerald-700 hover:to-emerald-800 focus-visible:ring-emerald-500 active:scale-[0.98]',
-        secondary:
-          'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md hover:from-blue-700 hover:to-blue-800 focus-visible:ring-blue-500 active:scale-[0.98]',
-        success:
-          'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md hover:from-green-700 hover:to-green-800 focus-visible:ring-green-500 active:scale-[0.98]',
+        primary: 'bg-brass-fill text-on-brass hover:bg-brass-fill/90',
+        secondary: OUTLINE_BUTTON,
+        /** @deprecated Use `secondary`, or `selected` for an on state. */
+        success: OUTLINE_BUTTON,
+        /** @deprecated Use `secondary`, or `selected` for an on state. */
+        warning: OUTLINE_BUTTON,
+        outline: OUTLINE_BUTTON,
+        ghost: 'text-heading hover:bg-surface-hover',
         danger:
-          'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md hover:from-red-700 hover:to-red-800 focus-visible:ring-red-500 active:scale-[0.98]',
-        warning:
-          'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md hover:from-amber-700 hover:to-amber-800 focus-visible:ring-amber-500 active:scale-[0.98]',
-        outline:
-          'border-2 border-divider bg-surface-raised text-heading hover:bg-surface-hover hover:border-divider-strong focus-visible:ring-ring',
-        ghost: 'text-heading hover:bg-surface-hover focus-visible:ring-ring',
-        link: 'text-emerald-600 underline-offset-4 hover:underline focus-visible:ring-emerald-500 dark:text-emerald-400',
+          'border border-blood-border bg-transparent text-blood-text hover:bg-surface-hover',
+        'danger-solid': 'bg-blood-fill text-on-blood hover:bg-blood-fill/90',
+        link: 'text-brass-text underline-offset-4 hover:underline',
       },
       size: {
         xs: 'h-7 px-3 text-xs',
@@ -44,11 +50,23 @@ export const buttonVariants = cva(
       fullWidth: {
         true: 'w-full',
       },
+      selected: {
+        true: '',
+        false: '',
+      },
     },
+    compoundVariants: [
+      {
+        variant: ['secondary', 'success', 'warning', 'outline', 'ghost'],
+        selected: true,
+        className: 'border border-brass-border text-brass-text',
+      },
+    ],
     defaultVariants: {
-      variant: 'primary',
+      variant: 'secondary',
       size: 'md',
       fullWidth: false,
+      selected: false,
     },
   }
 );
@@ -56,20 +74,26 @@ export const buttonVariants = cva(
 export type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 /**
- * Input field variants - used by Input, Textarea, and Select
+ * Input field variants - used by Input, Textarea, Select trigger and
+ * Autocomplete.
+ *
+ * Felt and Brass: surface-inset well, 1px input-border, 4px radius, and a
+ * 2px brass focus outline with a transparent gap (a ring offset would paint
+ * white on felt). error is a blood border; success is a deprecated alias of
+ * default. Coarse pointers get a 44px minimum height.
  */
+const DEFAULT_INPUT = 'border-input-border';
+
 export const inputVariants = cva(
   // Base styles
-  'flex w-full rounded-lg border-2 bg-input-bg px-3 py-2 text-input-text placeholder:text-input-placeholder transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+  'flex w-full rounded-sm border bg-input-bg px-3 py-2 text-input-text placeholder:text-input-placeholder transition-colors duration-120 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11',
   {
     variants: {
       variant: {
-        default:
-          'border-input-border focus-visible:border-input-border-focus focus-visible:ring-emerald-500 dark:focus-visible:ring-emerald-400',
-        error:
-          'border-red-300 focus-visible:border-red-500 focus-visible:ring-red-500 dark:border-red-700 dark:focus-visible:border-red-500',
-        success:
-          'border-green-300 focus-visible:border-green-500 focus-visible:ring-green-500 dark:border-green-700 dark:focus-visible:border-green-500',
+        default: DEFAULT_INPUT,
+        error: 'border-blood-border',
+        /** @deprecated Use `default`. */
+        success: DEFAULT_INPUT,
       },
       size: {
         sm: 'h-9 text-sm',
@@ -87,19 +111,26 @@ export const inputVariants = cva(
 export type InputVariants = VariantProps<typeof inputVariants>;
 
 /**
- * Card variants - used by Card and card-like containers
+ * Card variants - used by Card and card-like containers.
+ *
+ * Felt and Brass: a card is a discrete object (a character, monster, spell,
+ * item or campaign) on surface-raised with a 1px divider and a 6px radius,
+ * never a shadow. bordered is a deprecated alias of default. interactive
+ * swaps the hover shadow for an input-border edge.
  */
+const DEFAULT_CARD = 'border border-divider';
+
 export const cardVariants = cva(
   // Base styles
-  'rounded-lg bg-surface-raised transition-all duration-200',
+  'rounded-md bg-surface-raised transition-colors duration-120 ease-out',
   {
     variants: {
       variant: {
-        default: 'border border-divider',
-        bordered: 'border-2 border-divider-strong',
-        elevated: 'border border-divider shadow-md',
+        default: DEFAULT_CARD,
+        /** @deprecated Use `default`. */
+        bordered: DEFAULT_CARD,
         interactive:
-          'border-2 border-divider hover:border-divider-strong hover:shadow-md cursor-pointer',
+          'border border-divider cursor-pointer hover:border-input-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         ghost: 'border-0',
       },
       padding: {
@@ -120,27 +151,29 @@ export const cardVariants = cva(
 export type CardVariants = VariantProps<typeof cardVariants>;
 
 /**
- * Badge variants - used by Badge and badge-like labels
+ * Badge variants - used by Badge and badge-like labels.
+ *
+ * Felt and Brass: a 1px outline in the role colour with no fill. info,
+ * secondary and outline render as neutral.
  */
+const NEUTRAL_BADGE = 'border-input-border text-heading';
+
 export const badgeVariants = cva(
   // Base styles
-  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors',
+  'inline-flex items-center gap-1 rounded-[3px] border px-2.5 py-0.5 text-xs font-semibold transition-colors',
   {
     variants: {
       variant: {
-        primary:
-          'bg-accent-emerald-bg text-accent-emerald-text border border-accent-emerald-border',
-        secondary:
-          'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
-        success:
-          'bg-accent-green-bg text-accent-green-text border border-accent-green-border',
-        danger:
-          'bg-accent-red-bg text-accent-red-text border border-accent-red-border',
-        warning:
-          'bg-accent-amber-bg text-accent-amber-text border border-accent-amber-border',
-        info: 'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
-        neutral: 'bg-surface-secondary text-heading border border-divider',
-        outline: 'bg-transparent text-heading border border-divider-strong',
+        primary: 'border-brass-border text-brass-text',
+        success: 'border-verdigris-border text-verdigris-text',
+        warning: 'border-ember-border text-ember-text',
+        danger: 'border-blood-border text-blood-text',
+        // Lapis: concentration and other spell state on a chip.
+        magic: 'border-lapis-border text-lapis-text',
+        neutral: NEUTRAL_BADGE,
+        secondary: NEUTRAL_BADGE,
+        info: NEUTRAL_BADGE,
+        outline: NEUTRAL_BADGE,
       },
       size: {
         sm: 'text-xs px-2 py-0.5',
@@ -149,7 +182,7 @@ export const badgeVariants = cva(
       },
     },
     defaultVariants: {
-      variant: 'primary',
+      variant: 'neutral',
       size: 'md',
     },
   }
@@ -166,7 +199,7 @@ export const labelVariants = cva(
     variants: {
       variant: {
         default: '',
-        required: "after:content-['*'] after:text-red-500 after:ml-1",
+        required: "after:content-['*'] after:text-blood-text after:ml-1",
         optional:
           "after:content-['(optional)'] after:text-muted after:ml-1 after:font-normal",
       },
@@ -192,9 +225,9 @@ export const helperTextVariants = cva('text-sm transition-colors', {
   variants: {
     variant: {
       default: 'text-body',
-      error: 'text-red-600 dark:text-red-400',
-      success: 'text-green-600 dark:text-green-400',
-      warning: 'text-amber-600 dark:text-amber-400',
+      error: 'text-blood-text',
+      success: 'text-verdigris-text',
+      warning: 'text-ember-text',
     },
   },
   defaultVariants: {
@@ -203,3 +236,20 @@ export const helperTextVariants = cva('text-sm transition-colors', {
 });
 
 export type HelperTextVariants = VariantProps<typeof helperTextVariants>;
+
+/**
+ * Floating layers (menus, popovers, tooltips, dialogs, toasts): the elevated
+ * surface, a 1px divider edge, the 6px object radius and the one overlay
+ * shadow. Nothing in the page flow takes a shadow; the design ratchet keeps
+ * shadow-overlay inside this file and SideDrawer.
+ */
+export const OVERLAY_SURFACE =
+  'rounded-md border border-divider bg-surface-elevated shadow-overlay';
+
+/**
+ * Edit-mode cue on an ornament (medallion, AC shield) that opens an anchored
+ * editor: a faint dashed outline, always shown so touch users see it too.
+ * Keyboard focus swaps it for the solid brass outline.
+ */
+export const EDITABLE_ORNAMENT =
+  'outline-1 outline-dashed outline-offset-2 outline-input-border focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring';

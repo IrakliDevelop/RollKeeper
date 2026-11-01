@@ -52,20 +52,10 @@ describe('CurrencyManager', () => {
       <CurrencyManager currency={mockCurrency} onAddCurrency={onAddCurrency} />
     );
 
-    // Find the Gold label in the Manage Currency section, then find its input
-    const goldLabels = screen.getAllByText('Gold');
-    // The last "Gold" label is in the Manage Currency section
-    const manageGoldLabel = goldLabels[goldLabels.length - 1];
-    const goldSection = manageGoldLabel.closest('.space-y-2')!;
-    const goldInput = goldSection.querySelector('input')!;
-
-    fireEvent.change(goldInput, { target: { value: '50' } });
-
-    const addButtons = goldSection.querySelectorAll('button');
-    const addButton = Array.from(addButtons).find(b =>
-      b.textContent?.includes('Add')
-    )!;
-    fireEvent.click(addButton);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Gold amount' }), {
+      target: { value: '50' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add gold' }));
 
     expect(onAddCurrency).toHaveBeenCalledWith('gold', 50);
   });
@@ -79,18 +69,10 @@ describe('CurrencyManager', () => {
       />
     );
 
-    const silverLabels = screen.getAllByText('Silver');
-    const manageSilverLabel = silverLabels[silverLabels.length - 1];
-    const silverSection = manageSilverLabel.closest('.space-y-2')!;
-    const silverInput = silverSection.querySelector('input')!;
-
-    fireEvent.change(silverInput, { target: { value: '10' } });
-
-    const spendButtons = silverSection.querySelectorAll('button');
-    const spendButton = Array.from(spendButtons).find(b =>
-      b.textContent?.includes('Spend')
-    )!;
-    fireEvent.click(spendButton);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Silver amount' }), {
+      target: { value: '10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Spend silver' }));
 
     expect(onSubtractCurrency).toHaveBeenCalledWith('silver', 10);
   });
@@ -106,16 +88,8 @@ describe('CurrencyManager', () => {
       />
     );
 
-    // Find gold section in manage area
-    const goldLabels = screen.getAllByText('Gold');
-    const manageGoldLabel = goldLabels[goldLabels.length - 1];
-    const goldSection = manageGoldLabel.closest('.space-y-2')!;
-    const buttons = goldSection.querySelectorAll('button');
-
-    // Both Add and Spend should be disabled (input defaults to 0)
-    buttons.forEach(button => {
-      expect(button).toBeDisabled();
-    });
+    expect(screen.getByRole('button', { name: 'Add gold' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Spend gold' })).toBeDisabled();
   });
 
   it('hides Manage Currency section when readonly', () => {
@@ -126,19 +100,39 @@ describe('CurrencyManager', () => {
         onAddCurrency={vi.fn()}
       />
     );
-    expect(screen.queryByText('Manage Currency')).toBeNull();
+    expect(screen.queryByText('Add or spend coins')).toBeNull();
   });
 
-  it('shows Currency Conversion section by default in non-compact mode', () => {
+  it('shows plain conversion content by default in non-compact mode', () => {
     render(<CurrencyManager currency={mockCurrency} />);
-    expect(screen.getAllByText('Currency Conversion').length).toBeGreaterThan(
-      0
-    );
+    expect(screen.getByRole('heading', { name: 'Conversion' })).toBeVisible();
+    expect(
+      screen.getByText(
+        '10 cp = 1 sp · 5 sp = 1 ep · 10 sp = 1 gp · 10 gp = 1 pp'
+      )
+    ).toBeVisible();
   });
 
   it('hides Currency Conversion section in compact mode', () => {
     render(<CurrencyManager currency={mockCurrency} compact />);
-    expect(screen.queryByText('Currency Conversion')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Conversion' })).toBeNull();
+  });
+
+  it('keeps total-only and hidden-balance modes distinct', () => {
+    const { rerender } = render(
+      <CurrencyManager currency={mockCurrency} showOnlyTotal />
+    );
+    expect(screen.getByText('125 gp')).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Gold amount' })).toBeNull();
+    rerender(
+      <CurrencyManager
+        currency={mockCurrency}
+        hideIndividualCurrencies
+        onAddCurrency={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('textbox', { name: 'Gold amount' })).toBeVisible();
+    expect(screen.queryByText('100')).toBeNull();
   });
 
   it('renders compact layout with abbreviated title', () => {

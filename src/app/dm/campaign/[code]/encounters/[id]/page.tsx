@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import { Swords } from 'lucide-react';
 import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { EncounterView } from '@/components/ui/encounter/EncounterView';
 import { useHydration } from '@/hooks/useHydration';
@@ -16,22 +15,17 @@ export default function EncounterPage() {
   if (!hasHydrated) {
     return (
       <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+        <div className="text-muted">Loading encounter…</div>
       </div>
     );
   }
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
+      <header className="border-divider bg-surface-secondary border-b">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Swords className="text-accent-red-text mr-3 h-6 w-6" />
-              <h1 className="text-heading text-xl font-bold">
-                Encounter Tracker
-              </h1>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <h1 className="type-heading text-heading">Encounter</h1>
             <HeaderTrailing showSystemOption />
           </div>
         </div>

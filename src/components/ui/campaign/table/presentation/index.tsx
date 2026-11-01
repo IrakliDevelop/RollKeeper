@@ -19,14 +19,14 @@ import { useTableDisplayStatus } from './useTableDisplayStatus';
 
 const SHOW_BLOCKED = "This scene isn't ready to show yet.";
 const MESSAGE_TONE = {
-  success: 'text-accent-emerald-text',
-  info: 'text-accent-amber-text',
-  error: 'text-accent-red-text',
+  success: 'text-verdigris-text',
+  info: 'text-ember-text',
+  error: 'text-blood-text',
 } as const;
 const DISPLAY_TONE = {
-  success: 'text-accent-emerald-text',
+  success: 'text-verdigris-text',
   muted: 'text-muted',
-  warning: 'text-accent-amber-text',
+  warning: 'text-ember-text',
 } as const;
 
 /**
@@ -128,97 +128,79 @@ export function TablePresentationView(
   return (
     <section
       aria-label="What players see controls"
-      className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+      className="flex w-full min-w-0 flex-col gap-2"
     >
-      <div
-        role="status"
-        aria-label="What players see"
-        aria-live="polite"
-        className="min-w-0 text-xs"
-      >
-        {/* The display line shares the audience row when it fits (390 px). */}
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div
+          role="status"
+          aria-label="What players see"
+          aria-live="polite"
+          className="type-small min-w-0 flex-1 basis-52"
+        >
           <p
-            className="text-heading line-clamp-2 min-w-0 font-medium break-words"
+            className="type-ui text-heading line-clamp-2 min-w-0 break-words"
             title={lines.audience}
           >
             {lines.audience}
           </p>
-          {displayLine && (
-            <p
-              className={`${DISPLAY_TONE[displayLine.tone]} min-w-0 break-words`}
-            >
-              {displayLine.text}
-            </p>
-          )}
-          {calibrationLine && (
-            <p className="text-muted min-w-0 break-words">
-              {calibrationLine.text}
-            </p>
+          {lines.preparation && props.sceneId !== null && (
+            <p className="text-muted break-words">{lines.preparation}</p>
           )}
         </div>
-        {lines.preparation && props.sceneId !== null && (
-          <p className="text-muted break-words">{lines.preparation}</p>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <OpenDisplayButton
-          code={props.campaignCode}
-          dmId={props.dmId}
-          onLaunched={refresh}
-        />
-        {actions.includes('show') && (
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={disabled || showBlocked}
-            title={showBlockedReason ? SHOW_BLOCKED : undefined}
-            aria-describedby={reasonFor('show')}
-            onClick={presentation.show}
-          >
-            Show this scene
-          </Button>
-        )}
-        {actions.includes('reveal') && (
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={disabled}
-            aria-describedby={reasonFor('other')}
-            onClick={presentation.reveal}
-          >
-            {revealLabel(descriptor, sceneId, props.sceneName, labels)}
-          </Button>
-        )}
-        {actions.includes('blank') && (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            aria-describedby={reasonFor('other')}
-            onClick={presentation.blank}
-          >
-            Blank screen
-          </Button>
-        )}
-        {actions.includes('unpresent') && (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={disabled}
-            aria-describedby={reasonFor('other')}
-            onClick={presentation.unpresent}
-          >
-            Stop showing
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {actions.includes('show') && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={disabled || showBlocked}
+              title={showBlockedReason ? SHOW_BLOCKED : undefined}
+              aria-describedby={reasonFor('show')}
+              onClick={presentation.show}
+            >
+              Show this scene
+            </Button>
+          )}
+          {actions.includes('reveal') && (
+            <Button
+              variant={actions.includes('show') ? 'secondary' : 'primary'}
+              size="sm"
+              disabled={disabled}
+              aria-describedby={reasonFor('other')}
+              onClick={presentation.reveal}
+            >
+              {revealLabel(descriptor, sceneId, props.sceneName, labels)}
+            </Button>
+          )}
+          {actions.includes('blank') && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              aria-describedby={reasonFor('other')}
+              onClick={presentation.blank}
+            >
+              Blank screen
+            </Button>
+          )}
+          {actions.includes('unpresent') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={disabled}
+              aria-describedby={reasonFor('other')}
+              onClick={presentation.unpresent}
+            >
+              Stop showing
+            </Button>
+          )}
+        </div>
       </div>
       {showBlockedReason && (
-        <p id={blockedReasonId} className="text-muted text-xs">
+        <p id={blockedReasonId} className="type-small text-muted">
           {SHOW_BLOCKED}
         </p>
       )}
-      <div aria-live="polite" className="min-w-0 text-xs empty:hidden">
+      <div aria-live="polite" className="type-small min-w-0 empty:hidden">
         {!holder && (
           <p id={liveReasonId} className="text-muted">
             {LIVE_CONTROL_REQUIRED}
@@ -237,6 +219,32 @@ export function TablePresentationView(
             )}
           </div>
         )}
+      </div>
+      <div className="border-divider flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2">
+        <div
+          role="status"
+          aria-label="Table display"
+          aria-live="polite"
+          className="type-small flex min-w-0 flex-wrap items-baseline gap-x-2"
+        >
+          {displayLine && (
+            <p
+              className={`${DISPLAY_TONE[displayLine.tone]} min-w-0 break-words`}
+            >
+              {displayLine.text}
+            </p>
+          )}
+          {calibrationLine && (
+            <p className="text-muted min-w-0 break-words">
+              {calibrationLine.text}
+            </p>
+          )}
+        </div>
+        <OpenDisplayButton
+          code={props.campaignCode}
+          dmId={props.dmId}
+          onLaunched={refresh}
+        />
       </div>
     </section>
   );

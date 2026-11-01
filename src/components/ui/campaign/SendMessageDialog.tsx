@@ -138,6 +138,7 @@ export function SendMessageDialog({
               Message <span className="text-faint font-normal">(optional)</span>
             </label>
             <RichTextEditor
+              ariaLabel="Message"
               content={content}
               onChange={setContent}
               placeholder="Write your message..."

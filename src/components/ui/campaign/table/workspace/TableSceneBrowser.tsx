@@ -6,6 +6,8 @@ import { ImageOff, Layers, Plus, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { cn } from '@/utils/cn';
 import type { TableSceneRecordV1 } from '@/lib/table/schema';
 
 export const SCENES_PANEL_ID = 'table-scenes-panel';
@@ -19,7 +21,8 @@ export function TableScenesToggle(props: {
 }) {
   return (
     <Button
-      variant={props.open ? 'primary' : 'outline'}
+      variant="outline"
+      selected={props.open}
       size="sm"
       id={SCENES_TOGGLE_ID}
       aria-expanded={props.open}
@@ -39,7 +42,7 @@ function SceneThumbnail(props: { url: string }) {
   const [broken, setBroken] = useState(false);
   if (!props.url || broken || VIDEO.test(props.url)) {
     return (
-      <span className="bg-surface-secondary text-muted flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded text-[10px]">
+      <span className="bg-surface-secondary text-muted flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded-sm text-xs">
         <ImageOff size={14} aria-hidden="true" />
         No image
       </span>
@@ -55,7 +58,7 @@ function SceneThumbnail(props: { url: string }) {
       referrerPolicy="no-referrer"
       loading="lazy"
       onError={() => setBroken(true)}
-      className="bg-surface-secondary h-12 w-16 shrink-0 rounded object-cover"
+      className="bg-surface-secondary h-12 w-16 shrink-0 rounded-sm object-cover"
     />
   );
 }
@@ -97,10 +100,20 @@ export function TableSceneBrowser(props: {
           close();
         }
       }}
-      className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,4rem)] bottom-2 left-2 z-40 flex w-[min(20rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border shadow-md"
+      style={{
+        maxHeight: 'calc(100dvh - var(--dm-vtt-panel-top, 4rem) - 1rem)',
+      }}
+      className={cn(
+        OVERLAY_SURFACE,
+        'pointer-events-auto fixed top-[var(--dm-vtt-panel-top,4rem)] left-2 z-40 flex w-[min(20rem,calc(100vw-1rem))] flex-col overflow-hidden'
+      )}
     >
-      <div className="border-divider flex items-center justify-between gap-2 border-b px-3 py-2">
-        <h2 className="text-heading text-sm font-semibold">Scenes</h2>
+      <div className="border-divider flex shrink-0 items-center gap-2 border-b px-3 py-2">
+        <h2 className="type-subheading text-heading min-w-0 flex-1">Scenes</h2>
+        <Button size="sm" onClick={props.onCreate} disabled={props.busy}>
+          <Plus size={14} aria-hidden="true" />
+          New scene
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -110,49 +123,47 @@ export function TableSceneBrowser(props: {
           <X size={14} aria-hidden="true" />
         </Button>
       </div>
-      <p className="text-muted px-3 pt-2 text-xs">
+      <p className="type-small text-muted shrink-0 px-3 py-2">
         Picking a scene here doesn&apos;t change what players see.
       </p>
-      <div className="flex flex-wrap gap-2 px-3 py-2">
-        <Button size="sm" onClick={props.onCreate} disabled={props.busy}>
-          <Plus size={14} aria-hidden="true" />
-          New scene
-        </Button>
-      </div>
       {props.status && (
         <p
           role={props.status.tone}
           title={props.status.detail}
-          className={`px-3 text-xs ${props.status.tone === 'alert' ? 'text-accent-red-text' : 'text-muted'}`}
+          className={`type-small shrink-0 px-3 pb-2 ${props.status.tone === 'alert' ? 'text-blood-text' : 'text-muted'}`}
         >
           {props.status.text}
         </p>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div className="min-h-0 overflow-y-auto px-2 pb-2">
         {props.scenes.length === 0 ? (
-          <p className="text-muted px-1 py-2 text-xs">
+          <p className="type-small text-muted px-1 py-2">
             No scenes yet. Create one or add a battle map.
           </p>
         ) : (
-          <ul aria-label="Scenes on this Table" className="space-y-1">
+          <ul
+            aria-label="Scenes on this Table"
+            className="divide-divider divide-y"
+          >
             {props.scenes.map(scene => {
               const selected = scene.sceneId === props.selectedSceneId;
               const shown = presented === scene.sceneId;
               return (
                 <li key={scene.sceneId}>
-                  <button
+                  <Button
+                    variant="ghost"
+                    selected={selected}
                     type="button"
                     aria-current={selected ? 'true' : undefined}
                     onClick={() => props.onSelect(scene.sceneId)}
-                    className={`hover:bg-surface-secondary focus-visible:ring-accent-blue-border flex w-full items-center gap-2 rounded-lg border p-2 text-left focus-visible:ring-2 focus-visible:outline-none ${
-                      selected
-                        ? 'border-accent-blue-border bg-accent-blue-bg'
-                        : 'border-divider'
-                    }`}
+                    className={cn(
+                      'h-auto w-full items-center justify-start border p-2 text-left',
+                      selected ? 'bg-brass-bg' : 'border-transparent'
+                    )}
                   >
                     <SceneThumbnail url={scene.map.mapImageUrl} />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="text-heading truncate text-sm font-medium">
+                      <span className="type-ui text-heading line-clamp-2 break-words">
                         {scene.map.name}
                       </span>
                       <span className="flex flex-wrap gap-1">
@@ -173,18 +184,18 @@ export function TableSceneBrowser(props: {
                         )}
                       </span>
                     </span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
           </ul>
         )}
         <div className="border-divider mt-3 border-t pt-2">
-          <h3 className="text-heading px-1 text-xs font-semibold">
+          <h3 className="type-label-heading text-heading px-1">
             Add from battle maps
           </h3>
           {props.adoptable.length === 0 ? (
-            <p className="text-muted px-1 py-1 text-xs">
+            <p className="type-small text-muted px-1 py-1">
               Every battle map is already on this Table.
             </p>
           ) : (
@@ -202,13 +213,19 @@ export function TableSceneBrowser(props: {
               ))}
             </div>
           )}
-          <Link
-            href={props.battleMapsHref}
-            className="text-link px-1 text-xs underline"
-          >
+        </div>
+      </div>
+      <div className="border-divider shrink-0 border-t px-3 py-2">
+        <Button
+          asChild
+          variant="link"
+          size="sm"
+          className="h-auto px-0 text-left whitespace-normal"
+        >
+          <Link href={props.battleMapsHref}>
             Export or import a Table on Battle Maps
           </Link>
-        </div>
+        </Button>
       </div>
     </section>
   );

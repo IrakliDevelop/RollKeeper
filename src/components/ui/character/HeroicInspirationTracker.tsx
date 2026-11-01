@@ -14,6 +14,7 @@ interface HeroicInspirationTrackerProps {
   showStackableControl?: boolean;
   dmControlled?: boolean;
   onToggleStackable?: (enabled: boolean) => void;
+  editing?: boolean;
   className?: string;
 }
 
@@ -27,6 +28,7 @@ export default function HeroicInspirationTracker({
   showStackableControl,
   dmControlled,
   onToggleStackable,
+  editing = false,
   className = '',
 }: HeroicInspirationTrackerProps) {
   // Use the shared HeroicInspirationTracker component with full functionality
@@ -41,6 +43,7 @@ export default function HeroicInspirationTracker({
       showStackableControl={showStackableControl}
       dmControlled={dmControlled}
       onToggleStackable={onToggleStackable}
+      editing={editing}
       readonly={false}
       compact={false}
       hideControls={false}

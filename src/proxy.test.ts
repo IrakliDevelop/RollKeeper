@@ -30,7 +30,7 @@ describe('proxy auth refresh and dev-route gating', () => {
   it('returns 404 for a nested dev-only path in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     const res = await proxy(
-      new NextRequest('http://localhost/design-system/buttons')
+      new NextRequest('http://localhost/dice-components-demo/rolls')
     );
     expect(res.status).toBe(404);
   });

@@ -87,8 +87,9 @@ const player: EncounterEntity = {
 };
 
 /**
- * Byte-for-byte guard (R2-4): without the optional `capabilities` prop the
- * legacy combat-screen detail renders exactly as before PR03.
+ * Without `capabilities`, retain the full encounter detail with the current
+ * design-system controls. Normalize only React's generated IDs so suite order
+ * does not affect the snapshots; linked IDs remain distinct and consistent.
  */
 describe('CombatantDetail legacy rendering', () => {
   it.each([
@@ -98,6 +99,11 @@ describe('CombatantDetail legacy rendering', () => {
     const { container } = render(
       <CombatantDetail entity={entity} actions={actions} />
     );
-    expect(container.innerHTML).toMatchSnapshot();
+    const ids = new Map<string, string>();
+    const html = container.innerHTML.replace(/«[^»]+»/g, id => {
+      if (!ids.has(id)) ids.set(id, `«generated-${ids.size}»`);
+      return ids.get(id)!;
+    });
+    expect(html).toMatchSnapshot();
   });
 });

@@ -27,6 +27,7 @@ export type SkillName =
   | 'survival';
 
 import type { CharacterDiceSet } from './dice';
+import type { Theme } from './theme';
 import type { SpellbookState } from './spells';
 import type { Summon } from './summon';
 import type { SpellAoe } from './spellAoe';
@@ -731,6 +732,8 @@ export interface CharacterState {
   stackableInspiration?: boolean; // House-rule: allow holding more than one Heroic Inspiration. Default false. When in a campaign, materialized from the DM's setting.
   /** 3D dice appearance. Absent uses Pollyroll's classic set. */
   diceSet?: CharacterDiceSet;
+  /** Theme override saved with this character. Absent follows the app theme. */
+  themePreference?: Theme;
 
   // Summons (familiars, summoned creatures)
   summons?: Summon[];

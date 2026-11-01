@@ -1,15 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  Heart,
-  Shield,
   ClockAlert,
-  Brain,
   Zap,
-  Footprints,
-  Award,
-  Sparkles,
   Sun,
   Moon,
   Plus,
@@ -19,10 +13,15 @@ import {
   Bird,
   Mountain,
   Waves,
-  Wand2,
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
-import { NumberField } from '@/components/ui/forms/NumberInput';
+import * as Popover from '@radix-ui/react-popover';
+import { Button } from '@/components/ui/forms/button';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { SpeedEditor } from './SpeedEditor';
+import { badgeVariants } from '@/components/ui/layout/badge';
+import { AcShield } from '@/components/ui/game/AcShield';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import {
   calculateCharacterArmorClass,
   calculateSpellAttackBonus,
@@ -32,10 +31,13 @@ import {
   getBuffSpeedBonus,
 } from '@/utils/calculations';
 import { getActiveClassResources } from '@/utils/classResources';
+import { cn } from '@/utils/cn';
 import {
   CLASS_RESOURCE_ICONS,
-  CLASS_RESOURCE_COLORS,
+  CLASS_RESOURCE_STYLE,
 } from './classResourceStyles';
+import { HudHitPoints } from './HudHitPoints';
+import { HudStat } from './HudStat';
 
 interface CharacterHUDProps {
   character: CharacterState;
@@ -55,6 +57,11 @@ interface CharacterHUDProps {
   onNavigateToSpells?: () => void;
   onToggleBuff?: (id: string) => void;
   onUpdateCharacter?: (updates: Partial<CharacterState>) => void;
+  /**
+   * Sheet mode: false shows the speed as a plain tile (no popover). Defaults
+   * to true (editable) for callers outside the character sheet.
+   */
+  editing?: boolean;
 }
 
 export default function CharacterHUD({
@@ -75,6 +82,7 @@ export default function CharacterHUD({
   onNavigateToSpells,
   onToggleBuff,
   onUpdateCharacter,
+  editing = true,
 }: CharacterHUDProps) {
   const totalLevel = character.totalLevel || character.level;
   const proficiencyBonus = getProficiencyBonus(totalLevel);
@@ -84,11 +92,6 @@ export default function CharacterHUD({
   const initiativeModifier = character.initiative.isOverridden
     ? character.initiative.value
     : Math.floor((character.abilities.dexterity - 10) / 2);
-
-  const hpCurrent = character.hitPoints.current;
-  const hpMax = character.hitPoints.max;
-  const hpTemp = character.hitPoints.temporary;
-  const hpPercent = hpMax > 0 ? Math.round((hpCurrent / hpMax) * 100) : 0;
 
   const activeConditionsCount =
     (character.conditionsAndDiseases?.activeConditions?.length || 0) +
@@ -117,100 +120,62 @@ export default function CharacterHUD({
   const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
   const activeBuffCount = activeBuffs.length;
 
-  const getHPColor = () => {
-    if (hpPercent > 60) return 'bg-emerald-500';
-    if (hpPercent > 30) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  const getHPTextColor = () => {
-    if (hpCurrent === 0) return 'text-red-500';
-    if (hpPercent <= 30) return 'text-amber-500';
-    return 'text-emerald-600 dark:text-emerald-400';
-  };
-
   const hasContextualIndicators =
     isConcentrating || activeConditionsCount > 0 || activeBuffCount > 0;
 
   return (
-    <div className="border-divider bg-surface-raised mx-auto mb-4 max-w-7xl rounded-xl border p-4 shadow-sm">
+    <div className="mx-auto mb-4 max-w-7xl">
       {/* Row 1: Stats + Status Indicators */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Primary Stats */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-stretch gap-2">
           {/* HP */}
-          <button
-            onClick={onNavigateToCombat}
-            className="border-divider hover:bg-surface-hover flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors"
-            title="Go to Combat tab"
-          >
-            <Heart className="h-5 w-5 text-red-500" />
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1">
-                <span className={`text-lg font-bold ${getHPTextColor()}`}>
-                  {hpCurrent}
-                </span>
-                <span className="text-faint text-sm">/</span>
-                <span className="text-muted text-sm">{hpMax}</span>
-                {hpTemp > 0 && (
-                  <span className="text-sm font-medium text-blue-500">
-                    +{hpTemp}
-                  </span>
-                )}
-              </div>
-              <div className="bg-surface-secondary h-1.5 w-20 overflow-hidden rounded-full">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${getHPColor()}`}
-                  style={{ width: `${Math.min(100, hpPercent)}%` }}
-                />
-              </div>
-            </div>
-          </button>
-
-          {/* AC */}
-          <StatChip
-            icon={<Shield className="h-5 w-5 text-blue-500" />}
-            value={String(totalAC)}
-            label="AC"
+          <HudHitPoints
+            characterId={character.id}
+            current={character.hitPoints.current}
+            max={character.hitPoints.max}
+            temporary={character.hitPoints.temporary}
             onClick={onNavigateToCombat}
           />
 
+          {/* AC */}
+          <HudStat caption="AC" onClick={onNavigateToCombat}>
+            <AcShield value={totalAC} />
+          </HudStat>
+
           {/* Initiative */}
-          <StatChip
-            icon={<Zap className="h-5 w-5 text-amber-500" />}
+          <HudStat
+            caption="Initiative"
             value={formatModifier(initiativeModifier)}
-            label="Init"
           />
 
           {/* Speed */}
           <SpeedChip
             character={character}
+            editing={editing}
             onUpdateCharacter={onUpdateCharacter}
           />
 
           {/* Proficiency Bonus */}
-          <StatChip
-            icon={<Award className="h-5 w-5 text-purple-500" />}
+          <HudStat
+            caption="Proficiency"
             value={formatModifier(proficiencyBonus)}
-            label="Prof"
           />
 
           {/* Spell Attack - conditional */}
           {spellAttackBonus !== null && (
-            <StatChip
-              icon={<Wand2 className="h-5 w-5 text-indigo-500" />}
+            <HudStat
+              caption="Spell attack"
               value={formatModifier(spellAttackBonus)}
-              label="Atk"
               onClick={onNavigateToSpells}
             />
           )}
 
           {/* Spell Save DC - conditional */}
           {spellSaveDC !== null && (
-            <StatChip
-              icon={<Sparkles className="h-5 w-5 text-indigo-500" />}
+            <HudStat
+              caption="Spell save DC"
               value={String(spellSaveDC)}
-              label="DC"
               onClick={onNavigateToSpells}
             />
           )}
@@ -218,33 +183,35 @@ export default function CharacterHUD({
 
         {/* Contextual Indicators */}
         {hasContextualIndicators && (
-          <div className="border-divider flex flex-wrap items-center gap-2 border-l pl-3">
+          <div className="border-divider flex flex-wrap items-center gap-2 border-l pl-3 pointer-coarse:gap-x-3 pointer-coarse:gap-y-6">
             {isConcentrating && (
-              <button
-                onClick={onStopConcentration}
-                className="bg-accent-amber-bg text-accent-amber-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
-                title={`Concentrating on ${character.concentration.spellName || 'spell'} — click to stop`}
-              >
-                <Brain className="h-3.5 w-3.5 shrink-0" />
-                <span className="max-w-[100px] truncate">
-                  {character.concentration.spellName || 'Conc.'}
-                </span>
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <ConditionChip
+                kind="concentration"
+                name={`Concentrating on ${character.concentration.spellName || 'spell'}`}
+                onRemove={onStopConcentration}
+              />
             )}
 
             {activeConditionsCount > 0 && (
               <button
+                type="button"
                 onClick={onNavigateToConditions}
-                className="bg-accent-red-bg text-accent-red-text animate-condition-pulse flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
-                title="View active conditions"
+                aria-label={
+                  activeConditionsCount === 1
+                    ? '1 condition. Open the Combat tab'
+                    : `${activeConditionsCount} conditions. Open the Combat tab`
+                }
+                className={cn(
+                  badgeVariants({ variant: 'warning' }),
+                  'hover:bg-surface-hover focus-visible:outline-ring min-h-6 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+                )}
               >
-                <AlertCircle className="h-3.5 w-3.5" />
+                <AlertCircle className="size-3.5" aria-hidden="true" />
                 <span>{activeConditionsCount}</span>
               </button>
             )}
 
-            {/* Active Buffs */}
+            {/* Active buffs */}
             {activeBuffCount > 0 && (
               <ActiveBuffsIndicator
                 buffs={activeBuffs}
@@ -258,88 +225,86 @@ export default function CharacterHUD({
 
       {/* Row 2: Quick Actions */}
       <div className="border-divider mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-        {/* Short Rest */}
-        <button
+        <Button
+          type="button"
+          size="sm"
+          aria-label="Take a short rest"
           onClick={onShortRest}
-          className="border-divider text-muted hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:text-amber-600"
-          title="Short Rest"
+          leftIcon={<Sun className="size-4" aria-hidden />}
         >
-          <Sun className="h-4 w-4" />
           <span className="hidden sm:inline">Short</span>
-        </button>
-
-        {/* Long Rest */}
-        <button
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          aria-label="Take a long rest"
           onClick={onLongRest}
-          className="border-divider text-muted hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:text-indigo-600"
-          title="Long Rest"
+          leftIcon={<Moon className="size-4" aria-hidden />}
         >
-          <Moon className="h-4 w-4" />
           <span className="hidden sm:inline">Long</span>
-        </button>
-
-        {/* Day Counter */}
-        <div className="border-divider text-muted flex items-center gap-1 rounded-lg border px-2 py-1.5">
+        </Button>
+        <div className="text-muted flex items-center gap-1">
           {calendarDays == null && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Go back a day"
               onClick={onDecrementDays}
-              className="hover:text-body rounded p-0.5 transition-colors"
-              title="Decrease day"
             >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
+              <Minus className="size-3.5" aria-hidden />
+            </Button>
           )}
-          <span className="min-w-[48px] text-center text-sm font-medium">
+          <span className="type-ui min-w-12 text-center">
             Day {(calendarDays ?? character.daysSpent ?? 0) + 1}
           </span>
           {calendarDays == null && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Advance a day"
               onClick={onIncrementDays}
-              className="hover:text-body rounded p-0.5 transition-colors"
-              title="Increase day"
             >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
+              <Plus className="size-3.5" aria-hidden />
+            </Button>
           )}
         </div>
 
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Heroic Inspiration */}
-        <button
+        <Button
+          type="button"
+          size="sm"
+          selected={hasInspiration}
           onClick={onToggleInspiration}
-          className={`relative rounded-lg border px-2.5 py-2 transition-colors ${
+          className="relative"
+          aria-label={
             hasInspiration
-              ? 'border-amber-400 bg-amber-50 text-amber-600 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-400'
-              : 'border-divider text-muted hover:bg-surface-hover hover:text-amber-600'
-          }`}
-          title={
-            hasInspiration
-              ? `Use Heroic Inspiration (${inspirationCount} available)`
-              : 'Add Heroic Inspiration'
+              ? `Use heroic inspiration (${inspirationCount} left)`
+              : 'Gain heroic inspiration'
           }
         >
-          <Sparkles
-            className={`h-4 w-4 ${hasInspiration ? 'fill-current' : ''}`}
-          />
+          <Sun className="size-4" aria-hidden />
           {inspirationCount > 1 && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-bold text-white dark:bg-amber-400 dark:text-amber-950">
+            <span className="type-caption bg-brass-fill text-on-brass absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full">
               {inspirationCount}
             </span>
           )}
-        </button>
+        </Button>
 
         {/* Class resource chips */}
         {onUseClassResource &&
           onRestoreClassResource &&
           classResourceChips.map(resource => {
             const Icon = CLASS_RESOURCE_ICONS[resource.definition.icon];
-            const colors = CLASS_RESOURCE_COLORS[resource.definition.color];
             const isPool = resource.definition.displayStyle === 'pool';
             const hasUses = resource.usesRemaining > 0;
             return (
-              <button
+              <Button
+                type="button"
+                size="sm"
                 key={resource.definition.id}
                 onClick={
                   isPool
@@ -349,225 +314,121 @@ export default function CharacterHUD({
                       : () => onRestoreClassResource(resource.definition.id)
                 }
                 aria-disabled={isPool || undefined}
-                className={`relative rounded-lg border px-2.5 py-2 transition-colors ${
+                className={`relative ${
                   hasUses
-                    ? colors.chipOn
+                    ? CLASS_RESOURCE_STYLE.chipOn
                     : 'border-divider text-muted hover:bg-surface-hover'
                 } ${isPool ? 'cursor-default' : ''}`}
-                title={
+                aria-label={
                   isPool
-                    ? `${resource.definition.name}: ${resource.usesRemaining}/${resource.maxUses} (manage in Actions tab)`
+                    ? `${resource.definition.name}: ${resource.usesRemaining} of ${resource.maxUses}. Change it on the Actions tab.`
                     : hasUses
-                      ? `Expend ${resource.definition.name} (${resource.usesRemaining}/${resource.maxUses})`
-                      : `Restore ${resource.definition.name} (0/${resource.maxUses})`
+                      ? `Spend 1 ${resource.definition.name} (${resource.usesRemaining} of ${resource.maxUses} left)`
+                      : `Restore 1 ${resource.definition.name}`
                 }
               >
                 <Icon className="h-4 w-4" />
                 <span className="bg-surface-elevated text-heading border-divider absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border px-0.5 text-[10px] font-bold">
                   {resource.usesRemaining}
                 </span>
-              </button>
+              </Button>
             );
           })}
 
-        {/* Reaction Toggle */}
-        <button
+        <Button
+          type="button"
+          size="sm"
           onClick={onToggleReaction}
-          className={`rounded-lg border px-2.5 py-2 transition-colors ${
+          aria-label="Reaction used"
+          aria-pressed={hasUsedReaction}
+          className={
             hasUsedReaction
-              ? 'border-red-400 bg-red-50 text-red-600 dark:border-red-600 dark:bg-red-950 dark:text-red-400'
-              : 'border-divider text-muted hover:bg-surface-hover hover:text-red-600'
-          }`}
-          title={
-            hasUsedReaction
-              ? 'Reaction used — click to reset'
-              : 'Mark reaction as used'
+              ? 'border-input-border bg-surface-inset text-heading'
+              : ''
           }
         >
-          <ClockAlert className="h-4 w-4" />
-        </button>
+          <ClockAlert className="size-4" aria-hidden />
+        </Button>
       </div>
     </div>
-  );
-}
-
-function StatChip({
-  icon,
-  value,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  onClick?: () => void;
-}) {
-  const Tag = onClick ? 'button' : 'div';
-  return (
-    <Tag
-      className={`border-divider flex items-center gap-1.5 rounded-lg border px-3 py-2.5 ${
-        onClick ? 'hover:bg-surface-hover cursor-pointer transition-colors' : ''
-      }`}
-      title={label}
-      onClick={onClick}
-    >
-      {icon}
-      <span className="text-heading text-lg font-bold">{value}</span>
-      <span className="text-faint hidden text-xs uppercase sm:inline">
-        {label}
-      </span>
-    </Tag>
   );
 }
 
 function SpeedChip({
   character,
+  editing,
   onUpdateCharacter,
 }: {
   character: CharacterState;
+  editing: boolean;
   onUpdateCharacter?: (updates: Partial<CharacterState>) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
   const hasExtraSpeeds = !!(
     character.flySpeed ||
     character.climbSpeed ||
     character.swimSpeed
   );
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
-  return (
-    <div className="relative" ref={popoverRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="border-divider hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors"
-        title="Click to edit speeds"
-      >
-        <Footprints className="h-5 w-5 text-emerald-500" />
-        <span className="text-heading text-lg font-bold">
-          {character.speed + getBuffSpeedBonus(character)}ft
+  const valueLine = (
+    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+      <span className="flex items-baseline">
+        <span className="type-num-lg text-heading">
+          {character.speed + getBuffSpeedBonus(character)}
         </span>
-        {hasExtraSpeeds && (
-          <div className="text-muted flex items-center gap-1 text-xs">
-            {!!character.flySpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Fly ${character.flySpeed}ft`}
-              >
-                <Bird size={10} />
-                {character.flySpeed}
-              </span>
-            )}
-            {!!character.climbSpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Climb ${character.climbSpeed}ft`}
-              >
-                <Mountain size={10} />
-                {character.climbSpeed}
-              </span>
-            )}
-            {!!character.swimSpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Swim ${character.swimSpeed}ft`}
-              >
-                <Waves size={10} />
-                {character.swimSpeed}
-              </span>
-            )}
-          </div>
-        )}
-        <span className="text-faint hidden text-xs uppercase sm:inline">
-          Spd
+        <span className="type-small text-muted">ft</span>
+      </span>
+      {hasExtraSpeeds && (
+        <span className="type-caption text-muted flex items-center gap-1">
+          {!!character.flySpeed && (
+            <span
+              className="flex items-center gap-0.5"
+              title={`Fly ${character.flySpeed}ft`}
+            >
+              <Bird size={10} />
+              {character.flySpeed}
+            </span>
+          )}
+          {!!character.climbSpeed && (
+            <span
+              className="flex items-center gap-0.5"
+              title={`Climb ${character.climbSpeed}ft`}
+            >
+              <Mountain size={10} />
+              {character.climbSpeed}
+            </span>
+          )}
+          {!!character.swimSpeed && (
+            <span
+              className="flex items-center gap-0.5"
+              title={`Swim ${character.swimSpeed}ft`}
+            >
+              <Waves size={10} />
+              {character.swimSpeed}
+            </span>
+          )}
         </span>
-      </button>
-
-      {isOpen && onUpdateCharacter && (
-        <div className="bg-surface-raised border-divider absolute top-full left-0 z-50 mt-1 w-56 rounded-lg border p-3 shadow-lg">
-          <div className="space-y-2">
-            <SpeedRow
-              icon={<Footprints size={14} className="text-emerald-500" />}
-              label="Walk"
-              value={character.speed}
-              onChange={v => onUpdateCharacter({ speed: v })}
-            />
-            <SpeedRow
-              icon={<Bird size={14} className="text-emerald-500" />}
-              label="Fly"
-              value={character.flySpeed || 0}
-              onChange={v => onUpdateCharacter({ flySpeed: v })}
-            />
-            <SpeedRow
-              icon={<Mountain size={14} className="text-emerald-500" />}
-              label="Climb"
-              value={character.climbSpeed || 0}
-              onChange={v => onUpdateCharacter({ climbSpeed: v })}
-            />
-            <SpeedRow
-              icon={<Waves size={14} className="text-emerald-500" />}
-              label="Swim"
-              value={character.swimSpeed || 0}
-              onChange={v => onUpdateCharacter({ swimSpeed: v })}
-            />
-          </div>
-        </div>
       )}
-    </div>
+    </span>
   );
-}
 
-function SpeedRow({
-  icon,
-  label,
-  value,
-  onChange,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
+  if (!editing || !onUpdateCharacter)
+    return <HudStat caption="Speed">{valueLine}</HudStat>;
   return (
-    <div className="flex items-center gap-2">
-      {icon}
-      <span className="text-body w-12 text-xs font-medium">{label}</span>
-      <div className="flex items-center gap-1">
+    <SpeedEditor
+      character={character}
+      onSave={onUpdateCharacter}
+      trigger={
         <button
-          onClick={() => onChange(Math.max(0, value - 5))}
-          className="text-muted hover:text-body hover:bg-surface-hover rounded p-0.5 transition-colors"
+          type="button"
+          aria-label="Edit speeds"
+          className="border-divider hover:bg-surface-hover focus-visible:outline-ring flex cursor-pointer flex-col items-center justify-center rounded-sm border px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         >
-          <Minus size={12} />
+          {valueLine}{' '}
+          <span className="type-caption text-muted whitespace-nowrap">
+            Speed
+          </span>
         </button>
-        <NumberField
-          value={value}
-          onChange={v => onChange(Math.max(0, v ?? 0))}
-          min={0}
-          className="text-heading bg-surface-secondary w-14 [appearance:textfield] rounded px-1.5 py-0.5 text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        />
-        <button
-          onClick={() => onChange(value + 5)}
-          className="text-muted hover:text-body hover:bg-surface-hover rounded p-0.5 transition-colors"
-        >
-          <Plus size={12} />
-        </button>
-        <span className="text-faint text-xs">ft</span>
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -581,56 +442,55 @@ function ActiveBuffsIndicator({
   onToggle?: (id: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
 
   return (
-    <div className="relative" ref={popoverRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="bg-accent-blue-bg text-accent-blue-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
-        title="Active buffs — click to view"
-      >
-        <Zap className="h-3.5 w-3.5" />
-        <span>{buffs.length}</span>
-      </button>
+    <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={
+            buffs.length === 1
+              ? '1 active buff'
+              : `${buffs.length} active buffs`
+          }
+        >
+          <Zap className="size-3.5" aria-hidden />
+          <span>{buffs.length}</span>
+        </Button>
+      </Popover.Trigger>
 
-      {isOpen && (
-        <div className="bg-surface-raised border-divider absolute top-full right-0 z-50 mt-1 w-64 rounded-lg border p-3 shadow-lg">
+      <Popover.Portal>
+        <Popover.Content
+          aria-label="Active buffs"
+          align="end"
+          sideOffset={8}
+          className={`${OVERLAY_SURFACE} z-50 w-64 max-w-[calc(100vw-1rem)] p-3`}
+        >
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-heading text-xs font-bold uppercase">
-              Active Buffs
+            <span className="type-label-heading text-heading">
+              Active buffs
             </span>
             {onNavigate && (
-              <button
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
                 onClick={() => {
                   onNavigate();
                   setIsOpen(false);
                 }}
-                className="text-accent-blue-text text-xs font-medium hover:underline"
               >
-                Manage
-              </button>
+                Manage buffs
+              </Button>
             )}
           </div>
           <div className="space-y-1.5">
             {buffs.map(buff => (
               <div
                 key={buff.id}
-                className="border-divider flex items-center justify-between rounded-md border px-2.5 py-1.5"
+                className="flex items-center justify-between gap-2 py-2 pointer-coarse:min-h-11"
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-heading truncate text-sm font-medium">
@@ -658,19 +518,22 @@ function ActiveBuffsIndicator({
                   </div>
                 </div>
                 {onToggle && (
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onToggle(buff.id)}
-                    className="text-muted hover:text-accent-red-text ml-2 shrink-0 rounded p-0.5 transition-colors"
-                    title={`Deactivate ${buff.name}`}
+                    className="text-muted hover:text-blood-text shrink-0"
+                    aria-label={`Deactivate ${buff.name}`}
                   >
                     <X className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
           </div>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

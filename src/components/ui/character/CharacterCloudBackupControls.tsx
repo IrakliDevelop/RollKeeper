@@ -30,7 +30,7 @@ function EnabledCharacterCloudBackupControls(
   });
 
   return (
-    <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
+    <section className="border-divider mb-6 border-b pb-6">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-heading flex items-center gap-2 text-sm font-semibold">
@@ -55,29 +55,31 @@ function EnabledCharacterCloudBackupControls(
         {props.characters.map(character => (
           <div
             key={character.id}
-            className="border-divider bg-surface-raised flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+            className="border-divider flex flex-wrap items-center justify-between gap-2 border-b py-3"
           >
-            <span className="text-heading text-sm font-medium">
+            <span
+              id={`local-backup-${character.id}-name`}
+              className="text-heading text-sm font-medium"
+            >
               {character.name}
             </span>
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="secondary"
                 size="sm"
-                aria-label={`Back up ${character.name} now`}
                 onClick={() => actions.backup(character)}
                 disabled={actions.busy !== null}
               >
-                Back up now
+                Back up now <span className="sr-only">{character.name}</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                aria-label={`Verify ${character.name} cloud copy`}
                 onClick={() => actions.verify(character)}
                 disabled={actions.busy !== null}
               >
-                Verify cloud copy
+                Verify cloud copy{' '}
+                <span className="sr-only">{character.name}</span>
               </Button>
             </div>
           </div>
@@ -87,12 +89,14 @@ function EnabledCharacterCloudBackupControls(
       {actions.rows.length > 0 && (
         <div className="border-divider mt-4 space-y-2 border-t pt-4">
           {actions.rows.map(row => (
-            <div
-              key={row.id}
-              className="border-divider bg-surface-raised rounded-md border p-3"
-            >
+            <div key={row.id} className="border-divider border-b py-3">
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-heading font-medium">{row.name}</span>
+                <span
+                  id={`cloud-backup-${row.id}-name`}
+                  className="text-heading font-medium"
+                >
+                  {row.name}
+                </span>
                 <Badge
                   variant={row.deleted_at ? 'warning' : 'success'}
                   size="sm"
@@ -102,44 +106,41 @@ function EnabledCharacterCloudBackupControls(
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant="success"
+                  variant="secondary"
                   size="sm"
-                  aria-label={`Restore ${row.name}`}
                   onClick={() => actions.restore(row, false)}
                   disabled={actions.busy !== null}
                 >
-                  Restore
+                  Restore <span className="sr-only">{row.name}</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label={`Restore ${row.name} as copy`}
                   onClick={() => actions.restore(row, true)}
                   disabled={actions.busy !== null}
                 >
-                  Restore as copy
+                  Restore as copy <span className="sr-only">{row.name}</span>
                 </Button>
                 {!row.deleted_at && (
                   <Button
-                    variant="warning"
+                    variant="secondary"
                     size="sm"
                     leftIcon={<Archive size={14} />}
-                    aria-label={`Archive ${row.name} cloud copy`}
                     onClick={() => actions.archive(row)}
                     disabled={actions.busy !== null}
                   >
-                    Archive cloud copy
+                    Archive cloud copy{' '}
+                    <span className="sr-only">{row.name}</span>
                   </Button>
                 )}
                 <Button
                   variant="outline"
                   size="sm"
                   leftIcon={<Download size={14} />}
-                  aria-label={`Download ${row.name} recovery`}
                   onClick={() => actions.download(row)}
                   disabled={actions.busy !== null}
                 >
-                  Download recovery
+                  Download recovery <span className="sr-only">{row.name}</span>
                 </Button>
               </div>
             </div>
@@ -149,14 +150,14 @@ function EnabledCharacterCloudBackupControls(
 
       {actions.status && (
         <p
-          className="text-accent-emerald-text mt-3 flex items-center gap-2 text-sm"
+          className="text-verdigris-text mt-3 flex items-center gap-2 text-sm"
           role="status"
         >
           <ShieldCheck size={16} /> {actions.status}
         </p>
       )}
       {actions.error && (
-        <p className="text-accent-red-text mt-3 text-sm" role="alert">
+        <p className="text-blood-text mt-3 text-sm" role="alert">
           {actions.error}
         </p>
       )}

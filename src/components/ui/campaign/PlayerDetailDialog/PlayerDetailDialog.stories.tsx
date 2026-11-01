@@ -148,6 +148,11 @@ const meta: Meta<typeof PlayerDetailDialog> = {
     open: true,
     onOpenChange: fn(),
   },
+  // "Scores large" is this device's setting: start and leave it unset.
+  beforeEach: () => {
+    localStorage.removeItem('rollkeeper-ui-prefs');
+    return () => localStorage.removeItem('rollkeeper-ui-prefs');
+  },
 };
 
 export default meta;
@@ -214,5 +219,85 @@ export const NonCaster: Story = {
     ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
     await expect(screen.getByText('Greataxe')).toBeInTheDocument();
+  },
+};
+
+const PREFS_KEY = 'rollkeeper-ui-prefs';
+
+/** How many ability cells share the first cell's row. */
+function cellsPerRow(root: HTMLElement) {
+  const tops = Array.from(root.querySelectorAll('[data-ledger-cell]'), cell =>
+    Math.round(cell.getBoundingClientRect().top)
+  );
+  return tops.filter(top => top === tops[0]).length;
+}
+
+/**
+ * The DM's view of a player's abilities: a read-only ledger row, six
+ * across, with the DM's own "Scores large" switch (this device only).
+ */
+export const Abilities: Story = {
+  args: { player: nonCasterPlayer },
+  parameters: {
+    viewport: {
+      options: {
+        desktop: {
+          name: 'Desktop',
+          styles: { width: '1440px', height: '900px' },
+          type: 'desktop',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'desktop', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const screen = body(canvasElement);
+    const dialog = await screen.findByRole('dialog');
+    await expect(
+      within(dialog).getByRole('heading', { level: 3, name: 'Abilities' })
+    ).toBeInTheDocument();
+    await expect(cellsPerRow(dialog)).toBe(6);
+    await expect(
+      within(dialog).queryByRole('button', { name: /^Roll / })
+    ).toBeNull();
+    const row = dialog.querySelector('[data-ledger-row]')!;
+    await expect(row).toHaveAttribute('data-display', 'modifier');
+    await userEvent.click(
+      within(dialog).getByRole('switch', { name: 'Scores large' })
+    );
+    await expect(row).toHaveAttribute('data-display', 'score');
+    // A change made here animates.
+    await expect(
+      getComputedStyle(row.querySelector('[data-number="large"]')!)
+        .animationName
+    ).toBe('rk-number-swap');
+    await expect(JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}')).toEqual({
+      abilityDisplay: 'score',
+    });
+  },
+};
+
+/** On a phone the row wraps 3×2 and the heading row keeps its switch. */
+export const AbilitiesOnPhone: Story = {
+  args: { player: nonCasterPlayer },
+  parameters: {
+    viewport: {
+      options: {
+        phone: {
+          name: 'Phone',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const screen = body(canvasElement);
+    const dialog = await screen.findByRole('dialog');
+    await expect(cellsPerRow(dialog)).toBe(3);
+    await expect(
+      within(dialog).getByRole('switch', { name: 'Scores large' })
+    ).toBeVisible();
   },
 };

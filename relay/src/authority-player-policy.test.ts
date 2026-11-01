@@ -114,6 +114,58 @@ function recordingClient() {
 }
 
 describe('stateless v1 player intent guard', () => {
+  it('forwards public movement to atomic target authorization and rejects DM-only player movement', async () => {
+    const movement = {
+      ...element(),
+      id: 'vtt-movement:party-a',
+      type: 'extension',
+      extensionType: 'vtt:movement',
+      data: {
+        targetId: 'party-a',
+        epoch: 'epoch-a',
+        feet: 5,
+        diagonals: 0,
+        visibility: 'all',
+        trail: [],
+      },
+    };
+    const accepted = recordingClient();
+    await new RedisAuthorityDriver(accepted.client).commit(
+      context('player', 'player-a'),
+      upsert(movement)
+    );
+    expect(accepted.calls).toHaveLength(1);
+    const denied = recordingClient();
+    expect(
+      await new RedisAuthorityDriver(denied.client).commit(
+        context('player', 'player-a'),
+        upsert({ ...movement, data: { ...movement.data, visibility: 'dm' } })
+      )
+    ).toEqual({ status: 'rejected', reason: 'forbidden' });
+    expect(denied.calls).toHaveLength(0);
+    for (const field of [
+      'tokenKind',
+      'characterId',
+      'sceneMemberId',
+      'entityId',
+    ]) {
+      const forged = { ...movement, [field]: 'forged-identity' };
+      expect(
+        playerIntentShapeAllowed(
+          { schema: 1, kind: 'element-upsert', element: forged } as never,
+          'player-a'
+        )
+      ).toBe(false);
+      const blocked = recordingClient();
+      expect(
+        await new RedisAuthorityDriver(blocked.client).commit(
+          context('player', 'player-a'),
+          upsert(forged)
+        )
+      ).toEqual({ status: 'rejected', reason: 'invalid' });
+      expect(blocked.calls).toHaveLength(0);
+    }
+  });
   it('rejects display mutations before any Redis script runs', async () => {
     const { calls, client } = recordingClient();
     const result = await new RedisAuthorityDriver(client).commit(

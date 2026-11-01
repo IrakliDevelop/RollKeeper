@@ -21,8 +21,9 @@ import {
   ShieldOff,
   Eye,
   Languages,
-  Check,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/forms/switch';
+import { LedgerRow, type LedgerCell } from '@/components/ui/game/LedgerRow';
 import { Badge } from '@/components/ui/layout/badge';
 import { XpAwardControl } from '@/components/ui/campaign/XpAwardControl';
 import { SectionTitle, ensureArray, formatMod } from './shared';
@@ -32,6 +33,8 @@ import {
   getProficiencyBonus,
   calculateCharacterArmorClass,
 } from '@/utils/calculations';
+import { getHpNumberColor } from '@/utils/hpColor';
+import { useUiPrefs } from '@/hooks/useUiPrefs';
 import { CharacterState } from '@/types/character';
 
 const ABILITY_KEYS = [
@@ -80,12 +83,32 @@ function formatSkillName(key: string): string {
     .trim();
 }
 
+/**
+ * The six ledger cells from a synced character. Saves use this dialog's
+ * proficiency bonus (total level) and read older blobs safely.
+ */
+function abilityCells(char: CharacterState, profBonus: number): LedgerCell[] {
+  return ABILITY_KEYS.map(ability => {
+    const score = char.abilities?.[ability] ?? 10;
+    const modifier = calculateModifier(score);
+    const save = char.savingThrows?.[ability];
+    const saveProficient = save?.proficient ?? false;
+    return {
+      ability,
+      score,
+      modifier,
+      save:
+        modifier +
+        (saveProficient ? profBonus : 0) +
+        (save?.customModifier ?? 0),
+      saveProficient,
+    };
+  });
+}
+
 function getHpColor(current: number, max: number): string {
   if (max === 0) return 'text-muted';
-  const pct = current / max;
-  if (pct > 0.5) return 'text-green-600 dark:text-green-400';
-  if (pct > 0.25) return 'text-yellow-600 dark:text-yellow-400';
-  return 'text-red-600 dark:text-red-400';
+  return getHpNumberColor(current, max);
 }
 
 interface OverviewTabProps {
@@ -124,6 +147,11 @@ export function OverviewTab({
   const initBonus = char.initiative?.isOverridden
     ? char.initiative.value
     : dexMod;
+  const { prefs, setPref, localChange } = useUiPrefs();
+  const cells = React.useMemo(
+    () => abilityCells(char, profBonus),
+    [char, profBonus]
+  );
 
   return (
     <div className="space-y-6">
@@ -245,35 +273,28 @@ export function OverviewTab({
         )}
       </div>
 
-      {/* ── Ability Scores ── */}
+      {/* ── Abilities ── */}
       <div>
-        <SectionTitle icon={<Gem size={14} />}>Ability Scores</SectionTitle>
-        <div className="grid grid-cols-6 gap-2">
-          {ABILITY_KEYS.map(key => {
-            const score = char.abilities?.[key] ?? 10;
-            const mod = calculateModifier(score);
-            const saveProf = char.savingThrows?.[key]?.proficient ?? false;
-            return (
-              <div
-                key={key}
-                className="bg-surface-secondary rounded-lg p-2 text-center"
-              >
-                <div className="text-muted text-[10px] font-bold uppercase">
-                  {ABILITY_LABELS[key]}
-                </div>
-                <div className="text-heading text-lg font-bold">{score}</div>
-                <div className="text-body text-xs">{formatMod(mod)}</div>
-                {saveProf && (
-                  <div className="mt-0.5 text-[9px] text-green-600 dark:text-green-400">
-                    <span className="inline-flex items-center gap-0.5">
-                      Save <Check className="h-2.5 w-2.5" />
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <SectionTitle
+          icon={<Gem size={14} />}
+          trailing={
+            <Switch
+              label="Scores large"
+              size="sm"
+              checked={prefs.abilityDisplay === 'score'}
+              onCheckedChange={on =>
+                setPref('abilityDisplay', on ? 'score' : 'modifier')
+              }
+            />
+          }
+        >
+          Abilities
+        </SectionTitle>
+        <LedgerRow
+          cells={cells}
+          abilityDisplay={prefs.abilityDisplay}
+          animateSwap={localChange}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

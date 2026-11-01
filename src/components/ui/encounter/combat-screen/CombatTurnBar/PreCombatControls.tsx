@@ -28,13 +28,13 @@ export function PreCombatControls({
   return (
     <>
       <Button
-        variant="primary"
+        variant={isEmpty ? 'secondary' : 'primary'}
         size="sm"
         onClick={onStartCombat}
         disabled={isEmpty}
         leftIcon={<Play size={16} />}
       >
-        Start Combat
+        Start combat
       </Button>
       <Button
         variant="secondary"
@@ -43,7 +43,7 @@ export function PreCombatControls({
         disabled={isEmpty}
         leftIcon={<Dices size={16} />}
       >
-        Roll Initiatives (NPCs/Monsters)
+        Roll NPC and monster initiative
       </Button>
       {canRequestRolls && (
         <Button
@@ -52,14 +52,14 @@ export function PreCombatControls({
           onClick={onRequestPlayerRolls}
           disabled={isEmpty || !hasPlayers}
           leftIcon={<Swords size={16} />}
-          title={
-            requestActive
-              ? 'Re-request (players who already answered are asked again)'
-              : 'Ask players to roll initiative'
-          }
         >
           {requestActive ? 'Re-request player rolls' : 'Request player rolls'}
         </Button>
+      )}
+      {canRequestRolls && requestActive && (
+        <span className="text-muted text-xs">
+          Re-requesting asks players who already rolled to roll again.
+        </span>
       )}
       {canRequestRolls && requestActive && waitingNames.length > 0 && (
         <span className="text-muted text-xs">

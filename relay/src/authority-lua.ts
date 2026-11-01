@@ -8,6 +8,84 @@
  */
 export const AUTHORITY_ROOM_TTL_SECONDS = 172800;
 
+// Mirrored by validMovementEnvelope and the installed SDK movement data validator.
+const MOVEMENT_VALIDATION_LUA = String.raw`
+local MOVEMENT_PREFIX = 'vtt-movement:'
+local function movement_target_id(id)
+  if type(id) == 'string' and string.sub(id, 1, #MOVEMENT_PREFIX) == MOVEMENT_PREFIX then
+    return string.sub(id, #MOVEMENT_PREFIX + 1)
+  end
+  return nil
+end
+local function finite(value)
+  return type(value) == 'number' and value == value and value > -math.huge and value < math.huge
+end
+local function movement_array(value)
+  if type(value) ~= 'table' then return false end
+  local count = 0
+  for key, _ in pairs(value) do
+    if type(key) ~= 'number' or key < 1 or key % 1 ~= 0 then return false end
+    count = count + 1
+  end
+  return count == #value
+end
+local function valid_movement_envelope(element)
+  if type(element) ~= 'table' or type(element.id) ~= 'string' then return false end
+  local targetId = movement_target_id(element.id)
+  if not targetId and element.extensionType ~= 'vtt:movement' then return true end
+  if not targetId or targetId == '' or movement_target_id(targetId)
+    or element.type ~= 'extension' or element.extensionType ~= 'vtt:movement'
+    or type(element.data) ~= 'table' then return false end
+  -- Movement envelopes are never tokens and cannot carry token identities.
+  for _, field in ipairs({'tokenKind','characterId','sceneMemberId','entityId'}) do
+    if element[field] ~= nil and element[field] ~= cjson.null then return false end
+  end
+  local data = element.data
+  if data.targetId ~= targetId or type(data.epoch) ~= 'string'
+    or not finite(data.feet) or data.feet < 0 or not finite(data.diagonals)
+    or data.diagonals < 0 or data.diagonals > 9007199254740991
+    or data.diagonals ~= math.floor(data.diagonals)
+    or (data.visibility ~= 'all' and data.visibility ~= 'dm')
+    or not movement_array(data.trail) then return false end
+  local count = 0
+  for _, run in ipairs(data.trail) do
+    if not movement_array(run) or #run == 0 then return false end
+    count = count + #run
+    if count > 64 then return false end
+    for _, point in ipairs(run) do
+      if type(point) ~= 'table' or not finite(point.x) or not finite(point.y) then return false end
+    end
+  end
+  return true
+end
+`;
+
+// Redis cjson turns [] into {} when it re-encodes an empty table. A reset's
+// empty trail must remain an array in storage, snapshots and publication evidence.
+const MOVEMENT_ENCODING_LUA = String.raw`
+local function element_json(element)
+  if element.type ~= 'extension' or element.extensionType ~= 'vtt:movement'
+    or type(element.data) ~= 'table' or type(element.data.trail) ~= 'table' then
+    return cjson.encode(element)
+  end
+  local dataFields, fields = {}, {}
+  for key, value in pairs(element.data) do
+    local encoded = key == 'trail' and #value == 0 and '[]' or cjson.encode(value)
+    dataFields[#dataFields + 1] = cjson.encode(key) .. ':' .. encoded
+  end
+  for key, value in pairs(element) do
+    local encoded = key == 'data' and ('{' .. table.concat(dataFields, ',') .. '}') or cjson.encode(value)
+    fields[#fields + 1] = cjson.encode(key) .. ':' .. encoded
+  end
+  return '{' .. table.concat(fields, ',') .. '}'
+end
+local function elements_json(elements)
+  local encoded = {}
+  for index, element in ipairs(elements) do encoded[index] = element_json(element) end
+  return '[' .. table.concat(encoded, ',') .. ']'
+end
+`;
+
 /**
  * Trusted host appended to the frozen Fieldnotes fog authority library.
  * KEYS[1..2] and ARGV[1] are permanently reserved for the fog ABI.
@@ -19,6 +97,8 @@ local dedupeKey, dedupeOrderKey, receiptsKey = KEYS[7], KEYS[8], KEYS[9]
 local historyKey, evidenceKey, outboxKey, claimsKey = KEYS[10], KEYS[11], KEYS[12], KEYS[13]
 local controlKey, registryKey = KEYS[14], KEYS[15]
 local playerRateKey = KEYS[16]
+${MOVEMENT_VALIDATION_LUA}
+${MOVEMENT_ENCODING_LUA}
 
 local function reject(reason) return {0, reason} end
 local expectedTypes = {'hash','hash','string','hash','hash','hash','hash','list','hash','list','hash','list','hash','string','hash','hash'}
@@ -234,7 +314,7 @@ end
 local function state_json(elements, layers, fog)
   local fogJson = fog == cjson.null and 'null' or '{"meta":' .. cjson.encode(fog.meta)
     .. ',"tiles":' .. json_array(fog.tiles) .. '}'
-  return '{"elements":' .. json_array(elements) .. ',"layers":' .. json_array(layers)
+  return '{"elements":' .. elements_json(elements) .. ',"layers":' .. json_array(layers)
     .. ',"extensions":{"fog":{"pluginName":"fog","version":1,"data":' .. fogJson .. '}}}'
 end
 local function changed_hash_values(key, changedField, changedValue, remove, clear)
@@ -295,12 +375,22 @@ local function equal_except(stored, incoming, allowed)
   end
   return true
 end
-local PLAYER_MOVE = {position=true}
-local PLAYER_BACKFILL = {position=true, characterId=true}
+-- Core stamps a local edit with version + 1 and removes editor. These are
+-- protocol metadata; they must not turn an otherwise position-only edit
+-- into an unauthorized token reshape.
+local function player_move_metadata(stored, incoming)
+  if not deep_equal(stored.editor, incoming.editor) and not absent(incoming.editor) then return false end
+  if deep_equal(stored.version, incoming.version) then return true end
+  return safe_integer(stored.version)
+    and safe_integer(incoming.version) and incoming.version == stored.version + 1
+end
+local PLAYER_MOVE = {position=true, version=true, editor=true}
+local PLAYER_BACKFILL = {position=true, characterId=true, version=true, editor=true}
 
 local kind = app.kind
 local retainedOwner = nil
 local fogPlan = nil
+local dependentMovementId = nil
 if kind == 'element-upsert' or kind == 'element-remove' then
   retainedOwner = redis.call('HGET', ownershipKey, app.elementId)
   local currentRaw = redis.call('HGET', elementsKey, app.elementId)
@@ -309,6 +399,23 @@ if kind == 'element-upsert' or kind == 'element-remove' then
     local currentOk, decoded = pcall(cjson.decode, currentRaw)
     if not currentOk or type(decoded) ~= 'table' then return reject('invalid') end
     current = decoded
+  end
+  local movementTargetId = movement_target_id(app.elementId)
+  if kind == 'element-upsert' and not valid_movement_envelope(app.element) then
+    return reject('invalid')
+  end
+  local movementTarget = nil
+  if movementTargetId then
+    if movementTargetId == '' or movement_target_id(movementTargetId) then return reject('invalid') end
+    local targetRaw = redis.call('HGET', elementsKey, movementTargetId)
+    if targetRaw then
+      local targetOk, target = pcall(cjson.decode, targetRaw)
+      if not targetOk or type(target) ~= 'table' then return reject('invalid') end
+      movementTarget = target
+    end
+    if kind == 'element-upsert' and (not movementTarget
+      or movementTarget.extensionType == 'vtt:movement'
+      or app.element.layerId ~= movementTarget.layerId) then return reject('invalid') end
   end
   if app.role == 'player' then
     if not ascii(app.ownershipId) then return reject('invalid') end
@@ -320,7 +427,14 @@ if kind == 'element-upsert' or kind == 'element-remove' then
       -- Players never write any audience value, so they cannot reveal or hide.
       if not absent(incoming.audience) then return reject('forbidden') end
     end
-    if current then
+    if movementTargetId then
+      -- The target grants control; the trail's retained owner grants none.
+      -- In particular, a DM-created trail for a party token stays editable.
+      if not movementTarget or movementTarget.audience == 'dm'
+        or movementTarget.tokenKind ~= 'player' or movementTarget.characterId ~= self
+        or movementTarget.layerId ~= ownLayer then return reject('forbidden') end
+      if kind == 'element-upsert' and incoming.data.visibility ~= 'all' then return reject('forbidden') end
+    elseif current then
       if current.audience == 'dm' then return reject('forbidden') end
       if control_bearing(current) then
         local ownToken = current.tokenKind == 'player' and current.layerId == ownLayer
@@ -331,10 +445,12 @@ if kind == 'element-upsert' or kind == 'element-remove' then
           end
         else
           local moves = ownToken and current.characterId == self
+            and player_move_metadata(current, incoming)
             and equal_except(current, incoming, PLAYER_MOVE)
           local backfills = ownToken and absent(current.characterId)
             and retainedOwner == self and absent(current.sceneMemberId)
             and absent(current.audience) and incoming.characterId == self
+            and player_move_metadata(current, incoming)
             and equal_except(current, incoming, PLAYER_BACKFILL)
           if not moves and not backfills then return reject('forbidden') end
         end
@@ -356,6 +472,22 @@ if kind == 'element-upsert' or kind == 'element-remove' then
       if incoming.tokenKind == 'player' or not absent(incoming.characterId) then
         if (not absent(incoming.characterId) and incoming.characterId ~= self)
           or incoming.layerId ~= ownLayer then return reject('forbidden') end
+      end
+    end
+  end
+  -- Target removal and layer reassignment cannot leave a stale movement
+  -- record that a later checkpoint cannot restore. The same publication
+  -- records both removals, after the target's normal authorization succeeds.
+  if not movementTargetId and (kind == 'element-remove'
+    or (current and app.element.layerId ~= current.layerId)) then
+    local dependentId = MOVEMENT_PREFIX .. app.elementId
+    local dependentRaw = redis.call('HGET', elementsKey, dependentId)
+    if dependentRaw then
+      local dependentOk, dependent = pcall(cjson.decode, dependentRaw)
+      if dependentOk and valid_movement_envelope(dependent)
+        and dependent.type == 'extension' and dependent.extensionType == 'vtt:movement'
+        and dependent.id == dependentId and dependent.data.targetId == app.elementId then
+        dependentMovementId = dependentId
       end
     end
   end
@@ -452,6 +584,13 @@ elseif kind == 'fog' then
   afterFog = plannedFog
 end
 if not afterElements or not afterLayers then return reject('invalid') end
+if dependentMovementId then
+  local retained = {}
+  for _, element in ipairs(afterElements) do
+    if element.id ~= dependentMovementId then retained[#retained + 1] = element end
+  end
+  afterElements = retained
+end
 local afterJson = state_json(afterElements, afterLayers, afterFog)
 if #afterJson > 20971520 then return reject('overloaded') end
 
@@ -512,7 +651,7 @@ if outboxBytes > 8388608 then return reject('overloaded') end
 
 -- No validation, capacity decision or fallible serialization remains after this point.
 if kind == 'element-upsert' then
-  redis.call('HSET', elementsKey, app.elementId, cjson.encode(app.element))
+  redis.call('HSET', elementsKey, app.elementId, element_json(app.element))
   if not retainedOwner then redis.call('HSET', ownershipKey, app.elementId, app.ownershipId) end
 elseif kind == 'element-remove' then
   redis.call('HDEL', elementsKey, app.elementId)
@@ -522,6 +661,10 @@ elseif kind == 'layer-write' then
   redis.call('HSET', layersKey, app.record.id, cjson.encode(app.record))
 else
   fn_fog_apply_v1(fogMetaKey, fogTilesKey, fogPlan)
+end
+if dependentMovementId then
+  redis.call('HDEL', elementsKey, dependentMovementId)
+  redis.call('HDEL', ownershipKey, dependentMovementId)
 end
 for _, operationId in ipairs(expiredDedupe) do
   redis.call('HDEL', dedupeKey, operationId)
@@ -556,6 +699,7 @@ return {1, result}
 `;
 
 export const ROLLKEEPER_CHECKPOINT_LUA_V1 = String.raw`
+${MOVEMENT_ENCODING_LUA}
 local app = cjson.decode(ARGV[1])
 local controlRaw = redis.call('GET', KEYS[6])
 local registryRaw = redis.call('HGET', KEYS[7], app.sceneId)
@@ -616,7 +760,7 @@ local function json_array(items)
 end
 local fogJson = fog == cjson.null and 'null' or '{"meta":' .. cjson.encode(fog.meta)
   .. ',"tiles":' .. json_array(fog.tiles) .. '}'
-local stateJson = '{"elements":' .. json_array(elements) .. ',"layers":' .. json_array(layers)
+local stateJson = '{"elements":' .. elements_json(elements) .. ',"layers":' .. json_array(layers)
   .. ',"extensions":{"fog":{"pluginName":"fog","version":1,"data":' .. fogJson .. '}}}'
 if #stateJson > 20971520 then return {0, 'overloaded'} end
 local result = '{"generation":' .. cjson.encode(meta.generation)
@@ -626,6 +770,8 @@ return {1,result}
 `;
 
 export const ROLLKEEPER_PROVISION_LUA_V1 = String.raw`
+${MOVEMENT_VALIDATION_LUA}
+${MOVEMENT_ENCODING_LUA}
 local expectedTypes = {'string','hash','string','hash','hash','hash','hash','hash',
   'hash','list','hash','list','hash','list','hash','hash'}
 for index = 1, #KEYS do
@@ -695,7 +841,16 @@ local elementIds, layerIds = {}, {}
 for _, element in ipairs(state.elements) do
   if type(element) ~= 'table' or type(element.id) ~= 'string' or element.id == ''
     or elementIds[element.id] then return {0,'invalid'} end
-  elementIds[element.id] = true
+  if not valid_movement_envelope(element) then return {0,'invalid'} end
+  elementIds[element.id] = element
+end
+for _, element in ipairs(state.elements) do
+  local targetId = movement_target_id(element.id)
+  if targetId then
+    local target = elementIds[targetId]
+    if not target or target.extensionType == 'vtt:movement'
+      or target.layerId ~= element.layerId then return {0,'invalid'} end
+  end
 end
 for _, layer in ipairs(state.layers) do
   if type(layer) ~= 'table' or type(layer.id) ~= 'string' or layer.id == ''
@@ -737,7 +892,7 @@ end
 redis.call('DEL', KEYS[4],KEYS[5],KEYS[6],KEYS[7],KEYS[8],KEYS[9],KEYS[10],
   KEYS[11],KEYS[12],KEYS[13],KEYS[14],KEYS[15],KEYS[16])
 for _, element in ipairs(state.elements) do
-  redis.call('HSET',KEYS[4],element.id,cjson.encode(element))
+  redis.call('HSET',KEYS[4],element.id,element_json(element))
   if type(element.ownerId) == 'string' then redis.call('HSET',KEYS[5],element.id,element.ownerId) end
 end
 for _, layer in ipairs(state.layers) do redis.call('HSET',KEYS[6],layer.id,cjson.encode(layer)) end

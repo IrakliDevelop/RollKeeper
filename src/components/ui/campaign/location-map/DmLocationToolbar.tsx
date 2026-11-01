@@ -248,7 +248,8 @@ export default function DmLocationToolbar({
           </Button>
           {onToggleArrangeMaps && (
             <Button
-              variant={arrangeMapsActive ? 'warning' : 'ghost'}
+              variant="ghost"
+              selected={arrangeMapsActive}
               onClick={onToggleArrangeMaps}
               title={
                 arrangeMapsActive
@@ -269,7 +270,8 @@ export default function DmLocationToolbar({
         {liveControls && (
           <>
             <Button
-              variant={hiddenPlacementActive ? 'warning' : 'ghost'}
+              variant="ghost"
+              selected={hiddenPlacementActive}
               onClick={onToggleHiddenPlacement}
               title={
                 hiddenPlacementActive
@@ -314,7 +316,7 @@ export default function DmLocationToolbar({
         {markerAudienceNotice != null && (
           <span
             role="status"
-            className="text-accent-amber-text bg-accent-amber-bg border-accent-amber-border max-w-xs rounded border px-2 py-1 text-xs"
+            className="text-ember-text bg-ember-bg border-ember-border max-w-xs rounded border px-2 py-1 text-xs"
           >
             {markerAudienceNotice}
           </span>
@@ -337,7 +339,7 @@ export default function DmLocationToolbar({
               <div
                 className={`flex items-center gap-1 text-xs ${
                   hasUnsyncedChanges
-                    ? 'text-accent-amber-text'
+                    ? 'text-ember-text'
                     : 'text-accent-emerald-text'
                 }`}
                 title={
@@ -376,7 +378,7 @@ export default function DmLocationToolbar({
           {mode === 'battlemap' && displayLauncher.message && (
             <span
               role="status"
-              className="text-accent-amber-text max-w-[16rem] text-xs break-words"
+              className="text-ember-text max-w-[16rem] text-xs break-words"
             >
               {displayLauncher.message}
             </span>
@@ -391,7 +393,7 @@ export default function DmLocationToolbar({
                 syncStatus === 'live'
                   ? 'bg-accent-emerald-bg text-accent-emerald-text'
                   : syncStatus === 'connecting'
-                    ? 'bg-accent-amber-bg text-accent-amber-text'
+                    ? 'bg-ember-bg text-ember-text'
                     : syncStatus === 'denied' || syncStatus === 'offline'
                       ? 'bg-accent-red-bg text-accent-red-text'
                       : 'text-muted'

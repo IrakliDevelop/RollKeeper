@@ -6,6 +6,7 @@ import type {
   Spell,
   SpellSlot,
 } from '@/types/character';
+import type { LedgerCell } from '@/components/ui/game/LedgerRow';
 import type { SpellAoe } from '@/types/spellAoe';
 
 export type SheetTabId =
@@ -71,14 +72,10 @@ export interface SheetVitalsView {
   proficiencyBonus: number;
 }
 
-export interface AbilityCellView {
-  ability: AbilityName;
+/** A `LedgerRow` cell plus the names the drawer's roll labels use. */
+export interface AbilityCellView extends LedgerCell {
   abbr: string;
   name: string;
-  score: number;
-  modifier: number;
-  save: number;
-  saveProficient: boolean;
 }
 
 export interface HitDiceView {

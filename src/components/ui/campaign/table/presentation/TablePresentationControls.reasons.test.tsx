@@ -104,12 +104,20 @@ describe('visible disabled reasons (HR-7)', () => {
     expect(screen.queryByText(LIVE_CONTROL_REQUIRED)).toBeNull();
   });
 
-  it('wraps on one row: no stacked column or top border', () => {
+  it('keeps presentation actions together before the separate display controls', () => {
     view({ holder: true });
     const section = screen.getByRole('region', {
       name: 'What players see controls',
     });
-    expect(section.className).toMatch(/flex-wrap/u);
-    expect(section.className).not.toMatch(/flex-col|border-t/u);
+    const show = screen.getByRole('button', { name: 'Show this scene' });
+    const display = screen.getByRole('button', { name: 'Open display' });
+    expect(show.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Blank screen' })
+    );
+    expect(show.parentElement).not.toContainElement(display);
+    expect(
+      show.compareDocumentPosition(display) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(section).toContainElement(display);
   });
 });

@@ -10,7 +10,11 @@ import {
   type TableRepositoryOptions,
   type TableWorkspaceSelection,
 } from './repository';
-import { deriveSceneRoster } from './roster';
+import {
+  deriveSceneRoster,
+  verifyPlayerIdentity,
+  type TableCampaignPlayer,
+} from './roster';
 import type { JsonObject, TableSceneRecordV1 } from './schema';
 
 const DEFAULT_WALK_FEET = 30;
@@ -60,6 +64,12 @@ function asBattleMap(
 
 export type OfflineForkClearResult = 'cleared' | 'gone' | 'failed';
 
+export interface TableMovementTurn {
+  epoch: string;
+  entityIds: string[];
+  playerIds: string[];
+}
+
 export interface TableSceneAdapter {
   readonly sceneId: string;
   readonly sourceMapId: string;
@@ -76,6 +86,10 @@ export interface TableSceneAdapter {
    * the verified player id for party tokens.
    */
   resolveMovement(identity: MovableTokenIdentity): MovementResolution | null;
+  /** Active run on this scene; absent on structural legacy test doubles. */
+  getMovementTurn?(
+    players?: readonly TableCampaignPlayer[]
+  ): TableMovementTurn | null;
   getPendingConflict(): {
     operationId: string;
     fields: string[];
@@ -415,6 +429,52 @@ export function createTableSceneAdapter(options: {
             entityId: identity.key,
           }
         : null;
+    },
+    getMovementTurn: players => {
+      const current = options.repository.getCurrent();
+      if (current?.status !== 'ready') return null;
+      const snapshot = current.snapshot;
+      const run = snapshot.encounters.find(
+        value => value.runId === snapshot.campaign?.activeRunId
+      );
+      if (
+        !run?.isActive ||
+        run.sceneId !== options.sceneId ||
+        !run.currentActorId
+      )
+        return null;
+      const roster = deriveSceneRoster({
+        snapshot,
+        sceneId: options.sceneId,
+        players,
+      });
+      const active = roster.entries.find(
+        entry => entry.actorId === run.currentActorId && !entry.removed
+      );
+      if (!active?.sceneMemberId) return null;
+      return {
+        // Match the public initiative's member id, never a private actor id.
+        epoch: `${run.runId}:${run.combatGeneration ?? 0}:${run.round}:${active.sceneMemberId}`,
+        entityIds: [
+          active.sceneMemberId,
+          ...(active.sourceEntityId ? [active.sourceEntityId] : []),
+        ],
+        playerIds: active.identityLegacyPlayerId
+          ? (() => {
+              const verified = players
+                ? verifyPlayerIdentity(players, active.identityLegacyPlayerId)
+                : null;
+              return [
+                ...new Set([
+                  active.identityLegacyPlayerId,
+                  ...(verified?.status === 'verified' && verified.characterId
+                    ? [verified.characterId]
+                    : []),
+                ]),
+              ];
+            })()
+          : [],
+      };
     },
     getPendingConflict: pendingView,
     refreshPendingConflict: async () => {

@@ -67,15 +67,25 @@ export const PATTERNS = [
     regex: /import\s*\{[^}]*\bSparkles\b[^}]*\}\s*from\s*['"]lucide-react['"]/g,
   },
   {
+    id: 'overlay-shadow',
+    description: 'shadow-overlay outside the floating-layer primitives',
+    regex: new RegExp(`${VARIANTS}shadow-overlay(?![\\w-])`, 'g'),
+  },
+  {
     id: 'number-input',
     description: 'type="number" inputs (use NumberInput)',
     regex: /type=(?:"number"|'number'|\{\s*['"]number['"]\s*\})/g,
   },
 ];
 
-// Files whose matches are intentional (hpColor.ts's raw fills are deliberate).
+// Files whose matches are intentional: shadow-overlay belongs to the
+// floating-layer primitives (popover, menu, tooltip, dialog, drawer, toast)
+// and nowhere else.
 export const ALLOWLIST = {
-  'raw-hue': ['src/utils/hpColor.ts'],
+  'overlay-shadow': [
+    'src/components/ui/primitives/variants.ts',
+    'src/components/ui/feedback/SideDrawer.tsx',
+  ],
 };
 
 export function collectCounts(
@@ -164,31 +174,73 @@ function sortCounts(counts) {
   );
 }
 
-async function main() {
-  const [mode = 'check', ...flags] = process.argv.slice(2);
-  const current = collectCounts(await readSourceFiles());
-  const baseline = JSON.parse(
-    await readFile(baselinePath, 'utf8').catch(() => '{}')
-  );
-  const result = compareToBaseline(current, baseline);
+// Returns the parsed baseline, or null when the file does not exist yet.
+// Any other problem (unreadable file, malformed JSON) is thrown.
+export async function readBaseline(file = baselinePath) {
+  try {
+    return JSON.parse(await readFile(file, 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
 
-  if (mode === 'update') {
-    if (result.regressions.length > 0 && !flags.includes('--force')) {
-      console.error(formatReport(result));
-      console.error('Refusing to raise the baseline without --force.');
-      process.exitCode = 1;
-      return;
-    }
-    await writeFile(
-      baselinePath,
-      `${JSON.stringify(sortCounts(current), null, 2)}\n`
-    );
-    console.log('Design ratchet baseline updated.');
-    return;
+export const MISSING_BASELINE_HINT =
+  'Design ratchet: no baseline at scripts/design-ratchet-baseline.json. Run `npm run design:baseline` to create it.';
+
+// Runs the ratchet and reports what happened instead of exiting, so tests
+// can drive it with a temporary baseline file.
+export async function runRatchet({
+  mode = 'check',
+  flags = [],
+  file = baselinePath,
+  readFiles = readSourceFiles,
+} = {}) {
+  const current = collectCounts(await readFiles());
+  const baseline = await readBaseline(file);
+
+  if (baseline === null && mode !== 'update') {
+    return { exitCode: 1, stdout: '', stderr: MISSING_BASELINE_HINT };
   }
 
-  console.log(formatReport(result));
-  if (result.regressions.length > 0) process.exitCode = 1;
+  const result = compareToBaseline(current, baseline ?? {});
+
+  if (mode === 'update') {
+    if (
+      baseline !== null &&
+      result.regressions.length > 0 &&
+      !flags.includes('--force')
+    ) {
+      return {
+        exitCode: 1,
+        stdout: '',
+        stderr: `${formatReport(result)}\nRefusing to raise the baseline without --force.`,
+      };
+    }
+    await writeFile(file, `${JSON.stringify(sortCounts(current), null, 2)}\n`);
+    return {
+      exitCode: 0,
+      stdout:
+        baseline === null
+          ? 'Design ratchet baseline created.'
+          : 'Design ratchet baseline updated.',
+      stderr: '',
+    };
+  }
+
+  return {
+    exitCode: result.regressions.length > 0 ? 1 : 0,
+    stdout: formatReport(result),
+    stderr: '',
+  };
+}
+
+async function main() {
+  const [mode = 'check', ...flags] = process.argv.slice(2);
+  const { exitCode, stdout, stderr } = await runRatchet({ mode, flags });
+  if (stdout) console.log(stdout);
+  if (stderr) console.error(stderr);
+  process.exitCode = exitCode;
 }
 
 if (

@@ -45,14 +45,14 @@ function NoticeLine(props: {
     <div className="flex min-h-7 flex-wrap items-center gap-2">
       <p
         className={`min-w-0 flex-1 text-xs ${
-          notice?.tone === 'error' ? 'text-accent-red-text' : 'text-muted'
+          notice?.tone === 'error' ? 'text-blood-text' : 'text-muted'
         }`}
       >
         {notice?.message ?? props.fallback}
       </p>
       {notice?.link && (
         <Link
-          className="text-accent-blue-text text-xs underline"
+          className="text-lapis-text text-xs underline"
           href={notice.link.href}
         >
           {notice.link.label}

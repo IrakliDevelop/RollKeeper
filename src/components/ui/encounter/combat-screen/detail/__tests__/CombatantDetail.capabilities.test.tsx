@@ -89,20 +89,26 @@ describe('CombatantDetail capabilities (R2-4, C3-3)', () => {
     expect(screen.getByRole('button', { name: /Damage/ })).toBeVisible();
     expect(screen.getByLabelText('Armor class')).toBeVisible();
     expect(screen.queryByLabelText('Temporary AC bonus')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
-    expect(screen.queryByTitle('Remove from combat')).toBeNull();
-    expect(screen.queryByTitle('View NPC details')).toBeNull();
-    expect(screen.queryByLabelText('Initiative Mod')).toBeNull();
-    expect(screen.queryByText(/Spend Hit Die/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Rename/ })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Remove .* from combat/ })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /View .* in NPC library/ })
+    ).toBeNull();
+    expect(screen.queryByLabelText('Initiative modifier')).toBeNull();
+    expect(screen.queryByText(/Spend hit die/i)).toBeNull();
     expect(screen.queryByPlaceholderText('None')).toBeNull();
     expect(screen.queryByText('Ally')).toBeNull();
     expect(screen.queryByText(/Bite/)).toBeNull();
     expect(screen.getByText(/not available in scene runs/i)).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear temp HP' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Clear Goblin temp HP' })
+    );
     expect(handlers.onUpdate).toHaveBeenCalledWith('m-goblin', { tempHp: 0 });
     fireEvent.click(screen.getByRole('button', { name: 'Remove Prone' }));
     expect(handlers.onRemoveCondition).toHaveBeenCalledWith('m-goblin', 'c-1');
-    fireEvent.click(screen.getByRole('button', { name: 'Available' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Reaction used' }));
     expect(handlers.onUpdate).toHaveBeenCalledWith('m-goblin', {
       hasUsedReaction: true,
     });
@@ -121,18 +127,22 @@ describe('CombatantDetail capabilities (R2-4, C3-3)', () => {
     expect(screen.queryByRole('button', { name: /Damage/ })).toBeNull();
     expect(screen.queryByLabelText('Armor class')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Remove Prone' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Clear temp HP' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Clear .* temp HP/ })
+    ).toBeNull();
     expect(screen.queryByPlaceholderText('Custom effect…')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Edit max HP' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /edit .* max HP/ })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Reaction used' })).toBeNull();
     expect(screen.getByText('Prone')).toBeVisible();
   });
 
   it('uses the creature-conditions override and never searches legacy encounters', () => {
     const selector = vi.spyOn(useEncounterStore.getState().encounters, 'find');
+    const handlers = actions();
     render(
       <CombatantDetail
         entity={creature}
-        actions={actions()}
+        actions={handlers}
         capabilities={{
           ...editable,
           creatureConditions: [
@@ -150,9 +160,15 @@ describe('CombatantDetail capabilities (R2-4, C3-3)', () => {
         }}
       />
     );
-    expect(
-      screen.getByRole('button', { name: 'Paralyzed (from Ghoul)' })
-    ).toBeVisible();
+    const apply = screen.getByRole('button', {
+      name: 'Apply Paralyzed (from Ghoul)',
+    });
+    expect(apply).toBeVisible();
+    fireEvent.click(apply);
+    expect(handlers.onAddCondition).toHaveBeenCalledWith(
+      'm-goblin',
+      expect.objectContaining({ name: 'Paralyzed', sourceEntity: 'Ghoul' })
+    );
     expect(selector).not.toHaveBeenCalled();
   });
 

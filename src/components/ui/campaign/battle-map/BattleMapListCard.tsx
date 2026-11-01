@@ -59,7 +59,7 @@ export function BattleMapListCard({
             {confirmDelete ? (
               <>
                 <Button
-                  variant="danger"
+                  variant="danger-solid"
                   size="sm"
                   onClick={handleDeleteClick}
                   className="h-7 px-2 text-xs"

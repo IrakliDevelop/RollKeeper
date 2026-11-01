@@ -1,4 +1,5 @@
 'use client';
+import { BattleMapMovement } from './BattleMapMovement';
 
 import { useEffect, useState } from 'react';
 import { Loader2, Layers } from 'lucide-react';
@@ -292,6 +293,15 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           />
         )}
 
+        {viewport && mode === 'battlemap' && (
+          <BattleMapMovement
+            viewport={viewport}
+            campaignCode={props.campaignCode}
+            battleMapId={props.location.id}
+            dash={movementDash}
+            onDashChange={handleSetMovementDash}
+          />
+        )}
         {/* Mounted only while a marker is active. Painting and activation are
             connection-independent, so this panel opens with no relay URL
             configured — see `useMarkerRegistration` in the hook. */}

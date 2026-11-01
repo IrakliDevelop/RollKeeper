@@ -243,8 +243,8 @@ describe('CombatPanel', () => {
 
     const percentText = screen.getByText('42%');
     expect(percentText).toBeInTheDocument();
-    // 'mid' tier renders with the shared amber tier colour, not the flat faint tone.
-    expect(percentText.className).toMatch(/text-accent-amber-text/);
+    // 'mid' tier renders with the shared ember tier colour, not the flat faint tone.
+    expect(percentText.className).toMatch(/text-ember-text/);
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     const rows = screen.getAllByRole('listitem');
     expect(
@@ -258,7 +258,7 @@ describe('CombatPanel', () => {
       displayName: 'Villager',
       type: 'npc',
       disposition: 'neutral',
-      hpState: 'Unharmed',
+      hpState: 'Healthy',
     };
     render(
       <CombatPanel
@@ -299,9 +299,9 @@ describe('CombatPanel', () => {
 
     expect(screen.queryByText('65%')).not.toBeInTheDocument();
     const rows = screen.getAllByRole('listitem');
-    expect(
-      rows[0].querySelector('.bg-surface-raised.rounded-full')
-    ).toBeInTheDocument();
+    expect(rows[0].querySelector('[data-hp-track]')).toHaveClass(
+      'bg-surface-inset'
+    );
   });
 
   it('applies defeated styling', () => {

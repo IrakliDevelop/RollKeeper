@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import WebSocket from 'ws';
+import WebSocket from './testSocket.js';
 import { signBattleMapToken } from './token.js';
 import { startRelay, type RelayHandle } from './server.js';
 
@@ -66,7 +66,7 @@ describe('server-owned presence senders (real relay)', () => {
     // A snapshot response proves each connection has been admitted to the hub.
     const waitUntilAdmitted = async (socket: WebSocket, from: string) => {
       const messages: Array<Record<string, unknown>> = [];
-      const onMessage = (data: WebSocket.RawData) => {
+      const onMessage = (data: import('ws').RawData) => {
         messages.push(JSON.parse(data.toString()) as Record<string, unknown>);
       };
       socket.on('message', onMessage);

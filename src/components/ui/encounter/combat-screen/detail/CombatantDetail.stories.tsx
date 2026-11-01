@@ -293,7 +293,7 @@ export const EditStatBlockActions: Story = {
       await body.findByRole('dialog', { name: /edit ancient red dragon/i })
     );
     await userEvent.click(
-      dialog.getByRole('button', { name: /actions & traits/i })
+      dialog.getByRole('tab', { name: /actions and traits/i })
     );
     const nameInputs = dialog.getAllByLabelText(/entry name/i);
     await userEvent.type(nameInputs[0], '!');

@@ -2077,6 +2077,7 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
                 size: { w: 10, h: 10 },
               }),
               id: 'seed-a',
+              index: 'a0',
               ownerId: 'dm-a',
             },
           ],
@@ -2282,6 +2283,7 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
             size: { w: 10, h: 10 },
           }),
           id: 'seed-a',
+          index: 'a0',
           ownerId: 'dm-a',
         },
       ],
@@ -2359,6 +2361,7 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
                 size: { w: 10, h: 10 },
               }),
               id: 'seed-b',
+              index: 'a0',
               ownerId: 'restored-owner',
             },
           ],
@@ -2407,6 +2410,7 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
           layerId: ownLayer(PLAYER_A),
         }),
         id,
+        index: 'a0',
         ...fields,
       };
     }
@@ -2575,6 +2579,550 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
       expect(await client.hGet(keys.ownership, id)).toBe('dm-a');
     }
 
+    function movement(
+      targetId = 'party-a',
+      fields: Record<string, unknown> = {}
+    ): Record<string, unknown> {
+      return {
+        id: `vtt-movement:${targetId}`,
+        type: 'extension',
+        extensionType: 'vtt:movement',
+        position: { x: 0, y: 0 },
+        index: 'a1',
+        version: 1,
+        locked: true,
+        layerId: ownLayer(PLAYER_A),
+        data: {
+          targetId,
+          epoch: 'movement-epoch',
+          feet: 5,
+          diagonals: 0,
+          visibility: 'all',
+          trail: [
+            [
+              { x: 10, y: 20 },
+              { x: 20, y: 20 },
+            ],
+          ],
+        },
+        ...fields,
+      };
+    }
+
+    it('derives movement create/update/reset/remove control from the actual token, preserving DM provenance', async () => {
+      await dmPlacesPartyToken();
+      const trail = movement();
+      await expectCommitted('DM creates trail', () =>
+        asDm(op => upsertOf(op, trail))
+      );
+      expect(await client.hGet(keys.ownership, String(trail.id))).toBe('dm-a');
+      await expectCommitted('owner updates DM trail', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, {
+            ...trail,
+            data: { ...(trail.data as object), feet: 15, diagonals: 1 },
+          })
+        )
+      );
+      await expectForbidden('foreign player cannot edit trail', () =>
+        asPlayer(PLAYER_B, op => upsertOf(op, trail))
+      );
+      await expectForbidden('foreign player cannot remove trail', () =>
+        asPlayer(PLAYER_B, op => removeOf(op, String(trail.id)))
+      );
+      await expectCommitted('owner resets trail', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, {
+            ...trail,
+            data: {
+              ...(trail.data as object),
+              feet: 0,
+              diagonals: 0,
+              trail: [],
+            },
+          })
+        )
+      );
+      const capture = await new RedisAuthorityDriver(client).checkpoint(
+        context(),
+        {
+          deadlineAt: Date.now() + 5_000,
+          signal: new AbortController().signal,
+        }
+      );
+      expect(
+        (
+          capture.state.elements.find(
+            element => element.id === trail.id
+          ) as unknown as typeof trail
+        ).data
+      ).toMatchObject({ trail: [] });
+      const checkpoint = await prepareAuthorityCheckpoint(
+        {
+          ...capture.state,
+          cursor: {
+            generation: GENERATION,
+            streamId: '0'.repeat(32),
+            revision: Number(capture.position.revision),
+          },
+          casToken: capture.casToken,
+        },
+        {
+          requestId: 'movement-reset',
+          checkpointId: 'movement-reset',
+          requiredExtensions: [createFogAuthorityServerExtension().requirement],
+        }
+      );
+      checkpoint.dispose();
+      await capture.release();
+      await expectCommitted('owner removes DM trail', () =>
+        asPlayer(PLAYER_A, op => removeOf(op, String(trail.id)))
+      );
+      await expectCommitted('owner recreates DM trail', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, trail))
+      );
+      expect(await client.hGet(keys.ownership, String(trail.id))).toBe('dm-a');
+      expect(await client.hGet(keys.ownership, 'party-a')).toBe('dm-a');
+      expect(await storedElement('party-a')).toMatchObject({
+        characterId: PLAYER_A,
+        position: { x: 10, y: 20 },
+      });
+    });
+
+    it('rejects missing, hidden, foreign, non-player and wrong-layer movement targets without changing Redis', async () => {
+      const targets: Array<[string, Record<string, unknown> | null]> = [
+        ['missing', null],
+        [
+          'hidden',
+          { tokenKind: 'player', characterId: PLAYER_A, audience: 'dm' },
+        ],
+        ['foreign', { tokenKind: 'player', characterId: PLAYER_B }],
+        [
+          'combatant',
+          { tokenKind: 'combatant', characterId: PLAYER_A, entityId: 'npc-a' },
+        ],
+        ['ordinary', {}],
+        [
+          'wrong-layer',
+          {
+            tokenKind: 'player',
+            characterId: PLAYER_A,
+            layerId: ownLayer(PLAYER_B),
+          },
+        ],
+      ];
+      for (const [label, fields] of targets) {
+        if (fields)
+          await expectCommitted(label, () =>
+            asDm(op => upsertOf(op, token(label, fields)))
+          );
+        const trail = movement(label, {
+          layerId: fields?.layerId ?? ownLayer(PLAYER_A),
+        });
+        await client.del(keys.playerRate);
+        const before = await logicalSnapshot();
+        expect(
+          await asPlayer(PLAYER_A, op => upsertOf(op, trail)),
+          label
+        ).toMatchObject({ status: 'rejected' });
+        expect(await logicalSnapshot(), label).toEqual(before);
+        await expectForbidden(`${label} remove`, () =>
+          asPlayer(PLAYER_A, op => removeOf(op, String(trail.id)))
+        );
+      }
+      await dmPlacesPartyToken();
+      await expectForbidden('player cannot hide own trail', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(
+            op,
+            movement('party-a', {
+              data: { ...(movement().data as object), visibility: 'dm' },
+            })
+          )
+        )
+      );
+      const before = await logicalSnapshot();
+      expect(
+        await asDm(op =>
+          upsertOf(op, movement('party-a', { layerId: 'other-layer' }))
+        )
+      ).toEqual({ status: 'rejected', reason: 'invalid' });
+      expect(await logicalSnapshot()).toEqual(before);
+    });
+
+    it('rechecks the target after a DM hides, reassigns or removes it, ignoring retained trail ownership', async () => {
+      await dmPlacesPartyToken();
+      const trail = movement();
+      await expectCommitted('player creates trail', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, trail))
+      );
+      const target = await storedElement('party-a');
+      for (const fields of [{ audience: 'dm' }, { characterId: PLAYER_B }]) {
+        await expectCommitted('DM changes target', () =>
+          asDm(op => upsertOf(op, { ...target, ...fields }))
+        );
+        await expectForbidden('stale trail update', () =>
+          asPlayer(PLAYER_A, op => upsertOf(op, trail))
+        );
+        await expectForbidden('stale trail remove', () =>
+          asPlayer(PLAYER_A, op => removeOf(op, String(trail.id)))
+        );
+      }
+      await expectCommitted('DM removes target', () =>
+        asDm(op => removeOf(op, 'party-a'))
+      );
+      const before = await logicalSnapshot();
+      expect(await asPlayer(PLAYER_A, op => upsertOf(op, trail))).toMatchObject(
+        { status: 'rejected' }
+      );
+      expect(await logicalSnapshot()).toEqual(before);
+      await expectForbidden(
+        'player follow-up removal after target deletion',
+        () => asPlayer(PLAYER_A, op => removeOf(op, String(trail.id)))
+      );
+      await expectCommitted('DM repeated removal is harmless', () =>
+        asDm(op => removeOf(op, String(trail.id)))
+      );
+    });
+
+    it('rejects reserved id/type mismatches and malformed movement even for a fenced DM', async () => {
+      await dmPlacesPartyToken();
+      const trail = movement();
+      const invalid = [
+        token(String(trail.id)),
+        { ...trail, id: 'unreserved' },
+        { ...trail, data: { ...(trail.data as object), targetId: 'foreign' } },
+        {
+          ...trail,
+          id: `vtt-movement:${trail.id}`,
+          data: { ...(trail.data as object), targetId: trail.id },
+        },
+        { ...trail, data: { ...(trail.data as object), feet: -1 } },
+        { ...trail, data: { ...(trail.data as object), diagonals: 0.5 } },
+        {
+          ...trail,
+          data: {
+            ...(trail.data as object),
+            trail: [Array.from({ length: 65 }, () => ({ x: 1, y: 1 }))],
+          },
+        },
+      ];
+      for (const element of invalid) {
+        const before = await logicalSnapshot();
+        expect(await asDm(op => upsertOf(op, element))).toEqual({
+          status: 'rejected',
+          reason: 'invalid',
+        });
+        expect(await logicalSnapshot()).toEqual(before);
+      }
+    });
+
+    it('repeats movement envelope and target checks atomically when host preflight is bypassed', async () => {
+      await dmPlacesPartyToken();
+      const trail = movement();
+      const invalid: Array<[Record<string, unknown>, string, string]> = [
+        [token(String(trail.id)), PLAYER_A, 'invalid'],
+        [{ ...trail, id: 'unreserved' }, PLAYER_A, 'invalid'],
+        [
+          {
+            ...trail,
+            data: { ...(trail.data as object), targetId: 'foreign' },
+          },
+          PLAYER_A,
+          'invalid',
+        ],
+        [
+          { ...trail, data: { ...(trail.data as object), feet: -1 } },
+          PLAYER_A,
+          'invalid',
+        ],
+        [
+          { ...trail, data: { ...(trail.data as object), diagonals: 0.5 } },
+          PLAYER_A,
+          'invalid',
+        ],
+        [
+          {
+            ...trail,
+            data: { ...(trail.data as object), trail: [[{ x: null, y: 1 }]] },
+          },
+          PLAYER_A,
+          'invalid',
+        ],
+        [
+          {
+            ...trail,
+            data: {
+              ...(trail.data as object),
+              trail: [Array.from({ length: 65 }, () => ({ x: 1, y: 1 }))],
+            },
+          },
+          PLAYER_A,
+          'invalid',
+        ],
+        [{ ...trail, layerId: 'foreign-layer' }, PLAYER_A, 'invalid'],
+        [
+          { ...trail, data: { ...(trail.data as object), visibility: 'dm' } },
+          PLAYER_A,
+          'forbidden',
+        ],
+        [trail, PLAYER_B, 'forbidden'],
+        ...['tokenKind', 'characterId', 'sceneMemberId', 'entityId'].map(
+          field =>
+            [{ ...trail, [field]: 'forged-identity' }, PLAYER_A, 'invalid'] as [
+              Record<string, unknown>,
+              string,
+              string,
+            ]
+        ),
+      ];
+      for (const [element, player, reason] of invalid) {
+        const before = await logicalSnapshot();
+        const raw = await client.eval(AUTHORITY_SCRIPT, {
+          keys: [
+            keys.fogMeta,
+            keys.fogTiles,
+            keys.meta,
+            keys.elements,
+            keys.ownership,
+            keys.layers,
+            keys.dedupe,
+            keys.dedupeOrder,
+            keys.receipts,
+            keys.history,
+            keys.evidence,
+            keys.outbox,
+            keys.outboxClaims,
+            tableControlKey(CAMPAIGN),
+            tableRegistryKey(CAMPAIGN),
+            keys.playerRate,
+          ],
+          arguments: [
+            'null',
+            JSON.stringify({
+              campaign: CAMPAIGN,
+              sceneId: 'scene-a',
+              room: ROOM,
+              epoch: EPOCH,
+              role: 'player',
+              ownershipId: player,
+              playerPrincipal: player,
+              generation: GENERATION,
+              clientOperationId: 'raw-movement',
+              operationDigest: operationDigest('raw-movement'),
+              deadlineAt: Date.now() + 5_000,
+              receiptId: '00000000-0000-4000-8000-000000000001',
+              evidenceId: 'raw-movement',
+              nextCasToken: 'raw-movement',
+              kind: 'element-upsert',
+              elementId: element.id,
+              element,
+            }),
+          ],
+        });
+        expect(raw).toEqual([0, reason]);
+        expect(await logicalSnapshot()).toEqual(before);
+      }
+    });
+
+    it('preserves reset arrays when provisioning movement and rejects malformed or unpaired restore records', async () => {
+      const target = token('party-a', {
+        tokenKind: 'player',
+        characterId: PLAYER_A,
+      });
+      const trail = movement('party-a', {
+        data: {
+          ...(movement().data as object),
+          feet: 0,
+          diagonals: 0,
+          trail: [],
+        },
+      });
+      const state = {
+        elements: [target, trail],
+        layers: [],
+        extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+      };
+      const control = JSON.parse(
+        (await client.get(tableControlKey(CAMPAIGN)))!
+      );
+      await client.set(
+        tableControlKey(CAMPAIGN),
+        JSON.stringify({ ...control, holderPrincipal: 'principal-a' })
+      );
+      await client.del(keys.meta);
+      const driver = new RedisAuthorityDriver(client);
+      const provision = (
+        elements: Record<string, unknown>[],
+        restore = false
+      ) =>
+        driver.provision({
+          campaign: CAMPAIGN,
+          sceneId: 'scene-a',
+          room: ROOM,
+          epoch: EPOCH,
+          writerFence: 7,
+          principal: 'principal-a',
+          deadlineAt: Date.now() + 5_000,
+          generation: GENERATION,
+          casToken: 'movement-provision',
+          expectedGeneration: restore ? GENERATION : null,
+          expectedCasToken: restore ? 'movement-provision' : null,
+          state: { ...state, elements } as never,
+        });
+      expect(await provision(state.elements)).toEqual({
+        status: 'provisioned',
+        generation: GENERATION,
+      });
+      expect(
+        JSON.parse((await client.hGet(keys.elements, String(trail.id)))!).data
+          .trail
+      ).toEqual([]);
+      for (const invalid of [
+        [target, token(String(trail.id))],
+        [target, { ...trail, id: 'unreserved' }],
+        [target, { ...trail, layerId: 'foreign' }],
+        [trail],
+      ]) {
+        const before = await logicalSnapshot();
+        expect(await provision(invalid, true)).toEqual({
+          status: 'rejected',
+          reason: 'invalid',
+        });
+        expect(await logicalSnapshot()).toEqual(before);
+      }
+    });
+
+    it('atomically removes dependent movement with an authorized token removal, replays once, and restores the checkpoint', async () => {
+      const target = token('self-remove', {
+        tokenKind: 'player',
+        characterId: PLAYER_A,
+      });
+      const trail = movement(String(target.id));
+      const other = token('unrelated-target', {
+        tokenKind: 'player',
+        characterId: PLAYER_A,
+      });
+      const otherTrail = movement(String(other.id));
+      await expectCommitted('player places target', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, target))
+      );
+      await expectCommitted('DM creates dependent trail', () =>
+        asDm(op => upsertOf(op, trail))
+      );
+      await expectCommitted('DM creates unrelated target', () =>
+        asDm(op => upsertOf(op, other))
+      );
+      await expectCommitted('DM creates unrelated trail', () =>
+        asDm(op => upsertOf(op, otherTrail))
+      );
+      const operationId = nextId('remove-with-trail');
+      const driver = new RedisAuthorityDriver(client);
+      const ctx = playerContext(operationId);
+      const request = removeOf(operationId, String(target.id));
+      const removed = await driver.commit(ctx, request);
+      expect(removed).toMatchObject({ status: 'committed', replayed: false });
+      expect(await client.hGet(keys.elements, String(target.id))).toBeNull();
+      expect(await client.hGet(keys.elements, String(trail.id))).toBeNull();
+      expect(await client.hGet(keys.ownership, String(trail.id))).toBeNull();
+      expect(
+        await client.hGet(keys.elements, String(otherTrail.id))
+      ).not.toBeNull();
+      const afterRemoval = await logicalSnapshot();
+      expect(await driver.commit(ctx, request)).toMatchObject({
+        status: 'committed',
+        replayed: true,
+      });
+      expect(await logicalSnapshot()).toEqual(afterRemoval);
+      await expectForbidden(
+        'SDK follow-up trail removal remains harmless',
+        () => asPlayer(PLAYER_A, op => removeOf(op, String(trail.id)))
+      );
+      const publication = JSON.parse((await client.lIndex(keys.history, -1))!);
+      const before = JSON.parse(
+        (await client.hGet(keys.evidence, publication.before.id))!
+      );
+      const after = JSON.parse(
+        (await client.hGet(keys.evidence, publication.after.id))!
+      );
+      expect(
+        before.elements.map((element: { id: string }) => element.id)
+      ).toContain(trail.id);
+      expect(
+        after.elements.map((element: { id: string }) => element.id)
+      ).not.toContain(trail.id);
+      const capture = await driver.checkpoint(context(), {
+        deadlineAt: Date.now() + 5_000,
+        signal: new AbortController().signal,
+      });
+      const control = JSON.parse(
+        (await client.get(tableControlKey(CAMPAIGN)))!
+      );
+      await client.set(
+        tableControlKey(CAMPAIGN),
+        JSON.stringify({ ...control, holderPrincipal: 'principal-a' })
+      );
+      const restoredGeneration = '423e4567-e89b-42d3-a456-426614174000';
+      expect(
+        await driver.provision({
+          campaign: CAMPAIGN,
+          sceneId: 'scene-a',
+          room: ROOM,
+          epoch: EPOCH,
+          writerFence: 7,
+          principal: 'principal-a',
+          deadlineAt: Date.now() + 5_000,
+          generation: restoredGeneration,
+          casToken: 'removed-trail-restore',
+          expectedGeneration: GENERATION,
+          expectedCasToken: capture.casToken,
+          state: capture.state,
+        })
+      ).toEqual({ status: 'provisioned', generation: restoredGeneration });
+      expect(await client.hGet(keys.elements, String(trail.id))).toBeNull();
+      expect(
+        await client.hGet(keys.elements, String(otherTrail.id))
+      ).not.toBeNull();
+      await capture.release();
+    });
+
+    it('atomically retires dependent movement on a target layer change while hide-only preserves history', async () => {
+      await dmPlacesPartyToken();
+      const trail = movement();
+      await expectCommitted('DM creates trail', () =>
+        asDm(op => upsertOf(op, trail))
+      );
+      const target = await storedElement('party-a');
+      await expectCommitted('DM hides token', () =>
+        asDm(op => upsertOf(op, { ...target, audience: 'dm' }))
+      );
+      expect(await client.hGet(keys.elements, String(trail.id))).not.toBeNull();
+      expect(await client.hGet(keys.ownership, String(trail.id))).toBe('dm-a');
+      await expectCommitted('DM changes layer', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...target,
+            layerId: ownLayer(PLAYER_B),
+            characterId: PLAYER_B,
+          })
+        )
+      );
+      expect(await client.hGet(keys.elements, String(trail.id))).toBeNull();
+      expect(await client.hGet(keys.ownership, String(trail.id))).toBeNull();
+      const publication = JSON.parse((await client.lIndex(keys.history, -1))!);
+      const after = JSON.parse(
+        (await client.hGet(keys.evidence, publication.after.id))!
+      );
+      expect(after.elements).toEqual([
+        expect.objectContaining({ id: 'party-a', layerId: ownLayer(PLAYER_B) }),
+      ]);
+      await expectForbidden('old player cannot revive movement', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...trail, layerId: ownLayer(PLAYER_B) })
+        )
+      );
+    });
+
     it('rejects every forged initial player-token creation and keeps state unchanged', async () => {
       await client.hSet(keys.ownership, 'foreign-element', PLAYER_B);
       const forged: Array<[string, Record<string, unknown>]> = [
@@ -2709,6 +3257,58 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
       await expectForbidden('display remove', () =>
         asDisplay(op => removeOf(op, 'party-a'))
       );
+    });
+
+    it('accepts core version stamps on position-only token moves and rejects forged metadata or reshapes', async () => {
+      await expectCommitted('legacy version-zero token', () =>
+        asDm(op =>
+          upsertOf(
+            op,
+            token('legacy-zero-token', {
+              tokenKind: 'player',
+              characterId: PLAYER_A,
+              version: 0,
+            })
+          )
+        )
+      );
+      const legacy = await storedElement('legacy-zero-token');
+      await expectCommitted('core upgrades version zero', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...legacy, position: { x: 10, y: 30 }, version: 1 })
+        )
+      );
+      await expectCommitted('DM token with editor stamp', () =>
+        asDm(op =>
+          upsertOf(
+            op,
+            token('stamped-token', {
+              tokenKind: 'player',
+              characterId: PLAYER_A,
+              version: 4,
+              editor: 'dm-editor',
+            })
+          )
+        )
+      );
+      const current = await storedElement('stamped-token');
+      const moved = { ...current, position: { x: 50, y: 60 }, version: 5 };
+      delete moved.editor;
+      await expectCommitted('SDK stamps the move', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, moved))
+      );
+      for (const fields of [
+        { version: 3 },
+        { version: 99 },
+        { version: 5.5 },
+        { editor: 'forged-editor' },
+        { version: 6, size: { w: 999, h: 999 } },
+        { index: 'a9' },
+      ]) {
+        await expectForbidden('forged token update', () =>
+          asPlayer(PLAYER_A, op => upsertOf(op, { ...moved, ...fields }))
+        );
+      }
     });
 
     it('protects a DM-created image token src and size', async () => {

@@ -1,3 +1,4 @@
+import { getMovementVisibility } from '@fieldnotes/vtt';
 import {
   createManagedSyncConnection,
   type AuthorityBarrier,
@@ -334,7 +335,8 @@ export function createManagedBattleMapConnection(
   const connection = createManagedSyncConnection({
     store: opts.store,
     clientId: opts.clientId,
-    resolveAudience: opts.resolveAudience,
+    resolveAudience: el =>
+      getMovementVisibility(el) === 'dm' ? 'dm' : opts.resolveAudience?.(el),
     // Seeding rides the SDK's authoritative bootstrap/reconcile hooks: the
     // managed lifecycle persists hub knowledge across credential rebuilds and
     // calls the hook synchronously for every snapshot addressed to us, so no

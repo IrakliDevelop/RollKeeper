@@ -4,6 +4,7 @@ import type {
   AuthorityIntent,
 } from '@fieldnotes/sync-server';
 import { prepareFogAuthorityIntent } from '@fieldnotes/vtt/server';
+import { movementRecordTypeDefinition } from '@fieldnotes/vtt';
 
 type ValidatedIntent = AuthorityIntent & { readonly expectedState?: string };
 
@@ -48,6 +49,32 @@ function withoutOwner(value: unknown): Record<string, unknown> | null {
   return safe;
 }
 
+export const MOVEMENT_ID_PREFIX = 'vtt-movement:';
+
+/** Reserve both the id namespace and wire type, including for fenced DM writes. */
+export function validMovementEnvelope(value: unknown): boolean {
+  const element = record(value);
+  if (!element || typeof element.id !== 'string') return false;
+  const reservedId = element.id.startsWith(MOVEMENT_ID_PREFIX);
+  const reservedType = element.extensionType === 'vtt:movement';
+  if (!reservedId && !reservedType) return true;
+  const targetId = element.id.slice(MOVEMENT_ID_PREFIX.length);
+  const data = record(element.data);
+  return (
+    reservedId &&
+    reservedType &&
+    element.type === 'extension' &&
+    targetId.length > 0 &&
+    !targetId.startsWith(MOVEMENT_ID_PREFIX) &&
+    ['tokenKind', 'characterId', 'sceneMemberId', 'entityId'].every(
+      field => element[field] === undefined || element[field] === null
+    ) &&
+    data !== null &&
+    data.targetId === targetId &&
+    movementRecordTypeDefinition.validateData(data)
+  );
+}
+
 /** Rejects every proposal/intent mismatch before the driver is allowed to touch Redis. */
 export function validateAuthorityRequest(
   context: AuthorityCommitContext,
@@ -87,6 +114,7 @@ export function validateAuthorityRequest(
       !element ||
       intent.schema !== 1 ||
       intent.kind !== 'element-upsert' ||
+      !validMovementEnvelope(element) ||
       !equal(element, intent.element)
     )
       return null;
@@ -231,6 +259,13 @@ export function playerIntentShapeAllowed(
   if (value.kind === 'element-upsert') {
     const element = record(value.element);
     if (!element) return false;
+    if (!validMovementEnvelope(element)) return false;
+    if (String(element.id).startsWith(MOVEMENT_ID_PREFIX)) {
+      return (
+        record(element.data)?.visibility === 'all' &&
+        (element.audience === undefined || element.audience === null)
+      );
+    }
     const absent = (field: unknown) => field === undefined || field === null;
     return (
       absent(element.audience) &&

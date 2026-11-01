@@ -45,6 +45,8 @@ import {
 } from './authority-lua.js';
 import {
   playerIntentShapeAllowed,
+  validMovementEnvelope,
+  MOVEMENT_ID_PREFIX,
   validateAuthorityRequest,
 } from './authority-validation.js';
 
@@ -98,6 +100,26 @@ async function validatesAuthorityState(value: unknown): Promise<boolean> {
     return false;
   if (!Array.isArray(value.elements) || !Array.isArray(value.layers))
     return false;
+  const elements = new Map(
+    value.elements.filter(isRecord).map(element => [element.id, element])
+  );
+  for (const element of value.elements) {
+    if (!validMovementEnvelope(element)) return false;
+    if (
+      isRecord(element) &&
+      String(element.id).startsWith(MOVEMENT_ID_PREFIX)
+    ) {
+      const target = elements.get(
+        String(element.id).slice(MOVEMENT_ID_PREFIX.length)
+      );
+      if (
+        !target ||
+        target.extensionType === 'vtt:movement' ||
+        target.layerId !== element.layerId
+      )
+        return false;
+    }
+  }
   if (!isRecord(value.extensions) || !hasExactKeys(value.extensions, ['fog']))
     return false;
   const fog = value.extensions.fog;

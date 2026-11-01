@@ -131,6 +131,7 @@ import {
   setViewportFogStyle,
 } from '@/lib/fieldnotesVtt';
 import { assetProxyUrl as proxyUrl } from '@/utils/assetProxyUrl';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 /** Stable identity for an empty campaign record — avoids a fresh `{}` on each
  *  selector call that would defeat Zustand's referential equality check. */
@@ -1243,6 +1244,7 @@ export function useDmLocationEditor(
                   connection,
                   {
                     role: 'dm',
+                    viewport: vp,
                     isDmOnlyElement: id =>
                       isElementDmOnly(mode, campaignCode, location.id, id),
                     getElement: id => vp.store.getById(id) ?? null,
@@ -1619,9 +1621,19 @@ export function useDmLocationEditor(
   ]);
 
   const handleClear = useCallback(async () => {
+    const before = getVp();
+    if (!before?.store.count) return;
+    const confirmed = await confirmDialog({
+      title: 'Clear the canvas?',
+      message: 'Everything on this map is removed. Fog of war is kept.',
+      confirmLabel: 'Clear canvas',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    // Re-read the viewport: the editor can remount while the dialog is open,
+    // and the answer was about the map that was open when it was asked.
     const vp = getVp();
-    if (!vp || vp.store.count === 0) return;
-    if (!confirm('Clear all canvas elements? Fog of war will be kept.')) return;
+    if (!vp || vp !== before) return;
     vp.store.clear();
     await autoSaveRef.current?.clear();
     vp.requestRender();

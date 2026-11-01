@@ -54,6 +54,7 @@ export function TableSceneStage(props: {
   repository: TableRepository;
   adapter: TableSceneAdapter;
   header: ReactNode;
+  sceneBrowserOpen?: boolean;
   relayStatus: string;
   relayLive: boolean;
   /** The scene is the shown, unblanked one (live editing wording). */
@@ -205,16 +206,19 @@ export function TableSceneStage(props: {
           onCancel={() => setArming(false)}
         />
       )}
-      <TableRosterPanel
-        repository={repository}
-        sceneId={sceneId}
-        campaignCode={props.campaignCode}
-        dmId={props.dmId}
-        canvas={rosterCanvas}
-        live={props.relayLive}
-        liveHolder={props.liveHolder}
-        arrival={{ arming, onArm: () => setArming(value => !value) }}
-      />
+      {/* Keep roster subscriptions and open-control state while browsing scenes. */}
+      <div hidden={props.sceneBrowserOpen}>
+        <TableRosterPanel
+          repository={repository}
+          sceneId={sceneId}
+          campaignCode={props.campaignCode}
+          dmId={props.dmId}
+          canvas={rosterCanvas}
+          live={props.relayLive}
+          liveHolder={props.liveHolder}
+          arrival={{ arming, onArm: () => setArming(value => !value) }}
+        />
+      </div>
     </DmBattleMapCanvas>
   );
 }

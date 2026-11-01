@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const NO_REFERRER = [{ key: 'Referrer-Policy', value: 'no-referrer' }];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Recompile production assets instead of restoring persisted compiler output.
+    // Development keeps its separate default cache.
+    turbopackFileSystemCacheForBuild: false,
+  },
   images: {
     remotePatterns: [
       {

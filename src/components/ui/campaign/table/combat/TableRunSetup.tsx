@@ -38,7 +38,7 @@ export function TableRunSetup(props: {
   if (model.importedActive) {
     return (
       <div className="space-y-2 px-3 py-4">
-        <p className="text-accent-amber-text text-xs font-medium">
+        <p className="text-ember-text text-xs font-medium">
           Imported mid-fight. Not running here.
         </p>
         <p className="text-muted text-xs">
@@ -63,8 +63,8 @@ export function TableRunSetup(props: {
   return (
     <div className="space-y-3 px-2 py-3">
       {props.activeElsewhere && (
-        <div className="border-accent-amber-border rounded-lg border p-2">
-          <p className="text-accent-amber-text text-xs">
+        <div className="border-ember-border rounded-lg border p-2">
+          <p className="text-ember-text text-xs">
             {`Another run is active: ${props.activeElsewhere.label}${
               props.activeElsewhere.sameScene
                 ? ''
@@ -77,7 +77,7 @@ export function TableRunSetup(props: {
             </Button>
           ) : (
             <Link
-              className="text-accent-blue-text text-xs font-medium underline"
+              className="text-lapis-text text-xs font-medium underline"
               href={props.activeElsewhere.href}
             >
               Go to active run
@@ -111,7 +111,7 @@ export function TableRunSetup(props: {
         </ul>
       )}
       {props.missingPrompt && props.missingPrompt.length > 0 && (
-        <p role="alert" className="text-accent-red-text px-1 text-xs">
+        <p role="alert" className="text-blood-text px-1 text-xs">
           {`Missing initiative: ${props.missingPrompt.join(', ')}. Enter a roll (0 is valid) before starting.`}
         </p>
       )}

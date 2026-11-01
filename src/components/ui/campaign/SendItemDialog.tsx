@@ -11,8 +11,8 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
-import { Badge } from '@/components/ui/layout/badge';
 import type { InventoryItem } from '@/types/character';
+import { formatRarity } from '@/utils/formatRarity';
 
 export interface SendItemTarget {
   playerId: string;
@@ -60,25 +60,25 @@ export function SendItemDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Send Item</DialogTitle>
+          <DialogTitle>Send item</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-4">
           {item && (
-            <div className="bg-surface-secondary rounded-lg p-3">
+            <div className="border-divider border-b pb-3">
               <p className="text-heading text-sm font-bold">{item.name}</p>
               {item.quantity > 1 && (
-                <p className="text-muted text-xs">Quantity: {item.quantity}</p>
+                <p className="text-muted text-sm">Sends all {item.quantity}</p>
               )}
               {item.rarity && (
-                <Badge variant="secondary" size="sm" className="mt-1">
-                  {item.rarity}
-                </Badge>
+                <p className="text-muted mt-1 text-sm">
+                  {formatRarity(item.rarity)}
+                </p>
               )}
             </div>
           )}
 
           <div className="space-y-2">
-            <label className="text-body text-sm font-medium">Send to</label>
+            <p className="text-body text-sm font-medium">Send to</p>
             {targets.length === 0 ? (
               <p className="text-muted text-sm">
                 No other players in this campaign
@@ -88,14 +88,19 @@ export function SendItemDialog({
                 {targets.map(target => (
                   <button
                     key={target.playerId}
+                    type="button"
                     onClick={() => setSelectedTarget(target)}
-                    className={`flex w-full items-center gap-3 rounded-lg border-2 p-3 text-left transition-all ${
+                    aria-pressed={selectedTarget?.playerId === target.playerId}
+                    className={`border-divider flex w-full items-center gap-3 border-b p-3 text-left transition-colors ${
                       selectedTarget?.playerId === target.playerId
-                        ? 'border-accent-blue-border bg-accent-blue-bg'
-                        : 'border-divider bg-surface-raised hover:border-divider-strong'
+                        ? 'bg-surface-hover'
+                        : 'hover:bg-surface-hover'
                     }`}
                   >
-                    <div className="bg-surface-secondary rounded-full p-1.5">
+                    <div
+                      className="bg-surface-secondary rounded-full p-1.5"
+                      aria-hidden="true"
+                    >
                       <User size={14} className="text-muted" />
                     </div>
                     <div>
@@ -121,7 +126,7 @@ export function SendItemDialog({
             onClick={handleSend}
             disabled={!selectedTarget || sending}
           >
-            {sending ? 'Sending...' : 'Send'}
+            {sending ? 'Sending…' : 'Send'}
           </Button>
         </DialogFooter>
       </DialogContent>

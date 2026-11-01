@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import WebSocket from 'ws';
+import WebSocket from './testSocket.js';
 import { createShape } from '@fieldnotes/core';
 import { InMemoryHubFanout, MemoryHubBackend } from '@fieldnotes/sync-server';
 import {

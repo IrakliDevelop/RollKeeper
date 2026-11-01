@@ -15,6 +15,7 @@ import {
 } from '@fieldnotes/sync';
 import { createFogAuthorityClientExtension } from '@fieldnotes/vtt/sync';
 import type { FogManager } from '@fieldnotes/vtt';
+import { authorityElementVersion } from './authorityElementVersion';
 
 import type {
   BattleMapConnection,
@@ -404,7 +405,10 @@ export function createManagedBattleMapAuthorityConnection(
     const audience = options.resolveAudience?.(element);
     submit({
       kind: 'upsert',
-      element: { ...element, ...(audience === undefined ? {} : { audience }) },
+      element: {
+        ...authorityElementVersion(element),
+        ...(audience === undefined ? {} : { audience }),
+      },
     });
   };
   const unsubscribers = [

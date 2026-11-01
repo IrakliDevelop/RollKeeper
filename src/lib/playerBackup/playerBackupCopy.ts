@@ -48,7 +48,7 @@ export const PLAYER_BACKUP_COPY = {
     },
   },
   chrome: {
-    back: 'Back to my characters',
+    back: 'Characters',
     close: 'Close character backup',
     readsOnly: 'Reads only',
     continueSetup: 'Continue setup',

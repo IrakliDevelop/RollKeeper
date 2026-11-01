@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Pen } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 const FieldNotesCanvas = dynamic(
   () => import('@/prototypes/notes-module/FieldNotesCanvas'),
@@ -29,20 +29,6 @@ export default function FieldNotesPrototypePage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href="/prototype"
-              className="flex items-center gap-1.5 rounded bg-indigo-100 px-2.5 py-1 text-xs text-indigo-800 hover:bg-indigo-200"
-            >
-              <ArrowLeft size={12} />
-              ReactFlow Canvas
-            </Link>
-            <Link
-              href="/prototype/tldraw"
-              className="flex items-center gap-1.5 rounded bg-indigo-100 px-2.5 py-1 text-xs text-indigo-800 hover:bg-indigo-200"
-            >
-              <Pen size={12} />
-              tldraw Canvas
-            </Link>
             <Link
               href="/"
               className="flex items-center gap-1.5 rounded bg-indigo-100 px-2.5 py-1 text-xs text-indigo-800 hover:bg-indigo-200"

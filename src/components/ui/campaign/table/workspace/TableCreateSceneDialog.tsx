@@ -189,7 +189,7 @@ export function TableCreateSceneDialog(props: {
             </div>
           )}
           {error && (
-            <p role="alert" className="text-accent-red-text text-sm">
+            <p role="alert" className="text-blood-text text-sm">
               {error}
             </p>
           )}

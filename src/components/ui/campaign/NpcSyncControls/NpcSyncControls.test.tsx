@@ -38,6 +38,10 @@ import {
   planNpcMutations,
   runNpcMutationPlan,
 } from './index';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-23T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -453,9 +457,8 @@ describe('NpcSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs(['cancel', 'confirm']);
     fireEvent.click(
       screen.getByRole('button', { name: 'Download recovery file' })
     );
@@ -581,7 +584,8 @@ describe('NpcSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     fireEvent.click(
@@ -788,7 +792,8 @@ describe('NpcSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     const { container } = renderControls();
     fireEvent.click(
@@ -829,7 +834,8 @@ describe('NpcSyncControls gates', () => {
    * only state both hydrating paths below start from.
    */
   async function enrollAgainstCloudGeneration(
-    requests: Record<string, unknown>[]
+    requests: Record<string, unknown>[],
+    extraDocuments: unknown[] = []
   ) {
     const cloudPayload = { ...npcPayload(), name: 'Cloud NPC' };
     const cloudFingerprint = await fingerprintNpcPayload(cloudPayload);
@@ -864,6 +870,7 @@ describe('NpcSyncControls gates', () => {
                 tombstoned: false,
                 payload: cloudPayload,
               },
+              ...extraDocuments,
             ],
           });
         if (body.action === 'enroll-device') return respond({});
@@ -894,7 +901,8 @@ describe('NpcSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    const dialogs = answerConfirmDialogs('confirm');
 
     renderControls();
     fireEvent.click(
@@ -910,7 +918,35 @@ describe('NpcSyncControls gates', () => {
     await screen.findByText(
       'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
+    return dialogs;
   }
+
+  it('counts only live NPCs when asking to load from the account', async () => {
+    vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    useNPCStore.setState(oneNpcState());
+    seedOneNpcEnvelope();
+    const dialogs = await enrollAgainstCloudGeneration(
+      [],
+      [
+        {
+          legacyId: 'npc-deleted',
+          serverVersion: 2,
+          schemaVersion: 4,
+          payloadFingerprint: 'deleted-fingerprint',
+          tombstoned: true,
+          payload: null,
+        },
+      ]
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply exact cloud version' })
+    );
+    await screen.findByText(/Browser hydrated from the exact cloud generation/);
+
+    expect(dialogs.titles).toContain('Load 1 NPC from your account?');
+  });
 
   it('arms autosave when the exact cloud generation is applied', async () => {
     vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');

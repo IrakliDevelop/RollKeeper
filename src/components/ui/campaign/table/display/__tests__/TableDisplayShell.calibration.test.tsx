@@ -116,7 +116,8 @@ function mapImage(): CanvasElement {
     shape: 'rectangle',
     position: { x: 0, y: 0 },
     size: { w: 2000, h: 1500 },
-    zIndex: 0,
+    index: 'a0',
+    version: 1,
     locked: true,
     layerId: 'map',
   } as unknown as CanvasElement;

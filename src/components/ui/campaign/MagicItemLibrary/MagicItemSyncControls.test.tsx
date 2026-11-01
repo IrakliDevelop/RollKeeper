@@ -36,6 +36,10 @@ import {
   planMagicItemMutations,
   runMagicItemMutationPlan,
 } from './MagicItemSyncControls';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-22T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -452,9 +456,8 @@ describe('MagicItemSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs(['cancel', 'confirm']);
     fireEvent.click(
       screen.getByRole('button', { name: 'Download recovery file' })
     );
@@ -571,7 +574,8 @@ describe('MagicItemSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     render(<MagicItemSyncControls campaign={campaign} />);
     fireEvent.click(
@@ -784,7 +788,8 @@ describe('MagicItemSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     const { container } = render(<MagicItemSyncControls campaign={campaign} />);
     fireEvent.click(
@@ -895,7 +900,8 @@ describe('MagicItemSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     render(<MagicItemSyncControls campaign={campaign} />);
     fireEvent.click(

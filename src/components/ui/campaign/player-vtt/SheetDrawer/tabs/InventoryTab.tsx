@@ -86,7 +86,8 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
         <div role="group" aria-label="Inventory view" className="flex gap-1">
           <Button
             type="button"
-            variant={viewMode === 'list' ? 'secondary' : 'outline'}
+            variant="outline"
+            selected={viewMode === 'list'}
             size="sm"
             aria-label="List view"
             aria-pressed={viewMode === 'list'}
@@ -96,7 +97,8 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
           </Button>
           <Button
             type="button"
-            variant={viewMode === 'grid' ? 'secondary' : 'outline'}
+            variant="outline"
+            selected={viewMode === 'grid'}
             size="sm"
             aria-label="Grid view"
             aria-pressed={viewMode === 'grid'}

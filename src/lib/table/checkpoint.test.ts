@@ -114,7 +114,7 @@ describe('scene checkpoint persistence', () => {
         state: checkpoint,
       })
     ).toEqual({
-      version: 4,
+      version: 6,
       camera: { position: { x: 0, y: 0 }, zoom: 1 },
       elements: checkpoint.elements,
       layers: [{ id: 'tokens' }],

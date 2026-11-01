@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -15,6 +15,7 @@ import { cn } from '@/utils/cn';
 import { calculateModifier } from '@/utils/calculations';
 import { useCharacterStore } from '@/store/characterStore';
 import { useLevelUpWizard } from './LevelUpWizard.hooks';
+import { grantsThatWillBeAdded } from './LevelUpWizard.utils';
 import EditionPickerStep from './steps/EditionPickerStep';
 import ClassPickerStep from './steps/ClassPickerStep';
 import SubclassSelectionStep from './steps/SubclassSelectionStep';
@@ -30,20 +31,28 @@ interface LevelUpWizardProps {
 }
 
 export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
-  const character = useCharacterStore(s => s.character);
+  const liveCharacter = useCharacterStore(s => s.character);
+  // While the dialog fades out after Level up, keep showing the character it
+  // opened with instead of re-deriving every step from the levelled-up one.
+  const characterRef = useRef(liveCharacter);
+  if (isOpen) characterRef.current = liveCharacter;
+  const character = characterRef.current;
   const wizard = useLevelUpWizard(character);
 
   const handleApply = useCallback(() => {
-    wizard.applyLevelUp();
-    onClose();
+    if (wizard.applyLevelUp()) onClose();
   }, [wizard, onClose]);
 
   if (wizard.loading) {
     return (
       <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-        <DialogContent size="md">
+        <DialogContent size="md" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Level up</DialogTitle>
           <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="text-muted animate-spin" />
+            <Loader2
+              size={24}
+              className="text-muted motion-safe:animate-spin"
+            />
           </div>
         </DialogContent>
       </Dialog>
@@ -62,35 +71,39 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent size="md">
+      <DialogContent size="md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
-            Level Up — {state.targetClass?.className || 'Character'}{' '}
-            {state.targetClass &&
-              `${state.targetClass.level} → ${state.newClassLevel}`}
+            {state.targetClass
+              ? `Level up — ${state.targetClass.className} ${state.targetClass.level} → ${state.newClassLevel}`
+              : 'Level up'}
           </DialogTitle>
         </DialogHeader>
 
         {/* Step indicators */}
         {state.steps.length > 1 && (
-          <div className="border-divider flex items-center gap-1 border-b px-6 pb-3">
+          <ol className="border-divider flex flex-wrap gap-x-4 gap-y-2 border-b pb-3">
             {state.steps.map((step, i) => (
-              <div key={step.id} className="flex items-center gap-1">
-                <div
+              <li
+                key={step.id}
+                className="flex min-w-0 items-center gap-1.5"
+                aria-current={i === state.currentStepIndex ? 'step' : undefined}
+              >
+                <span
                   className={cn(
-                    'flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium',
+                    'type-caption flex size-6 shrink-0 items-center justify-center rounded-full border',
                     i < state.currentStepIndex
-                      ? 'bg-accent-emerald-bg text-accent-emerald-text'
+                      ? 'border-divider-strong text-heading'
                       : i === state.currentStepIndex
-                        ? 'bg-accent-blue-bg text-accent-blue-text'
-                        : 'bg-surface-secondary text-muted'
+                        ? 'border-brass-border text-brass-text'
+                        : 'border-divider text-muted'
                   )}
                 >
                   {i < state.currentStepIndex ? <Check size={12} /> : i + 1}
-                </div>
+                </span>
                 <span
                   className={cn(
-                    'hidden text-xs sm:inline',
+                    'type-caption',
                     i === state.currentStepIndex
                       ? 'text-heading font-medium'
                       : 'text-muted'
@@ -98,12 +111,9 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
                 >
                   {step.label}
                 </span>
-                {i < state.steps.length - 1 && (
-                  <div className="bg-surface-secondary mx-1 h-px w-4" />
-                )}
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         )}
 
         <DialogBody className="min-h-[300px]">
@@ -187,8 +197,12 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
           {currentStep?.id === 'hp' && state.targetClass && (
             <HPStep
               hitDie={state.targetClass.hitDie}
-              constitutionScore={character.abilities.constitution}
+              constitutionScore={wizard.prospectiveConstitution}
               hpRollResult={state.hpRollResult}
+              hpGained={wizard.hpPreview?.gained}
+              newLevelHp={wizard.hpPreview?.newLevelGain}
+              retroactiveHp={wizard.hpPreview?.retroactiveGain}
+              minimumAdjustment={wizard.hpPreview?.minimumAdjustment}
               onRollResultChange={wizard.setHPRollResult}
             />
           )}
@@ -207,11 +221,23 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               features={state.features}
               subclassFeatures={state.subclassFeatures}
               subclassSpellGrants={state.subclassSpellGrants}
+              migrationFeatures={state.subclassMigration.missedFeatures
+                .filter(item => item.adopted)
+                .map(item => item.feature)}
+              migrationSpellGrants={grantsThatWillBeAdded(
+                state.subclassMigration.missedSpellGrants,
+                wizard.allSpells,
+                wizard.character.spells || []
+              )}
               asiChoice={state.asiChoice}
               abilities={character.abilities}
               hpRollResult={state.hpRollResult}
               hitDie={state.targetClass.hitDie}
-              conModifier={calculateModifier(character.abilities.constitution)}
+              conModifier={calculateModifier(wizard.prospectiveConstitution)}
+              hpGained={wizard.hpPreview?.gained}
+              newLevelHp={wizard.hpPreview?.newLevelGain}
+              retroactiveHp={wizard.hpPreview?.retroactiveGain}
+              minimumAdjustment={wizard.hpPreview?.minimumAdjustment}
               isCustomClass={state.isCustomClass}
               spellsKnownDelta={wizard.spellsKnownDelta}
               cantripsKnownDelta={wizard.cantripsKnownDelta}
@@ -221,7 +247,7 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
         </DialogBody>
 
         <DialogFooter>
-          <div className="flex w-full items-center justify-between">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <div>
               {!isFirstStep && (
                 <Button variant="ghost" onClick={wizard.goBack}>
@@ -231,13 +257,13 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="secondary" onClick={onClose}>
                 Cancel
               </Button>
               {isLastStep ? (
                 <Button variant="primary" onClick={handleApply}>
                   <Check size={14} className="mr-1" />
-                  Apply Level Up
+                  Level up
                 </Button>
               ) : (
                 <Button

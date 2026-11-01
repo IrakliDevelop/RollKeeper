@@ -281,7 +281,6 @@ The matching app-side defaults are already present in `.env.example`. The main a
 | `AWS_SECRET_ACCESS_KEY` | No | — | S3 avatar/banner uploads |
 | `AWS_S3_REGION` | No | `eu-central-1` | S3 bucket region |
 | `AWS_S3_BUCKET_NAME` | No | `rollkeeper-images` | S3 bucket name |
-| `NEXT_PUBLIC_TLDRAW_LICENSE_KEY` | No | — | License used by legacy TlDraw prototypes |
 | `BATTLEMAP_RELAY_SECRET` | For live maps | `dev-secret-change-me` | Shared secret used to issue relay access tokens |
 | `NEXT_PUBLIC_BATTLEMAP_RELAY_URL` | For live maps | `ws://localhost:8787` | Browser-facing WebSocket relay URL |
 

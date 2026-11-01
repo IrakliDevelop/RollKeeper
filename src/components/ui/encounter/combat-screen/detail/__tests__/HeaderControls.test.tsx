@@ -49,6 +49,17 @@ function makeActions(): EntityActions {
 afterEach(() => cleanup());
 
 describe('HeaderControls players-see text', () => {
+  it('shows selected state on the exact-HP visibility toggle', () => {
+    render(
+      <HeaderControls
+        entity={makeEntity({ hpVisibleToPlayers: true })}
+        actions={makeActions()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Hide HP from players' })
+    ).toHaveAttribute('data-selected', 'true');
+  });
   it('renders the alias when hidden with an alias, plus exact HP suffix', () => {
     render(
       <HeaderControls

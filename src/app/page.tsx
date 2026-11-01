@@ -196,7 +196,7 @@ export default function LandingPage() {
           <div className="flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
               <Dice6 className="text-accent-purple-text h-7 w-7" />
-              <span className="font-cinzel text-heading text-xl font-bold tracking-wide">
+              <span className="font-heading text-heading text-xl font-bold tracking-wide">
                 RollKeeper
               </span>
             </Link>
@@ -390,7 +390,6 @@ export default function LandingPage() {
                   variant="secondary"
                   size="xl"
                   rightIcon={<ArrowRight size={18} />}
-                  className="shadow-lg"
                   asChild
                 >
                   <Link href="/player">Start as Player</Link>
@@ -404,7 +403,6 @@ export default function LandingPage() {
                   variant="outline"
                   size="xl"
                   rightIcon={<Crown size={18} />}
-                  className="shadow-sm"
                   asChild
                 >
                   <Link href="/dm">Start as DM</Link>
@@ -509,10 +507,7 @@ export default function LandingPage() {
                   whileHover={{ y: -6, transition: { duration: 0.25 } }}
                   className="h-full"
                 >
-                  <Card
-                    className="relative h-full overflow-hidden border-none p-6 sm:p-8"
-                    variant="elevated"
-                  >
+                  <Card className="relative h-full overflow-hidden border-none p-6 sm:p-8">
                     <div
                       className={`pointer-events-none absolute inset-0 bg-linear-to-br ${feature.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`}
                     />
@@ -828,7 +823,6 @@ export default function LandingPage() {
                   variant="secondary"
                   size="lg"
                   rightIcon={<ArrowRight size={16} />}
-                  className="shadow-lg"
                   asChild
                 >
                   <Link href="/player">Start as Player</Link>
@@ -869,7 +863,7 @@ export default function LandingPage() {
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <div className="flex items-center gap-2">
               <Dice6 className="text-accent-purple-text h-5 w-5" />
-              <span className="font-cinzel text-heading text-sm font-bold tracking-wide">
+              <span className="font-heading text-heading text-sm font-bold tracking-wide">
                 RollKeeper
               </span>
             </div>

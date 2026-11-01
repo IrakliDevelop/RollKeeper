@@ -4,7 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Users, User, Heart, Skull, EyeOff, Shield } from 'lucide-react';
 import { useDraggableY } from '@/hooks/useDraggableY';
-import { getHpBarColor } from '@/utils/hpColor';
+import {
+  getHpBarColor,
+  getHpNumberColor,
+  getHpTierTextColor,
+} from '@/utils/hpColor';
+import { hpPercent, hpStatus, hpTier, HP_STATUS_LABELS } from '@/utils/hpState';
 import { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 import { Badge } from '@/components/ui/layout/badge';
 
@@ -25,7 +30,7 @@ function DeathSavesDisplay({
             key={`s-${i}`}
             className={`h-2 w-2 rounded-full border ${
               i < deathSaves.successes
-                ? 'border-green-600 bg-green-500'
+                ? 'border-verdigris-border bg-verdigris-fill'
                 : 'border-divider bg-surface-secondary'
             }`}
           />
@@ -38,16 +43,14 @@ function DeathSavesDisplay({
             key={`f-${i}`}
             className={`h-2 w-2 rounded-full border ${
               i < deathSaves.failures
-                ? 'border-red-600 bg-red-500'
+                ? 'border-blood-border bg-blood-fill'
                 : 'border-divider bg-surface-secondary'
             }`}
           />
         ))}
       </div>
       {deathSaves.isStabilized && (
-        <span className="text-accent-emerald-text text-xs font-medium">
-          Stable
-        </span>
+        <span className="text-verdigris-text text-xs font-medium">Stable</span>
       )}
     </div>
   );
@@ -88,7 +91,7 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
 
       {/* AC + HP Section */}
       <div className="mb-1 flex items-center gap-1.5">
-        <Shield size={11} className="text-accent-blue-text flex-shrink-0" />
+        <Shield size={11} className="text-muted flex-shrink-0" />
         <span className="text-body text-xs font-medium">
           {member.armorClass}
         </span>
@@ -102,9 +105,9 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
       ) : isDown ? (
         <div>
           <div className="flex items-center gap-1.5">
-            <Skull size={12} className="text-accent-red-text" />
-            <span className="text-accent-red-text text-xs font-medium">
-              Down ({hp.current}/{hp.max})
+            <Skull size={12} className="text-blood-text" />
+            <span className="text-blood-text text-xs font-medium">
+              {HP_STATUS_LABELS.down} ({hp.current}/{hp.max})
             </span>
           </div>
           {hp.deathSaves && <DeathSavesDisplay deathSaves={hp.deathSaves} />}
@@ -123,12 +126,23 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
               />
             </div>
           </div>
-          <div className="flex items-center gap-1 pl-5">
-            <span className="text-body text-xs font-medium">
+          <div className="flex flex-wrap items-center gap-1 pl-5">
+            <span
+              className={`${getHpNumberColor(hp.current, hp.max)} text-xs font-medium`}
+            >
               {hp.current}/{hp.max}
             </span>
+            <span
+              className={`${getHpTierTextColor(hpTier(hpPercent(hp.current, hp.max)))} text-xs`}
+            >
+              {HP_STATUS_LABELS[hpStatus(hp.current, hp.max)]}
+            </span>
             {hp.temporary > 0 && (
-              <Badge variant="info" size="sm" className="text-xs">
+              <Badge
+                variant="neutral"
+                size="sm"
+                className="text-frost-text text-xs"
+              >
                 +{hp.temporary}
               </Badge>
             )}
@@ -223,7 +237,7 @@ export function PartyHPSidebar({
             className="border-divider cursor-grab touch-none border-b px-3 py-2.5 select-none active:cursor-grabbing"
           >
             <div className="text-heading flex items-center gap-2 text-sm font-semibold">
-              <Users size={14} className="text-accent-blue-text" />
+              <Users size={14} className="text-muted" />
               Party HP
               <span className="text-faint text-xs font-normal">
                 ({partyMembers.length})
@@ -261,14 +275,14 @@ export function PartyHPSidebar({
         onClick={() => setIsOpen(!isOpen)}
         className={`relative self-center rounded-r-lg border-y-2 border-r-2 px-2.5 py-5 shadow-md transition-colors ${
           isOpen
-            ? 'border-accent-blue-border bg-accent-blue-bg text-accent-blue-text'
+            ? 'border-divider-strong bg-surface-elevated text-heading'
             : 'border-divider bg-surface-raised text-muted hover:text-body hover:bg-surface-secondary'
         }`}
         title={isOpen ? 'Hide party HP' : 'Show party HP'}
       >
         <Users size={20} />
         {!isOpen && partyMembers.length > 0 && (
-          <div className="bg-accent-blue-bg text-accent-blue-text border-accent-blue-border absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border text-xs font-bold">
+          <div className="bg-surface-elevated text-heading border-divider absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border text-xs font-bold">
             {partyMembers.length}
           </div>
         )}

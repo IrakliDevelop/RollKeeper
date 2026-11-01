@@ -1,4 +1,16 @@
 import type { Skin } from 'pollyroll';
+import type { TrayOptions } from 'pollyroll/render';
+
+export type DicePreferences = Pick<
+  TrayOptions,
+  | 'sound'
+  | 'reducedMotion'
+  | 'shadows'
+  | 'maxDpr'
+  | 'labels'
+  | 'announce'
+  | 'fadeAfterMs'
+>;
 
 // Dice roll result types. Values come from Pollyroll; the shape is what the sheet reads.
 
@@ -26,6 +38,7 @@ export interface CharacterDiceSet {
   skin: Skin;
   /** Largest die size. Rolls with many dice shrink to fit. */
   dieScale: number;
+  options?: DicePreferences;
 }
 
 export interface RollSummary {

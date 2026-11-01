@@ -1,3 +1,4 @@
+import { CANVAS_STATE_VERSION } from '@fieldnotes/core';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,6 +46,7 @@ describe('adopt to live authority checkpoint integration', () => {
       activeLayerId: 'tokens',
       extensions: { fog: { version: 1, data: null } },
     };
+    const sourceBytes = JSON.stringify(sourceCanvas);
     const source = {
       readCampaign: vi.fn(async () => '{"code":"CAMP"}'),
       readMap: vi.fn(async () =>
@@ -219,7 +221,7 @@ describe('adopt to live authority checkpoint integration', () => {
       unknown
     >;
     expect(canvas).toMatchObject({
-      version: 4,
+      version: CANVAS_STATE_VERSION,
       elements: [{ id: 'edited-token' }],
       layers: [{ id: 'tokens', name: 'Tokens' }],
       activeLayerId: 'tokens',
@@ -232,6 +234,16 @@ describe('adopt to live authority checkpoint integration', () => {
         },
       },
     });
+    // Current editor snapshots may advance their SDK version; adoption keeps
+    // the exact legacy source capture for comparison and recovery.
+    expect(JSON.stringify(sourceCanvas)).toBe(sourceBytes);
+    const final = repository.getCurrent();
+    if (final?.status !== 'ready') throw new Error('repository not ready');
+    const capturedMap = final.snapshot.sources.find(
+      record => record.sourceKind === 'map'
+    );
+    expect(capturedMap).toBeDefined();
+    expect(JSON.parse(capturedMap!.rawJson).canvasState).toBe(sourceBytes);
     reloaded.dispose();
   });
 });

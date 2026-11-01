@@ -59,3 +59,27 @@ rest of the campaign sync layer (`relayPoke.ts`, `battlemapPokeListener.ts`) —
 see [04](04-campaign-sync-redis.md) for the general pattern. If you're
 debugging a stale battle-map view, check both the fog/battlemap-specific sync
 files here and the general Redis sync notes.
+
+## Turn movement
+
+Battle maps use Fieldnotes `MovementTracker` for normal Select-tool drags
+and keep waypoint Move-tool commits in the same cumulative record. Tracking
+is active for the current combatant only; each encounter/round/turn has its
+own movement budget. Player canvases track only that player's character.
+The DM uses synced character speed (including buffs), or stat-block walking
+speed for other combatants. Dash extends the budget and switches off when
+the turn changes.
+
+During a tracked drag, **F** adds a waypoint and **Backspace** removes one;
+touch/pen users can hold still to add a waypoint. The movement controls show
+feet spent and remaining. **Reset movement** leaves the token in place and
+is undoable. **Teleport** accepts a range in feet and starts destination
+placement; out-of-range destinations are refused, Escape/Cancel leaves the
+token in place, and a turn change cancels pending placement. Teleporting
+breaks the trail without spending movement. Position and movement records
+share the gesture's undo transaction.
+
+Live drag trails follow the existing movement-sharing control. Hidden-token
+trails are never broadcast, and DM-only movement records are filtered by the
+relay. The app and relay must use the matching versioned sync protocol when
+this dependency upgrade is deployed.

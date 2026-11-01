@@ -501,6 +501,16 @@ export const usePlayerStore = create<PlayerStoreState>()(
 
       // Migration and utility
       migrateFromOldStorage: () => {
+        // The legacy key also mirrors the active character. Only bootstrap a
+        // pristine roster, using live state rather than a caller's mount snapshot.
+        const { characters, characterTombstones } = get();
+        if (
+          characters.length > 0 ||
+          Object.keys(characterTombstones).length > 0
+        ) {
+          return false;
+        }
+
         const migratedCharacter = migrateOldCharacterData();
         if (!migratedCharacter) return false;
 
@@ -599,9 +609,9 @@ export const usePlayerStore = create<PlayerStoreState>()(
         },
       }),
       onRehydrateStorage: () => {
-        return (state: PlayerStoreState | undefined) => {
-          // Auto-migrate on store initialization if needed
-          if (state && state.characters.length === 0) {
+        return (state: PlayerStoreState | undefined, error) => {
+          // Hydration must establish the authoritative roster before importing.
+          if (state && !error) {
             const migrated = state.migrateFromOldStorage();
             if (migrated) {
               console.log(

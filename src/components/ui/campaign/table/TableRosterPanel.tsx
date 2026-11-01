@@ -144,7 +144,7 @@ export function TableRosterPanel(props: {
       {!collapsed && !adding && details === null && (
         <div className="bg-surface-raised border-divider pointer-events-auto fixed bottom-24 left-0 max-w-[clamp(150px,16vw,180px)] rounded-r-xl border px-2 py-1 shadow-md">
           {ambiguous > 0 && (
-            <p className="text-accent-amber-text px-1 text-xs">
+            <p className="text-ember-text px-1 text-xs">
               {`${ambiguous} map token${ambiguous === 1 ? '' : 's'} could belong to more than one member. Open a member to link it.`}
             </p>
           )}

@@ -28,7 +28,7 @@ interface Target {
   requestRender?: () => void;
 }
 
-/** Every image on the map layer, lowest z first (C6-1 detection). */
+/** Every image on the map layer, lowest fractional order first (C6-1 detection). */
 export function mapLayerImages(
   store: Pick<ElementStore, 'getAll'>
 ): ImageElement[] {
@@ -38,7 +38,9 @@ export function mapLayerImages(
       (element): element is ImageElement =>
         element.type === 'image' && element.layerId === MAP_LAYER_ID
     )
-    .sort((left, right) => (left.zIndex ?? 0) - (right.zIndex ?? 0));
+    .sort((left, right) =>
+      left.index < right.index ? -1 : left.index > right.index ? 1 : 0
+    );
 }
 
 /** The map image is always public: undo hidden placement for it (C6-1). */

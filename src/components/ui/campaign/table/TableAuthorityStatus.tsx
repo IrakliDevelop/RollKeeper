@@ -98,7 +98,7 @@ export function TableAuthorityBanner(props: {
     >
       {text && (
         <p
-          className={`text-xs ${state.phase === 'offline' ? 'text-muted' : 'text-accent-amber-text'}`}
+          className={`text-xs ${state.phase === 'offline' ? 'text-muted' : 'text-ember-text'}`}
           role={state.phase === 'lost' ? 'alert' : 'status'}
           title={failureReason(state)}
         >
@@ -106,7 +106,7 @@ export function TableAuthorityBanner(props: {
         </p>
       )}
       {cleared && (
-        <p className="text-accent-amber-text text-xs" role="status">
+        <p className="text-ember-text text-xs" role="status">
           You&apos;re live again. Players&apos; initiative list was cleared. Use
           Share with players in the combat panel to send it again.
         </p>

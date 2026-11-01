@@ -33,7 +33,7 @@ export function OpenDisplayButton({
       </Button>
       <span
         role="status"
-        className="text-accent-amber-text min-w-0 text-xs break-words"
+        className="type-small text-ember-text min-w-0 break-words"
       >
         {message}
       </span>

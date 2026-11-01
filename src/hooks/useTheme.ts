@@ -8,12 +8,18 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-export type Theme = 'light' | 'dark' | 'parchment' | 'system';
-export type ResolvedTheme = 'light' | 'dark' | 'parchment';
+import type { Theme, ResolvedTheme } from '@/types/theme';
+export type { Theme, ResolvedTheme } from '@/types/theme';
+
+export interface CharacterThemeScopeValue {
+  characterId: string;
+  theme: Theme | undefined;
+}
 
 interface ThemeContextValue {
-  /** The user-chosen preference: 'light', 'dark', 'parchment', or 'system'. */
+  /** The user-chosen preference: 'light', 'dark', 'blue', or 'system'. */
   theme: Theme;
+  characterScope: CharacterThemeScopeValue | null;
   /** The actual applied theme after resolving 'system'. */
   resolvedTheme: ResolvedTheme;
   /** Change the theme preference. */
@@ -21,6 +27,9 @@ interface ThemeContextValue {
 }
 
 const STORAGE_KEY = 'rollkeeper-theme';
+
+/** Retired in Felt and Brass 1b. A stored value migrates to 'light'. */
+const RETIRED_PARCHMENT = 'parchment';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,11 +44,27 @@ function getSystemPreference(): ResolvedTheme {
 
 function getStoredTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
-  const stored = localStorage.getItem(STORAGE_KEY);
+  let stored: string | null;
+  try {
+    stored = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    // Storage is blocked: follow the system preference for this visit.
+    return 'system';
+  }
+  if (stored === RETIRED_PARCHMENT) {
+    // Paper replaces parchment. Write it back so later reads, including the
+    // pre-hydration script in themeScript.ts, see 'light'.
+    try {
+      localStorage.setItem(STORAGE_KEY, 'light');
+    } catch {
+      // Storage is full or blocked: still render paper for this visit.
+    }
+    return 'light';
+  }
   if (
     stored === 'light' ||
     stored === 'dark' ||
-    stored === 'parchment' ||
+    stored === 'blue' ||
     stored === 'system'
   ) {
     return stored;
@@ -68,6 +93,37 @@ function applyTheme(resolved: ResolvedTheme) {
 let listeners: Array<() => void> = [];
 let currentTheme: Theme = 'system';
 let currentResolved: ResolvedTheme = 'light';
+let characterScope: (CharacterThemeScopeValue & { owner: object }) | null =
+  null;
+
+function applyCurrentTheme() {
+  currentResolved = resolveTheme(characterScope?.theme ?? currentTheme);
+  applyTheme(currentResolved);
+  emitChange();
+}
+
+/** Route scope is visit-local; only setTheme writes the app preference. */
+export function registerCharacterThemeScope(
+  owner: object,
+  characterId: string,
+  theme: Theme | undefined
+) {
+  characterScope = { owner, characterId, theme };
+  applyCurrentTheme();
+}
+
+export function clearCharacterThemeScope(owner: object) {
+  if (characterScope?.owner !== owner) return;
+  characterScope = null;
+  applyCurrentTheme();
+}
+
+function getSnapshotScope() {
+  return characterScope;
+}
+function getServerSnapshotScope() {
+  return null;
+}
 
 function subscribe(listener: () => void) {
   listeners = [...listeners, listener];
@@ -104,6 +160,7 @@ function getServerSnapshotResolved(): ResolvedTheme {
 
 export const ThemeContext = createContext<ThemeContextValue>({
   theme: 'system',
+  characterScope: null,
   resolvedTheme: 'light',
   setTheme: () => {},
 });
@@ -131,20 +188,14 @@ export function useThemeInit(): ThemeContextValue {
   // Hydrate the store on first client render
   useEffect(() => {
     const stored = getStoredTheme();
-    const resolved = resolveTheme(stored);
     currentTheme = stored;
-    currentResolved = resolved;
-    applyTheme(resolved);
-    emitChange();
+    applyCurrentTheme();
 
     // Listen for system preference changes
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      if (currentTheme === 'system') {
-        currentResolved = getSystemPreference();
-        applyTheme(currentResolved);
-        emitChange();
-      }
+      if ((characterScope?.theme ?? currentTheme) === 'system')
+        applyCurrentTheme();
     };
     mql.addEventListener('change', handleChange);
     return () => mql.removeEventListener('change', handleChange);
@@ -162,12 +213,19 @@ export function useThemeInit(): ThemeContextValue {
   );
 
   const setTheme = useCallback((next: Theme) => {
-    localStorage.setItem(STORAGE_KEY, next);
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Storage is full or blocked: the choice still applies for this visit.
+    }
     currentTheme = next;
-    currentResolved = resolveTheme(next);
-    applyTheme(currentResolved);
-    emitChange();
+    applyCurrentTheme();
   }, []);
 
-  return { theme, resolvedTheme, setTheme };
+  const scope = useSyncExternalStore(
+    subscribe,
+    getSnapshotScope,
+    getServerSnapshotScope
+  );
+  return { theme, resolvedTheme, setTheme, characterScope: scope };
 }

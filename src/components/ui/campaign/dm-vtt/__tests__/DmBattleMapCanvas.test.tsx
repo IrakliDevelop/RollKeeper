@@ -1,3 +1,6 @@
+vi.mock('@/components/ui/campaign/location-map/BattleMapMovement', () => ({
+  BattleMapMovement: () => null,
+}));
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   act,
@@ -274,7 +277,11 @@ describe('DmBattleMapCanvas wiring', () => {
 
     expect(mockHookState.handleSaveMarkerDetail).toHaveBeenCalledTimes(1);
     expect(mockHookState.handleCloseMarkerPanel).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Marker saved')).toBeInTheDocument();
+    // The visible toast, and the copy screen readers hear.
+    expect(document.body.querySelector('[data-toast-type]')).toHaveTextContent(
+      'Marker saved'
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Marker saved');
   });
 
   it('does not reach the toolbar before a viewport exists (viewport gate)', () => {
@@ -439,8 +446,10 @@ describe('DmBattleMapCanvas: Table scene side channels (PR04 P7)', () => {
       'Markers not shared with players';
     renderCanvas();
     expect(
-      await screen.findByText('Markers not shared with players')
-    ).toBeInTheDocument();
+      await screen.findByRole('heading', {
+        name: 'Markers not shared with players',
+      })
+    ).toBeVisible();
   });
 });
 

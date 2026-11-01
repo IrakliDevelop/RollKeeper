@@ -27,10 +27,10 @@ const TONE_VARIANT = {
 } as const;
 
 const TONE_BOX = {
-  ok: 'border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text',
-  warn: 'border-accent-amber-border bg-accent-amber-bg text-accent-amber-text',
-  info: 'border-accent-blue-border bg-accent-blue-bg text-accent-blue-text',
-  bad: 'border-accent-red-border bg-accent-red-bg text-accent-red-text',
+  ok: 'border-verdigris-border bg-verdigris-bg text-verdigris-text',
+  warn: 'border-ember-border bg-ember-bg text-ember-text',
+  info: 'border-divider bg-surface-secondary text-heading',
+  bad: 'border-blood-border bg-blood-bg text-blood-text',
   none: 'border-divider bg-surface-secondary text-body',
 } as const;
 
@@ -51,7 +51,7 @@ export function ResultStep({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase">
+          <p className="text-muted mb-0.5 text-[11px] font-bold">
             {COPY.result.eyebrow}
           </p>
           <h3
@@ -67,18 +67,18 @@ export function ResultStep({
         </Button>
       </div>
 
-      <div className={`rounded-lg border p-4 ${TONE_BOX[result.tone]}`}>
+      <div className={`rounded-md border p-4 ${TONE_BOX[result.tone]}`}>
         <p className="text-sm font-semibold">{result.headline}</p>
         <p className="mt-1 text-[13px]">{result.body}</p>
       </div>
 
       {result.continueSetup ? (
-        <Button variant="primary" onClick={onContinueSetup}>
+        <Button variant="secondary" onClick={onContinueSetup}>
           {COPY.result.continueSetup}
         </Button>
       ) : null}
 
-      <div className="border-divider overflow-hidden rounded-lg border">
+      <div className="border-divider divide-divider divide-y border-y">
         {result.rows.map(row => (
           <div
             key={row.id}
@@ -96,22 +96,22 @@ export function ResultStep({
       {result.conflicts.map(conflict => (
         <div
           key={conflict.conflictId}
-          className="border-accent-amber-border bg-accent-amber-bg rounded-lg border-2 p-4"
+          className="border-ember-border bg-ember-bg rounded-md border-2 p-4"
         >
-          <p className="text-accent-amber-text text-sm font-semibold">
+          <p className="text-ember-text text-sm font-semibold">
             {COPY.conflict.title}
           </p>
-          <p className="text-accent-amber-text mt-1 text-[13px]">
+          <p className="text-ember-text mt-1 text-[13px]">
             {conflict.description}
           </p>
           {conflict.pendingApplication ? (
             <div className="mt-3">
-              <p className="text-accent-amber-text text-[13px]">
+              <p className="text-ember-text text-[13px]">
                 {COPY.conflict.pendingBody}
               </p>
               <Button
                 className="mt-2"
-                variant="primary"
+                variant="secondary"
                 onClick={() => onApplyPending(conflict.applicationLegacyId)}
                 disabled={view.busy}
               >
@@ -123,7 +123,7 @@ export function ResultStep({
               {conflict.choices.map(choice => (
                 <div
                   key={choice.resolution}
-                  className="border-accent-amber-border bg-surface flex flex-col gap-2 rounded-lg border p-3"
+                  className="border-ember-border bg-surface flex flex-col gap-2 rounded-md border p-3"
                 >
                   <p className="text-heading text-[13px] font-semibold">
                     {choice.label}
@@ -146,14 +146,11 @@ export function ResultStep({
       ))}
 
       {result.heldAside.map(item => (
-        <div
-          key={item.legacyId}
-          className="border-accent-blue-border bg-accent-blue-bg rounded-lg border p-4"
-        >
-          <p className="text-accent-blue-text text-sm font-semibold">
+        <div key={item.legacyId} className="border-divider border-b py-4">
+          <p className="text-heading text-sm font-semibold">
             {COPY.conflict.futureTitle}
           </p>
-          <p className="text-accent-blue-text mt-1 text-[13px]">
+          <p className="text-heading mt-1 text-[13px]">
             {COPY.conflict.futureDescription}
           </p>
           {item.recoveryAvailable ? (

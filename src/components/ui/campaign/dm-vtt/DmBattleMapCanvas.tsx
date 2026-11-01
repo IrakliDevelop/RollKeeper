@@ -1,4 +1,6 @@
 'use client';
+import { BattleMapMovement } from '../location-map/BattleMapMovement';
+import { TableBattleMapMovement } from '../table/TableBattleMapMovement';
 
 import { useCallback, useEffect, useState } from 'react';
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
@@ -184,9 +186,24 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   // anyone else's camera.
   const [cameraSharing, setCameraSharing] = useState(false);
 
+  const Movement = props.tableSceneAdapter
+    ? TableBattleMapMovement
+    : BattleMapMovement;
   return (
     <ViewportContext.Provider value={viewport}>
       <div className="bg-surface fixed inset-0">
+        {viewport && (
+          <div className="absolute bottom-16 left-3 z-20">
+            <Movement
+              viewport={viewport}
+              campaignCode={campaignCode}
+              battleMapId={battleMapId}
+              sceneAdapter={props.tableSceneAdapter}
+              dash={movementDash}
+              onDashChange={handleSetMovementDash}
+            />
+          </div>
+        )}
         <FieldNotesCanvas
           tools={tools}
           defaultTool="hand"

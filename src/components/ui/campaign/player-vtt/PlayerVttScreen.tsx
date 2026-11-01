@@ -22,6 +22,7 @@ import { SheetDrawer } from './SheetDrawer';
 import { SpellPlacementController } from './SpellPlacementController';
 import { StatusEffectTray } from './StatusEffectTray';
 import { useSheetDrawerState } from './useSheetDrawerState';
+import { useVttRest } from './useVttRest';
 
 interface PlayerVttScreenProps {
   campaignCode: string;
@@ -63,8 +64,14 @@ export function PlayerVttScreen({
     dismissToast,
     showAttackRoll,
     showShortRest,
-    showLongRest,
   } = usePlayerVttState(campaignCode, characterId);
+  const handleRested = useVttRest({
+    campaignCode,
+    characterId,
+    sharedCalendar: sharedState?.calendar,
+    addToast,
+    showShortRest,
+  });
 
   const handleReactionAutoReset = useCallback(() => {
     addToast({
@@ -122,6 +129,7 @@ export function PlayerVttScreen({
 
   return (
     <PlayerBattleMapCanvas
+      initiative={sharedState?.initiative}
       campaignCode={campaignCode}
       battleMapId={battleMapId}
       characterId={characterId}
@@ -189,9 +197,7 @@ export function PlayerVttScreen({
           onCloseAutoFocus={handleSheetCloseAutoFocus}
           addToast={addToast}
           showAttackRoll={showAttackRoll}
-          onRested={type =>
-            type === 'short' ? showShortRest() : showLongRest()
-          }
+          onRested={handleRested}
           spellCasting={spellCasting}
           openTarget={openTarget}
           partyMembers={partyMembers}

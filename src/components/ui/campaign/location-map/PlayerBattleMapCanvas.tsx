@@ -1,4 +1,6 @@
 'use client';
+import { BattleMapMovement } from './BattleMapMovement';
+import type { SharedInitiativeState } from '@/types/sharedState';
 
 import React, {
   useCallback,
@@ -129,6 +131,7 @@ import {
 } from '@/lib/fieldnotesVtt';
 
 interface PlayerBattleMapCanvasProps {
+  initiative?: SharedInitiativeState | null;
   campaignCode: string;
   battleMapId: string;
   characterId: string;
@@ -305,7 +308,7 @@ export function PlayerToolbar({
             ? 'bg-accent-emerald-bg text-accent-emerald-text'
             : status === 'denied'
               ? 'bg-accent-red-bg text-accent-red-text'
-              : 'bg-accent-amber-bg text-accent-amber-text'
+              : 'bg-ember-bg text-ember-text'
         }`}
       >
         {status === 'live'
@@ -325,6 +328,7 @@ export function PlayerBattleMapCanvas({
   characterName,
   characterAvatar,
   children,
+  initiative,
   onStatus: onStatusProp,
   onPoke,
   spellTemplateConfigRef,
@@ -992,6 +996,7 @@ export function PlayerBattleMapCanvas({
           scope.push(
             attachPathBroadcast(movementTool, connection, {
               role: 'player',
+              viewport: vp,
               // Players hold no dmOnlyElements state; DM-only elements never
               // reach them (relay canRead), so an own-token anchor cannot be
               // DM-only from this client's view.
@@ -1102,8 +1107,8 @@ export function PlayerBattleMapCanvas({
           }
         />
         {sceneNotice && (
-          <div className="border-accent-amber-border bg-accent-amber-bg pointer-events-auto absolute top-16 left-1/2 z-[110] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 shadow-md">
-            <p role="status" className="text-accent-amber-text text-sm">
+          <div className="border-ember-border bg-ember-bg pointer-events-auto absolute top-16 left-1/2 z-[110] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 shadow-md">
+            <p role="status" className="text-ember-text text-sm">
               {sceneNotice}
             </p>
             <Button
@@ -1117,6 +1122,15 @@ export function PlayerBattleMapCanvas({
         )}
         {viewport && (
           <PlayerMapToolControls>
+            <BattleMapMovement
+              viewport={viewport}
+              campaignCode={campaignCode}
+              battleMapId={battleMapId}
+              characterId={characterId}
+              initiative={initiative}
+              dash={movementDash}
+              onDashChange={handleSetMovementDash}
+            />
             <PlayerToolbar
               status={status}
               hasSelection={hasSelection}

@@ -188,11 +188,7 @@ export function MagicItemLibrarySection({
               id="magic-item-library-heading"
               className="text-heading flex items-center gap-2 text-lg font-semibold"
             >
-              <AppIcon
-                name="magicItem"
-                size={20}
-                className="text-accent-purple-text"
-              />{' '}
+              <AppIcon name="magicItem" size={20} className="text-muted" />{' '}
               Magic Item Library ({items.length})
             </h3>
             <p className="text-muted text-sm">

@@ -119,14 +119,14 @@ export function TableArrivalMarker(props: {
       className="pointer-events-none fixed z-10 flex -translate-x-1/2 -translate-y-full flex-col items-center"
       style={{ left: screen.x, top: screen.y }}
     >
-      <span className="border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text rounded border px-1 text-[10px] leading-4 font-semibold whitespace-nowrap shadow-sm">
+      <span className="border-verdigris-border bg-verdigris-bg text-verdigris-text rounded border px-1 text-[10px] leading-4 font-semibold whitespace-nowrap shadow-sm">
         Arrival
       </span>
       <MapPin
         size={24}
         strokeWidth={2.5}
         aria-hidden="true"
-        className="text-accent-emerald-text fill-accent-emerald-bg drop-shadow"
+        className="text-verdigris-text fill-verdigris-bg drop-shadow"
       />
     </div>
   );

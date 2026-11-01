@@ -5,6 +5,7 @@ import { DiceSetEditor } from './DiceSetEditor';
 import { RollSummary } from '@/types/dice';
 import { AppIcon } from '@/components/ui/icons';
 import { DEFAULT_DICE_SET } from '@/utils/diceSet';
+import { DEFAULT_DICE_PREFERENCES } from '@/utils/dicePreferences';
 
 export interface DiceRollerProps
   extends Omit<UseDiceRollerOptions, 'containerId'> {
@@ -81,7 +82,13 @@ export function DiceRoller({
     onError: addLog,
     onLog: addLog,
     ...diceOptions,
-    ...(showDiceSet ? { skin: diceSet.skin, dieScale: diceSet.dieScale } : {}),
+    ...(showDiceSet
+      ? {
+          skin: diceSet.skin,
+          dieScale: diceSet.dieScale,
+          trayOptions: diceSet.options ?? DEFAULT_DICE_PREFERENCES,
+        }
+      : {}),
   });
 
   const handleCustomRoll = () => {
@@ -110,15 +117,7 @@ export function DiceRoller({
           position: 'fixed',
         }}
       />
-      {showDiceSet && (
-        <DiceSetEditor
-          value={diceSet}
-          onChange={setDiceSet}
-          onPreview={() => {
-            void roll('1d20+1d8+1d6');
-          }}
-        />
-      )}
+      {showDiceSet && <DiceSetEditor value={diceSet} onChange={setDiceSet} />}
 
       <style jsx global>{`
         #${containerId} {

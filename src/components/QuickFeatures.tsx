@@ -38,7 +38,7 @@ export function QuickFeatures() {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="divide-divider divide-y">
         {favoriteFeatures.map(feature => (
           <QuickFeatureCard
             key={feature.id}
@@ -88,11 +88,7 @@ function QuickFeatureCard({
 
   return (
     <div
-      className={`bg-surface-raised flex items-center gap-3 rounded-lg border-2 p-3 transition-all ${
-        isExhausted
-          ? 'border-accent-red-border bg-accent-red-bg opacity-70'
-          : 'border-divider-strong hover:border-accent-amber-border'
-      }`}
+      className={`flex flex-wrap items-center gap-3 py-3 ${isExhausted ? 'opacity-70' : ''}`}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -100,7 +96,7 @@ function QuickFeatureCard({
             {feature.name}
           </h4>
           {feature.sourceDetail && (
-            <span className="bg-surface-inset text-muted hidden rounded px-1.5 py-0.5 text-[10px] sm:inline-block">
+            <span className="text-muted hidden text-xs sm:inline-block">
               {feature.sourceDetail}
             </span>
           )}
@@ -108,20 +104,12 @@ function QuickFeatureCard({
 
         <div className="mt-1 flex items-center gap-3 text-xs">
           {feature.isPassive ? (
-            <span className="text-accent-blue-text-muted flex items-center gap-1">
+            <span className="text-muted flex items-center gap-1">
               <CheckCircle2 className="h-3 w-3" />
               Passive
             </span>
           ) : hasUses ? (
-            <span
-              className={`flex items-center gap-1 ${
-                isExhausted
-                  ? 'text-accent-red-text-muted'
-                  : usesRemaining <= 1
-                    ? 'text-accent-orange-text-muted'
-                    : 'text-accent-green-text-muted'
-              }`}
-            >
+            <span className="text-muted flex items-center gap-1">
               {isExhausted ? (
                 <AlertCircle className="h-3 w-3" />
               ) : (
@@ -130,7 +118,7 @@ function QuickFeatureCard({
               {usesRemaining}/{maxUses}
             </span>
           ) : (
-            <span className="text-accent-blue-text-muted flex items-center gap-1">
+            <span className="text-muted flex items-center gap-1">
               <Zap className="h-3 w-3" />
               Unlimited
             </span>
@@ -148,9 +136,8 @@ function QuickFeatureCard({
         {!feature.isPassive && hasUses && !isExhausted && (
           <Button
             onClick={onUse}
-            variant="primary"
+            variant="secondary"
             size="xs"
-            className="bg-accent-indigo-text hover:bg-accent-indigo-text-muted"
             title="Use feature"
           >
             <Zap className="h-4 w-4" />
@@ -169,7 +156,7 @@ function QuickFeatureCard({
           onClick={onUnfavorite}
           variant="ghost"
           size="xs"
-          className="text-accent-amber-text hover:bg-accent-amber-bg-strong"
+          className="text-muted"
           title="Remove from quick actions"
         >
           <Star className="h-4 w-4 fill-current" />

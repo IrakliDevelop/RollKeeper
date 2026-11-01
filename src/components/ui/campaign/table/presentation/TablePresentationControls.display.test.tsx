@@ -123,8 +123,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const audienceStatus = () =>
-  screen.getByRole('status', { name: 'What players see' });
+const displayStatusRegion = () =>
+  screen.getByRole('status', { name: 'Table display' });
 async function settle(ms = 0) {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
@@ -172,19 +172,24 @@ describe('display status wording (E13)', () => {
     ).toEqual({ text: "Couldn't check the TV", tone: 'muted' });
   });
 
-  it('shows the display line in the audience status region and drops the PR04 suffix', async () => {
+  it('separates the TV report from the audience status and drops the PR04 suffix', async () => {
     displayReply = () =>
       Response.json({ state: 'loaded', sceneId: 'scene-tavern', ageMs: 1_000 });
     render(controls({}).element);
     await settle();
-    expect(audienceStatus()).toHaveTextContent("TV says it's showing Tavern");
+    expect(displayStatusRegion()).toHaveTextContent(
+      "TV says it's showing Tavern"
+    );
     cleanup();
     render(controls({ current: descriptor('scene-hall') }).element);
     await settle();
-    expect(audienceStatus()).toHaveTextContent(
-      'Players see: Hall (on the TV only)'
+    const audience = screen.getByRole('status', { name: 'What players see' });
+    expect(audience).toHaveTextContent('Players see: Hall (on the TV only)');
+    expect(audience.textContent).not.toContain('arrives later');
+    expect(audience).not.toHaveTextContent("TV says it's showing Tavern");
+    expect(displayStatusRegion()).toHaveTextContent(
+      "TV says it's showing Tavern"
     );
-    expect(audienceStatus().textContent).not.toContain('arrives later');
   });
 
   it('a stale or failed read never shows success styling', async () => {
@@ -193,7 +198,7 @@ describe('display status wording (E13)', () => {
     render(controls({}).element);
     await settle();
     const stale = screen.getByText('No word from the TV for 20 s');
-    expect(stale.className).not.toContain('emerald');
+    expect(stale.className).not.toContain('verdigris');
     displayReply = () => new Response('{}', { status: 503 });
     await settle(5_000);
     expect(screen.getByText("Couldn't check the TV")).toBeVisible();
@@ -207,7 +212,7 @@ describe('display status read timeout (review 01 F1)', () => {
     render(controls({}).element);
     await settle();
     const loaded = screen.getByText("TV says it's showing Tavern");
-    expect(loaded.className).toContain('emerald');
+    expect(loaded.className).toContain('verdigris');
     fetchFn.mockImplementation(async (url: string, init?: RequestInit) => {
       if (!String(url).includes('/table/display/status'))
         return Response.json({
@@ -223,7 +228,7 @@ describe('display status read timeout (review 01 F1)', () => {
     await settle(5_000);
     await settle(5_000);
     const line = screen.getByText("Couldn't check the TV");
-    expect(line.className).not.toContain('emerald');
+    expect(line.className).not.toContain('verdigris');
     expect(screen.queryByText("TV says it's showing Tavern")).toBeNull();
   });
 });
@@ -364,7 +369,7 @@ describe('Open display launcher (E12)', () => {
       button.parentElement!.querySelector('[role="status"]')!;
     for (const element of [line, launcherStatus]) {
       expect(element.className).toMatch(
-        /\btext-(?:accent-[a-z]+-text|muted)\b/u
+        /\btext-(?:verdigris-text|ember-text|blood-text|muted)\b/u
       );
       expect(element.className).not.toMatch(
         /\b(?:text|bg|border)-(?:white|black|gray|slate|zinc|red|green|blue|amber|emerald)-\d+\b/u
@@ -442,7 +447,9 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
       });
     render(controls({}).element);
     await settle();
-    expect(audienceStatus()).toHaveTextContent('TV says the scale is checked');
+    expect(displayStatusRegion()).toHaveTextContent(
+      'TV says the scale is checked'
+    );
     displayReply = () =>
       Response.json({
         state: 'loaded',
@@ -470,7 +477,9 @@ describe('O7-A5 uncalibrated after verified', () => {
     expect(screen.queryByText("TV says it's back to normal view")).toBeNull();
     displayReply = report('verified');
     await settle(5_000);
-    expect(audienceStatus()).toHaveTextContent('TV says the scale is checked');
+    expect(displayStatusRegion()).toHaveTextContent(
+      'TV says the scale is checked'
+    );
     displayReply = report('uncalibrated');
     await settle(5_000);
     const line = screen.getByText("TV says it's back to normal view");

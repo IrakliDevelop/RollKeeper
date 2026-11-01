@@ -779,3 +779,58 @@ describe('Table control session across a display rotation (PR05 R4-F1)', () => {
     expect(prepared.session.isLost()).toBe(false);
   });
 });
+
+it('upgrades copied legacy order and a current indexed zero-version movement record without mutating source bytes', async () => {
+  const { canvasStateToAuthorityState } = await import('./authorityLifecycle');
+  const { movementRecordTypeDefinition } = await import('@fieldnotes/vtt');
+  const trail = movementRecordTypeDefinition.wrap({
+    id: 'vtt-movement:token',
+    type: 'movement',
+    position: { x: 0, y: 0 },
+    index: 'a1',
+    version: 0,
+    locked: true,
+    layerId: 'map',
+    targetId: 'token',
+    epoch: 'run:1:1:member',
+    visibility: 'all',
+    feet: 5,
+    diagonals: 0,
+    trail: [],
+  });
+  const current = JSON.parse(
+    JSON.stringify({ version: 6, elements: [trail], layers: [] })
+  );
+  const bytes = JSON.stringify(current);
+  expect(
+    (
+      canvasStateToAuthorityState(current, 'dm').elements as Array<{
+        version: number;
+      }>
+    )[0].version
+  ).toBe(1);
+  expect(JSON.stringify(current)).toBe(bytes);
+  const legacy = {
+    version: 4,
+    elements: [
+      { id: 'back', zIndex: -1 },
+      { id: 'front', zIndex: 10 },
+    ],
+    layers: [],
+  };
+  const legacyBytes = JSON.stringify(legacy);
+  const converted = canvasStateToAuthorityState(legacy, 'dm')
+    .elements as Array<{
+    id: string;
+    index: string;
+    version: number;
+    zIndex?: number;
+  }>;
+  expect(converted[0].index < converted[1].index).toBe(true);
+  expect(
+    converted.every(
+      element => element.version === 1 && element.zIndex === undefined
+    )
+  ).toBe(true);
+  expect(JSON.stringify(legacy)).toBe(legacyBytes);
+});

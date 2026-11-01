@@ -16,7 +16,7 @@ import {
   createFogAuthorityServerExtension,
   prepareFogAuthorityIntent,
 } from '@fieldnotes/vtt/server';
-import { FogManager } from '@fieldnotes/vtt';
+import { FogManager, movementRecordTypeDefinition } from '@fieldnotes/vtt';
 
 import {
   createManagedBattleMapAuthorityConnection,
@@ -385,10 +385,10 @@ run('two relay authority transport', () => {
         JSON.stringify({ a: a.getState(), b: b.getState(), closeEvents })
       );
     });
-    const element = createShape({
-      position: { x: 1, y: 2 },
-      size: { w: 10, h: 10 },
-    });
+    const element = {
+      ...createShape({ position: { x: 1, y: 2 }, size: { w: 10, h: 10 } }),
+      index: 'a0',
+    };
     expect(a.submit({ kind: 'upsert', element })).toMatchObject({
       status: 'admitted',
     });
@@ -815,6 +815,7 @@ run('two relay authority transport', () => {
         layerId: band.id,
       }),
       id: 'party-token-a',
+      index: 'a0',
       tokenKind: 'player',
       characterId: 'player-a',
       sceneMemberId: 'member-a',
@@ -903,6 +904,193 @@ run('two relay authority transport', () => {
       dm.getState().document?.layers.find(record => record.id === band.id)
         ?.definition
     ).toMatchObject({ visible: true });
+
+    const trail = {
+      id: `vtt-movement:${partyToken.id}`,
+      type: 'extension' as const,
+      extensionType: 'vtt:movement',
+      position: { x: 0, y: 0 },
+      index: 'a1',
+      version: 1,
+      locked: true,
+      layerId: band.id,
+      data: {
+        targetId: partyToken.id,
+        epoch: 'transport-epoch',
+        feet: 5,
+        diagonals: 0,
+        visibility: 'all',
+        trail: [
+          [
+            { x: 10, y: 10 },
+            { x: 300, y: 200 },
+          ],
+        ],
+      },
+    };
+    expect(dm.submit({ kind: 'upsert', element: trail })).toMatchObject({
+      status: 'admitted',
+    });
+    const dmTrail = () =>
+      dm.getState().document?.elements.find(item => item.id === trail.id);
+    const displayHasTrail = () =>
+      display
+        .getState()
+        .document?.elements.some(item => item.id === trail.id) === true;
+    await eventually(
+      () =>
+        playerA.store.getById(trail.id) !== undefined &&
+        playerB.store.getById(trail.id) !== undefined &&
+        displayHasTrail()
+    );
+    playerA.store.update(trail.id, {
+      data: { ...trail.data, feet: 15 },
+    } as never);
+    await eventually(
+      () => (dmTrail() as typeof trail | undefined)?.data.feet === 15
+    );
+    playerB.store.update(trail.id, {
+      data: { ...trail.data, feet: 500 },
+    } as never);
+    await eventually(
+      () =>
+        (playerB.store.getById(trail.id) as unknown as typeof trail | undefined)
+          ?.data.feet === 15
+    );
+    expect((dmTrail() as typeof trail).data.feet).toBe(15);
+
+    // A reset keeps its empty trail array through Redis and publication evidence.
+    playerA.store.update(trail.id, {
+      data: { ...trail.data, feet: 0, diagonals: 0, trail: [] },
+    } as never);
+    await eventually(
+      () => (dmTrail() as typeof trail | undefined)?.data.feet === 0
+    );
+    expect((dmTrail() as typeof trail).data.trail).toEqual([]);
+    playerA.store.update(trail.id, {
+      tokenKind: 'combatant',
+      entityId: 'foreign-member',
+    } as never);
+    await eventually(
+      () =>
+        (
+          playerA.store.getById(trail.id) as unknown as
+            | { tokenKind?: string }
+            | undefined
+        )?.tokenKind === undefined
+    );
+    expect(dmTrail()).not.toHaveProperty('tokenKind');
+    expect(dmTrail()).not.toHaveProperty('entityId');
+    expect(
+      JSON.parse((await redis.hGet(keys.elements, trail.id))!).ownerId
+    ).toBe('dm-a');
+
+    // The SDK starts a new movement record at version zero; the app wrapper
+    // normalizes the first wire write before the authority client validates it.
+    const firstMoveToken = {
+      ...partyToken,
+      id: 'first-move-token',
+      index: 'a2',
+    };
+    expect(
+      dm.submit({ kind: 'upsert', element: firstMoveToken })
+    ).toMatchObject({ status: 'admitted' });
+    await eventually(
+      () => playerA.store.getById(firstMoveToken.id) !== undefined
+    );
+    const initialMovement = movementRecordTypeDefinition.wrap({
+      id: `vtt-movement:${firstMoveToken.id}`,
+      type: 'movement',
+      position: { x: 0, y: 0 },
+      index: '',
+      version: 0,
+      locked: true,
+      layerId: band.id,
+      targetId: firstMoveToken.id,
+      epoch: 'transport-epoch',
+      feet: 5,
+      diagonals: 0,
+      visibility: 'all',
+      trail: [
+        [
+          { x: 10, y: 10 },
+          { x: 20, y: 10 },
+        ],
+      ],
+    });
+    playerA.store.add(initialMovement);
+    await eventually(
+      () =>
+        dm
+          .getState()
+          .document?.elements.some(item => item.id === initialMovement.id) ===
+        true
+    );
+    expect(
+      JSON.parse((await redis.hGet(keys.elements, initialMovement.id))!)
+    ).toMatchObject({ version: 1, ownerId: 'player-a' });
+    expect(dm.submit({ kind: 'remove', id: firstMoveToken.id })).toMatchObject({
+      status: 'admitted',
+    });
+    await eventually(
+      () =>
+        playerA.store.getById(firstMoveToken.id) === undefined &&
+        playerA.store.getById(initialMovement.id) === undefined &&
+        display
+          .getState()
+          .document?.elements.some(item => item.id === initialMovement.id) ===
+          false &&
+        dm
+          .getState()
+          .document?.elements.some(item => item.id === initialMovement.id) ===
+          false
+    );
+    expect(await redis.hGet(keys.ownership, initialMovement.id)).toBeNull();
+    expect(dmTrail()).toBeDefined();
+
+    // Hiding the target must withdraw its already-public trail on both relays.
+    expect(
+      dm.submit({
+        kind: 'upsert',
+        element: {
+          ...partyToken,
+          position: { x: 300, y: 200 },
+          audience: 'dm',
+        },
+      })
+    ).toMatchObject({ status: 'admitted' });
+    await eventually(
+      () =>
+        playerA.store.getById(partyToken.id) === undefined &&
+        playerA.store.getById(trail.id) === undefined &&
+        playerB.store.getById(trail.id) === undefined &&
+        !displayHasTrail()
+    );
+    expect(dmTrail()).toBeDefined();
+    const reloadedPlayer = raw(
+      first,
+      'player-a-reload',
+      playerToken('player-a')
+    );
+    const reloadedDisplay = raw(
+      first,
+      `display-${CAMPAIGN}-reload`,
+      displayToken
+    );
+    await eventually(
+      () =>
+        reloadedPlayer.getState().status === 'live' &&
+        reloadedDisplay.getState().status === 'live'
+    );
+    for (const reloaded of [reloadedPlayer, reloadedDisplay]) {
+      expect(
+        reloaded
+          .getState()
+          .document?.elements.some(
+            item => item.id === trail.id || item.id === partyToken.id
+          )
+      ).toBe(false);
+    }
     expect(closeEvents.some(event => event.code === 1013)).toBe(false);
   }, 20_000);
 
@@ -973,6 +1161,7 @@ run('two relay authority transport', () => {
     const visible = {
       ...createShape({ position: { x: 5, y: 5 }, size: { w: 10, h: 10 } }),
       id: 'before-rotation',
+      index: 'a0',
     };
     dm.submit({ kind: 'upsert', element: visible });
     await eventually(
@@ -1007,6 +1196,7 @@ run('two relay authority transport', () => {
     const hidden = {
       ...createShape({ position: { x: 9, y: 9 }, size: { w: 10, h: 10 } }),
       id: 'after-rotation',
+      index: 'a1',
     };
     dm.submit({ kind: 'upsert', element: hidden });
     await eventually(
@@ -1631,6 +1821,7 @@ run('two relay authority transport', () => {
     const restoredToken = {
       ...createShape({ position: { x: 1, y: 1 }, size: { w: 10, h: 10 } }),
       id: 'restored-token',
+      index: 'a0',
     };
     const restore = await fetch(
       `http://127.0.0.1:${first.address().port}/authority-admin/provision`,

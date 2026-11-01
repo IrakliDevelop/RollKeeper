@@ -444,6 +444,52 @@ function stubPopoverLayout() {
 }
 
 describe('W1 canonical selection', () => {
+  it('positions Scenes below a changing header before a canvas is available and releases the measurement on exit', async () => {
+    let bottom = 180;
+    let resize = () => {};
+    const disconnect = vi.fn();
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: 500,
+        bottom,
+        width: 500,
+        height: bottom,
+        toJSON: () => ({}),
+      })
+    );
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resize = callback;
+        }
+        observe() {}
+        disconnect = disconnect;
+      }
+    );
+    nav.reset('scene=scene-elsewhere&panel=scenes');
+    const view = render(<TableWorkspace campaignCode="CAMP" />);
+    await screen.findByText("That scene isn't on this device.");
+    expect(canvasScene()).toBeUndefined();
+    expect(
+      document.documentElement.style.getPropertyValue('--dm-vtt-panel-top')
+    ).toBe('192px');
+    bottom = 240;
+    act(() => resize());
+    expect(
+      document.documentElement.style.getPropertyValue('--dm-vtt-panel-top')
+    ).toBe('252px');
+    expect(presentationCommands()).toEqual([]);
+    view.unmount();
+    expect(disconnect).toHaveBeenCalled();
+    expect(
+      document.documentElement.style.getPropertyValue('--dm-vtt-panel-top')
+    ).toBe('');
+  });
   it('opens ?scene= privately: one canvas, the scene registered, nothing presented', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
@@ -1276,15 +1322,24 @@ describe('W5/W6 browser, creation and local adoption in the workspace', () => {
     const windowAdd = vi.spyOn(window, 'addEventListener');
     const documentAdd = vi.spyOn(document, 'addEventListener');
     const mounts = mocks.canvasMounts;
+    const combatMounts = mocks.combatMounts;
+    const roster = screen.getByTestId('table-roster');
+    const combat = screen.getByTestId('table-combat');
     const toggle = screen.getByRole('button', { name: 'Scenes' });
     for (let index = 0; index < 10; index += 1) {
       fireEvent.click(toggle);
+      expect(roster).not.toBeVisible();
       fireEvent.click(toggle);
+      expect(roster).toBeVisible();
     }
     expect(created).not.toHaveBeenCalled();
     expect(windowAdd).not.toHaveBeenCalled();
     expect(documentAdd).not.toHaveBeenCalled();
     expect(mocks.canvasMounts).toBe(mounts);
+    expect(mocks.combatMounts).toBe(combatMounts);
+    expect(screen.getByTestId('table-roster')).toBe(roster);
+    expect(screen.getByTestId('table-combat')).toBe(combat);
+    expect(presentationCommands()).toEqual([]);
     expect(camera.position).toEqual({ x: -40, y: -30 });
     expect(canvasScene()).toBe('scene-tavern');
   });

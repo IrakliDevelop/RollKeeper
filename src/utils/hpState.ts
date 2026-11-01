@@ -9,12 +9,44 @@ export function hpPercent(current: number, max: number): number {
 
 export type HpTier = 'high' | 'mid' | 'low' | 'critical';
 
-/** Coarse health tier from a 0-100 percentage, for colour-coding. */
+/**
+ * Coarse health tier from a 0-100 percentage, for colour-coding. Each
+ * threshold is inclusive (75% is still `high`), matching the `>=` rule of
+ * the DM's HP state bands so a label and its colour never disagree.
+ */
 export function hpTier(percent: number): HpTier {
-  if (percent > 75) return 'high';
-  if (percent > 50) return 'mid';
-  if (percent > 25) return 'low';
+  if (percent >= 75) return 'high';
+  if (percent >= 50) return 'mid';
+  if (percent >= 25) return 'low';
   return 'critical';
+}
+
+/** The four HP statuses a viewer can be told about. */
+export type HpStatus = 'healthy' | 'bloodied' | 'critical' | 'down';
+
+/** The word shown for each status wherever there's room for one. */
+export const HP_STATUS_LABELS: Record<HpStatus, string> = {
+  healthy: 'Healthy',
+  bloodied: 'Bloodied',
+  critical: 'Critical',
+  down: 'Down',
+};
+
+/**
+ * Status for current/max HP: `down` at 0 HP or below, otherwise the tier
+ * (`mid` and `low` are both `bloodied`).
+ */
+export function hpStatus(current: number, max: number): HpStatus {
+  if (current <= 0) return 'down';
+  switch (hpTier(hpPercent(current, max))) {
+    case 'high':
+      return 'healthy';
+    case 'mid':
+    case 'low':
+      return 'bloodied';
+    case 'critical':
+      return 'critical';
+  }
 }
 
 /**

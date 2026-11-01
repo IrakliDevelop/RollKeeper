@@ -1,15 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { RotateCcw, Plus, X, Bird, Mountain, Waves, Zap } from 'lucide-react';
-import { formatModifier, getBuffSpeedBonus } from '@/utils/calculations';
+import type { ReactNode } from 'react';
+import { getBuffSpeedBonus } from '@/utils/calculations';
 import { Button, Switch } from '@/components/ui/forms';
-import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { InPlaceField } from '@/components/ui/forms/InPlaceField';
 import { CharacterState } from '@/types/character';
 import { AppIcon } from '@/components/ui/icons';
 
 interface CombatStatsProps {
   character: CharacterState;
+  /**
+   * Sheet mode: false shows the build values as plain text. Defaults to true
+   * (editable) for callers outside the character sheet.
+   */
+  editing?: boolean;
   getInitiativeModifier: () => number;
   onUpdateInitiative: (value: number, isOverridden: boolean) => void;
   onResetInitiativeToDefault: () => void;
@@ -20,205 +24,125 @@ interface CombatStatsProps {
   onRollInitiative: () => void;
 }
 
+function StatCell({
+  caption,
+  children,
+  note,
+}: {
+  caption: string;
+  children: ReactNode;
+  note?: ReactNode;
+}) {
+  return (
+    <div className="min-w-16 space-y-1">
+      <div className="type-num-lg text-heading flex min-h-10 items-center tabular-nums pointer-coarse:min-h-11">
+        {children}
+      </div>
+      <p className="type-caption text-muted">{caption}</p>
+      {note}
+    </div>
+  );
+}
+
+const EXTRA_SPEEDS = [
+  { key: 'flySpeed', label: 'Fly' },
+  { key: 'climbSpeed', label: 'Climb' },
+  { key: 'swimSpeed', label: 'Swim' },
+] as const;
+
 export default function CombatStats({
   character,
+  editing = true,
   getInitiativeModifier,
   onUpdateInitiative,
   onResetInitiativeToDefault,
   onUpdateSpeed,
   onUpdateCharacter,
   onToggleReaction,
-  onResetReaction,
   onRollInitiative,
 }: CombatStatsProps) {
-  const [showExtraSpeeds, setShowExtraSpeeds] = useState(
-    !!(character.flySpeed || character.climbSpeed || character.swimSpeed)
+  const initiative = getInitiativeModifier();
+  const rollLabel = `Roll initiative (d20 ${initiative < 0 ? '−' : '+'} ${Math.abs(initiative)})`;
+  const speedBonus = getBuffSpeedBonus(character);
+  const extraSpeeds = EXTRA_SPEEDS.filter(
+    ({ key }) => editing || (character[key] ?? 0) > 0
   );
   return (
-    <>
-      {/* Initiative and Speed Row */}
-      <div className="mb-6 grid grid-cols-2 gap-4">
-        {/* Initiative */}
-        <div className="text-center">
-          <div
-            className={`flex h-20 flex-col justify-center rounded-lg border-2 p-3 transition-colors ${
-              character.initiative.isOverridden
-                ? 'border-accent-orange-border bg-accent-orange-bg'
-                : 'border-accent-amber-border bg-accent-amber-bg'
-            }`}
-          >
-            <div className="text-accent-amber-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
-              INITIATIVE
-              {character.initiative.isOverridden && (
-                <Button
-                  onClick={onResetInitiativeToDefault}
-                  variant="ghost"
-                  size="xs"
-                  className="h-4 w-4 p-0 text-orange-600 hover:text-orange-800"
-                  title="Reset to DEX modifier"
-                >
-                  <RotateCcw size={10} />
-                </Button>
-              )}
-              <Button
-                onClick={onRollInitiative}
-                variant="ghost"
-                size="xs"
-                className="text-accent-amber-text-muted hover:text-accent-amber-text ml-1 h-4 w-4 p-0"
-                title={`Roll initiative (d20 + ${formatModifier(getInitiativeModifier())})`}
-              >
-                <AppIcon name="dice" className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <NumberInput
-              value={getInitiativeModifier()}
-              onChange={v => onUpdateInitiative(v ?? 0, true)}
-              className={`[appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                character.initiative.isOverridden
-                  ? 'text-accent-orange-text'
-                  : 'text-accent-amber-text'
-              }`}
-              title={
-                character.initiative.isOverridden
-                  ? 'Custom initiative (overridden)'
-                  : 'DEX modifier (auto-calculated)'
-              }
-            />
-          </div>
-        </div>
-
-        {/* Speed */}
-        <div className="text-center">
-          <div
-            className="border-accent-green-border bg-accent-green-bg flex flex-col justify-center rounded-lg border-2 p-3"
-            style={{ minHeight: '5rem' }}
-          >
-            <div className="text-accent-green-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
-              SPEED
-              <Button
-                onClick={() => setShowExtraSpeeds(!showExtraSpeeds)}
-                variant="ghost"
-                size="xs"
-                className="text-accent-green-text-muted hover:text-accent-green-text ml-1 h-4 w-4 p-0"
-                title={
-                  showExtraSpeeds
-                    ? 'Hide extra speeds'
-                    : 'Add fly/climb/swim speeds'
-                }
-              >
-                {showExtraSpeeds ? <X size={10} /> : <Plus size={10} />}
-              </Button>
-            </div>
-            <NumberInput
-              value={character.speed}
-              onChange={v => onUpdateSpeed(v ?? 30)}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            {getBuffSpeedBonus(character) !== 0 && (
-              <div className="text-accent-blue-text mt-0.5 flex items-center justify-center gap-1 text-xs font-medium">
-                <Zap size={10} />
-                Effective: {character.speed + getBuffSpeedBonus(character)}ft (
-                {getBuffSpeedBonus(character) > 0 ? '+' : ''}
-                {getBuffSpeedBonus(character)})
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Extra Speeds */}
-      {showExtraSpeeds && (
-        <div className="mb-6 grid grid-cols-3 gap-3">
-          <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
-            <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
-              <Bird size={12} />
-              FLY
-            </div>
-            <NumberInput
-              value={character.flySpeed || 0}
-              onChange={v => onUpdateCharacter({ flySpeed: v ?? 0 })}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0"
-            />
-          </div>
-          <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
-            <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
-              <Mountain size={12} />
-              CLIMB
-            </div>
-            <NumberInput
-              value={character.climbSpeed || 0}
-              onChange={v => onUpdateCharacter({ climbSpeed: v ?? 0 })}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0"
-            />
-          </div>
-          <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
-            <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
-              <Waves size={12} />
-              SWIM
-            </div>
-            <NumberInput
-              value={character.swimSpeed || 0}
-              onChange={v => onUpdateCharacter({ swimSpeed: v ?? 0 })}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Reaction Tracking */}
-      <div className="mb-6">
-        <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="text-accent-purple-text text-sm font-bold">
-                REACTION
-              </div>
-              <div className="text-accent-purple-text-muted text-xs">
-                {character.reaction.hasUsedReaction
-                  ? 'Used this turn'
-                  : 'Available'}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!character.reaction.hasUsedReaction}
-                onCheckedChange={() => onToggleReaction()}
-                size="sm"
-                variant="success"
-                title={
-                  character.reaction.hasUsedReaction
-                    ? 'Mark reaction as available'
-                    : 'Mark reaction as used'
-                }
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+        <StatCell
+          caption="Initiative"
+          note={
+            character.initiative.isOverridden && (
+              <p className="type-small text-muted">Custom</p>
+            )
+          }
+        >
+          <span className="flex items-center gap-3">
+            <span>
+              {initiative >= 0 && <span>+</span>}
+              <InPlaceField
+                label="Initiative"
+                value={initiative}
+                editing={editing}
+                onCommit={v => onUpdateInitiative(v, true)}
               />
-
-              <Button
-                onClick={onResetReaction}
-                variant="ghost"
-                size="xs"
-                className="text-accent-purple-text-muted hover:bg-accent-purple-bg-strong p-1"
-                title="Reset reaction to available"
-              >
-                <RotateCcw size={14} />
-              </Button>
-            </div>
-          </div>
-
-          <div className="bg-accent-purple-bg-strong text-accent-purple-text-muted mt-2 rounded p-2 text-xs">
-            <strong>Reaction:</strong> One reaction per turn - used for
-            opportunity attacks, spells like Shield, or other triggered
-            abilities.
-          </div>
-        </div>
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={rollLabel}
+              onClick={() => onRollInitiative()}
+            >
+              <AppIcon name="dice" className="size-4" />
+            </Button>
+          </span>
+        </StatCell>
+        <StatCell
+          caption="Speed"
+          note={
+            speedBonus !== 0 && (
+              <p className="type-small text-muted">
+                {character.speed + speedBonus} ft with buffs
+              </p>
+            )
+          }
+        >
+          <InPlaceField
+            label="Speed"
+            value={character.speed}
+            editing={editing}
+            min={0}
+            onCommit={onUpdateSpeed}
+          />
+          <span className="type-small text-muted ml-1">ft</span>
+        </StatCell>
+        {extraSpeeds.map(({ key, label }) => (
+          <StatCell key={key} caption={label}>
+            <InPlaceField
+              label={label}
+              value={character[key] || 0}
+              editing={editing}
+              min={0}
+              onCommit={v => onUpdateCharacter({ [key]: v })}
+            />
+            <span className="type-small text-muted ml-1">ft</span>
+          </StatCell>
+        ))}
       </div>
-    </>
+      {editing && character.initiative.isOverridden && (
+        <Button size="sm" onClick={() => onResetInitiativeToDefault()}>
+          Reset to Dexterity modifier
+        </Button>
+      )}
+      <Switch
+        label="Reaction used"
+        description={
+          character.reaction.hasUsedReaction ? 'Used this turn' : 'Available'
+        }
+        checked={character.reaction.hasUsedReaction}
+        onCheckedChange={() => onToggleReaction()}
+      />
+    </div>
   );
 }

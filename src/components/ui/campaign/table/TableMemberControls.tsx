@@ -113,8 +113,8 @@ export function TableMemberControls({
           </div>
         ))}
         {mismatched.length > 0 && (
-          <div className="border-accent-amber-border bg-accent-amber-bg flex flex-wrap items-center gap-2 rounded-lg border p-2">
-            <p className="text-accent-amber-text min-w-0 flex-1 text-xs">
+          <div className="border-ember-border bg-ember-bg flex flex-wrap items-center gap-2 rounded-lg border p-2">
+            <p className="text-ember-text min-w-0 flex-1 text-xs">
               The token on the map does not match this member’s control.
             </p>
             <Button
@@ -167,9 +167,7 @@ export function TableMemberControls({
           <p className="text-muted text-xs">{PHYSICAL_PLAYER_HELP}</p>
         )}
         {!liveHolder && (
-          <p className="text-accent-amber-text text-xs">
-            {REPRESENTATION_PENDING}
-          </p>
+          <p className="text-ember-text text-xs">{REPRESENTATION_PENDING}</p>
         )}
       </section>
     </div>

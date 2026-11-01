@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn, screen } from 'storybook/test';
+import { expect, fn, screen, userEvent } from 'storybook/test';
 import { AddCombatantDialog } from './index';
 import type { CampaignNPC } from '@/types/encounter';
 
@@ -96,7 +96,12 @@ export const PlayerTab: Story = {
   play: async () => {
     // Dialog content renders in a Radix portal (outside canvasElement),
     // so query the whole document via `screen`.
-    screen.getByRole('button', { name: /player/i }).click();
+    await userEvent.click(screen.getByRole('tab', { name: /player/i }));
+    await expect(screen.getByRole('tab', { name: /player/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await expect(screen.getByText('Thorin Ironforge')).toBeVisible();
   },
 };
 
@@ -107,7 +112,12 @@ export const NpcTab: Story = {
     campaignPlayers: [],
   },
   play: async () => {
-    screen.getByRole('button', { name: /npc/i }).click();
+    await userEvent.click(screen.getByRole('tab', { name: /npc/i }));
+    await expect(screen.getByRole('tab', { name: /npc/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await expect(screen.getByText('Innkeeper Brennan')).toBeVisible();
   },
 };
 
@@ -127,6 +137,14 @@ export const CustomTab: Story = {
     campaignPlayers: [],
   },
   play: async () => {
-    screen.getByRole('button', { name: /custom/i }).click();
+    await userEvent.click(screen.getByRole('tab', { name: /custom/i }));
+    await expect(screen.getByRole('tab', { name: /custom/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await expect(
+      screen.getByRole('heading', { name: 'One-off combatant' })
+    ).toBeInTheDocument();
+    await expect(screen.getByRole('button', { name: 'Add NPC' })).toBeVisible();
   },
 };

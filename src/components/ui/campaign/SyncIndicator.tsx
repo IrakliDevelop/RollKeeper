@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
 import { Button } from '@/components/ui/forms/button';
 import { CharacterState } from '@/types/character';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface SyncIndicatorProps {
   syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
@@ -77,6 +78,7 @@ export function SyncIndicator({
   const [menuOpen, setMenuOpen] = useState(false);
   const [displayTime, setDisplayTime] = useState(formatSyncTime(lastSyncedAt));
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -104,18 +106,20 @@ export function SyncIndicator({
   return (
     <div className="relative" ref={menuRef}>
       <button
+        ref={triggerRef}
+        aria-expanded={menuOpen}
         onClick={() => setMenuOpen(!menuOpen)}
-        className="border-divider bg-surface-secondary hover:bg-surface-hover flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
+        className="border-divider bg-surface-secondary hover:bg-surface-hover focus-visible:outline-ring flex min-h-6 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >
         <div className={`h-2 w-2 rounded-full ${getStatusColor(syncStatus)}`} />
         <Link2 size={14} className="text-muted" />
-        <span className="text-body max-w-[120px] truncate text-xs">
+        <span className="text-body sr-only max-w-[120px] truncate text-xs sm:not-sr-only">
           {campaignName || campaignCode}
         </span>
-        <span className="text-muted text-xs">
+        <span className="text-muted sr-only text-xs sm:not-sr-only">
           {syncStatus === 'syncing' ? 'Syncing...' : displayTime}
         </span>
-        <ChevronDown size={12} className="text-muted" />
+        <ChevronDown size={12} className="text-muted hidden sm:block" />
       </button>
 
       {menuOpen && (
@@ -131,7 +135,7 @@ export function SyncIndicator({
 
           <div className="border-divider space-y-3 border-t pt-3">
             {/* Auto-sync toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pointer-coarse:min-h-11">
               <div className="flex items-center gap-2">
                 {autoSync ? (
                   <Wifi size={14} className="text-green-500" />
@@ -166,7 +170,7 @@ export function SyncIndicator({
             )}
 
             {/* Share HP with party toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pointer-coarse:min-h-11">
               <div className="flex items-center gap-2">
                 <Heart
                   size={14}
@@ -185,7 +189,7 @@ export function SyncIndicator({
 
             {/* Share sheet with party toggle */}
             <div
-              className="flex items-center justify-between"
+              className="flex items-center justify-between pointer-coarse:min-h-11"
               title="Let party members open a limited view of this character on the battle map"
             >
               <div className="flex items-center gap-2">
@@ -206,15 +210,20 @@ export function SyncIndicator({
 
             {/* Leave campaign */}
             <button
-              onClick={() => {
-                if (
-                  confirm(
-                    'Leave this campaign? Your character data will remain locally.'
-                  )
-                ) {
-                  onLeaveCampaign();
-                  setMenuOpen(false);
-                }
+              onClick={async () => {
+                // Close the menu first: the dialog is outside it, so the
+                // menu's click-outside handler would close it anyway. Focus
+                // the trigger first so the dialog returns focus to it, not to
+                // the menu button that is about to unmount.
+                triggerRef.current?.focus();
+                setMenuOpen(false);
+                const confirmed = await confirmDialog({
+                  title: 'Leave this campaign?',
+                  message:
+                    'Your character stays on this device. You can rejoin with the campaign code.',
+                  confirmLabel: 'Leave campaign',
+                });
+                if (confirmed) onLeaveCampaign();
               }}
               className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
             >

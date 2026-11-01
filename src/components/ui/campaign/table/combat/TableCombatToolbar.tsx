@@ -104,7 +104,7 @@ export function TableCombatToolbar(props: {
         <p className="text-muted text-xs">
           Copied from a library encounter ·{' '}
           <Link
-            className="text-accent-blue-text underline"
+            className="text-lapis-text underline"
             href={`/dm/campaign/${encodeURIComponent(props.campaignCode)}/encounters/${encodeURIComponent(run.sourceEncounterId)}`}
           >
             Open library encounter
@@ -112,17 +112,17 @@ export function TableCombatToolbar(props: {
         </p>
       )}
       {props.playersStale && (
-        <p className="text-accent-amber-text text-xs">
+        <p className="text-ember-text text-xs">
           Player data may be out of date
         </p>
       )}
       {props.playerNotices.map(message => (
-        <p key={message} className="text-accent-amber-text text-xs">
+        <p key={message} className="text-ember-text text-xs">
           {message}
         </p>
       ))}
       {props.loggingPaused && (
-        <p className="text-accent-amber-text text-xs">
+        <p className="text-ember-text text-xs">
           Combat log paused: history is full
         </p>
       )}

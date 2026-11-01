@@ -41,6 +41,10 @@ import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 
 import type { CardParityHarness } from '../adapterConformance';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-25T00:00:00.000Z';
 const ACCOUNT_ID = '77777777-7777-4777-8777-777777777777';
@@ -1347,7 +1351,7 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
      * Named, expected differences from the adapter's own chain:
      *   - the card discovers and selects a workspace interactively; the
      *     adapter receives an already-selected `MigrationRunContext`.
-     *   - the card uses `window.confirm`; the adapter has none (spec R12).
+     *   - the card asks in the shared confirm dialog (`confirmDialog`); the adapter has none (spec R12).
      *   - the card has no `verifyCloud` equivalent (adapter-only, per R1).
      *   - mutation ids are random (`crypto.randomUUID()`) on the card and
      *     deterministic on the adapter.
@@ -1401,7 +1405,8 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
           }),
         },
       } as never);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderConfirmDialogHost();
+      answerConfirmDialogs('confirm');
       const createObjectURL = vi
         .spyOn(URL, 'createObjectURL')
         .mockReturnValue('blob:magic-item-recovery');

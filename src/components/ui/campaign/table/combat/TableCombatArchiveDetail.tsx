@@ -53,8 +53,8 @@ export function TableCombatArchiveDetail(props: {
         )}
       </div>
       {props.confirming && (
-        <div className="border-accent-red-border space-y-2 rounded border p-2">
-          <p className="text-accent-red-text text-xs">
+        <div className="border-blood-border space-y-2 rounded border p-2">
+          <p className="text-blood-text text-xs">
             This permanently deletes the archive from this device. Export it
             first if you need a copy.
           </p>

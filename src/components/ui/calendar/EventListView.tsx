@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Search, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { EventDialog } from './EventDialog';
 import { EventMarker } from './EventMarker';
 import {
@@ -27,6 +28,7 @@ interface EventListViewProps {
   ) => void;
   onDeleteEvent: (eventId: string) => void;
   onMoveEvent?: (eventId: string, direction: EventMoveDirection) => void;
+  showVisibility?: boolean;
 }
 
 function compareDateKeys(a: CalendarEvent, b: CalendarEvent): number {
@@ -45,6 +47,7 @@ export function EventListView({
   onUpdateEvent,
   onDeleteEvent,
   onMoveEvent,
+  showVisibility = true,
 }: EventListViewProps) {
   const [search, setSearch] = useState('');
   const [monthFilter, setMonthFilter] = useState<string>('all');
@@ -152,6 +155,18 @@ export function EventListView({
     }
   };
 
+  const handleDeleteRow = async (event: CalendarEvent) => {
+    if (
+      await confirmDialog({
+        title: `Delete ${event.title}?`,
+        confirmLabel: 'Delete event',
+        cancelLabel: 'Cancel',
+        tone: 'danger',
+      })
+    )
+      onDeleteEvent(event.id);
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -216,21 +231,17 @@ export function EventListView({
                     key={event.id}
                     className="hover:bg-surface-elevated border-divider group flex w-full items-center gap-2 border-b px-3 py-2.5 transition-colors duration-150 last:border-b-0"
                   >
-                    <EventMarker
-                      event={event}
-                      size="row"
-                      className="transition-transform duration-150 group-hover:scale-125"
-                    />
+                    <EventMarker event={event} size="row" />
                     <button
                       type="button"
                       onClick={() => handleEditEvent(event)}
                       className="min-w-0 flex-1 text-left"
                     >
-                      <span className="text-heading truncate text-sm font-medium transition-transform duration-150 group-hover:translate-x-0.5">
+                      <span className="text-heading truncate text-sm font-medium">
                         {event.title}
                       </span>
                     </button>
-                    <div className="ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                    <div className="ml-auto flex shrink-0 flex-wrap items-center gap-1">
                       {canReorder && group.events.length > 1 && (
                         <>
                           <button
@@ -238,7 +249,7 @@ export function EventListView({
                             aria-label={`Move ${event.title} earlier`}
                             disabled={index === 0}
                             onClick={() => onMoveEvent?.(event.id, 'up')}
-                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                           >
                             <ChevronUp size={12} />
                           </button>
@@ -247,7 +258,7 @@ export function EventListView({
                             aria-label={`Move ${event.title} later`}
                             disabled={index === group.events.length - 1}
                             onClick={() => onMoveEvent?.(event.id, 'down')}
-                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                           >
                             <ChevronDown size={12} />
                           </button>
@@ -255,15 +266,17 @@ export function EventListView({
                       )}
                       <button
                         type="button"
+                        aria-label={`Edit ${event.title}`}
                         onClick={() => handleEditEvent(event)}
-                        className="text-muted hover:text-heading rounded p-1 transition-colors"
+                        className="text-muted hover:text-heading rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                       >
                         <Pencil size={12} />
                       </button>
                       <button
                         type="button"
-                        onClick={() => onDeleteEvent(event.id)}
-                        className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
+                        aria-label={`Delete ${event.title}`}
+                        onClick={() => void handleDeleteRow(event)}
+                        className="text-blood-text rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -283,6 +296,7 @@ export function EventListView({
         onDelete={handleDelete}
         event={editingEvent}
         config={config}
+        showVisibility={showVisibility}
         defaultDate={
           editingEvent
             ? {

@@ -67,7 +67,7 @@ describe('W11 arrival point picker and marker', () => {
     expect(container.querySelector('canvas')).toBeNull();
   });
 
-  it('is a labelled, accent-coloured pin only when an arrival point exists (FU-10)', () => {
+  it('is a labelled pin using semantic tokens only when an arrival point exists (FU-10)', () => {
     const vp = viewport();
     const { rerender } = render(
       <TableArrivalMarker viewport={vp} point={{ x: 5, y: 5 }} />
@@ -76,14 +76,11 @@ describe('W11 arrival point picker and marker', () => {
     expect(marker).toHaveAttribute('title', 'Party arrival point');
     expect(marker.querySelector('svg')).not.toBeNull();
     const pin = marker.querySelector('svg')!;
-    expect(pin).toHaveClass(
-      'text-accent-emerald-text',
-      'fill-accent-emerald-bg'
-    );
+    expect(pin).toHaveClass('text-verdigris-text', 'fill-verdigris-bg');
     expect(screen.getByText('Arrival')).toHaveClass(
-      'bg-accent-emerald-bg',
-      'text-accent-emerald-text',
-      'border-accent-emerald-border'
+      'bg-verdigris-bg',
+      'text-verdigris-text',
+      'border-verdigris-border'
     );
     rerender(<TableArrivalMarker viewport={vp} point={null} />);
     expect(

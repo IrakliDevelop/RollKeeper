@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 
 vi.mock('next/image', () => ({
@@ -11,7 +11,9 @@ vi.mock('next/image', () => ({
 
 vi.mock('@/hooks/useClassData', () => ({
   useClassData: () => ({
-    classData: [],
+    classData: [
+      { name: 'Wizard', spellcasting: { type: 'full' }, hitDie: 'd6' },
+    ],
     loading: false,
     error: null,
   }),
@@ -35,7 +37,7 @@ describe('CharacterHUD', () => {
         onStopConcentration={vi.fn()}
       />
     );
-    expect(screen.getByTitle('AC')).toBeInTheDocument();
+    expect(screen.getByText('AC', { exact: true })).toBeInTheDocument();
   });
 
   it('displays HP and AC values', async () => {
@@ -50,7 +52,7 @@ describe('CharacterHUD', () => {
         calculationMode: 'auto',
       },
     });
-    render(
+    const { container } = render(
       <CharacterHUD
         character={character}
         onShortRest={vi.fn()}
@@ -62,9 +64,12 @@ describe('CharacterHUD', () => {
         onStopConcentration={vi.fn()}
       />
     );
-    expect(screen.getByText('30')).toBeInTheDocument();
-    expect(screen.getByText('40')).toBeInTheDocument();
-    expect(screen.getByText('+5')).toBeInTheDocument();
+    const hp = within(container).getByRole('button', {
+      name: /^Hit points /,
+    });
+    expect(within(hp).getByText('30')).toBeInTheDocument();
+    expect(within(hp).getByText('40')).toBeInTheDocument();
+    expect(within(hp).getByText('+5 temp')).toBeInTheDocument();
   });
 });
 
@@ -130,7 +135,7 @@ describe('CharacterBasicInfo', { timeout: 10_000 }, () => {
         getClassDisplayString={() => 'Fighter 5'}
       />
     );
-    expect(screen.getAllByText('Character Information').length).toBeGreaterThan(
+    expect(screen.getAllByText('Character information').length).toBeGreaterThan(
       0
     );
   });
@@ -199,7 +204,7 @@ describe('MulticlassManager', () => {
         onUpdateClassLevel={vi.fn()}
       />
     );
-    expect(screen.getByText('Multiclass Levels')).toBeInTheDocument();
+    expect(screen.getByText('Classes')).toBeInTheDocument();
   });
 
   it('displays class names and total level', async () => {
@@ -234,9 +239,7 @@ describe('MulticlassManager', () => {
     );
     expect(screen.getAllByText('Fighter').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Wizard').length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText('Total Character Level:').length
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Total level: 5').length).toBeGreaterThan(0);
   });
 });
 
@@ -257,7 +260,7 @@ describe('ArmorClassManager', () => {
       />
     );
     expect(
-      screen.getByText('ARMOR CLASS', { exact: false })
+      screen.getByText('Armor class', { exact: false })
     ).toBeInTheDocument();
   });
 
@@ -276,7 +279,7 @@ describe('ArmorClassManager', () => {
         onUpdateShieldBonus={vi.fn()}
       />
     );
-    expect(screen.getAllByText('Total AC').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Total').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Base AC').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Temp AC').length).toBeGreaterThan(0);
   });
@@ -301,7 +304,9 @@ describe('CombatStats', () => {
         onRollInitiative={vi.fn()}
       />
     );
-    expect(screen.getByText('INITIATIVE')).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Initiative' })
+    ).toBeInTheDocument();
   });
 
   it('displays speed and reaction sections', async () => {
@@ -322,50 +327,56 @@ describe('CombatStats', () => {
         onRollInitiative={vi.fn()}
       />
     );
-    expect(screen.getAllByText('SPEED').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('REACTION').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Speed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Reaction used').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0);
   });
 });
 
-describe('Skills', () => {
-  it('renders without crashing', async () => {
-    const { default: Skills } = await import(
-      '@/components/ui/character/Skills'
+describe('AbilitiesSection', () => {
+  beforeEach(() => {
+    // The medallions' score editor asks for (min-width: 640px).
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: true,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }))
     );
-    const character = makeCharacter();
-    render(
-      <Skills
-        skills={character.skills}
-        jackOfAllTrades={false}
-        proficiencyBonus={3}
-        getSkillModifier={() => 2}
-        onUpdateSkillProficiency={vi.fn()}
-        onUpdateSkillExpertise={vi.fn()}
-        onToggleJackOfAllTrades={vi.fn()}
-        onRollSkillCheck={vi.fn()}
-      />
-    );
-    expect(screen.getByText('Skills')).toBeInTheDocument();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('displays skill names', async () => {
-    const { default: Skills } = await import(
-      '@/components/ui/character/Skills'
+  it('renders the abilities with their skills', async () => {
+    const { AbilitiesSection } = await import(
+      '@/components/ui/character/AbilitiesSection'
     );
     const character = makeCharacter();
     render(
-      <Skills
+      <AbilitiesSection
+        abilities={character.abilities}
+        savingThrows={character.savingThrows}
         skills={character.skills}
         jackOfAllTrades={false}
-        proficiencyBonus={3}
+        getSavingThrowModifier={() => 1}
         getSkillModifier={() => 2}
+        onUpdateAbilityScore={vi.fn()}
+        onRollAbilityCheck={vi.fn()}
+        onUpdateSavingThrowProficiency={vi.fn()}
+        onRollSavingThrow={vi.fn()}
         onUpdateSkillProficiency={vi.fn()}
         onUpdateSkillExpertise={vi.fn()}
         onToggleJackOfAllTrades={vi.fn()}
         onRollSkillCheck={vi.fn()}
+        editing={false}
       />
     );
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Abilities' })
+    ).toBeInTheDocument();
     expect(screen.getAllByText('Athletics').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Perception').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Stealth').length).toBeGreaterThan(0);

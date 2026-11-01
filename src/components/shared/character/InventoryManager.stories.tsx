@@ -1,30 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
-import { vi } from 'vitest';
 import { InventoryManager } from './InventoryManager';
 import type { InventoryItem } from '@/types/character';
-
-vi.mock('@/hooks/useItemsData', () => ({
-  useItemsData: () => ({ items: [], loading: false, error: null }),
-}));
-vi.mock('@/hooks/useMagicItemsData', () => ({
-  useMagicItemsData: () => ({ items: [], loading: false, error: null }),
-}));
-vi.mock('@/components/ui/layout/DragDropList', () => ({
-  default: ({
-    items,
-    renderItem,
-  }: {
-    items: unknown[];
-    renderItem: (item: unknown) => React.ReactNode;
-  }) => (
-    <div data-testid="drag-drop-list">
-      {items.map((item: unknown, i: number) => (
-        <div key={i}>{renderItem(item)}</div>
-      ))}
-    </div>
-  ),
-}));
 
 const sampleItems: InventoryItem[] = [
   {
@@ -114,4 +91,48 @@ export const Readonly: Story = {
 export const ReadonlyDark: Story = {
   ...Readonly,
   globals: { theme: 'dark' },
+};
+
+const longNamedItems: InventoryItem[] = sampleItems.map((item, index) =>
+  index === 0
+    ? {
+        ...item,
+        name: 'The blade of a thousand moonlit names and an unusually long inscription',
+        rarity: 'very rare',
+      }
+    : item
+);
+
+export const LongNames390: Story = {
+  args: { items: longNamedItems },
+  decorators: [
+    Story => (
+      <div style={{ width: '100%', maxWidth: 390 }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+export const LongNames430: Story = {
+  ...LongNames390,
+  decorators: [
+    Story => (
+      <div style={{ width: '100%', maxWidth: 430 }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+export const LongNames500Dark: Story = {
+  ...LongNames390,
+  globals: { theme: 'dark' },
+  decorators: [
+    Story => (
+      <div style={{ width: '100%', maxWidth: 500 }}>
+        <Story />
+      </div>
+    ),
+  ],
 };

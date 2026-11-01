@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import { useState } from 'react';
 import { User, Search, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { Input } from './input';
+import { NumberField } from './NumberInput';
 
 /**
  * The Input component is a flexible text input with support for labels,
@@ -24,7 +26,7 @@ const meta: Meta<typeof Input> = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['default', 'error', 'success'],
+      options: ['default', 'error'],
       description: 'Visual variant for validation states',
     },
     size: {
@@ -115,17 +117,6 @@ export const ErrorState: Story = {
     placeholder: 'Enter email',
     value: 'invalid-email',
     error: 'Please enter a valid email address',
-  },
-};
-
-// Success state
-export const SuccessState: Story = {
-  args: {
-    label: 'Username',
-    placeholder: 'Enter username',
-    value: 'available_user',
-    variant: 'success',
-    helperText: 'Username is available!',
   },
 };
 
@@ -261,5 +252,125 @@ export const FormExample: Story = {
         story: 'Example of inputs used together in a form context.',
       },
     },
+  },
+};
+
+function FieldStates() {
+  return (
+    <div className="w-80 space-y-4">
+      <Input label="Character name" placeholder="Thorin" />
+      <Input
+        label="Level"
+        defaultValue="3"
+        helperText="Sets your proficiency bonus"
+      />
+      <Input label="Speed" defaultValue="-5" error="Speed can't be negative" />
+      <Input label="Class" defaultValue="Fighter" disabled />
+    </div>
+  );
+}
+
+export const States: Story = {
+  render: () => <FieldStates />,
+  parameters: { a11y: { test: 'error' } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const speed = canvas.getByLabelText('Speed');
+    await expect(speed).toHaveAttribute('aria-invalid', 'true');
+    await expect(speed).toHaveAccessibleDescription("Speed can't be negative");
+
+    const name = canvas.getByLabelText('Character name');
+    name.focus();
+    const focused = getComputedStyle(name);
+    await expect(focused.outlineStyle).toBe('solid');
+    await expect(focused.outlineWidth).toBe('2px');
+    await expect(focused.outlineOffset).toBe('2px');
+    await expect(focused.borderTopLeftRadius).toBe('4px');
+  },
+};
+
+export const StatesDark: Story = {
+  render: () => <FieldStates />,
+  parameters: { a11y: { test: 'error' } },
+  globals: { theme: 'dark' },
+};
+
+/**
+ * Fields as a touch device sees them: small text grows to 16px so iOS
+ * Safari doesn't zoom on focus, large numbers keep their size, and inputs
+ * reach 44px. The play function copies the coarse-pointer rules in, since
+ * the test browser has a fine pointer.
+ */
+function TouchFields() {
+  return (
+    <div className="w-80 space-y-4">
+      <Input aria-label="Small field" />
+      <Input aria-label="Large field" size="lg" />
+      <NumberField
+        aria-label="Bonus"
+        className="text-xs"
+        value={2}
+        onChange={() => {}}
+      />
+      <input aria-label="Ability score" className="text-2xl" />
+      <div className="text-xs">
+        <input aria-label="Inherits small" />
+      </div>
+      <div className="text-2xl">
+        <input aria-label="Inherits large" />
+      </div>
+    </div>
+  );
+}
+
+export const CoarsePointer: Story = {
+  render: () => <TouchFields />,
+  parameters: { a11y: { test: 'error' } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const size = (name: string) =>
+      getComputedStyle(canvas.getByLabelText(name)).fontSize;
+
+    await expect(size('Small field')).toBe('14px');
+    const restore = emulateCoarsePointer();
+    try {
+      await expect(size('Small field')).toBe('16px');
+      await expect(size('Large field')).toBe('16px');
+      await expect(size('Bonus')).toBe('16px');
+      await expect(size('Ability score')).toBe('24px');
+      await expect(size('Inherits small')).toBe('16px');
+      await expect(size('Inherits large')).toBe('24px');
+      await expect(
+        getComputedStyle(canvas.getByLabelText('Small field')).minHeight
+      ).toBe('44px');
+    } finally {
+      restore();
+    }
+    await expect(size('Small field')).toBe('14px');
+  },
+};
+
+/**
+ * A raw number field, as the 20 not-yet-migrated call sites render one: the
+ * global rule hides the spin buttons. The arrow keys still step (a native
+ * default action, which synthetic key events don't trigger).
+ */
+export const NumberWithoutSpinButtons: Story = {
+  render: () => (
+    <input
+      type="number"
+      aria-label="Initiative"
+      defaultValue={12}
+      className="w-24"
+    />
+  ),
+  parameters: { a11y: { test: 'error' } },
+  play: async ({ canvasElement }) => {
+    const field = within(canvasElement).getByLabelText(
+      'Initiative'
+    ) as HTMLInputElement;
+    // Computed styles can't reach the spin-button pseudo-element; the CSS
+    // test pins that rule and the Chrome gate looks at it.
+    await expect(getComputedStyle(field).appearance).toBe('textfield');
   },
 };

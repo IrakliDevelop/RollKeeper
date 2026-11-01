@@ -1,46 +1,60 @@
-import type { HpTier } from './hpState';
+import { hpPercent, hpTier, type HpTier } from './hpState';
 
 /**
- * Tailwind background class for an HP bar, by current/max ratio.
- * Green > 50%, amber > 25%, red at/below 25%. Shared by the party HP sidebar
- * and the initiative panel so player HP reads consistently across the app.
+ * HP colours by tier, in Felt and Brass roles: verdigris while healthy,
+ * ember while bloodied (`mid` and `low`), blood when critical. Every HP
+ * readout, bar and status word takes its colour from here.
  */
-export function getHpBarColor(current: number, max: number): string {
-  if (max <= 0) return 'bg-surface-secondary';
-  const pct = current / max;
-  if (pct > 0.5) return 'bg-green-600 dark:bg-green-500';
-  if (pct > 0.25) return 'bg-amber-500 dark:bg-amber-400';
-  return 'bg-red-600 dark:bg-red-500';
-}
 
-/** Semantic text-colour token for a coarse health tier (enemy status labels). */
-export function getHpTierTextColor(tier: HpTier): string {
-  switch (tier) {
-    case 'high':
-      return 'text-accent-emerald-text';
-    case 'mid':
-      return 'text-accent-amber-text';
-    case 'low':
-      return 'text-accent-orange-text';
-    case 'critical':
-      return 'text-accent-red-text';
-  }
-}
-
-/**
- * Bar-fill class for a coarse health tier. Raw Tailwind colors are the
- * established precedent for HP-bar fills (see getHpBarColor above) — these
- * are canvas-adjacent paint, not themed UI chrome.
- */
+/** Bar fill for a health tier. */
 export function getHpTierBarColor(tier: HpTier): string {
   switch (tier) {
     case 'high':
-      return 'bg-green-600 dark:bg-green-500';
+      return 'bg-verdigris-fill';
     case 'mid':
-      return 'bg-amber-500 dark:bg-amber-400';
     case 'low':
-      return 'bg-orange-500 dark:bg-orange-400';
+      return 'bg-ember-fill';
     case 'critical':
-      return 'bg-red-600 dark:bg-red-500';
+      return 'bg-blood-fill';
   }
+}
+
+/** Text colour for a status word ("Healthy", "Bloodied", "Critical"). */
+export function getHpTierTextColor(tier: HpTier): string {
+  switch (tier) {
+    case 'high':
+      return 'text-verdigris-text';
+    case 'mid':
+    case 'low':
+      return 'text-ember-text';
+    case 'critical':
+      return 'text-blood-text';
+  }
+}
+
+/**
+ * Text colour for an HP number. It stays the heading colour while healthy:
+ * red is kept for real danger.
+ */
+export function getHpTierNumberColor(tier: HpTier): string {
+  switch (tier) {
+    case 'high':
+      return 'text-heading';
+    case 'mid':
+    case 'low':
+      return 'text-ember-text';
+    case 'critical':
+      return 'text-blood-text';
+  }
+}
+
+/** Bar fill for current/max HP; a neutral track colour when there is no max. */
+export function getHpBarColor(current: number, max: number): string {
+  if (max <= 0) return 'bg-surface-secondary';
+  return getHpTierBarColor(hpTier(hpPercent(current, max)));
+}
+
+/** Text colour for a current-HP number out of max (blood when there is no max). */
+export function getHpNumberColor(current: number, max: number): string {
+  return getHpTierNumberColor(hpTier(hpPercent(current, max)));
 }

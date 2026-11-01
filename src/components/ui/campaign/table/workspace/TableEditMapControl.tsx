@@ -322,7 +322,7 @@ export function TableEditMapControl(props: {
             className="border-divider bg-surface-raised pointer-events-auto fixed z-50 flex w-[min(18rem,calc(100vw-1rem))] flex-col gap-2 rounded-lg border p-3 shadow-md"
           >
             {props.presentedHere && (
-              <p className="text-accent-amber-text text-xs" role="status">
+              <p className="text-ember-text text-xs" role="status">
                 {LIVE_EDIT}
               </p>
             )}
@@ -351,7 +351,7 @@ export function TableEditMapControl(props: {
               {battleMap?.mapImageUrl ? 'Replace map image' : 'Set map image'}
             </Button>
             {error && (
-              <p role="alert" className="text-accent-red-text text-xs">
+              <p role="alert" className="text-blood-text text-xs">
                 {error}
               </p>
             )}

@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
@@ -32,6 +33,7 @@ interface EventDialogProps {
   event?: CalendarEvent;
   config: CalendarConfig;
   defaultDate?: SelectedDay;
+  showVisibility?: boolean;
 }
 
 export function EventDialog({
@@ -42,13 +44,13 @@ export function EventDialog({
   event,
   config,
   defaultDate,
+  showVisibility = true,
 }: EventDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [year, setYear] = useState(0);
   const [month, setMonth] = useState(0);
   const [day, setDay] = useState(0);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [markerMode, setMarkerMode] = useState<MarkerMode>('dot');
   const [markerColor, setMarkerColor] = useState(DEFAULT_EVENT_COLOR);
   const [markerEmoji, setMarkerEmoji] = useState<string | null>(null);
@@ -73,7 +75,6 @@ export function EventDialog({
         setMonth(defaultDate.month);
         setDay(defaultDate.day);
       }
-      setConfirmDelete(false);
       setVisibility(event?.visibility ?? 'private');
 
       if (event?.emoji) {
@@ -118,20 +119,25 @@ export function EventDialog({
     onClose();
   };
 
-  const handleDelete = () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
+  const handleDelete = async () => {
+    if (!event || !onDelete) return;
+    const confirmed = await confirmDialog({
+      title: `Delete ${event.title}?`,
+      confirmLabel: 'Delete event',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+    if (confirmed) {
+      onDelete();
+      onClose();
     }
-    onDelete?.();
-    onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Event' : 'New Event'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit event' : 'Add event'}</DialogTitle>
         </DialogHeader>
 
         <DialogBody className="space-y-4">
@@ -183,23 +189,26 @@ export function EventDialog({
             onEmojiChange={setMarkerEmoji}
           />
 
-          <SelectField
-            label="Player visibility"
-            value={visibility}
-            onValueChange={value =>
-              setVisibility(value as 'private' | 'public' | 'discovered')
-            }
-          >
-            <SelectItem value="private">Private (DM only)</SelectItem>
-            <SelectItem value="public">Public</SelectItem>
-            <SelectItem value="discovered">Discovered</SelectItem>
-          </SelectField>
+          {showVisibility && (
+            <SelectField
+              label="Player visibility"
+              value={visibility}
+              onValueChange={value =>
+                setVisibility(value as 'private' | 'public' | 'discovered')
+              }
+            >
+              <SelectItem value="private">Private (DM only)</SelectItem>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="discovered">Discovered</SelectItem>
+            </SelectField>
+          )}
 
           <div>
             <label className="text-body mb-1 block text-sm font-medium">
               Description
             </label>
             <RichTextEditor
+              ariaLabel="Description"
               content={description}
               onChange={setDescription}
               placeholder="Event details..."
@@ -214,10 +223,10 @@ export function EventDialog({
               variant="danger"
               size="sm"
               leftIcon={<Trash2 size={14} />}
-              onClick={handleDelete}
+              onClick={() => void handleDelete()}
               className="mr-auto"
             >
-              {confirmDelete ? 'Confirm Delete' : 'Delete'}
+              Delete event
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -229,7 +238,7 @@ export function EventDialog({
             onClick={handleSave}
             disabled={saveDisabled}
           >
-            {isEdit ? 'Save Changes' : 'Create Event'}
+            {isEdit ? 'Save changes' : 'Add event'}
           </Button>
         </DialogFooter>
       </DialogContent>

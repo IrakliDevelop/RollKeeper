@@ -49,9 +49,12 @@ function renderModal(pactMagic: PactMagic | null, onCastSpell = vi.fn()) {
 describe('SpellCastModal pact magic', () => {
   it('offers a pact slot and casts with usePact=true at pact level', () => {
     const onCastSpell = renderModal({ slots: { max: 2, used: 0 }, level: 3 });
-    const pactButton = screen.getByRole('button', { name: /pact/i });
-    fireEvent.click(pactButton);
-    fireEvent.click(screen.getByRole('button', { name: /^cast/i }));
+    const pactOption = screen.getByRole('radio', { name: /pact slot/i });
+    fireEvent.click(pactOption);
+    expect(pactOption).toHaveAttribute('data-state', 'checked');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Cast Hunger of Hadar' })
+    );
     // If multiple buttons match /^cast/i, read the confirm button's actual
     // label from the DialogFooter at the end of SpellCastModal.tsx and
     // tighten the query — do not weaken the assertion below.
@@ -60,17 +63,17 @@ describe('SpellCastModal pact magic', () => {
 
   it('disables the pact option when pact slots are exhausted', () => {
     renderModal({ slots: { max: 2, used: 2 }, level: 3 });
-    expect(screen.getByRole('button', { name: /pact/i })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /pact slot/i })).toBeDisabled();
   });
 
   it('hides the pact option when pact level is below the spell level', () => {
     renderModal({ slots: { max: 2, used: 0 }, level: 2 });
-    expect(screen.queryByRole('button', { name: /pact/i })).toBeNull();
+    expect(screen.queryByRole('radio', { name: /pact slot/i })).toBeNull();
   });
 
   it('renders no pact option without the prop (existing consumers)', () => {
     renderModal(null);
-    expect(screen.queryByRole('button', { name: /pact/i })).toBeNull();
+    expect(screen.queryByRole('radio', { name: /pact slot/i })).toBeNull();
   });
 
   it('slot button at pact level does not show selected when pact option is chosen', () => {
@@ -95,11 +98,11 @@ describe('SpellCastModal pact magic', () => {
       />
     );
 
-    const pactButton = screen.getByRole('button', { name: /pact/i });
+    const pactButton = screen.getByRole('radio', { name: /pact slot/i });
     fireEvent.click(pactButton);
 
     // Find the level 3 slot button (unique to slot buttons) and verify it's not selected
-    const slotButton = screen.getByRole('button', { name: /Base Level/ });
-    expect(slotButton.className).not.toContain('border-purple-500');
+    const slotButton = screen.getByRole('radio', { name: /base level/i });
+    expect(slotButton).toHaveAttribute('data-state', 'unchecked');
   });
 });

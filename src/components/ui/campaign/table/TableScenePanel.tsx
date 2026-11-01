@@ -291,13 +291,13 @@ export function TableScenePanel({
       </div>
 
       {current?.status === 'unavailable' && (
-        <p className="text-accent-red-text mt-4 text-sm" role="alert">
+        <p className="text-blood-text mt-4 text-sm" role="alert">
           This device can&apos;t store Table data right now. Your battle maps
           are still available.
         </p>
       )}
       {current?.status === 'read-only' && (
-        <p className="text-accent-orange-text mt-4 text-sm" role="status">
+        <p className="text-ember-text mt-4 text-sm" role="status">
           This Table&apos;s data is in a format the app can&apos;t edit. You can
           still export it.
         </p>
@@ -306,7 +306,7 @@ export function TableScenePanel({
         <p
           className={
             status.kind === 'error'
-              ? 'text-accent-red-text mt-4 text-sm'
+              ? 'text-blood-text mt-4 text-sm'
               : 'text-muted mt-4 text-sm'
           }
           role={status.kind === 'error' ? 'alert' : 'status'}
@@ -316,12 +316,12 @@ export function TableScenePanel({
         </p>
       )}
       {error && (
-        <p className="text-accent-red-text mt-4 text-sm" role="alert">
+        <p className="text-blood-text mt-4 text-sm" role="alert">
           {error}
         </p>
       )}
       {routeRejected && (
-        <p className="text-accent-red-text mt-4 text-sm" role="alert">
+        <p className="text-blood-text mt-4 text-sm" role="alert">
           This imported Table belongs to another campaign, so it can&apos;t go
           live here. Nothing was sent.
         </p>
@@ -368,7 +368,7 @@ export function TableScenePanel({
                   : 'Ready to open'}
             </p>
             {changedScenes.has(scene.sceneId) && (
-              <p className="text-accent-orange-text mt-1 text-xs" role="alert">
+              <p className="text-ember-text mt-1 text-xs" role="alert">
                 Source changed
               </p>
             )}

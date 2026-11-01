@@ -109,7 +109,8 @@ export function InventoryEntryControls({
         {entry.equippable && (
           <Button
             type="button"
-            variant={entry.equipped ? 'secondary' : 'outline'}
+            variant="outline"
+            selected={entry.equipped}
             size="sm"
             aria-label={`${entry.equipped ? 'Unequip' : 'Equip'} ${name}`}
             aria-pressed={entry.equipped}
@@ -122,7 +123,8 @@ export function InventoryEntryControls({
         {entry.attunable && (
           <Button
             type="button"
-            variant={entry.attuned ? 'secondary' : 'outline'}
+            variant="outline"
+            selected={entry.attuned}
             size="sm"
             aria-label={`${entry.attuned ? 'End attunement' : 'Attune'} ${name}`}
             aria-pressed={entry.attuned}

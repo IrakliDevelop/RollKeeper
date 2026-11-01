@@ -26,7 +26,7 @@ export function AccountStep({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase lg:block">
+          <p className="text-muted mb-0.5 text-[11px] font-bold lg:block">
             <span className="lg:hidden">{view.compactStepLabel}</span>
             <span className="hidden lg:inline">{COPY.account.eyebrow}</span>
           </p>
@@ -43,13 +43,13 @@ export function AccountStep({
 
       <p className="text-body text-sm">{COPY.account.description}</p>
 
-      <div className="border-divider bg-surface flex items-center justify-between gap-3 rounded-lg border p-4">
+      <div className="border-divider flex items-center justify-between gap-3 border-b py-4">
         <div className="flex min-w-0 items-center gap-2.5">
           <UserRound
             size={18}
             className={
               view.account.signedIn
-                ? 'text-accent-emerald-text shrink-0'
+                ? 'text-verdigris-text shrink-0'
                 : 'text-muted shrink-0'
             }
             aria-hidden="true"
@@ -64,7 +64,7 @@ export function AccountStep({
           </div>
         </div>
         <Button
-          variant={view.account.signedIn ? 'outline' : 'primary'}
+          variant={view.account.signedIn ? 'outline' : 'secondary'}
           onClick={view.account.signedIn ? onCheckAccount : onSignIn}
         >
           {view.account.actionLabel}
@@ -75,16 +75,14 @@ export function AccountStep({
         <div
           role="alert"
           tabIndex={-1}
-          className="border-accent-red-border bg-accent-red-bg rounded-lg border p-3.5"
+          className="border-blood-border bg-blood-bg rounded-md border p-3.5"
         >
-          <p className="text-accent-red-text text-[13px]">
-            {view.account.error}
-          </p>
+          <p className="text-blood-text text-[13px]">{view.account.error}</p>
         </div>
       ) : null}
 
-      <div className="border-accent-emerald-border bg-accent-emerald-bg flex items-start gap-2.5 rounded-lg border p-3">
-        <p className="text-accent-emerald-text text-[13px]">
+      <div className="border-verdigris-border bg-verdigris-bg flex items-start gap-2.5 rounded-md border p-3">
+        <p className="text-verdigris-text text-[13px]">
           {COPY.account.stayPlayable}
         </p>
       </div>

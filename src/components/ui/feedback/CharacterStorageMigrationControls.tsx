@@ -19,6 +19,7 @@ import {
   selectCharacterCutover,
 } from '@/lib/indexeddb/characterCutoverSelection';
 import { APP_VERSION } from '@/utils/constants';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export function CharacterStorageMigrationControls() {
   const [preview, setPreview] = useState<DeviceBackupV1 | null>(null);
@@ -150,11 +151,13 @@ export function CharacterStorageMigrationControls() {
     setError(null);
     try {
       await initiateDeviceBackupDownload(preview, browserRecoveryRepository);
-      if (
-        !window.confirm(
-          'The recovery download was initiated. Explicitly prepare this browser profile for character IndexedDB migration? LocalStorage remains authoritative until a separate final confirmation.'
-        )
-      ) {
+      const prepare = await confirmDialog({
+        title: 'Prepare this browser for the new storage?',
+        message:
+          'Your recovery download has started. Characters stay in the current storage until you confirm the switch.',
+        confirmLabel: 'Prepare browser',
+      });
+      if (!prepare) {
         setStatus('Recovery downloaded; migration was not selected.');
         return;
       }
@@ -179,13 +182,16 @@ export function CharacterStorageMigrationControls() {
       !selection.recoveryCreatedAt
     )
       return;
-    if (
-      !window.confirm(
-        'Switch this browser profile’s character data to IndexedDB authority now? Current localStorage mirrors and immutable captures will be retained.'
-      )
-    )
-      return;
     setBusy(true);
+    const confirmed = await confirmDialog({
+      title: 'Switch character storage on this browser?',
+      message: 'Characters move to the new storage. The old copies are kept.',
+      confirmLabel: 'Switch storage',
+    });
+    if (!confirmed) {
+      setBusy(false);
+      return;
+    }
     try {
       const { activatePreparedCharacterCutover } = await import(
         '@/lib/indexeddb/characterCutoverControl'
@@ -217,13 +223,17 @@ export function CharacterStorageMigrationControls() {
   };
 
   const handleRollback = async () => {
-    if (
-      !window.confirm(
-        'Attempt rollback only if every current localStorage mirror exactly matches the active IndexedDB generation?'
-      )
-    )
-      return;
     setBusy(true);
+    const confirmed = await confirmDialog({
+      title: 'Roll back character storage?',
+      message:
+        "This only works if every old copy still matches the current data. Nothing changes if they don't.",
+      confirmLabel: 'Roll back',
+    });
+    if (!confirmed) {
+      setBusy(false);
+      return;
+    }
     try {
       const [
         { openRollkeeperDatabase },
@@ -281,7 +291,7 @@ export function CharacterStorageMigrationControls() {
   };
 
   return (
-    <section className="border-divider bg-surface-secondary mt-4 rounded-lg border p-4">
+    <section className="border-divider bg-surface-secondary mt-4 rounded-md border p-4">
       <h2 className="text-heading text-sm font-semibold">
         Character IndexedDB migration
       </h2>
@@ -346,7 +356,7 @@ export function CharacterStorageMigrationControls() {
         />
       )}
       {status && <p className="text-muted mt-2 text-sm">{status}</p>}
-      {error && <p className="text-accent-red-text mt-2 text-sm">{error}</p>}
+      {error && <p className="text-blood-text mt-2 text-sm">{error}</p>}
     </section>
   );
 }

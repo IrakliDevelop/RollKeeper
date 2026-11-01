@@ -1,5 +1,11 @@
+import { assignLegacyOrder } from '@fieldnotes/core';
 import type { CanvasElement, ServiceKey } from '@fieldnotes/core';
-import type { HubBackend } from '@fieldnotes/sync-server';
+import type {
+  HubBackend,
+  ElementWrite,
+  HubRecord,
+  StoredTombstone,
+} from '@fieldnotes/sync-server';
 import type { LayerRecord, SyncOp } from '@fieldnotes/sync';
 import { RedisHubBackend, type RedisHashClient } from '@fieldnotes/sync-redis';
 import {
@@ -44,6 +50,7 @@ export interface BufferedRedisBackendOptions {
 
 interface RoomState {
   elements: Map<string, CanvasElement>;
+  tombstones: Map<string, StoredTombstone>;
   dirty: Set<string>;
   removed: Set<string>;
   revisions: Map<string, number>;
@@ -164,6 +171,7 @@ export class BufferedRedisBackend implements HubBackend {
     if (!st) {
       st = {
         elements: new Map(),
+        tombstones: new Map(),
         dirty: new Set(),
         removed: new Set(),
         revisions: new Map(),
@@ -183,12 +191,20 @@ export class BufferedRedisBackend implements HubBackend {
         for (const [id, json] of Object.entries(raw)) {
           if (!roomState.elements.has(id) && !roomState.removed.has(id)) {
             try {
-              roomState.elements.set(id, JSON.parse(json) as CanvasElement);
+              const value = JSON.parse(json);
+              if (value.kind === 'tombstone')
+                roomState.tombstones.set(id, value.tombstone);
+              else roomState.elements.set(id, value as CanvasElement);
             } catch {
               // corrupt entry — skip
             }
           }
         }
+        const ordered = assignLegacyOrder(
+          [...roomState.elements.values()].map(element => ({ ...element }))
+        );
+        for (const element of ordered)
+          roomState.elements.set(element.id, element);
         roomState.hydrated = true;
       })().finally(() => {
         roomState.hydrating = null;
@@ -198,9 +214,84 @@ export class BufferedRedisBackend implements HubBackend {
     return st;
   }
 
-  async snapshot(room: string): Promise<CanvasElement[]> {
+  async snapshot(room: string): ReturnType<HubBackend['snapshot']> {
     const st = await this.ensure(room);
-    return [...st.elements.values()];
+    return {
+      elements: [...st.elements.values()],
+      tombstones: [...st.tombstones.values()],
+    };
+  }
+
+  async getRecord(room: string, id: string): Promise<HubRecord | undefined> {
+    const state = await this.ensure(room);
+    const element = state.elements.get(id);
+    if (element) return { kind: 'element', element };
+    const tombstone = state.tombstones.get(id);
+    return tombstone ? { kind: 'tombstone', tombstone } : undefined;
+  }
+
+  async applyElement(
+    room: string,
+    write: ElementWrite,
+    expected: { version: number; editor?: string } | null
+  ): ReturnType<HubBackend['applyElement']> {
+    const state = await this.ensure(room);
+    const matches = (
+      id: string,
+      value: { version: number; editor?: string } | null | undefined
+    ) => {
+      const current = state.elements.get(id) ?? state.tombstones.get(id);
+      return value == null
+        ? current === undefined
+        : current?.version === value.version && current.editor === value.editor;
+    };
+    const dirty = (id: string) => {
+      state.revisions.set(id, ++state.revisionClock);
+      state.dirty.add(id);
+      state.removed.delete(id);
+    };
+    if (write.kind === 'clear') {
+      if (
+        write.tombstones.length !== write.expected.size ||
+        new Set(write.tombstones.map(t => t.id)).size !== write.expected.size ||
+        !write.tombstones.every(
+          t =>
+            write.expected.has(t.id) && matches(t.id, write.expected.get(t.id))
+        )
+      )
+        return { ok: false, current: undefined };
+      for (const tombstone of write.tombstones) {
+        state.elements.delete(tombstone.id);
+        state.tombstones.set(tombstone.id, tombstone);
+        dirty(tombstone.id);
+      }
+    } else {
+      const id =
+        write.kind === 'upsert' ? write.element.id : write.tombstone.id;
+      if (!matches(id, expected)) {
+        const current = state.elements.get(id);
+        const tombstone = state.tombstones.get(id);
+        return {
+          ok: false,
+          current: current
+            ? { kind: 'element', element: current }
+            : tombstone
+              ? { kind: 'tombstone', tombstone }
+              : undefined,
+        };
+      }
+      if (write.kind === 'upsert') {
+        state.elements.set(id, write.element);
+        state.tombstones.delete(id);
+      } else {
+        state.elements.delete(id);
+        state.tombstones.set(id, write.tombstone);
+      }
+      dirty(id);
+    }
+    this.schedule();
+    this.refreshRoomTtl(room);
+    return { ok: true };
   }
 
   async get(room: string, id: string): Promise<CanvasElement | undefined> {
@@ -344,7 +435,11 @@ export class BufferedRedisBackend implements HubBackend {
         const toSet: Record<string, string> = {};
         const setRevisions = new Map<string, number>();
         for (const id of st.dirty) {
-          const el = st.elements.get(id);
+          const el =
+            st.elements.get(id) ??
+            (st.tombstones.has(id)
+              ? { kind: 'tombstone', tombstone: st.tombstones.get(id) }
+              : undefined);
           if (el) {
             toSet[id] = JSON.stringify(el);
             setRevisions.set(id, st.revisions.get(id) ?? 0);
@@ -364,7 +459,7 @@ export class BufferedRedisBackend implements HubBackend {
           for (const id of Object.keys(toSet)) {
             if (
               st.revisions.get(id) === setRevisions.get(id) &&
-              st.elements.has(id)
+              (st.elements.has(id) || st.tombstones.has(id))
             ) {
               st.dirty.add(id);
             }

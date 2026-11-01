@@ -18,6 +18,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   toggleSkillBonusAbility: 'CANONICAL',
   updateSavingThrowProficiency: 'CANONICAL',
   updateHitPoints: 'CANONICAL',
+  setCurrentHitPoints: 'CANONICAL',
   updateInitiative: 'CANONICAL',
   resetInitiativeToDefault: 'CANONICAL',
   toggleReaction: 'CANONICAL',
@@ -81,6 +82,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   removeDisease: 'CANONICAL',
   setExhaustionVariant: 'CANONICAL',
   clearAllConditions: 'CANONICAL',
+  clearNonBuffConditions: 'CANONICAL',
   clearAllDiseases: 'CANONICAL',
   // — XP —
   addExperience: 'CANONICAL',

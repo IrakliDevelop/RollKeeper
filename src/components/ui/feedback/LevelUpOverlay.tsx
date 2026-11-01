@@ -233,7 +233,7 @@ export function LevelUpOverlay({
         {/* LEVEL UP text */}
         <p
           style={{
-            fontFamily: 'var(--font-cinzel-decorative), Georgia, serif',
+            fontFamily: 'var(--font-heading-family)',
             fontSize: 'clamp(0.875rem, 2vw, 1rem)',
             fontWeight: 400,
             color: 'rgba(255, 215, 0, 0.7)',
@@ -248,7 +248,7 @@ export function LevelUpOverlay({
         {/* Level number */}
         <h1
           style={{
-            fontFamily: 'var(--font-cinzel-decorative), Georgia, serif',
+            fontFamily: 'var(--font-heading-family)',
             fontSize: 'clamp(4rem, 15vw, 8rem)',
             fontWeight: 700,
             color: '#FFD700',
@@ -270,7 +270,7 @@ export function LevelUpOverlay({
         {characterName && (
           <p
             style={{
-              fontFamily: 'var(--font-cinzel-decorative), Georgia, serif',
+              fontFamily: 'var(--font-heading-family)',
               fontSize: 'clamp(0.875rem, 2.5vw, 1.25rem)',
               fontWeight: 400,
               color: 'rgba(255, 255, 255, 0.6)',
@@ -305,7 +305,7 @@ export function LevelUpOverlay({
           style={{
             position: 'absolute',
             bottom: '2rem',
-            fontFamily: 'var(--font-cinzel-decorative), Georgia, serif',
+            fontFamily: 'var(--font-heading-family)',
             fontSize: '0.75rem',
             color: 'rgba(255, 215, 0, 0.4)',
             letterSpacing: '0.1em',

@@ -55,6 +55,22 @@ describe('useThemeInit', () => {
     vi.restoreAllMocks();
   });
 
+  it('persists blue, restores it on remount and ignores OS changes', async () => {
+    const mql = mockMatchMedia(false);
+    const { useThemeInit } = await import('@/hooks/useTheme');
+    const view = renderHook(() => useThemeInit());
+    act(() => view.result.current.setTheme('blue'));
+    expect(view.result.current.theme).toBe('blue');
+    expect(view.result.current.resolvedTheme).toBe('blue');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('blue');
+    act(() => mql._fireChange(true));
+    expect(document.documentElement.getAttribute('data-theme')).toBe('blue');
+    view.unmount();
+    const restored = renderHook(() => useThemeInit());
+    expect(restored.result.current.theme).toBe('blue');
+    expect(restored.result.current.resolvedTheme).toBe('blue');
+  });
+
   it('defaults to system theme when nothing is stored in localStorage', async () => {
     const { useThemeInit } = await import('@/hooks/useTheme');
 
@@ -179,37 +195,100 @@ describe('useThemeInit', () => {
     expect(result.current.resolvedTheme).toBe('light');
   });
 
-  it('resolves parchment when stored', async () => {
+  it('migrates a stored parchment theme to light and writes it back', async () => {
     localStorage.setItem(STORAGE_KEY, 'parchment');
     const { useThemeInit } = await import('@/hooks/useTheme');
 
     const { result } = renderHook(() => useThemeInit());
     await act(async () => {});
 
-    expect(result.current.theme).toBe('parchment');
-    expect(result.current.resolvedTheme).toBe('parchment');
-    expect(document.documentElement.getAttribute('data-theme')).toBe(
-      'parchment'
-    );
+    expect(result.current.theme).toBe('light');
+    expect(result.current.resolvedTheme).toBe('light');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('light');
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
   });
 
-  it('setTheme("parchment") applies attribute and persists', async () => {
+  it('migrates parchment to light even when the OS prefers dark', async () => {
+    mockMatchMedia(true);
+    localStorage.setItem(STORAGE_KEY, 'parchment');
     const { useThemeInit } = await import('@/hooks/useTheme');
 
     const { result } = renderHook(() => useThemeInit());
     await act(async () => {});
 
-    act(() => {
-      result.current.setTheme('parchment');
-    });
-
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('parchment');
-    expect(document.documentElement.getAttribute('data-theme')).toBe(
-      'parchment'
-    );
+    expect(result.current.theme).toBe('light');
+    expect(result.current.resolvedTheme).toBe('light');
   });
 
-  it('system never resolves to parchment', async () => {
+  it('clears a stale data-theme="parchment" left by an older page', async () => {
+    document.documentElement.setAttribute('data-theme', 'parchment');
+    localStorage.setItem(STORAGE_KEY, 'parchment');
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+  });
+
+  it('still renders light when the parchment write-back fails', async () => {
+    localStorage.setItem(STORAGE_KEY, 'parchment');
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage is full', 'QuotaExceededError');
+    });
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    expect(result.current.theme).toBe('light');
+    expect(result.current.resolvedTheme).toBe('light');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('parchment');
+  });
+
+  it('falls back to system for an unknown stored value without rewriting it', async () => {
+    localStorage.setItem(STORAGE_KEY, 'sepia');
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    expect(result.current.theme).toBe('system');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('sepia');
+  });
+
+  it('falls back to system when reading storage throws', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage is blocked', 'SecurityError');
+    });
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    expect(result.current.theme).toBe('system');
+    expect(result.current.resolvedTheme).toBe('light');
+  });
+
+  it('still applies the chosen theme when saving it throws', async () => {
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage is full', 'QuotaExceededError');
+    });
+
+    act(() => {
+      result.current.setTheme('dark');
+    });
+
+    expect(result.current.theme).toBe('dark');
+    expect(result.current.resolvedTheme).toBe('dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
+
+  it('system resolves only to light or dark', async () => {
     localStorage.setItem(STORAGE_KEY, 'system');
     const { useThemeInit } = await import('@/hooks/useTheme');
 
@@ -217,8 +296,8 @@ describe('useThemeInit', () => {
     await act(async () => {});
 
     expect(['light', 'dark']).toContain(result.current.resolvedTheme);
-    expect(
+    expect(['light', 'dark']).toContain(
       document.documentElement.getAttribute('data-theme') ?? 'light'
-    ).not.toBe('parchment');
+    );
   });
 });

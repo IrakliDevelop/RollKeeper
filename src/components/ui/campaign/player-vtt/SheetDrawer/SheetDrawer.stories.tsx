@@ -7,6 +7,7 @@ import {
   SHEET_TAB_STORAGE_KEY,
 } from './SheetDrawer.types';
 import { useCharacterStore } from '@/store/characterStore';
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 import type {
@@ -337,6 +338,36 @@ const NOT_SHARED_ALLY: PartyMemberHP = {
   publicSheet: null,
 };
 
+/** The switch's ::after hit box, centred on the track. */
+function switchHitBox(toggle: HTMLElement) {
+  const box = toggle.getBoundingClientRect();
+  const after = getComputedStyle(toggle, '::after');
+  const width = parseFloat(after.width);
+  const height = parseFloat(after.height);
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  return {
+    left: x - width / 2,
+    right: x + width / 2,
+    top: y - height / 2,
+    bottom: y + height / 2,
+    width,
+    height,
+  };
+}
+
+function intersects(
+  a: { left: number; right: number; top: number; bottom: number },
+  b: { left: number; right: number; top: number; bottom: number }
+) {
+  return (
+    Math.round(a.left) < Math.round(b.right) &&
+    Math.round(b.left) < Math.round(a.right) &&
+    Math.round(a.top) < Math.round(b.bottom) &&
+    Math.round(b.top) < Math.round(a.bottom)
+  );
+}
+
 function body() {
   // The drawer portals to document.body via Radix — query the whole document,
   // not the Storybook canvas element.
@@ -369,15 +400,16 @@ export const Desktop: Story = {
   decorators: [withCharacter(kaelenFixture)],
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         desktop: {
           name: 'Desktop',
           styles: { width: '1440px', height: '900px' },
+          type: 'desktop',
         },
       },
-      defaultViewport: 'desktop',
     },
   },
+  globals: { viewport: { value: 'desktop', isRotated: false } },
   play: async () => {
     const screen = body();
     await waitFor(() =>
@@ -385,8 +417,10 @@ export const Desktop: Story = {
         screen.getByRole('dialog', { name: /kaelen voss/i })
       ).toBeInTheDocument()
     );
-    await userEvent.click(screen.getByRole('button', { name: /locked/i }));
-    await expect(screen.getByText(/editing unlocked/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
+    await expect(
+      screen.getByText(/changes save and sync to the dm/i)
+    ).toBeInTheDocument();
   },
 };
 
@@ -394,21 +428,65 @@ export const Tablet: Story = {
   decorators: [withCharacter(kaelenFixture)],
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         tablet: {
           name: 'Tablet',
           styles: { width: '1180px', height: '820px' },
+          type: 'tablet',
         },
       },
-      defaultViewport: 'tablet',
     },
   },
+  globals: { viewport: { value: 'tablet', isRotated: false } },
   play: async () => {
     const screen = body();
     const dialog = await waitFor(() =>
       screen.getByRole('dialog', { name: /kaelen voss/i })
     );
     await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(580);
+
+    // Touch: the tabs reach 44px and the strip stays inside the drawer.
+    const restore = emulateCoarsePointer();
+    try {
+      for (const tab of within(dialog).getAllByRole('tab')) {
+        await expect(tab.getBoundingClientRect().height).toBeGreaterThanOrEqual(
+          44
+        );
+      }
+      // Taller tabs don't push the drawer into sideways scrolling, and all
+      // six fit the strip without it scrolling either.
+      await expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+      const tablist = within(dialog).getByRole('tablist');
+      await expect(tablist.scrollWidth).toBeLessThanOrEqual(
+        tablist.clientWidth
+      );
+    } finally {
+      restore();
+    }
+  },
+};
+
+/**
+ * On a touch screen the Edit sheet switch reaches 44×44 and its hit box
+ * touches neither Close nor any rest button.
+ */
+export const TouchTargets: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  beforeEach: () => emulateCoarsePointer(),
+  play: async () => {
+    const dialog = await waitFor(() =>
+      body().getByRole('dialog', { name: /kaelen voss/i })
+    );
+    const drawer = within(dialog);
+    const area = switchHitBox(
+      drawer.getByRole('switch', { name: 'Edit sheet' })
+    );
+    await expect(area.width).toBeGreaterThanOrEqual(44);
+    await expect(area.height).toBeGreaterThanOrEqual(44);
+    for (const name of [/close sheet/i, /short rest/i, /long rest/i]) {
+      const box = drawer.getByRole('button', { name }).getBoundingClientRect();
+      await expect(intersects(area, box)).toBe(false);
+    }
   },
 };
 
@@ -613,5 +691,113 @@ export const PartyNotShared: Story = {
     await expect(
       screen.getByText(/dorric stonefist hasn't shared their sheet/i)
     ).toBeInTheDocument();
+  },
+};
+
+/** How many ability cells share the first cell's row. */
+function cellsPerRow(dialog: HTMLElement) {
+  const tops = Array.from(dialog.querySelectorAll('[data-ledger-cell]'), cell =>
+    Math.round(cell.getBoundingClientRect().top)
+  );
+  return tops.filter(top => top === tops[0]).length;
+}
+
+/**
+ * Editing a score inside the drawer: the score editor opens over the
+ * non-modal drawer, Escape closes only the editor, Save writes the store.
+ * Six abilities across at the drawer's width.
+ */
+export const ScoreEditorInDrawer: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  parameters: Desktop.parameters,
+  globals: Desktop.globals,
+  play: async ({ args }) => {
+    const screen = body();
+    const dialog = await waitFor(() =>
+      screen.getByRole('dialog', { name: /kaelen voss/i })
+    );
+    await expect(cellsPerRow(dialog)).toBe(6);
+    // Locked: plain cells, no score editor.
+    await expect(
+      within(dialog).queryByRole('button', { name: /^Strength: modifier/ })
+    ).toBeNull();
+    await userEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
+    const before = useCharacterStore.getState().character.abilities.strength;
+    const trigger = within(dialog).getByRole('button', {
+      name: /^Strength: modifier/,
+    });
+    await userEvent.click(trigger);
+    await screen.findByRole('dialog', { name: 'Strength score' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Strength score' })
+      ).toBeNull()
+    );
+    // The drawer is controlled: Escape reaching it would call onClose.
+    await expect(args.onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await expect(dialog).toBeVisible();
+
+    await userEvent.click(trigger);
+    await screen.findByRole('dialog', { name: 'Strength score' });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Increase Strength score' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(useCharacterStore.getState().character.abilities.strength).toBe(
+        before + 1
+      )
+    );
+    await expect(args.onClose).not.toHaveBeenCalled();
+  },
+};
+
+/** On a phone the drawer is full width and the abilities wrap 3×2. */
+export const AbilitiesOnPhone: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  parameters: {
+    viewport: {
+      options: {
+        phone: {
+          name: 'Phone',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async () => {
+    const dialog = await waitFor(() =>
+      body().getByRole('dialog', { name: /kaelen voss/i })
+    );
+    await expect(cellsPerRow(dialog)).toBe(3);
+    await expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+  },
+};
+
+/** iPad portrait: the drawer is 580px and the abilities still sit six across. */
+export const AbilitiesOnIpad: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  parameters: {
+    viewport: {
+      options: {
+        ipadPortrait: {
+          name: 'iPad portrait',
+          styles: { width: '820px', height: '1180px' },
+          type: 'tablet',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'ipadPortrait', isRotated: false } },
+  play: async () => {
+    const dialog = await waitFor(() =>
+      body().getByRole('dialog', { name: /kaelen voss/i })
+    );
+    await expect(Math.round(dialog.getBoundingClientRect().width)).toBe(580);
+    await expect(cellsPerRow(dialog)).toBe(6);
   },
 };

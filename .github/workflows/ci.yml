@@ -32,6 +32,9 @@ jobs:
       - name: Design ratchet
         run: npm run design:ci
 
+      - name: Design contrast
+        run: npm run design:contrast
+
       - name: Type check
         run: npm run type-check
 

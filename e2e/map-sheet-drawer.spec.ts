@@ -331,7 +331,7 @@ test.describe('player map sheet drawer', () => {
     await dialog
       .getByRole('textbox', { name: 'HP amount' })
       .fill(String(DAMAGE));
-    await dialog.getByRole('button', { name: 'Damage' }).click();
+    await dialog.getByRole('button', { name: 'Damage', exact: true }).click();
     await expect(dialog.getByText(expectedHp, { exact: true })).toBeVisible({
       timeout: 5_000,
     });
@@ -832,7 +832,7 @@ test.describe('player map party limited view', () => {
     ).toBeVisible();
     await expect(dialog.getByText(/Limited view · played by /)).toBeVisible();
     // Full HP → the top band's word.
-    await expect(dialog.getByText('Unharmed', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Healthy', { exact: true })).toBeVisible();
     // HP sharing defaults on, so the exact numbers ride along too.
     await expect(
       dialog.getByText(`${hpB.current}/${hpB.max}`, { exact: true })
@@ -866,7 +866,7 @@ test.describe('player map party limited view', () => {
     await expect(
       dialog.getByText(`${hpB.current}/${hpB.max}`, { exact: true })
     ).toHaveCount(0, { timeout: 30_000 });
-    await expect(dialog.getByText('Unharmed', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Healthy', { exact: true })).toBeVisible();
   });
 
   test("turning off sheet sharing shows that B hasn't shared their sheet", async () => {
@@ -888,7 +888,7 @@ test.describe('player map party limited view', () => {
     await expect(
       dialog.getByText(`${PARTY_B_NAME} hasn't shared their sheet.`)
     ).toBeVisible({ timeout: 30_000 });
-    await expect(dialog.getByText('Unharmed', { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText('Healthy', { exact: true })).toHaveCount(0);
   });
 
   test('double-clicking a DM combatant token opens no sheet', async () => {

@@ -78,21 +78,27 @@ const monsterEntity: EncounterEntity = {
 };
 
 describe('DetailAbilityScores — saves column', () => {
+  it('clicking the visible Prof label toggles that saving throw proficiency', () => {
+    const actions = makeActions();
+    render(<DetailAbilityScores entity={monsterEntity} actions={actions} />);
+    fireEvent.click(screen.getAllByText('Prof')[0]);
+    expect(actions.onUpdate).toHaveBeenCalled();
+  });
   it('shows the parsed save for proficient abilities (amber) and the modifier fallback for the rest (faint)', () => {
     render(
       <DetailAbilityScores entity={monsterEntity} actions={makeActions()} />
     );
 
-    const dexSave = screen.getByText('SAVE +9');
-    expect(dexSave).toHaveClass('text-accent-amber-text');
-    const conSave = screen.getByText('SAVE +8');
-    expect(conSave).toHaveClass('text-accent-amber-text');
+    const dexSave = screen.getByText('Save +9');
+    expect(dexSave).toHaveClass('text-brass-text');
+    const conSave = screen.getByText('Save +8');
+    expect(conSave).toHaveClass('text-brass-text');
 
-    const strSave = screen.getByText('SAVE +5');
+    const strSave = screen.getByText('Save +5');
     expect(strSave).toHaveClass('text-muted', 'font-semibold');
-    expect(screen.getByText('SAVE +2')).toHaveClass('text-muted'); // INT
-    expect(screen.getByText('SAVE +1')).toHaveClass('text-muted'); // WIS
-    expect(screen.getByText('SAVE -1')).toHaveClass('text-muted'); // CHA
+    expect(screen.getByText('Save +2')).toHaveClass('text-muted'); // INT
+    expect(screen.getByText('Save +1')).toHaveClass('text-muted'); // WIS
+    expect(screen.getByText('Save -1')).toHaveClass('text-muted'); // CHA
   });
 
   it('re-renders save values when the entity saves string changes (grid derives from the prop)', () => {
@@ -100,7 +106,7 @@ describe('DetailAbilityScores — saves column', () => {
     const { rerender } = render(
       <DetailAbilityScores entity={monsterEntity} actions={actions} />
     );
-    expect(screen.getByText('SAVE +9')).toBeInTheDocument();
+    expect(screen.getByText('Save +9')).toBeInTheDocument();
 
     rerender(
       <DetailAbilityScores
@@ -112,10 +118,10 @@ describe('DetailAbilityScores — saves column', () => {
       />
     );
 
-    expect(screen.getByText('SAVE +12')).toBeInTheDocument();
+    expect(screen.getByText('Save +12')).toBeInTheDocument();
     // CON is no longer proficient — falls back to its +3 modifier.
-    expect(screen.getByText('SAVE +3')).toHaveClass('text-muted');
-    expect(screen.queryByText('SAVE +8')).not.toBeInTheDocument();
+    expect(screen.getByText('Save +3')).toHaveClass('text-muted');
+    expect(screen.queryByText('Save +8')).not.toBeInTheDocument();
   });
 
   it('calculates proficient saves from PB and lets manual values override or reset', () => {
@@ -133,7 +139,7 @@ describe('DetailAbilityScores — saves column', () => {
       <DetailAbilityScores entity={entity} actions={actions} />
     );
 
-    expect(screen.getByText('SAVE +8')).toBeInTheDocument();
+    expect(screen.getByText('Save +8')).toBeInTheDocument();
     rerender(
       <DetailAbilityScores
         entity={{
@@ -144,7 +150,7 @@ describe('DetailAbilityScores — saves column', () => {
       />
     );
 
-    expect(screen.getByText('SAVE +11')).toBeInTheDocument();
+    expect(screen.getByText('Save +11')).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', { name: 'Reset STR saving throw' })
     );

@@ -41,6 +41,41 @@ export interface IntentBusDeps {
 const CHANNEL_NAME = 'rk-character-intents';
 const RETRY_INTERVAL_MS = 2000;
 
+const isDomEvent = (value: unknown): boolean => {
+  if (typeof Event === 'undefined') return false;
+  if (value instanceof Event) return true;
+  // React synthetic event: a wrapper whose nativeEvent is the DOM event.
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'nativeEvent' in value &&
+    (value as { nativeEvent: unknown }).nativeEvent instanceof Event
+  );
+};
+
+/**
+ * BroadcastChannel structured-clones every message. A button wired straight
+ * to a store action (`onClick={action}`) passes its click event, which the
+ * leader's direct call ignores, so drop it here too (trailing event
+ * arguments are removed, so the action sees the same arity). Returns the
+ * cloned arguments, so retries and promotion replay exactly what was
+ * checked, or null when an argument still can't be cloned.
+ */
+function toCloneableArgs(args: unknown[]): unknown[] | null {
+  const cleaned = args.map(arg => (isDomEvent(arg) ? undefined : arg));
+  let end = cleaned.length;
+  while (end > 0 && isDomEvent(args[end - 1])) end -= 1;
+  const result = cleaned.slice(0, end);
+  // Every browser with BroadcastChannel has structuredClone (Safari added
+  // both in 15.4); without it the bus is inert, so skipping is safe.
+  if (typeof structuredClone !== 'function') return result;
+  try {
+    return structuredClone(result);
+  } catch {
+    return null;
+  }
+}
+
 const newOpId = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -89,6 +124,16 @@ export class CharacterIntentBus {
 
   /** Follower path: queue + publish an intent for a character. */
   send(characterId: string, actionName: string, args: unknown[]): void {
+    // Validate before taking a seq: a queued intent that can never be posted
+    // would leave a gap the leader waits on forever, stalling every later
+    // intent from this tab.
+    const cloneableArgs = toCloneableArgs(args);
+    if (cloneableArgs === null) {
+      console.error(
+        `Character action "${actionName}" was not sent to the leader tab: an argument can't be copied between tabs.`
+      );
+      return;
+    }
     const seq = (this.seqByCharacter.get(characterId) ?? 0) + 1;
     this.seqByCharacter.set(characterId, seq);
     const intent: CharacterIntent = {
@@ -98,12 +143,25 @@ export class CharacterIntentBus {
       seq,
       characterId,
       actionName,
-      args,
+      args: cloneableArgs,
     };
     const queue = this.pendingByCharacter.get(characterId) ?? [];
     queue.push(intent);
     this.pendingByCharacter.set(characterId, queue);
-    this.channel?.postMessage(intent);
+    this.post(intent);
+  }
+
+  /** Posts without throwing into the caller: a pending intent that fails
+   * here stays queued and goes out with the next retry. */
+  private post(intent: CharacterIntent): void {
+    try {
+      this.channel?.postMessage(intent);
+    } catch (error) {
+      console.error(
+        `Character intent ${intent.seq} ("${intent.actionName}") couldn't be posted; it will be retried.`,
+        error
+      );
+    }
   }
 
   announceLeadership(characterId: string): void {
@@ -205,7 +263,7 @@ export class CharacterIntentBus {
 
   private resendPendingFor(characterId: string): void {
     const queue = this.pendingByCharacter.get(characterId) ?? [];
-    for (const intent of queue) this.channel?.postMessage(intent);
+    for (const intent of queue) this.post(intent);
   }
 
   private resendAllPending(): void {

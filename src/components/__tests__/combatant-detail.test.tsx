@@ -171,16 +171,74 @@ const playerEntity: EncounterEntity = {
 };
 
 describe('CombatantDetail — monster with full stat block', () => {
+  it('shows library sync in text and names the header actions', () => {
+    const actions = { ...makeActions(), onViewNPC: vi.fn() };
+    render(
+      <CombatantDetail
+        entity={{ ...monsterEntity, npcSourceId: 'npc-1' }}
+        actions={actions}
+      />
+    );
+    expect(
+      screen.getByText(/Stat edits sync to the NPC library record/)
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'View Ancient Dragon in NPC library' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Remove Ancient Dragon from combat' })
+    ).toBeVisible();
+  });
+
+  it('uses keyboard buttons for NPC death saves and keeps player saves read-only', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(
+      <CombatantDetail
+        entity={{
+          ...monsterEntity,
+          type: 'npc',
+          currentHp: 0,
+          deathSaves: { successes: 0, failures: 0, isStabilized: false },
+        }}
+        actions={actions}
+      />
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Mark death save success 1' })
+    );
+    expect(actions.onUpdate).toHaveBeenCalledWith(
+      'monster-1',
+      expect.objectContaining({
+        deathSaves: expect.objectContaining({ successes: 1 }),
+      })
+    );
+    cleanup();
+    render(
+      <CombatantDetail
+        entity={{
+          ...playerEntity,
+          currentHp: 0,
+          deathSaves: { successes: 0, failures: 0, isStabilized: false },
+        }}
+        actions={actions}
+      />
+    );
+    expect(
+      screen.queryByRole('button', { name: /death save success/i })
+    ).toBeNull();
+  });
+
   it('renders ability scores, combat info, actions, and effects sections', () => {
     const actions = makeActions();
     render(<CombatantDetail entity={monsterEntity} actions={actions} />);
 
     expect(screen.getByText('STR')).toBeInTheDocument();
-    expect(screen.getByText('Combat Details')).toBeInTheDocument();
+    expect(screen.getByText('Combat details')).toBeInTheDocument();
     expect(screen.getByText(/legendary actions/i)).toBeInTheDocument();
-    expect(screen.getByText(/active effects/i)).toBeInTheDocument();
+    expect(screen.getByText(/conditions and effects/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('textbox', { name: 'Initiative Mod' })
+      screen.getByRole('textbox', { name: 'Initiative modifier' })
     ).toBeInTheDocument();
   });
 
@@ -240,7 +298,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     const user = userEvent.setup();
     render(<CombatantDetail entity={monsterEntity} actions={actions} />);
 
-    await user.click(screen.getByRole('button', { name: 'Buffs' }));
+    await user.click(screen.getByRole('tab', { name: 'Buffs' }));
     await user.click(screen.getByRole('button', { name: 'Bless' }));
 
     expect(actions.onAddCondition).toHaveBeenCalledWith('monster-1', {
@@ -259,7 +317,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     render(<CombatantDetail entity={monsterEntity} actions={actions} />);
 
     await user.click(
-      screen.getByRole('button', { name: 'Frightened increase rounds' })
+      screen.getByRole('button', { name: 'Increase Frightened rounds' })
     );
 
     expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
@@ -279,7 +337,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     render(<CombatantDetail entity={entityWithOneRound} actions={actions} />);
 
     await user.click(
-      screen.getByRole('button', { name: 'Blinded decrease rounds' })
+      screen.getByRole('button', { name: 'Decrease Blinded rounds' })
     );
 
     expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
@@ -299,7 +357,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     render(<CombatantDetail entity={entityWithInfinite} actions={actions} />);
 
     const decreaseBtn = screen.getByRole('button', {
-      name: 'Stunned decrease rounds',
+      name: 'Decrease Stunned rounds',
     });
     expect(decreaseBtn).toBeDisabled();
 

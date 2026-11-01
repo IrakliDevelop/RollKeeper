@@ -1,3 +1,5 @@
+import { assignLegacyOrder } from '@fieldnotes/core';
+import { authorityElementVersion } from '../authorityElementVersion';
 import type { JsonObject } from './schema';
 import { editorFogToAuthorityFog } from './fogShape';
 import type { SharedInitiativeState } from '@/types/sharedState';
@@ -207,9 +209,21 @@ export function canvasStateToAuthorityState(
   canvasState: JsonObject,
   editor: string
 ): JsonObject {
-  const elements = Array.isArray(canvasState.elements)
+  const capturedElements = Array.isArray(canvasState.elements)
     ? structuredClone(canvasState.elements)
     : [];
+  // Canvas v1-v4 used numeric zIndex; room checkpoints require the current
+  // fractional order and per-element versions. Upgrade a copy at this wire
+  // boundary, preserving the source capture used for adoption and recovery.
+  const orderedElements =
+    typeof canvasState.version === 'number' &&
+    canvasState.version < 5 &&
+    capturedElements.every(element => record(element))
+      ? assignLegacyOrder(capturedElements as JsonObject[])
+      : capturedElements;
+  const elements = orderedElements.map(element =>
+    record(element) ? authorityElementVersion(element as JsonObject) : element
+  );
   const layers = Array.isArray(canvasState.layers)
     ? canvasState.layers.flatMap(value => {
         const definition = record(value);

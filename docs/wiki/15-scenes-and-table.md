@@ -10,6 +10,25 @@ of the Scenes and Table release; when in doubt, read the cited file.
 server and client deployment switches for it were removed. Entry points ("Open Table", "Prepare on map", "Open in Table" / "Use
 in Table", "Open display") always render.
 
+## Workspace controls
+
+The top dock distinguishes the DM's selected scene from the server-acknowledged
+**Players see** state. Scene navigation, local-save status, live ownership and
+Details sit on the left on wide screens; audience actions sit on the right.
+They stack on smaller screens. Show is the primary action when preparing a
+different scene; revealing an already shown, blanked scene remains available
+as a secondary action. TV status, mini-scale reports and Open display share
+a separate row. Alerts, save failures and conflicts remain visible below.
+
+Scenes opens a private, content-sized flyout below the measured dock. Short
+lists leave the canvas visible below; long lists scroll within the available
+height. Selecting a scene still changes only the DM's preparation. The roster
+stays mounted but hidden while the flyout is open; the combat panel does the
+same below `lg`, preserving its queue and control state. Before a canvas exists,
+the workspace shell measures its own header for the same flyout position.
+These layout rules do not change control leases, presentation commands,
+checkpoint recovery or calibration eligibility.
+
 ## Routes and auth model
 
 Pages:
@@ -301,6 +320,26 @@ scene rooms, player views and the TV cannot connect.
   not know is a 400, so during a deploy-skew window between display and app
   builds the TV's ACKs can be refused until both run the same release. An ACK
   without `calibration` is accepted.
+
+## Turn movement
+
+Table movement follows the active run for the viewed scene, rather than legacy
+encounter links. DM and player trackers use the same public turn identity,
+combat generation and round. Starting another turn or restarting combat resets
+the allowance; HP edits do not. Player speed comes from the authorized character
+snapshot, including movement bonuses. Teleport placement does not spend movement.
+
+The relay authorizes movement records against their current target token inside
+the Redis transaction. Players can edit only their own public token's trail,
+including one created by the DM. Hidden or missing targets never expose trails
+to players or the display. Removing a token or changing its layer atomically
+removes its dependent trail; hiding it only withdraws the public projection.
+Checkpoint, restore and live publication preserve that same invariant.
+
+Legacy canvas ordering is upgraded at the authority boundary for the current
+Fieldnotes format. New SDK movement records are given an authority-compatible
+initial version at that boundary too. The captured source map bytes remain
+unchanged.
 
 ## Local-only storage and recovery
 

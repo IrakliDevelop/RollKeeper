@@ -1,3 +1,4 @@
+import { CANVAS_STATE_VERSION } from '@fieldnotes/core';
 import type {
   AuthorityBarrier,
   AuthorityCheckpointPayload,
@@ -260,7 +261,7 @@ export function sceneCheckpointToViewportState(
   ) as JsonObject;
   const firstLayer = layers[0];
   return {
-    version: 4,
+    version: CANVAS_STATE_VERSION,
     camera: { position: { x: 0, y: 0 }, zoom: 1 },
     elements: structuredClone(state.elements ?? []) as JsonObject[string],
     layers,

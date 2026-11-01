@@ -26,7 +26,7 @@ export function TablePublicationControls({ control, combatActive }: Props) {
         {control.status === 'checking' ? "Checking if you're live…" : message}
       </span>
       {control.error && (
-        <span className="text-accent-red-text">{control.error}</span>
+        <span className="text-blood-text">{control.error}</span>
       )}
       {control.status === 'waiting' && (
         <Button

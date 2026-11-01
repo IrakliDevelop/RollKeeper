@@ -397,9 +397,10 @@ describe('PlayerBackupWizard', () => {
     );
     await user.click(screen.getByRole('button', { name: COPY.chrome.close }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByRole('link', { name: COPY.chrome.back })
-    ).toHaveAttribute('href', '/player');
+    expect(screen.getByRole('link', { name: 'Characters' })).toHaveAttribute(
+      'href',
+      '/player'
+    );
   });
 
   it('shows finish applying when a conflict still owes a roster write', () => {

@@ -154,13 +154,13 @@ export function WeaponFormDialog({
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>
-            {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
+            {editingWeapon ? 'Edit weapon' : 'Add weapon'}
           </DialogTitle>
-          <DialogDescription>
-            {editingWeapon
-              ? 'Update weapon details below.'
-              : 'Search the database or fill in manually.'}
-          </DialogDescription>
+          {!editingWeapon && (
+            <DialogDescription>
+              Search the database or fill in manually.
+            </DialogDescription>
+          )}
         </DialogHeader>
         <DialogBody>
           <WeaponForm

@@ -1,5 +1,7 @@
+import { Section } from '@/components/ui/layout/section';
+import { SubTabs } from '@/components/ui/layout/SubTabs';
+import { SheetLoadError } from './SheetLoadError';
 import React, { useState, useEffect } from 'react';
-import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
 import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
@@ -13,6 +15,7 @@ import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
 import NotesManager from '@/components/ui/game/NotesManager';
+import { CharacterAppearance } from '@/components/ui/appearance/CharacterAppearance';
 import { DiceSetEditor } from '@/components/ui/game/DiceSetEditor';
 import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
@@ -23,9 +26,7 @@ import { MagicItemsTab } from '@/components/ui/character/equipment/MagicItemsTab
 import { ArmorTab } from '@/components/ui/character/equipment/ArmorTab';
 import ActionsSection from '@/components/ui/character/ActionsSection';
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
-import AbilityScores from '@/components/ui/character/AbilityScores';
-import SavingThrows from '@/components/ui/character/SavingThrows';
-import Skills from '@/components/ui/character/Skills';
+import { AbilitiesSection } from '@/components/ui/character/AbilitiesSection';
 import QuickStats from '@/components/ui/character/QuickStats';
 import XPTracker from '@/components/ui/character/XPTracker';
 import SpellSlotTracker from '@/components/ui/character/SpellSlotTracker';
@@ -36,7 +37,6 @@ import HitDiceTracker from '@/components/ui/character/HitDiceTracker';
 import { WeaponProficiencies } from '@/components/WeaponProficiencies';
 import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import ToolProficienciesSection from '@/components/ui/character/ToolProficienciesSection';
-import TraitTracker from '@/components/ui/character/TraitTracker';
 import HeroicInspirationTracker from '@/components/ui/character/HeroicInspirationTracker';
 import Languages from '@/components/ui/character/LanguagesAndProficiencies';
 import { SummonsSubTab } from '@/components/ui/character/summons';
@@ -65,29 +65,41 @@ import {
   InventoryItem,
 } from '@/types/character';
 
-function LevelUpButton({
+export function LevelUpButton({
   pendingLevelUp = false,
 }: {
   pendingLevelUp?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  // Each open gets a fresh wizard, even when the previous one is still
+  // fading out, so no earlier choices carry over.
+  const [wizardSession, setWizardSession] = useState(0);
+  useEffect(() => {
+    if (isOpen || !showWizard) return;
+    const timer = window.setTimeout(() => setShowWizard(false), 200);
+    return () => window.clearTimeout(timer);
+  }, [isOpen, showWizard]);
   return (
     <>
       <Button
-        variant="primary"
+        variant={pendingLevelUp ? 'primary' : 'secondary'}
         size="sm"
-        onClick={() => setIsOpen(true)}
-        className={
-          pendingLevelUp
-            ? 'ring-accent-emerald-border animate-pulse ring-2'
-            : undefined
-        }
+        onClick={() => {
+          setWizardSession(session => session + 1);
+          setShowWizard(true);
+          setIsOpen(true);
+        }}
       >
         <AppIcon name="levelUp" size={14} />
-        Level Up
+        Level up
       </Button>
-      {isOpen && (
-        <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      {showWizard && (
+        <LevelUpWizard
+          key={wizardSession}
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+        />
       )}
     </>
   );
@@ -99,6 +111,13 @@ export interface TabbedSheetConfigParams {
   totalLevel: number;
   proficiencyBonus: number;
   characterHasSpells: boolean;
+  /**
+   * Sheet mode (`SheetMode.tsx`): false = play mode, build values are plain
+   * text. Passed to the Combat tab's max HP, base AC and speed, and to the
+   * Stats tab's abilities (scores, save and skill proficiencies, Jack of All
+   * Trades, bonus abilities; rolls only in play mode).
+   */
+  editing: boolean;
 
   // Ability / skill / save handlers
   updateAbilityScore: (ability: AbilityName, score: number) => void;
@@ -161,6 +180,7 @@ export interface TabbedSheetConfigParams {
   resetDeathSavingThrows: () => void;
   toggleHPCalculationMode: () => void;
   recalculateMaxHP: () => void;
+  setCurrentHitPoints: (value: number) => void;
   updateHitPoints: (updates: Partial<CharacterState['hitPoints']>) => void;
 
   // Hit dice
@@ -203,11 +223,7 @@ export interface TabbedSheetConfigParams {
   deleteExtendedFeature: (id: string) => void;
   useExtendedFeature: (id: string) => void;
   resetExtendedFeatures: (restType: 'short' | 'long') => void;
-  reorderExtendedFeatures: (
-    sourceIndex: number,
-    destinationIndex: number,
-    sourceType?: string
-  ) => void;
+  reorderExtendedFeatures: (sourceId: string, targetId: string) => void;
   addSpellsFromFeat?: (spells: Spell[]) => void;
   toggleFavoriteFeature: (id: string) => void;
 
@@ -279,6 +295,22 @@ export function createTabbedSheetConfig(
     onSendItem,
   } = params;
 
+  const renderSlotTracker = (compact = false) => (
+    <SpellSlotTracker
+      spellSlots={character.spellSlots}
+      pactMagic={character.pactMagic}
+      onSpellSlotChange={params.changeSpellSlotBy}
+      onPactMagicChange={
+        character.pactMagic ? params.changePactMagicBy : undefined
+      }
+      onResetSpellSlots={params.resetSpellSlots}
+      onResetPactMagic={
+        character.pactMagic ? params.resetPactMagicSlots : undefined
+      }
+      compact={compact}
+    />
+  );
+
   const tabs: BookmarkTabItem[] = [
     // Tab 1: Actions
     {
@@ -286,13 +318,14 @@ export function createTabbedSheetConfig(
       label: 'Actions',
       icon: <AppIcon name="attack" className="h-4 w-4" />,
       badge: character.concentration?.isConcentrating ? (
-        <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+        <span className="border-lapis-border text-lapis-text rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
           Conc.
         </span>
       ) : undefined,
       content: (
         <div className="space-y-6">
           <ActionsSection
+            editing={params.editing}
             character={character}
             showAttackRoll={params.showAttackRoll}
             showSavingThrow={params.showSavingThrow}
@@ -304,50 +337,10 @@ export function createTabbedSheetConfig(
             onUseClassResource={params.useClassResource}
             onRestoreClassResource={params.restoreClassResource}
             onResetClassResource={params.resetClassResource}
+            spellSlotsPanel={
+              characterHasSpells ? renderSlotTracker(true) : undefined
+            }
           />
-          {characterHasSpells && (
-            <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
-              <button
-                type="button"
-                onClick={() =>
-                  params.updateCharacter({
-                    spellSlotsExpanded: !character.spellSlotsExpanded,
-                  })
-                }
-                className="bg-accent-purple-bg flex w-full items-center justify-between px-4 py-2.5 transition-all hover:opacity-90"
-              >
-                <div className="text-accent-purple-text flex items-center gap-2 font-semibold">
-                  <Zap size={16} />
-                  Spell Slots
-                </div>
-                {character.spellSlotsExpanded ? (
-                  <ChevronDown size={16} className="text-accent-purple-text" />
-                ) : (
-                  <ChevronRight size={16} className="text-accent-purple-text" />
-                )}
-              </button>
-              {character.spellSlotsExpanded && (
-                <div className="p-3">
-                  <SpellSlotTracker
-                    spellSlots={character.spellSlots}
-                    pactMagic={character.pactMagic}
-                    onSpellSlotChange={params.changeSpellSlotBy}
-                    onPactMagicChange={
-                      character.pactMagic ? params.changePactMagicBy : undefined
-                    }
-                    onResetSpellSlots={params.resetSpellSlots}
-                    onResetPactMagic={
-                      character.pactMagic
-                        ? params.resetPactMagicSlots
-                        : undefined
-                    }
-                    compact
-                    hideTitle
-                  />
-                </div>
-              )}
-            </div>
-          )}
         </div>
       ),
     },
@@ -362,6 +355,7 @@ export function createTabbedSheetConfig(
           {/* Header row: Basic Info + Quick Stats */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <CharacterBasicInfo
+              editing={params.editing}
               character={character}
               race={character.race}
               characterClass={character.class}
@@ -405,64 +399,50 @@ export function createTabbedSheetConfig(
             />
           </div>
 
-          {/* Core stats: Abilities + Saves + XP on left, Skills on right (sticky) */}
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-            <div className="space-y-6">
-              <AbilityScores
-                abilities={character.abilities}
-                characterLevel={totalLevel}
-                onUpdateAbilityScore={params.updateAbilityScore}
-                onRollAbilityCheck={params.rollAbilityCheck}
-              />
-              <SavingThrows
-                savingThrows={character.savingThrows}
-                getSavingThrowModifier={params.getSavingThrowModifier}
-                onUpdateSavingThrowProficiency={
-                  params.updateSavingThrowProficiency
-                }
-                onRollSavingThrow={params.rollSavingThrow}
-              />
-              {(() => {
-                const pendingLevelUp = shouldLevelUp(
-                  character.experience,
-                  totalLevel
-                );
-                return (
-                  <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                    <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
-                      <h2 className="text-heading text-lg font-bold">
-                        Experience Points
-                      </h2>
-                      {totalLevel < 20 && (
-                        <LevelUpButton pendingLevelUp={pendingLevelUp} />
-                      )}
-                    </div>
-                    <XPTracker
-                      currentXP={character.experience}
-                      currentLevel={totalLevel}
-                      onAddXP={params.addExperience}
-                      onSetXP={params.setExperience}
-                      pendingLevelUp={pendingLevelUp}
-                    />
-                  </div>
-                );
-              })()}
-            </div>
+          <AbilitiesSection
+            abilities={character.abilities}
+            savingThrows={character.savingThrows}
+            skills={character.skills}
+            jackOfAllTrades={character.jackOfAllTrades ?? false}
+            getSavingThrowModifier={params.getSavingThrowModifier}
+            getSkillModifier={params.getSkillModifier}
+            onUpdateAbilityScore={params.updateAbilityScore}
+            onRollAbilityCheck={params.rollAbilityCheck}
+            onUpdateSavingThrowProficiency={params.updateSavingThrowProficiency}
+            onRollSavingThrow={params.rollSavingThrow}
+            onUpdateSkillProficiency={params.updateSkillProficiency}
+            onUpdateSkillExpertise={params.updateSkillExpertise}
+            onToggleJackOfAllTrades={params.toggleJackOfAllTrades}
+            onRollSkillCheck={params.rollSkillCheck}
+            onToggleSkillBonusAbility={params.toggleSkillBonusAbility}
+            editing={params.editing}
+          />
 
-            <div className="lg:sticky lg:top-4">
-              <Skills
-                skills={character.skills}
-                jackOfAllTrades={character.jackOfAllTrades ?? false}
-                proficiencyBonus={proficiencyBonus}
-                getSkillModifier={params.getSkillModifier}
-                onUpdateSkillProficiency={params.updateSkillProficiency}
-                onUpdateSkillExpertise={params.updateSkillExpertise}
-                onToggleJackOfAllTrades={params.toggleJackOfAllTrades}
-                onRollSkillCheck={params.rollSkillCheck}
-                onToggleSkillBonusAbility={params.toggleSkillBonusAbility}
-              />
-            </div>
-          </div>
+          {(() => {
+            const pendingLevelUp = shouldLevelUp(
+              character.experience,
+              totalLevel
+            );
+            return (
+              <Section
+                heading="Experience points"
+                trailing={
+                  totalLevel < 20 ? (
+                    <LevelUpButton pendingLevelUp={pendingLevelUp} />
+                  ) : undefined
+                }
+              >
+                <XPTracker
+                  editing={params.editing}
+                  currentXP={character.experience}
+                  currentLevel={totalLevel}
+                  onAddXP={params.addExperience}
+                  onSetXP={params.setExperience}
+                  pendingLevelUp={pendingLevelUp}
+                />
+              </Section>
+            );
+          })()}
         </div>
       ),
     },
@@ -502,63 +482,12 @@ export function createTabbedSheetConfig(
         ) : undefined,
       content: (
         <div className="space-y-6">
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">
-                  Unable to load spellcasting statistics
-                </p>
-              </div>
-            }
-          >
-            <SpellcastingStats />
+          <ErrorBoundary fallback={<SheetLoadError thing="Spellcasting" />}>
+            <SpellcastingStats editing={params.editing} />
           </ErrorBoundary>
-          <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
-            <button
-              type="button"
-              onClick={() =>
-                params.updateCharacter({
-                  spellSlotsExpanded: !character.spellSlotsExpanded,
-                })
-              }
-              className="bg-accent-purple-bg flex w-full items-center justify-between px-4 py-2.5 transition-all hover:opacity-90"
-            >
-              <div className="text-accent-purple-text flex items-center gap-2 font-semibold">
-                <Zap size={16} />
-                Spell Slots
-              </div>
-              {character.spellSlotsExpanded ? (
-                <ChevronDown size={16} className="text-accent-purple-text" />
-              ) : (
-                <ChevronRight size={16} className="text-accent-purple-text" />
-              )}
-            </button>
-            {character.spellSlotsExpanded && (
-              <div className="p-3">
-                <SpellSlotTracker
-                  spellSlots={character.spellSlots}
-                  pactMagic={character.pactMagic}
-                  onSpellSlotChange={params.changeSpellSlotBy}
-                  onPactMagicChange={
-                    character.pactMagic ? params.changePactMagicBy : undefined
-                  }
-                  onResetSpellSlots={params.resetSpellSlots}
-                  onResetPactMagic={
-                    character.pactMagic ? params.resetPactMagicSlots : undefined
-                  }
-                  hideTitle
-                />
-              </div>
-            )}
-          </div>
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">Unable to load spell management</p>
-              </div>
-            }
-          >
-            <SpellManagement />
+          {renderSlotTracker()}
+          <ErrorBoundary fallback={<SheetLoadError thing="Spells" />}>
+            <SpellManagement editing={params.editing} />
           </ErrorBoundary>
         </div>
       ),
@@ -581,14 +510,13 @@ export function createTabbedSheetConfig(
       icon: <AppIcon name="features" className="h-4 w-4" />,
       badge:
         (character.extendedFeatures?.length || 0) > 0 ? (
-          <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="text-muted text-xs font-medium">
             {character.extendedFeatures?.length}
           </span>
         ) : undefined,
       content: (
         <FeaturesTabContent
           character={character}
-          totalLevel={totalLevel}
           proficiencyBonus={proficiencyBonus}
           params={params}
           customCounter={params.customCounter}
@@ -600,7 +528,7 @@ export function createTabbedSheetConfig(
     {
       id: 'character',
       label: 'Character',
-      icon: <AppIcon name="features" className="h-4 w-4" />,
+      icon: <AppIcon name="character" className="h-4 w-4" />,
       content: <CharacterTabContent character={character} params={params} />,
     },
 
@@ -610,13 +538,7 @@ export function createTabbedSheetConfig(
       label: 'Calendar',
       icon: <AppIcon name="calendar" className="h-4 w-4" />,
       content: (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load calendar</p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Calendar" />}>
           <PlayerCalendarView
             characterId={character.id}
             campaignCode={params.campaignCode}
@@ -634,13 +556,7 @@ export function createTabbedSheetConfig(
       label: 'Map',
       icon: <AppIcon name="map" className="h-4 w-4" />,
       content: (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load map</p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Map" />}>
           <PlayerLocationView
             characterId={character.id}
             campaignCode={params.campaignCode}
@@ -661,7 +577,7 @@ const INVENTORY_SUB_TABS = [
   },
   {
     id: 'magic-items',
-    label: 'Magic Items',
+    label: 'Magic items',
     icon: <AppIcon name="magicItem" className="h-4 w-4" />,
   },
   {
@@ -685,8 +601,10 @@ type InventorySubTab = (typeof INVENTORY_SUB_TABS)[number]['id'];
 
 // Global setter so external code (e.g. item transfer notification) can switch to items sub-tab
 let inventorySubTabSetter: ((tab: InventorySubTab) => void) | null = null;
+let pendingInventorySubTab: InventorySubTab | null = null;
 export function setInventorySubTab(tab: InventorySubTab) {
-  inventorySubTabSetter?.(tab);
+  if (inventorySubTabSetter) inventorySubTabSetter(tab);
+  else pendingInventorySubTab = tab;
 }
 
 function InventoryTabContent({
@@ -700,117 +618,84 @@ function InventoryTabContent({
 
   useEffect(() => {
     inventorySubTabSetter = setActiveSubTab;
+    if (pendingInventorySubTab) {
+      setActiveSubTab(pendingInventorySubTab);
+      pendingInventorySubTab = null;
+    }
     return () => {
-      inventorySubTabSetter = null;
+      if (inventorySubTabSetter === setActiveSubTab)
+        inventorySubTabSetter = null;
     };
   }, []);
 
   return (
-    <div className="space-y-4">
-      <div className="bg-surface-secondary inline-flex flex-wrap rounded-lg p-1">
-        {INVENTORY_SUB_TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveSubTab(tab.id)}
-            className={`rounded-md px-3 py-2 text-sm font-medium transition-all ${
-              activeSubTab === tab.id
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            <span className="mr-1.5">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeSubTab === 'weapons' && (
-        <ErrorBoundary
-          fallback={
-            <div className="text-muted p-6 text-center">
-              Unable to load weapons
-            </div>
-          }
-        >
-          <WeaponsTab />
-        </ErrorBoundary>
-      )}
-
-      {activeSubTab === 'magic-items' && (
-        <ErrorBoundary
-          fallback={
-            <div className="text-muted p-6 text-center">
-              Unable to load magic items
-            </div>
-          }
-        >
-          <MagicItemsTab />
-        </ErrorBoundary>
-      )}
-
-      {activeSubTab === 'armor' && (
-        <ErrorBoundary
-          fallback={
-            <div className="text-muted p-6 text-center">
-              Unable to load armor
-            </div>
-          }
-        >
-          <ArmorTab />
-        </ErrorBoundary>
-      )}
-
-      {activeSubTab === 'items' && (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load inventory management</p>
-            </div>
-          }
-        >
-          <InventoryManager onSendItem={onSendItem} />
-        </ErrorBoundary>
-      )}
-
-      {activeSubTab === 'currency' && (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load currency management</p>
-            </div>
-          }
-        >
-          <CurrencyManager />
-        </ErrorBoundary>
-      )}
-    </div>
+    <SubTabs
+      label="Inventory"
+      value={activeSubTab}
+      onValueChange={value => setActiveSubTab(value as InventorySubTab)}
+      tabs={INVENTORY_SUB_TABS.map(tab => ({
+        value: tab.id,
+        id: `inventory-${tab.id}`,
+        label: tab.label,
+        content: {
+          weapons: (
+            <ErrorBoundary fallback={<SheetLoadError thing="Weapons" />}>
+              <WeaponsTab />
+            </ErrorBoundary>
+          ),
+          'magic-items': (
+            <ErrorBoundary fallback={<SheetLoadError thing="Magic items" />}>
+              <MagicItemsTab />
+            </ErrorBoundary>
+          ),
+          armor: (
+            <ErrorBoundary fallback={<SheetLoadError thing="Armor" />}>
+              <ArmorTab />
+            </ErrorBoundary>
+          ),
+          items: (
+            <ErrorBoundary fallback={<SheetLoadError thing="Items" />}>
+              <InventoryManager onSendItem={onSendItem} />
+            </ErrorBoundary>
+          ),
+          currency: (
+            <ErrorBoundary fallback={<SheetLoadError thing="Currency" />}>
+              <CurrencyManager />
+            </ErrorBoundary>
+          ),
+        }[tab.id],
+      }))}
+    />
   );
 }
 
 const CHARACTER_SUB_TABS = [
   {
     id: 'notes',
-    label: 'Session Notes',
-    icon: <AppIcon name="features" className="h-4 w-4" />,
+    label: 'Session notes',
+    icon: <AppIcon name="notes" className="h-4 w-4" />,
   },
   {
     id: 'details',
-    label: 'Features & Background',
-    icon: <AppIcon name="character" className="h-4 w-4" />,
+    label: 'Features and background',
+    icon: <AppIcon name="features" className="h-4 w-4" />,
   },
   {
     id: 'dice',
     label: 'Dice',
     icon: <AppIcon name="dice" className="h-4 w-4" />,
   },
+  { id: 'appearance', label: 'Appearance' },
 ] as const;
 
 type CharacterSubTab = (typeof CHARACTER_SUB_TABS)[number]['id'];
 
 // Global setter so external code (e.g. DM message accept) can switch to the notes sub-tab
 let characterSubTabSetter: ((tab: CharacterSubTab) => void) | null = null;
+let pendingCharacterSubTab: CharacterSubTab | null = null;
 export function setCharacterSubTab(tab: CharacterSubTab) {
-  characterSubTabSetter?.(tab);
+  if (characterSubTabSetter) characterSubTabSetter(tab);
+  else pendingCharacterSubTab = tab;
 }
 
 function CharacterTabContent({
@@ -825,125 +710,102 @@ function CharacterTabContent({
   // Register the setter so external code can switch sub-tabs
   React.useEffect(() => {
     characterSubTabSetter = setActiveSubTab;
+    if (pendingCharacterSubTab) {
+      setActiveSubTab(pendingCharacterSubTab);
+      pendingCharacterSubTab = null;
+    }
     return () => {
-      characterSubTabSetter = null;
+      if (characterSubTabSetter === setActiveSubTab)
+        characterSubTabSetter = null;
     };
   }, []);
 
   return (
-    <div className="space-y-4">
-      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
-        {CHARACTER_SUB_TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveSubTab(tab.id)}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition-all ${
-              activeSubTab === tab.id
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            <span className="mr-1.5">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <SubTabs
+      label="Character"
+      value={activeSubTab}
+      onValueChange={value => setActiveSubTab(value as CharacterSubTab)}
+      tabs={CHARACTER_SUB_TABS.map(tab => ({
+        value: tab.id,
+        id: `character-${tab.id}`,
+        label: tab.label,
+        content: {
+          notes: (
+            <div className="space-y-6">
+              {(() => {
+                const days = params.calendarDays ?? character.daysSpent ?? 0;
+                return (
+                  <span className="type-caption text-muted inline-flex items-center gap-1.5">
+                    <AppIcon name="calendar" className="h-4 w-4" />
+                    Campaign day {days + 1}
+                  </span>
+                );
+              })()}
 
-      {activeSubTab === 'notes' && (
-        <div className="space-y-6">
-          {(() => {
-            const days = params.calendarDays ?? character.daysSpent ?? 0;
-            return (
-              <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 text-sm font-medium shadow-sm">
-                <AppIcon name="calendar" className="h-4 w-4" />
-                Campaign Day {days + 1}
-              </span>
-            );
-          })()}
-
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load notes editor</p>
-              </div>
-            }
-          >
-            <NotesManager
-              items={character.notes}
-              onAdd={params.addNote}
-              onUpdate={params.updateNote}
-              onDelete={params.deleteNote}
-              onReorder={params.reorderNotes}
-              onAddToast={params.addToast}
-            />
-          </ErrorBoundary>
-        </div>
-      )}
-
-      {activeSubTab === 'details' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ErrorBoundary
-              fallback={
-                <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">Unable to load features editor</p>
+              <ErrorBoundary
+                fallback={<SheetLoadError thing="Session notes" />}
+              >
+                <NotesManager
+                  items={character.notes}
+                  onAdd={params.addNote}
+                  onUpdate={params.updateNote}
+                  onDelete={params.deleteNote}
+                  onReorder={params.reorderNotes}
+                  onAddToast={params.addToast}
+                />
+              </ErrorBoundary>
+            </div>
+          ),
+          details: (
+            <div className="space-y-6">
+              <Section heading="Features and traits">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  <ErrorBoundary fallback={<SheetLoadError thing="Features" />}>
+                    <FeaturesTraitsManager
+                      items={character.features}
+                      category="feature"
+                      onAdd={params.addFeature}
+                      onUpdate={params.updateFeature}
+                      onDelete={params.deleteFeature}
+                    />
+                  </ErrorBoundary>
+                  <ErrorBoundary fallback={<SheetLoadError thing="Traits" />}>
+                    <FeaturesTraitsManager
+                      items={character.traits}
+                      category="trait"
+                      onAdd={params.addTrait}
+                      onUpdate={params.updateTrait}
+                      onDelete={params.deleteTrait}
+                    />
+                  </ErrorBoundary>
                 </div>
-              }
-            >
-              <FeaturesTraitsManager
-                items={character.features}
-                category="feature"
-                onAdd={params.addFeature}
-                onUpdate={params.updateFeature}
-                onDelete={params.deleteFeature}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary
-              fallback={
-                <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">Unable to load traits editor</p>
-                </div>
-              }
-            >
-              <FeaturesTraitsManager
-                items={character.traits}
-                category="trait"
-                onAdd={params.addTrait}
-                onUpdate={params.updateTrait}
-                onDelete={params.deleteTrait}
-              />
-            </ErrorBoundary>
-          </div>
+              </Section>
 
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load background editor</p>
-              </div>
-            }
-          >
-            <CharacterBackgroundEditor
-              background={character.characterBackground}
-              onChange={params.updateCharacterBackground}
+              <ErrorBoundary fallback={<SheetLoadError thing="Background" />}>
+                <CharacterBackgroundEditor
+                  background={character.characterBackground}
+                  onChange={params.updateCharacterBackground}
+                />
+              </ErrorBoundary>
+            </div>
+          ),
+          appearance: (
+            <CharacterAppearance
+              value={character.themePreference}
+              onChange={themePreference =>
+                params.updateCharacter({ themePreference })
+              }
             />
-          </ErrorBoundary>
-        </div>
-      )}
-
-      {activeSubTab === 'dice' && (
-        <DiceSetEditor
-          value={parseDiceSet(character.diceSet) ?? DEFAULT_DICE_SET}
-          onChange={diceSet => params.updateCharacter({ diceSet })}
-          onPreview={
-            params.animateRoll
-              ? () => {
-                  void params.animateRoll?.('1d20+1d8+1d6');
-                }
-              : undefined
-          }
-        />
-      )}
-    </div>
+          ),
+          dice: (
+            <DiceSetEditor
+              value={parseDiceSet(character.diceSet) ?? DEFAULT_DICE_SET}
+              onChange={diceSet => params.updateCharacter({ diceSet })}
+            />
+          ),
+        }[tab.id],
+      }))}
+    />
   );
 }
 
@@ -955,7 +817,7 @@ const COMBAT_SUB_TABS = [
   },
   {
     id: 'defenses',
-    label: 'Defenses & Buffs',
+    label: 'Defenses and buffs',
     icon: <AppIcon name="armor" className="h-4 w-4" />,
   },
   {
@@ -966,6 +828,27 @@ const COMBAT_SUB_TABS = [
 ] as const;
 
 type CombatSubTab = (typeof COMBAT_SUB_TABS)[number]['id'];
+type CombatNavigationRequest = {
+  tab: CombatSubTab;
+  scrollToConditions?: boolean;
+};
+let combatSubTabSetter: ((request: CombatNavigationRequest) => void) | null =
+  null;
+let pendingCombatSubTab: CombatNavigationRequest | null = null;
+const USER_TAKEOVER_EVENTS = [
+  'wheel',
+  'touchstart',
+  'pointerdown',
+  'keydown',
+] as const;
+export function setCombatSubTab(
+  tab: CombatSubTab,
+  options?: { scrollToConditions?: boolean }
+) {
+  const request = { tab, scrollToConditions: options?.scrollToConditions };
+  if (combatSubTabSetter) combatSubTabSetter(request);
+  else pendingCombatSubTab = request;
+}
 
 function CombatTabContent({
   character,
@@ -978,175 +861,181 @@ function CombatTabContent({
   totalLevel: number;
   params: TabbedSheetConfigParams;
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<CombatSubTab>('player');
-  const summonCount = character.summons?.length || 0;
+  const [request, setRequest] = useState<CombatNavigationRequest>({
+    tab: 'player',
+  });
+  const activeSubTab = request.tab;
+  const [conditionsTarget, setConditionsTarget] =
+    useState<HTMLDivElement | null>(null);
+  const handledRequest = React.useRef<CombatNavigationRequest | null>(null);
+  useEffect(() => {
+    combatSubTabSetter = setRequest;
+    if (pendingCombatSubTab) {
+      setRequest(pendingCombatSubTab);
+      pendingCombatSubTab = null;
+    }
+    return () => {
+      if (combatSubTabSetter === setRequest) combatSubTabSetter = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (
+      request.tab !== 'player' ||
+      !request.scrollToConditions ||
+      handledRequest.current === request ||
+      !conditionsTarget
+    )
+      return;
+    handledRequest.current = request;
+    const align = () =>
+      conditionsTarget.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : 'smooth',
+        block: 'start',
+      });
+    align();
+    if (typeof ResizeObserver === 'undefined') return;
+    // The conditions load after the section mounts; re-aim as it grows until
+    // the player scrolls, taps or types.
+    let height = conditionsTarget.getBoundingClientRect().height;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.height === height) return;
+      height = entry.contentRect.height;
+      align();
+    });
+    observer.observe(conditionsTarget);
+    const stop = () => {
+      observer.disconnect();
+      for (const type of USER_TAKEOVER_EVENTS)
+        window.removeEventListener(type, stop, true);
+    };
+    for (const type of USER_TAKEOVER_EVENTS)
+      window.addEventListener(type, stop, { capture: true, passive: true });
+    return stop;
+  }, [request, conditionsTarget]);
 
   return (
-    <div className="space-y-4">
-      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
-        {COMBAT_SUB_TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveSubTab(tab.id)}
-            className={`rounded-md px-3 py-2 text-sm font-medium transition-all ${
-              activeSubTab === tab.id
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            <span className="mr-1.5">{tab.icon}</span>
-            {tab.label}
-            {tab.id === 'summons' && summonCount > 0 && (
-              <span className="bg-accent-emerald-bg text-accent-emerald-text ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                {summonCount}
+    <SubTabs
+      label="Combat"
+      value={activeSubTab}
+      onValueChange={value => setRequest({ tab: value as CombatSubTab })}
+      tabs={COMBAT_SUB_TABS.map(tab => ({
+        value: tab.id,
+        id: `combat-${tab.id}`,
+        label:
+          tab.id === 'summons' && (character.summons?.length || 0) > 0 ? (
+            <>
+              {tab.label}
+              <span className="type-caption text-muted ml-1.5">
+                {character.summons?.length}
               </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {activeSubTab === 'player' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="space-y-6">
-              <ArmorClassManager
-                character={character}
-                onUpdateArmorClass={ac =>
-                  params.updateCharacter({ armorClass: ac })
-                }
-                onUpdateTempArmorClass={params.updateTempArmorClass}
-                onSetTempACActive={params.setTempACActive}
-                onSetShieldEquipped={params.setShieldEquipped}
-                onUpdateShieldBonus={params.updateShieldBonus}
-              />
-              <CombatStats
-                character={character}
-                getInitiativeModifier={params.getInitiativeModifier}
-                onUpdateInitiative={params.updateInitiative}
-                onResetInitiativeToDefault={params.resetInitiativeToDefault}
-                onUpdateSpeed={speed => params.updateCharacter({ speed })}
-                onUpdateCharacter={params.updateCharacter}
-                onToggleReaction={params.toggleReaction}
-                onResetReaction={params.resetReaction}
-                onRollInitiative={params.rollInitiative}
-              />
-            </div>
-            <div className="space-y-6">
-              <ErrorBoundary
-                fallback={
-                  <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                    <p className="text-muted">Unable to load HP manager</p>
-                  </div>
-                }
-              >
-                <HitPointManager
-                  hitPoints={character.hitPoints}
-                  classInfo={character.class}
-                  level={totalLevel}
-                  constitutionScore={character.abilities.constitution}
-                  onApplyDamage={params.applyDamageToCharacter}
-                  onApplyHealing={params.applyHealingToCharacter}
-                  onAddTemporaryHP={params.addTemporaryHPToCharacter}
-                  onMakeDeathSave={params.makeDeathSavingThrow}
-                  onResetDeathSaves={params.resetDeathSavingThrows}
-                  onToggleCalculationMode={params.toggleHPCalculationMode}
-                  onRecalculateMaxHP={params.recalculateMaxHP}
-                  onUpdateHitPoints={params.updateHitPoints}
+            </>
+          ) : (
+            tab.label
+          ),
+        content: {
+          player: (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-2">
+                <ErrorBoundary fallback={<SheetLoadError thing="Hit points" />}>
+                  <HitPointManager
+                    editing={params.editing}
+                    hitPoints={character.hitPoints}
+                    classInfo={character.class}
+                    level={totalLevel}
+                    constitutionScore={character.abilities.constitution}
+                    onApplyDamage={params.applyDamageToCharacter}
+                    onApplyHealing={params.applyHealingToCharacter}
+                    onAddTemporaryHP={params.addTemporaryHPToCharacter}
+                    onMakeDeathSave={params.makeDeathSavingThrow}
+                    onResetDeathSaves={params.resetDeathSavingThrows}
+                    onToggleCalculationMode={params.toggleHPCalculationMode}
+                    onRecalculateMaxHP={params.recalculateMaxHP}
+                    onSetCurrentHitPoints={params.setCurrentHitPoints}
+                    onUpdateHitPoints={params.updateHitPoints}
+                  />
+                </ErrorBoundary>
+                <ArmorClassManager
+                  layout="ledger"
+                  editing={params.editing}
+                  character={character}
+                  onUpdateArmorClass={ac =>
+                    params.updateCharacter({ armorClass: ac })
+                  }
+                  onUpdateTempArmorClass={params.updateTempArmorClass}
+                  onSetTempACActive={params.setTempACActive}
+                  onSetShieldEquipped={params.setShieldEquipped}
+                  onUpdateShieldBonus={params.updateShieldBonus}
                 />
-              </ErrorBoundary>
-              <ErrorBoundary
-                fallback={
-                  <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                    <p className="text-muted">
-                      Unable to load hit dice tracker
-                    </p>
-                  </div>
-                }
-              >
-                <HitDiceTracker
-                  hitDicePools={character.hitDicePools || {}}
-                  onUseHitDie={params.useHitDie}
-                  onRestoreHitDice={params.restoreHitDice}
-                  onResetAllHitDice={params.resetAllHitDice}
-                />
-              </ErrorBoundary>
-            </div>
-          </div>
-
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">
-                  Unable to load weapon proficiencies
-                </p>
+                <ErrorBoundary fallback={<SheetLoadError thing="Hit dice" />}>
+                  <HitDiceTracker
+                    hitDicePools={character.hitDicePools || {}}
+                    onUseHitDie={params.useHitDie}
+                    onRestoreHitDice={params.restoreHitDice}
+                    onResetAllHitDice={params.resetAllHitDice}
+                  />
+                </ErrorBoundary>
+                <Section heading="Initiative and speed" level={3}>
+                  <CombatStats
+                    editing={params.editing}
+                    character={character}
+                    getInitiativeModifier={params.getInitiativeModifier}
+                    onUpdateInitiative={params.updateInitiative}
+                    onResetInitiativeToDefault={params.resetInitiativeToDefault}
+                    onUpdateSpeed={speed => params.updateCharacter({ speed })}
+                    onUpdateCharacter={params.updateCharacter}
+                    onToggleReaction={params.toggleReaction}
+                    onResetReaction={params.resetReaction}
+                    onRollInitiative={params.rollInitiative}
+                  />
+                </Section>
               </div>
-            }
-          >
-            <WeaponProficiencies />
-          </ErrorBoundary>
 
-          <div id="conditions-section">
-            <ErrorBoundary
-              fallback={
-                <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">
-                    Unable to load conditions and diseases manager
-                  </p>
-                </div>
-              }
-            >
-              {hasHydrated ? (
-                <ConditionsDiseasesManager />
-              ) : (
-                <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <div className="py-4 text-center">
-                    <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
-                    <p className="text-body mt-2">
-                      Loading conditions and diseases...
-                    </p>
-                  </div>
-                </div>
-              )}
+              <div
+                id="conditions-section"
+                ref={setConditionsTarget}
+                className="scroll-mt-[calc(var(--app-header-height,4rem)+1rem)]"
+              >
+                <ErrorBoundary
+                  fallback={<SheetLoadError thing="Conditions and effects" />}
+                >
+                  {hasHydrated ? (
+                    <ConditionsDiseasesManager />
+                  ) : (
+                    <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
+                      <div className="py-4 text-center">
+                        <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
+                        <p className="text-body mt-2">
+                          Loading conditions and diseases…
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </ErrorBoundary>
+              </div>
+            </div>
+          ),
+          defenses: (
+            <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+              <ErrorBoundary fallback={<SheetLoadError thing="Buffs" />}>
+                <TemporaryBuffsManager />
+              </ErrorBoundary>
+              <ErrorBoundary
+                fallback={<SheetLoadError thing="Defenses and senses" />}
+              >
+                <DefensesAndSenses editing={params.editing} />
+              </ErrorBoundary>
+            </div>
+          ),
+          summons: (
+            <ErrorBoundary fallback={<SheetLoadError thing="Summons" />}>
+              <SummonsSubTab />
             </ErrorBoundary>
-          </div>
-        </div>
-      )}
-
-      {activeSubTab === 'defenses' && (
-        <div className="space-y-6">
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">Unable to load temporary buffs</p>
-              </div>
-            }
-          >
-            <TemporaryBuffsManager />
-          </ErrorBoundary>
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load defenses and senses</p>
-              </div>
-            }
-          >
-            <DefensesAndSenses />
-          </ErrorBoundary>
-        </div>
-      )}
-
-      {activeSubTab === 'summons' && (
-        <ErrorBoundary
-          fallback={
-            <div className="border-divider bg-surface-raised rounded-lg border p-6">
-              <p className="text-muted">Unable to load summons</p>
-            </div>
-          }
-        >
-          <SummonsSubTab />
-        </ErrorBoundary>
-      )}
-    </div>
+          ),
+        }[tab.id],
+      }))}
+    />
   );
 }
 
@@ -1158,42 +1047,13 @@ function DmCustomCounterDisplay({
   value: number;
 }) {
   return (
-    <div className="from-accent-purple-bg to-accent-purple-bg-strong border-accent-purple-border-strong rounded-lg border-2 bg-linear-to-br p-4">
-      {/* Header */}
-      <div className="mb-3 flex items-center gap-2">
-        <Angry className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-        <h3 className="text-accent-purple-text text-lg font-bold">{label}</h3>
-      </div>
-
-      {/* Count */}
-      <div className="mb-4 text-center">
-        <div className="text-accent-purple-text text-3xl font-bold">
-          {value}
-        </div>
-        <div className="text-accent-purple-text-muted text-sm">
-          {value === 1 ? '1 point' : `${value} points`}
-        </div>
-      </div>
-
-      {/* Visual boxes — one per point, no empty placeholders */}
-      <div className="mb-4 flex flex-wrap justify-center gap-2">
-        {Array.from({ length: value }, (_, i) => (
-          <div
-            key={i}
-            className="border-accent-purple-border-strong bg-accent-purple-bg-strong text-accent-purple-text flex h-10 w-10 scale-110 transform items-center justify-center rounded-lg border-2 shadow-lg"
-          >
-            <Angry size={16} />
-          </div>
-        ))}
-      </div>
-
-      {/* Helper text */}
-      <div className="bg-accent-purple-bg-strong text-accent-purple-text-muted rounded p-2 text-center text-xs">
-        <p>
-          <strong>{label}</strong> are assigned by your DM.
-        </p>
-      </div>
-    </div>
+    <Section heading={label}>
+      <div className="type-num-lg text-heading">{value}</div>
+      <p className="text-muted text-sm">
+        {value === 1 ? '1 point' : `${value} points`}
+      </p>
+      <p className="text-muted mt-2 text-sm">Set by your DM.</p>
+    </Section>
   );
 }
 
@@ -1219,13 +1079,11 @@ type FeaturesSubTab = (typeof FEATURES_SUB_TABS)[number]['id'];
 
 function FeaturesTabContent({
   character,
-  totalLevel,
   proficiencyBonus,
   params,
   customCounter,
 }: {
   character: CharacterState;
-  totalLevel: number;
   proficiencyBonus: number;
   params: TabbedSheetConfigParams;
   customCounter?: { label: string; value: number } | null;
@@ -1233,97 +1091,86 @@ function FeaturesTabContent({
   const [activeSubTab, setActiveSubTab] = useState<FeaturesSubTab>('abilities');
 
   return (
-    <div className="space-y-4">
-      {/* Segmented control */}
-      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
-        {FEATURES_SUB_TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveSubTab(tab.id)}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition-all ${
-              activeSubTab === tab.id
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            <span className="mr-1.5">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Sub-tab content */}
-      {activeSubTab === 'abilities' && (
-        <div className="space-y-6">
-          <TraitTracker<ExtendedFeature>
-            traits={(character.extendedFeatures || []).filter(
-              t => !t.isPassive
-            )}
-            characterLevel={totalLevel}
-            onUpdateTrait={params.updateExtendedFeature}
-            onDeleteTrait={params.deleteExtendedFeature}
-            onUseTrait={params.useExtendedFeature}
-            onResetTraits={params.resetExtendedFeatures}
-            readonly={false}
-            hideControls={true}
-            enableViewModal={true}
-          />
-          <ExtendedFeaturesSection
-            features={character.extendedFeatures || []}
-            character={character}
-            onAddFeature={params.addExtendedFeature}
-            onUpdateFeature={params.updateExtendedFeature}
-            onDeleteFeature={params.deleteExtendedFeature}
-            onUseFeature={params.useExtendedFeature}
-            onResetFeatures={params.resetExtendedFeatures}
-            onReorderFeatures={params.reorderExtendedFeatures}
-            onAddSpells={params.addSpellsFromFeat}
-            favoriteFeatureIds={character.favoriteFeatureIds || []}
-            onToggleFavoriteFeature={params.toggleFavoriteFeature}
-          />
-        </div>
-      )}
-
-      {activeSubTab === 'inspiration' && (
-        <div className="space-y-6">
-          <HeroicInspirationTracker
-            inspiration={character.heroicInspiration}
-            onAddInspiration={params.addHeroicInspiration}
-            onUpdateInspiration={params.updateHeroicInspiration}
-            onUseInspiration={params.useHeroicInspiration}
-            onResetInspiration={params.resetHeroicInspiration}
-            stackable={params.stackableInspiration ?? false}
-            showStackableControl={
-              !params.inCampaign && Boolean(params.setStackableInspiration)
-            }
-            dmControlled={Boolean(params.inCampaign)}
-            onToggleStackable={params.setStackableInspiration}
-          />
-          {customCounter && customCounter.value > 0 && (
-            <DmCustomCounterDisplay
-              label={customCounter.label}
-              value={customCounter.value}
-            />
-          )}
-        </div>
-      )}
-
-      {activeSubTab === 'proficiencies' && (
-        <div className="space-y-6">
-          <ToolProficienciesSection
-            toolProficiencies={character.toolProficiencies || []}
-            proficiencyBonus={proficiencyBonus}
-            onAddToolProficiency={params.addToolProficiency}
-            onUpdateToolProficiency={params.updateToolProficiency}
-            onDeleteToolProficiency={params.deleteToolProficiency}
-          />
-          <Languages
-            languages={character.languages || []}
-            onAddLanguage={params.addLanguage}
-            onDeleteLanguage={params.deleteLanguage}
-          />
-        </div>
-      )}
-    </div>
+    <SubTabs
+      label="Features"
+      value={activeSubTab}
+      onValueChange={value => setActiveSubTab(value as FeaturesSubTab)}
+      tabs={FEATURES_SUB_TABS.map(tab => ({
+        value: tab.id,
+        id: `features-${tab.id}`,
+        label: tab.label,
+        content: {
+          abilities: (
+            <div className="space-y-6">
+              <ExtendedFeaturesSection
+                features={character.extendedFeatures || []}
+                character={character}
+                onAddFeature={params.addExtendedFeature}
+                onUpdateFeature={params.updateExtendedFeature}
+                onDeleteFeature={params.deleteExtendedFeature}
+                onUseFeature={params.useExtendedFeature}
+                onResetFeatures={params.resetExtendedFeatures}
+                onReorderFeatures={params.reorderExtendedFeatures}
+                onAddSpells={params.addSpellsFromFeat}
+                favoriteFeatureIds={character.favoriteFeatureIds || []}
+                onToggleFavoriteFeature={params.toggleFavoriteFeature}
+                editing={params.editing}
+              />
+            </div>
+          ),
+          inspiration: (
+            <div
+              className={`grid grid-cols-1 gap-6 ${customCounter && customCounter.value > 0 ? 'md:grid-cols-2' : ''}`}
+            >
+              <HeroicInspirationTracker
+                inspiration={character.heroicInspiration}
+                onAddInspiration={params.addHeroicInspiration}
+                onUpdateInspiration={params.updateHeroicInspiration}
+                onUseInspiration={params.useHeroicInspiration}
+                onResetInspiration={params.resetHeroicInspiration}
+                stackable={params.stackableInspiration ?? false}
+                showStackableControl={
+                  !params.inCampaign && Boolean(params.setStackableInspiration)
+                }
+                dmControlled={Boolean(params.inCampaign)}
+                onToggleStackable={params.setStackableInspiration}
+                editing={params.editing}
+              />
+              {customCounter && customCounter.value > 0 && (
+                <DmCustomCounterDisplay
+                  label={customCounter.label}
+                  value={customCounter.value}
+                />
+              )}
+            </div>
+          ),
+          proficiencies: (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <ToolProficienciesSection
+                  toolProficiencies={character.toolProficiencies || []}
+                  proficiencyBonus={proficiencyBonus}
+                  onAddToolProficiency={params.addToolProficiency}
+                  onUpdateToolProficiency={params.updateToolProficiency}
+                  onDeleteToolProficiency={params.deleteToolProficiency}
+                  editing={params.editing}
+                />
+                <Languages
+                  languages={character.languages || []}
+                  onAddLanguage={params.addLanguage}
+                  onDeleteLanguage={params.deleteLanguage}
+                  editing={params.editing}
+                />
+              </div>
+              <ErrorBoundary
+                fallback={<SheetLoadError thing="Weapon proficiencies" />}
+              >
+                <WeaponProficiencies editing={params.editing} />
+              </ErrorBoundary>
+            </div>
+          ),
+        }[tab.id],
+      }))}
+    />
   );
 }

@@ -1,8 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { Input } from '@/components/ui/forms/input';
+import { Badge } from '@/components/ui/layout/badge';
+import { stripTags } from '@/utils/parseEntriesToHtml';
 import type { ProcessedMonster } from '@/types/bestiary';
 
 interface MonsterSearchProps {
@@ -13,8 +16,12 @@ interface MonsterSearchProps {
   hasMore: boolean;
   loading: boolean;
   loadingMore: boolean;
+  loadMoreError: boolean;
+  error: boolean;
+  onRetry: () => void;
   onSelect: (m: ProcessedMonster) => void;
   onLoadMore: () => void;
+  onRetryLoadMore: () => void;
 }
 
 export function MonsterSearch({
@@ -25,70 +32,103 @@ export function MonsterSearch({
   hasMore,
   loading,
   loadingMore,
+  loadMoreError,
+  error,
+  onRetry,
   onSelect,
   onLoadMore,
+  onRetryLoadMore,
 }: MonsterSearchProps) {
+  const searchRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="space-y-3 pb-4">
-      <div className="relative">
-        <Search
-          size={14}
-          className="text-muted absolute top-1/2 left-[14px] -translate-y-1/2"
-        />
-        <input
-          value={query}
-          onChange={e => onQueryChange(e.target.value)}
-          placeholder="Search the bestiary…"
-          className="border-divider bg-surface-raised focus:border-accent-amber-border w-full rounded-[11px] border-[1.5px] py-3 pr-3 pl-9 text-sm focus:outline-none"
-        />
-      </div>
+      <Input
+        ref={searchRef}
+        value={query}
+        onChange={event => onQueryChange(event.target.value)}
+        placeholder="Goblin"
+        aria-label="Search the bestiary"
+        leftIcon={<Search size={16} />}
+        size="sm"
+      />
 
       {loading && (
-        <p className="text-muted py-8 text-center text-sm">Searching…</p>
-      )}
-      {!loading && results.length === 0 && query.length >= 2 && (
-        <p className="text-muted py-8 text-center text-sm">
-          No creatures match &ldquo;{query}&rdquo;.
+        <p role="status" className="text-muted py-8 text-center text-sm">
+          Searching…
         </p>
       )}
+      {!loading && error && (
+        <div role="alert" className="py-6 text-center">
+          <p className="text-body text-sm">Bestiary didn&apos;t load.</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              onRetry();
+              searchRef.current?.focus();
+            }}
+            className="mt-2"
+          >
+            Retry search
+          </Button>
+        </div>
+      )}
+      {!loading &&
+        !error &&
+        results.length === 0 &&
+        query.trim().length >= 2 && (
+          <p role="status" className="text-muted py-8 text-center text-sm">
+            No creatures match &ldquo;{query}&rdquo;.
+          </p>
+        )}
 
-      <div className="space-y-2">
+      <div className="border-divider border-t">
         {results.map(m => {
           const mType = typeof m.type === 'string' ? m.type : m.type.type;
           return (
             <button
               key={m.id}
               onClick={() => onSelect(m)}
-              className="border-divider bg-surface-raised hover:border-accent-purple-border hover:bg-accent-purple-bg w-full rounded-[13px] border-[1.5px] px-[14px] py-3 text-left transition-all"
+              className="hover:bg-surface-hover border-divider w-full border-b py-3 text-left pointer-coarse:min-h-11"
             >
               <div className="flex items-center justify-between">
                 <span className="text-heading text-[14.5px] font-bold">
-                  {m.name}
+                  {stripTags(m.name)}
                 </span>
-                <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap">
-                  CR {m.cr}
-                </span>
+                <Badge variant="neutral" size="sm">
+                  CR {stripTags(m.cr)}
+                </Badge>
               </div>
               <div className="text-muted mt-0.5 text-xs font-medium">
-                {m.hp} HP · AC {m.ac} · {mType}
+                {stripTags(m.hp)} HP · AC {stripTags(m.ac)} · {stripTags(mType)}
               </div>
             </button>
           );
         })}
       </div>
 
-      {!loading && hasMore && (
+      {!loading && !error && hasMore && (
         <div className="flex flex-col items-center gap-1 pt-1">
           <p className="text-muted text-xs font-medium">
             Showing {results.length} of {total}
           </p>
+          {loadMoreError && (
+            <p role="alert" className="text-body text-sm">
+              More creatures didn&apos;t load.
+            </p>
+          )}
           <Button
             variant="ghost"
             size="sm"
-            onClick={onLoadMore}
+            onClick={loadMoreError ? onRetryLoadMore : onLoadMore}
             disabled={loadingMore}
           >
-            {loadingMore ? 'Loading…' : 'Load more'}
+            {loadingMore
+              ? 'Loading…'
+              : loadMoreError
+                ? 'Retry load more'
+                : 'Load more'}
           </Button>
         </div>
       )}

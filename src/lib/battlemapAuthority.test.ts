@@ -2,10 +2,11 @@ import { cleanup } from '@testing-library/react';
 import {
   createShape,
   ElementStore,
+  ElementRegistry,
   type CanvasElement,
 } from '@fieldnotes/core';
 import type { AuthorityClientStatus } from '@fieldnotes/sync';
-import { FogManager } from '@fieldnotes/vtt';
+import { FogManager, movementRecordTypeDefinition } from '@fieldnotes/vtt';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authority = vi.hoisted(() => {
@@ -474,7 +475,8 @@ describe('A1 element submissions use JSON semantics', () => {
       string,
       unknown
     >;
-    expect(Object.hasOwn(local, 'rotation')).toBe(true);
+    // Current codecs omit absent optional transforms on the store element.
+    expect(Object.hasOwn(local, 'rotation')).toBe(false);
     connection.stop();
   });
 
@@ -487,7 +489,8 @@ describe('A1 element submissions use JSON semantics', () => {
       shape: 'ellipse',
       position: { x: 0, y: 0 },
       size: { w: 10, h: 10 },
-      zIndex: 1,
+      index: 'a0',
+      version: 1,
       locked: false,
       layerId: 'annotations',
       strokeColor: '#000',
@@ -588,7 +591,8 @@ describe('A1 element submissions use JSON semantics', () => {
       shape: 'ellipse',
       position: { x: 1, y: 1 },
       size: { w: 4, h: 4 },
-      zIndex: 1,
+      index: 'a0',
+      version: 1,
       locked: false,
       layerId: 'layer-a',
     } as unknown as CanvasElement;
@@ -1419,4 +1423,47 @@ describe('A1 element submissions use JSON semantics', () => {
     expect(input).toEqual(frozen);
     expect(Object.hasOwn(input, 'b')).toBe(true);
   });
+});
+
+it('submits the first real SDK movement record with an authority-valid initial version', () => {
+  authority.reset();
+  const registry = new ElementRegistry();
+  registry.register(movementRecordTypeDefinition);
+  const store = new ElementStore(registry);
+  const connection = createManagedBattleMapAuthorityConnection({
+    relayUrl: 'wss://relay.example',
+    campaignCode: 'CODE',
+    battleMapId: 'scene-a',
+    clientId: 'dm-a',
+    store,
+    tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+    mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+  });
+  authority.install(documentWithFog(1));
+  const movement = movementRecordTypeDefinition.wrap({
+    id: 'vtt-movement:token',
+    type: 'movement',
+    position: { x: 0, y: 0 },
+    index: '',
+    version: 0,
+    locked: true,
+    layerId: 'annotations',
+    targetId: 'token',
+    epoch: 'run:1:1:member',
+    visibility: 'all',
+    feet: 5,
+    diagonals: 0,
+    trail: [],
+  });
+  store.add(movement);
+  expect(store.getById(movement.id)?.version).toBe(0);
+  expect(authority.submit).toHaveBeenLastCalledWith({
+    kind: 'upsert',
+    element: expect.objectContaining({
+      id: movement.id,
+      version: 1,
+      index: 'a0',
+    }),
+  });
+  connection.stop();
 });

@@ -56,7 +56,7 @@ export function TablePrepareEncounter(props: {
     <div
       role="region"
       aria-label="Prepare encounter"
-      className="border-accent-blue-border bg-accent-blue-bg flex w-full flex-wrap items-center gap-2 rounded-lg border p-2"
+      className="border-lapis-border bg-lapis-bg flex w-full flex-wrap items-center gap-2 rounded-lg border p-2"
     >
       {content}
     </div>
@@ -67,7 +67,7 @@ export function TablePrepareEncounter(props: {
   if (!encounter || encounter.campaignCode !== props.campaignCode)
     return frame(
       <>
-        <p className="text-accent-amber-text text-sm" role="status">
+        <p className="text-ember-text text-sm" role="status">
           Encounter not found
         </p>
         {cancelButton}
@@ -204,7 +204,7 @@ export function TablePrepareEncounter(props: {
       )}
       {cancelButton}
       {error && (
-        <p role="alert" className="text-accent-red-text w-full text-xs">
+        <p role="alert" className="text-blood-text w-full text-xs">
           {error}
         </p>
       )}

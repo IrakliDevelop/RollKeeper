@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeft, Plus, Minus, FilePen } from 'lucide-react';
+import { ArrowLeft, FilePen } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Badge } from '@/components/ui/layout/badge';
 import type { ProcessedMonster } from '@/types/bestiary';
 import type { PlayerDisposition } from '@/types/encounter';
 import { bestiaryTokenUrl } from '@/utils/bestiaryTokenUrl';
@@ -50,15 +52,17 @@ export function MonsterDetail({
 
   return (
     <div className="space-y-3 pb-4">
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onBack}
-        className="text-muted hover:text-heading flex items-center gap-1 text-[13.5px] font-bold transition-colors"
+        leftIcon={<ArrowLeft size={16} />}
       >
-        <ArrowLeft size={14} /> Back to search
-      </button>
+        Back to search
+      </Button>
 
       {/* Stat card */}
-      <div className="border-accent-purple-border bg-surface-raised rounded-[16px] border-[1.5px] p-[18px]">
+      <div className="border-divider space-y-4 border-b pb-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-start gap-3">
             {selected.hasToken && selected.tokenSource && (
@@ -73,7 +77,7 @@ export function MonsterDetail({
               />
             )}
             <div className="min-w-0">
-              <h4 className="font-display text-heading text-[21px] leading-tight font-extrabold">
+              <h4 className="text-heading text-lg font-semibold">
                 {selected.name}
               </h4>
               <p className="text-muted text-[12.5px]">
@@ -82,79 +86,52 @@ export function MonsterDetail({
               </p>
             </div>
           </div>
-          <span className="bg-accent-purple-bg text-accent-purple-text shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold">
+          <Badge variant="neutral" size="sm">
             CR {selected.cr}
-          </span>
+          </Badge>
         </div>
 
-        {/* HP / AC / Count */}
-        <div className="mt-4 grid grid-cols-3 gap-2.5">
-          <div>
-            <label className="text-muted mb-1 block text-[11px] font-extrabold tracking-wider uppercase">
-              HP
-            </label>
-            <input
-              type="number"
-              value={hp}
-              onChange={e => onHpChange(e.target.value)}
-              className="border-divider bg-surface-secondary font-display w-full rounded-[10px] border-[1.5px] px-3 py-2.5 text-base font-bold focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="text-muted mb-1 block text-[11px] font-extrabold tracking-wider uppercase">
-              AC
-            </label>
-            <input
-              type="number"
-              value={ac}
-              onChange={e => onAcChange(e.target.value)}
-              className="border-divider bg-surface-secondary font-display w-full rounded-[10px] border-[1.5px] px-3 py-2.5 text-base font-bold focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="text-muted mb-1 block text-[11px] font-extrabold tracking-wider uppercase">
-              Count
-            </label>
-            <div className="border-divider flex items-center overflow-hidden rounded-[10px] border-[1.5px]">
-              <button
-                aria-label="Decrease count"
-                onClick={() => onCountChange(Math.max(1, count - 1))}
-                className="bg-surface-secondary flex h-[42px] w-9 items-center justify-center"
-              >
-                <Minus size={16} />
-              </button>
-              <span className="font-display flex-1 text-center text-base font-bold tabular-nums">
-                {count}
-              </span>
-              <button
-                aria-label="Increase count"
-                onClick={() => onCountChange(Math.min(20, count + 1))}
-                className="bg-surface-secondary flex h-[42px] w-9 items-center justify-center"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
+        <div className="grid grid-cols-3 gap-3">
+          <NumberInput
+            value={hp === '' ? undefined : Number(hp)}
+            onChange={value =>
+              onHpChange(value === undefined ? '' : String(value))
+            }
+            label="HP"
+            allowEmpty
+            min={0}
+          />
+          <NumberInput
+            value={ac === '' ? undefined : Number(ac)}
+            onChange={value =>
+              onAcChange(value === undefined ? '' : String(value))
+            }
+            label="AC"
+            allowEmpty
+            min={0}
+          />
+          <NumberInput
+            value={count}
+            onChange={value => onCountChange(value ?? 1)}
+            label="Count"
+            min={1}
+            max={20}
+          />
         </div>
 
         {/* Ability scores */}
-        <div className="mt-4 grid grid-cols-6 gap-1.5">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(ab => (
-            <div
-              key={ab}
-              className="bg-surface-secondary rounded-[9px] py-[7px] text-center"
-            >
-              <div className="text-muted block text-[9.5px] font-extrabold uppercase">
-                {ab}
-              </div>
-              <div className="font-display text-heading text-[15px] font-bold">
+            <div key={ab} className="border-divider border-l pl-2">
+              <div className="text-muted block text-xs uppercase">{ab}</div>
+              <div className="text-heading text-sm font-medium tabular-nums">
                 {selected[ab]}
               </div>
             </div>
           ))}
         </div>
 
-        <p className="text-faint mt-3 text-[11.5px] font-semibold">
+        <p className="text-muted text-xs">
           HP formula {selected.hpFormula}
           {selected.actions && selected.actions.length > 0
             ? ` · ${selected.actions.length} action(s)`

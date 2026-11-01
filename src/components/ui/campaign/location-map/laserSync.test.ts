@@ -37,6 +37,7 @@ function toolCtx(): ToolContext {
     } as unknown as Camera,
     store: {} as ToolContext['store'],
     requestRender: vi.fn(),
+    requestOverlayRender: vi.fn(),
   };
 }
 
@@ -107,6 +108,7 @@ describe('attachRemoteLaserTrails', () => {
         };
       },
       requestRender: vi.fn(),
+      requestOverlayRender: vi.fn(),
     };
   }
 
@@ -172,10 +174,10 @@ describe('attachRemoteLaserTrails', () => {
     // A hub poke presence frame must not create a trail.
     connection.emitPresence('hub', { kind: 'poke', feature: 'players' });
     expect(drawnStrokes(vp.overlays[0])).toBe(0);
-    expect(vp.requestRender).not.toHaveBeenCalled();
+    expect(vp.requestOverlayRender).not.toHaveBeenCalled();
 
     connection.emitPresence('conn-1', laser(0, 0));
-    expect(vp.requestRender).toHaveBeenCalled();
+    expect(vp.requestOverlayRender).toHaveBeenCalled();
     expect(drawnStrokes(vp.overlays[0])).toBe(1);
   });
 

@@ -33,6 +33,12 @@ export interface ButtonProps
    * Icon to display after the button text.
    */
   rightIcon?: React.ReactNode;
+  /**
+   * Marks the on state of an outline or ghost toggle (brass border and
+   * text). Filled variants ignore it. Pair it with `aria-pressed` only when
+   * the label stays the same in both states.
+   */
+  selected?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -42,6 +48,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       variant,
       size,
       fullWidth,
+      selected = false,
       asChild = false,
       loading = false,
       leftIcon,
@@ -57,7 +64,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, fullWidth }), className)}
+        className={cn(
+          buttonVariants({ variant, size, fullWidth, selected }),
+          className
+        )}
+        data-variant={variant ?? 'secondary'}
+        data-selected={selected ? 'true' : undefined}
         ref={ref}
         disabled={isDisabled}
         {...props}

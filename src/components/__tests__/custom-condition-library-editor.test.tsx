@@ -48,7 +48,11 @@ describe('CustomConditionLibraryEditor', () => {
   it('tells the DM descriptions are player-facing and shows an empty state', () => {
     render(<Harness initial={[]} onSnapshot={vi.fn()} />);
     expect(screen.getByText(/shown to players/i)).toBeTruthy();
-    expect(screen.getByText(/No custom conditions yet/i)).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Add a condition, then attach it to the creatures that inflict it.'
+      )
+    ).toBeTruthy();
   });
 
   it('adds a row with debuff defaults and edits its name and description', async () => {
@@ -72,6 +76,13 @@ describe('CustomConditionLibraryEditor', () => {
         kind: 'debuff',
       },
     ]);
+  });
+
+  it('returns focus to Add condition after removing the final row', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[marked]} onSnapshot={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Remove Marked' }));
+    expect(screen.getByRole('button', { name: 'Add condition' })).toHaveFocus();
   });
 
   it('changes icon and kind; a kind change re-defaults an untouched default icon only', async () => {

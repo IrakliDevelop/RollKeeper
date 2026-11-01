@@ -68,6 +68,8 @@ describe('StatusEffectTray', () => {
     render(<StatusEffectTray />);
 
     expect(screen.getByText('Poisoned')).toBeInTheDocument();
+    // The condition's book source ("Self", "XPHB", "DM") is not a spell.
+    expect(screen.queryByText(/^From /)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /remove poisoned/i }));
 

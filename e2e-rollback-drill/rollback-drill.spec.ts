@@ -97,7 +97,7 @@ async function signIn(page: Page, email: string) {
 async function createCharacterViaStore(page: Page, name: string) {
   await page.goto(`${BASE_URL}/player`);
   await expect(
-    page.getByRole('heading', { name: 'Your Characters' })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
   await page.waitForFunction(() =>
     Boolean(
@@ -344,6 +344,28 @@ test('phase A: activate ongoing backup', async () => {
       page.getByRole('heading', { name: 'Protect your characters' })
     ).toBeVisible();
 
+    for (const width of [390, 430]) {
+      await page.setViewportSize({ width, height: 800 });
+      const heading = page.locator('header h1');
+      const headingBox = await heading.boundingBox();
+      const backBox = await page
+        .getByRole('link', { name: 'Characters' })
+        .boundingBox();
+      const pageWidth = await page.evaluate(
+        () => document.documentElement.scrollWidth
+      );
+      expect(headingBox?.width).toBeGreaterThanOrEqual(130);
+      expect(
+        backBox && headingBox && backBox.x + backBox.width
+      ).toBeLessThanOrEqual((headingBox?.x ?? 0) + 1);
+      expect(pageWidth).toBeLessThanOrEqual(width);
+      await expect(page.locator('header p')).toBeHidden();
+      console.log(
+        `Backup header ${width}px: title ${headingBox?.width}px, page ${pageWidth}px`
+      );
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
+
     // Step 1: Account — already signed in, just continue.
     await page.getByRole('button', { name: 'Continue' }).click();
 
@@ -408,7 +430,7 @@ test('phase B: flags rolled back', async () => {
 
     await page.goto(`${BASE_URL}/player`);
     await expect(
-      page.getByRole('heading', { name: 'Your Characters' })
+      page.getByRole('heading', { name: 'Characters', exact: true })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: CHARACTER_NAME, exact: true })

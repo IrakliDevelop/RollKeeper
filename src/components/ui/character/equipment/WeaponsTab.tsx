@@ -1,15 +1,23 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { Weapon } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
-import { Plus, Swords } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { WeaponRow } from './WeaponRow';
 import { WeaponFormDialog } from './WeaponFormDialog';
-import { EquipmentFilterBar, type FilterConfig } from './EquipmentFilterBar';
+import {
+  EquipmentFilterBar,
+  getEquipmentEmptyText,
+  type FilterConfig,
+} from './EquipmentFilterBar';
 import { useEquipmentFilters } from '@/hooks/useEquipmentFilters';
+import { useSheetMode } from '@/components/ui/character/SheetMode';
+import { EquipmentReorderControls } from './EquipmentReorderControls';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import type {
   WeaponFormData,
   WeaponChargeFormData,
@@ -24,6 +32,7 @@ const FILTER_CONFIG: FilterConfig = {
 };
 
 export function WeaponsTab() {
+  const { editing } = useSheetMode();
   const {
     character,
     addWeapon,
@@ -41,6 +50,19 @@ export function WeaponsTab() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingWeapon, setEditingWeapon] = useState<Weapon | null>(null);
+  const [pendingDeleteFocusId, setPendingDeleteFocusId] = useState<
+    string | null
+  >(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (
+      pendingDeleteFocusId &&
+      !character.weapons.some(weapon => weapon.id === pendingDeleteFocusId)
+    ) {
+      addButtonRef.current?.focus();
+      setPendingDeleteFocusId(null);
+    }
+  }, [character.weapons, pendingDeleteFocusId]);
 
   const {
     filters,
@@ -118,82 +140,114 @@ export function WeaponsTab() {
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <Section
+      heading="Weapons"
+      level={3}
+      trailing={
         <div className="flex items-center gap-2">
-          <h3 className="text-heading text-lg font-semibold">Weapons</h3>
-          <span className="text-muted text-sm">
-            ({character.weapons.length})
-          </span>
+          <span className="text-muted text-sm">{character.weapons.length}</span>
+          <Button
+            ref={addButtonRef}
+            onClick={handleAdd}
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus size={16} />}
+          >
+            Add weapon
+          </Button>
         </div>
-        <Button
-          onClick={handleAdd}
-          variant="primary"
-          size="sm"
-          leftIcon={<Plus size={16} />}
-        >
-          Add Weapon
-        </Button>
-      </div>
-
-      <EquipmentFilterBar
-        filters={filters}
-        onFilterChange={updateFilter}
-        onReset={resetFilters}
-        hasActiveFilters={hasActiveFilters}
-        config={FILTER_CONFIG}
-      />
-
-      {filteredItems.length > 0 ? (
-        <DragDropList
-          items={filteredItems}
-          onReorder={reorderWeapons}
-          keyExtractor={w => w.id}
-          className="space-y-2"
-          showDragHandle
-          dragHandlePosition="left"
-          renderItem={weapon => (
-            <WeaponRow
-              weapon={weapon}
-              characterLevel={character.level}
-              onEdit={handleEdit}
-              onDelete={id => deleteWeapon(id)}
-              onToggleEquip={(id, eq) => equipWeapon(id, eq)}
-              onExpendCharge={expendWeaponCharge}
-              onRestoreCharge={restoreWeaponCharge}
-              onExpendChargePoolAbility={expendWeaponChargePoolAbility}
-              onRestoreChargePool={restoreWeaponChargePool}
-              onSetChargePoolUsed={setWeaponChargePoolUsed}
-              onUse={useWeapon}
-              inventoryItems={character.inventoryItems}
-            />
-          )}
+      }
+    >
+      <div className="space-y-4">
+        <EquipmentFilterBar
+          filters={filters}
+          onFilterChange={updateFilter}
+          onReset={resetFilters}
+          hasActiveFilters={hasActiveFilters}
+          config={FILTER_CONFIG}
         />
-      ) : (
-        <div className="text-muted py-12 text-center">
-          <Swords className="text-faint mx-auto mb-3 h-12 w-12" />
-          <p className="text-heading font-medium">
-            {hasActiveFilters
-              ? 'No weapons match your filters'
-              : 'No weapons added yet'}
-          </p>
-          <p className="mt-1 text-sm">
-            {hasActiveFilters
-              ? 'Try adjusting your filters.'
-              : 'Add weapons to manage your arsenal.'}
-          </p>
-        </div>
-      )}
 
-      <WeaponFormDialog
-        open={dialogOpen}
-        onClose={() => {
-          setDialogOpen(false);
-          setEditingWeapon(null);
-        }}
-        editingWeapon={editingWeapon}
-        onSubmit={handleSubmit}
-      />
-    </div>
+        {filteredItems.length > 0 ? (
+          <DragDropList
+            items={filteredItems}
+            onReorder={(sourceIndex, destinationIndex) => {
+              const source = filteredItems[sourceIndex];
+              const destination = filteredItems[destinationIndex];
+              if (source && destination)
+                reorderWeapons(source.id, destination.id);
+            }}
+            keyExtractor={w => w.id}
+            className="space-y-2"
+            showDragHandle
+            dragHandlePosition="left"
+            renderItem={(weapon, index) => (
+              <div>
+                <WeaponRow
+                  weapon={weapon}
+                  characterLevel={character.level}
+                  onEdit={handleEdit}
+                  onDelete={id => {
+                    void confirmDialog({
+                      title: `Delete ${weapon.name}?`,
+                      confirmLabel: 'Delete item',
+                      cancelLabel: 'Cancel',
+                      tone: 'danger',
+                    }).then(confirmed => {
+                      if (confirmed) {
+                        setPendingDeleteFocusId(id);
+                        deleteWeapon(id);
+                      }
+                    });
+                  }}
+                  onToggleEquip={(id, eq) => equipWeapon(id, eq)}
+                  onExpendCharge={expendWeaponCharge}
+                  onRestoreCharge={restoreWeaponCharge}
+                  onExpendChargePoolAbility={expendWeaponChargePoolAbility}
+                  onRestoreChargePool={restoreWeaponChargePool}
+                  onSetChargePoolUsed={setWeaponChargePoolUsed}
+                  onUse={useWeapon}
+                  inventoryItems={character.inventoryItems}
+                />
+                {editing && (
+                  <EquipmentReorderControls
+                    name={weapon.name}
+                    index={index}
+                    count={filteredItems.length}
+                    onMove={destinationIndex => {
+                      const destination = filteredItems[destinationIndex];
+                      if (destination)
+                        reorderWeapons(weapon.id, destination.id);
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          />
+        ) : (
+          <div className="text-muted py-12 text-center">
+            <p className="text-heading font-medium">
+              {hasActiveFilters
+                ? getEquipmentEmptyText('weapons', filters)
+                : 'Add your first weapon'}
+            </p>
+            {hasActiveFilters && (
+              <Button onClick={resetFilters} variant="ghost" size="sm">
+                Clear filters
+              </Button>
+            )}
+          </div>
+        )}
+
+        <WeaponFormDialog
+          open={dialogOpen}
+          onClose={() => {
+            setDialogOpen(false);
+            setEditingWeapon(null);
+          }}
+          editingWeapon={editingWeapon}
+          onSubmit={handleSubmit}
+        />
+      </div>
+    </Section>
   );
 }

@@ -37,6 +37,7 @@ import {
   stackTempHp,
 } from '@/utils/combatMechanics';
 import { normalizeCombatConfig } from '@/utils/customConditions';
+import { upgradeLegacyDefaultHpBands } from '@/utils/hpStateBands';
 import { buildNpcLibraryPatch } from '@/utils/npcLibrarySync';
 import { queueNpcLibrarySync } from '@/store/npcLibrarySyncQueue';
 import { getDeathSavesAfterDamage } from '@/utils/hpCalculations';
@@ -415,9 +416,10 @@ export function migrateEncounterPersistedState(
 }
 
 /**
- * Hydration merge. The legacy custom-status → customConditions migration lives here
- * and NOT in `migrate`: bumping the persist version would break the durable
- * encounter family, which pins ENCOUNTER_PERSIST_VERSION = 2
+ * Hydration merge. The legacy custom-status → customConditions migration and
+ * the old-default HP band upgrade live here and NOT in `migrate`: bumping the
+ * persist version would break the durable encounter family, which pins
+ * ENCOUNTER_PERSIST_VERSION = 2
  * (src/lib/durableDm/encounterFamily.ts). Everything else is the default
  * shallow merge.
  */
@@ -429,7 +431,7 @@ export function mergeEncounterPersistedState<
     ...current,
     ...incoming,
     combatConfig: normalizeCombatConfig(
-      incoming.combatConfig ?? current.combatConfig
+      upgradeLegacyDefaultHpBands(incoming.combatConfig ?? current.combatConfig)
     ),
   };
 }

@@ -63,7 +63,7 @@ export function CharacterAutomaticSyncControls(
   };
 
   return (
-    <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
+    <section className="border-divider mb-6 border-b pb-6">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-heading flex items-center gap-2 text-sm font-semibold">
@@ -91,7 +91,6 @@ export function CharacterAutomaticSyncControls(
           <Button
             variant="secondary"
             size="sm"
-            aria-label="Preview enable all eligible characters"
             onClick={handlePreview}
             disabled={!actions.indexedDbPrimary}
           >
@@ -102,7 +101,7 @@ export function CharacterAutomaticSyncControls(
 
       {!actions.indexedDbPrimary && (
         <p
-          className="text-accent-amber-text mb-3 flex items-center gap-2 text-sm"
+          className="text-ember-text mb-3 flex items-center gap-2 text-sm"
           role="status"
         >
           <ShieldAlert size={16} /> Complete the explicit character IndexedDB
@@ -111,7 +110,7 @@ export function CharacterAutomaticSyncControls(
       )}
 
       {preview && (
-        <div className="border-divider bg-surface-raised mb-3 rounded-md border p-3">
+        <div className="border-divider mb-3 border-b py-3">
           <p className="text-heading text-sm font-medium">
             {preview.eligible.length} eligible character
             {preview.eligible.length === 1 ? '' : 's'}
@@ -127,13 +126,8 @@ export function CharacterAutomaticSyncControls(
             overrides still win.
           </p>
           <div className="mt-3 flex gap-2">
-            <Button
-              variant="success"
-              size="sm"
-              aria-label="Confirm current and future automatic sync"
-              onClick={handleConfirm}
-            >
-              Confirm
+            <Button variant="success" size="sm" onClick={handleConfirm}>
+              Enable automatic sync
             </Button>
             <Button
               variant="outline"
@@ -155,10 +149,13 @@ export function CharacterAutomaticSyncControls(
           return (
             <div
               key={character.id}
-              className="border-divider bg-surface-raised flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+              className="border-divider flex flex-wrap items-center justify-between gap-3 border-b py-3"
             >
               <div>
-                <p className="text-heading text-sm font-medium">
+                <p
+                  id={`auto-sync-${character.id}-name`}
+                  className="text-heading text-sm font-medium"
+                >
                   {character.name}
                 </p>
                 <Badge variant={badgeVariant(status)} size="sm">
@@ -170,20 +167,18 @@ export function CharacterAutomaticSyncControls(
                   <Button
                     variant="secondary"
                     size="sm"
-                    aria-label={`Enable automatic sync for ${character.name}`}
                     onClick={() => actions.enable(character)}
                     disabled={!actions.indexedDbPrimary}
                   >
-                    Enable
+                    Enable <span className="sr-only">{character.name}</span>
                   </Button>
                 ) : (
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label={`Disable automatic sync for ${character.name}`}
                     onClick={() => actions.disable(character.id)}
                   >
-                    Turn off
+                    Turn off <span className="sr-only">{character.name}</span>
                   </Button>
                 )}
                 {['offline', 'auth-required', 'failed'].includes(status) && (
@@ -192,7 +187,7 @@ export function CharacterAutomaticSyncControls(
                     size="sm"
                     onClick={() => actions.retry(character.id)}
                   >
-                    Retry
+                    Retry <span className="sr-only">{character.name}</span>
                   </Button>
                 )}
                 {status === 'conflict' && (
@@ -200,32 +195,32 @@ export function CharacterAutomaticSyncControls(
                     <Button
                       variant="secondary"
                       size="sm"
-                      aria-label={`Keep my ${character.name}`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'keep-mine')
                       }
                     >
-                      Keep mine
+                      Keep mine{' '}
+                      <span className="sr-only">{character.name}</span>
                     </Button>
                     <Button
-                      variant="warning"
+                      variant="secondary"
                       size="sm"
-                      aria-label={`Use cloud ${character.name}`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'use-cloud')
                       }
                     >
-                      Use cloud
+                      Use cloud{' '}
+                      <span className="sr-only">{character.name}</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      aria-label={`Keep both ${character.name} versions`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'keep-both')
                       }
                     >
-                      Keep both
+                      Keep both{' '}
+                      <span className="sr-only">{character.name}</span>
                     </Button>
                   </>
                 )}
@@ -233,10 +228,10 @@ export function CharacterAutomaticSyncControls(
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label={`Download quarantined ${character.name} candidate`}
                     onClick={() => actions.downloadQuarantine(character.id)}
                   >
-                    Download quarantined data
+                    Download quarantined data{' '}
+                    <span className="sr-only">{character.name}</span>
                   </Button>
                 )}
               </div>
@@ -245,7 +240,7 @@ export function CharacterAutomaticSyncControls(
         })}
       </div>
       {actions.error && (
-        <p className="text-accent-red-text mt-3 text-sm" role="alert">
+        <p className="text-blood-text mt-3 text-sm" role="alert">
           {actions.error}
         </p>
       )}

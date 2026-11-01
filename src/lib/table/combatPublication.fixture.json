@@ -24,6 +24,7 @@
     ],
     "enemyHpMode": "off",
     "enemyConditionsMode": "off",
-    "updatedAt": "fixture"
+    "updatedAt": "fixture",
+    "combatGeneration": 1
   }
 }

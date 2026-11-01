@@ -1,7 +1,13 @@
 'use client';
 
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useRef } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from '@/components/ui/feedback/dialog';
 import type { Encounter } from '@/types/encounter';
 import type { EntityActions } from './types';
 import { getOnDeckEntity } from '@/utils/encounterTurn';
@@ -35,15 +41,36 @@ export function FocusLayout({
   const onDeckEntity = getOnDeckEntity(encounter);
   const drawerEntity = entities.find(e => e.id === drawerId);
   const drawerPcId = drawerEntity?.playerCharacterId;
+  const focusAfterRemove = useRef<string | null>(null);
+  const detailActions: EntityActions = {
+    ...actions,
+    onRemove: id => {
+      const index = entities.findIndex(entity => entity.id === id);
+      const targetId = (entities[index + 1] ?? entities[index - 1])?.id ?? '';
+      focusAfterRemove.current = targetId;
+      actions.onRemove(id);
+      onCloseDrawer();
+      setTimeout(() => {
+        if (focusAfterRemove.current !== targetId) return;
+        const next = Array.from(
+          document.querySelectorAll<HTMLButtonElement>(
+            '[data-combatant-select]'
+          )
+        ).find(button => button.dataset.combatantSelect === targetId);
+        (
+          next ?? document.querySelector<HTMLButtonElement>('[data-combat-add]')
+        )?.focus();
+      }, 0);
+    },
+  };
 
   return (
     <div className="relative flex-1 overflow-y-auto">
       <div className="mx-auto max-w-[760px] space-y-2 p-4">
         {entities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-muted mb-2">No combatants yet</p>
-            <p className="text-faint text-sm">
-              Use &quot;+ Add&quot; to add combatants
+          <div className="py-12 text-center">
+            <p className="type-subheading text-heading">
+              Add combatants to set initiative.
             </p>
           </div>
         ) : (
@@ -72,7 +99,7 @@ export function FocusLayout({
                     actions={actions}
                     onSelect={() => {}}
                   />
-                  <div className="bg-surface-raised border-divider rounded-b-lg border border-t-0">
+                  <div className="border-divider border-t pt-3">
                     <CombatantDetail
                       key={entity.id}
                       entity={entity}
@@ -103,45 +130,49 @@ export function FocusLayout({
                 counterLabel={customCounterLabel}
                 counterValue={counterValue}
                 actions={actions}
-                onSelect={() => onOpenDrawer(entity.id)}
+                onSelect={() => {
+                  focusAfterRemove.current = null;
+                  onOpenDrawer(entity.id);
+                }}
               />
             );
           })
         )}
       </div>
 
-      {drawerEntity && (
-        <>
-          <div
-            className="bg-surface-overlay fixed inset-0 z-40"
-            onClick={onCloseDrawer}
-          />
-          <div className="bg-surface-raised fixed top-0 right-0 z-50 h-full w-[min(440px,92vw)] overflow-y-auto shadow-xl">
-            <div className="border-divider flex items-center justify-between border-b p-4">
-              <span className="text-heading font-semibold">
-                {drawerEntity.name}
-              </span>
-              <button
-                onClick={onCloseDrawer}
-                className="text-muted hover:text-heading rounded p-1 transition-colors"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <CombatantDetail
-              key={drawerEntity.id}
-              entity={drawerEntity}
-              actions={actions}
-              onOpenSheet={
-                drawerPcId !== undefined
-                  ? () => actions.onViewPlayer?.(drawerPcId)
-                  : undefined
-              }
-            />
-          </div>
-        </>
-      )}
+      <Dialog
+        open={!!drawerEntity}
+        onOpenChange={open => {
+          if (!open) onCloseDrawer();
+        }}
+      >
+        {drawerEntity && (
+          <DialogContent
+            size="md"
+            aria-describedby={undefined}
+            onCloseAutoFocus={event => {
+              if (focusAfterRemove.current !== null) event.preventDefault();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>{drawerEntity.name} details</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="min-h-0 overflow-y-auto">
+              <CombatantDetail
+                key={drawerEntity.id}
+                entity={drawerEntity}
+                actions={detailActions}
+                hideNameHeading
+                onOpenSheet={
+                  drawerPcId !== undefined
+                    ? () => actions.onViewPlayer?.(drawerPcId)
+                    : undefined
+                }
+              />
+            </DialogBody>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

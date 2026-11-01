@@ -60,6 +60,7 @@ function toolCtx(): ToolContext {
     } as unknown as Camera,
     store: {} as ToolContext['store'],
     requestRender: vi.fn(),
+    requestOverlayRender: vi.fn(),
     constraintService,
   };
 }
@@ -256,6 +257,7 @@ describe('attachRemoteMeasurements', () => {
         };
       },
       requestRender: vi.fn(),
+      requestOverlayRender: vi.fn(),
     };
   }
 

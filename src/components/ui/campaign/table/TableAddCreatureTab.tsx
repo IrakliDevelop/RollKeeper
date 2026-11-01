@@ -39,6 +39,10 @@ export function TableAddCreatureTab({
       hasMore={search.hasMore}
       loading={search.loading}
       loadingMore={search.loadingMore}
+      error={search.error}
+      loadMoreError={search.loadMoreError}
+      onRetry={search.retry}
+      onRetryLoadMore={search.retryLoadMore}
       onSelect={handleSelect}
       onLoadMore={search.loadMore}
     />
