@@ -470,7 +470,10 @@ const LevelSection: React.FC<{
   const remaining = hasSlots ? slotMax! - (slotUsed ?? 0) : 0;
 
   return (
-    <div>
+    <section
+      aria-label={levelName}
+      className="border-divider-strong border-l-2 pl-3 sm:pl-4"
+    >
       <div className="border-divider flex w-full flex-wrap items-center gap-3 border-b pb-2">
         <button
           onClick={onToggle}
@@ -566,7 +569,7 @@ const LevelSection: React.FC<{
           />
         </div>
       )}
-    </div>
+    </section>
   );
 };
 
@@ -1238,7 +1241,7 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
       </Dialog>
 
       {/* Spell List */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {character.spells.length === 0 ? (
           <div className="text-muted py-12 text-center">
             <BookOpen size={64} className="text-faint mx-auto mb-4" />

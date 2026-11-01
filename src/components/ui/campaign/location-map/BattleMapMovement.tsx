@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import {
   useBattleMapMovement,
   type BattleMapMovementProps,
 } from './useBattleMapMovement';
 
 export function BattleMapMovement(props: BattleMapMovementProps) {
-  const [range, setRange] = useState('30');
+  const [range, setRange] = useState<number | undefined>(30);
   const { tracker, token, movement, epoch, placing, setPlacing } =
     useBattleMapMovement(props);
   if (!epoch || !token) return null;
   return (
     <div
-      className="bg-surface-raised border-divider pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl border p-2 text-xs shadow-lg"
+      className={`${OVERLAY_SURFACE} type-small pointer-events-auto flex flex-wrap items-center gap-2 p-2`}
       aria-label="Turn movement"
     >
       <span className="text-body">
@@ -22,21 +23,17 @@ export function BattleMapMovement(props: BattleMapMovementProps) {
       <Button variant="ghost" onClick={() => tracker.reset(token.id)}>
         Reset movement
       </Button>
-      <Input
+      <NumberInput
         aria-label="Teleport range in feet"
-        type="number"
         min="0"
         value={range}
-        onChange={event => setRange(event.target.value)}
+        onChange={setRange}
+        allowEmpty
         className="w-20"
       />
       <Button
         variant="outline"
-        disabled={
-          range.trim() === '' ||
-          !Number.isFinite(Number(range)) ||
-          Number(range) < 0
-        }
+        disabled={range === undefined || !Number.isFinite(range) || range < 0}
         onClick={() =>
           setPlacing(
             tracker.startPlacement(

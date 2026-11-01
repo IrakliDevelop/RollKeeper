@@ -15,6 +15,21 @@ import type { SaveStatus } from '@/types/character';
 
 /** The sizes a story picks with `globals: PHONE`, `IPAD_PORTRAIT` or `IPAD_LANDSCAPE`. */
 const VIEWPORTS = {
+  macbook14: {
+    name: 'MacBook Pro 14 inch',
+    styles: { width: '1512px', height: '982px' },
+    type: 'desktop',
+  },
+  laptop: {
+    name: 'Laptop at scaled width',
+    styles: { width: '1237px', height: '900px' },
+    type: 'desktop',
+  },
+  ipadCompact: {
+    name: 'iPad landscape 1024',
+    styles: { width: '1024px', height: '768px' },
+    type: 'tablet',
+  },
   phone: {
     name: 'Phone',
     styles: { width: '390px', height: '844px' },
@@ -424,4 +439,62 @@ export const SwitchHoldsStillWhileSaving: Story = {
       await expect(toggle.getBoundingClientRect().left).toBeCloseTo(left, 0);
     }
   },
+};
+
+/** Full campaign + signed-out controls must share the identity row on laptop widths. */
+async function checkSingleHeaderRow(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  await canvas.findByRole('button', { name: 'Sign in' });
+  await checkBar(canvasElement);
+  const controls = [
+    canvas.getByRole('link', { name: 'Characters' }),
+    canvas.getByRole('switch', { name: 'Edit sheet' }),
+    canvas.getByRole('button', { name: 'Character' }),
+    canvas.getByRole('button', { name: 'Sign in' }),
+  ];
+  const centers = controls.map(control => {
+    const rect = control.getBoundingClientRect();
+    return rect.top + rect.height / 2;
+  });
+  await expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(
+    1
+  );
+}
+export const CampaignMacbook14: Story = {
+  args: { campaign: true, lastSaved: new Date() },
+  globals: { viewport: { value: 'macbook14', isRotated: false } },
+  play: async ({ canvasElement }) => checkSingleHeaderRow(canvasElement),
+};
+export const CampaignLaptopScaled: Story = {
+  ...CampaignMacbook14,
+  globals: { viewport: { value: 'laptop', isRotated: false } },
+};
+export const CampaignLaptopScaledDark: Story = {
+  ...CampaignLaptopScaled,
+  globals: { ...CampaignLaptopScaled.globals, theme: 'dark' },
+};
+export const CampaignIpadLandscape: Story = {
+  ...CampaignMacbook14,
+  globals: IPAD_LANDSCAPE,
+  beforeEach: () => emulateCoarsePointer(),
+};
+export const CampaignIpadPortrait: Story = {
+  args: { campaign: true },
+  globals: IPAD_PORTRAIT,
+  beforeEach: () => emulateCoarsePointer(),
+  play: async ({ canvasElement }) => {
+    await checkPopulatedPhone(canvasElement, false);
+    const canvas = within(canvasElement);
+    const back = canvas
+      .getByRole('link', { name: 'Characters' })
+      .getBoundingClientRect();
+    const toggle = canvas
+      .getByRole('switch', { name: 'Edit sheet' })
+      .getBoundingClientRect();
+    await expect(toggle.top).toBeGreaterThanOrEqual(back.bottom);
+  },
+};
+export const CampaignIpadCompact: Story = {
+  ...CampaignIpadPortrait,
+  globals: { viewport: { value: 'ipadCompact', isRotated: false } },
 };
