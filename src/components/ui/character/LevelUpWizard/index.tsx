@@ -212,6 +212,10 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               features={state.features}
               subclassFeatures={state.subclassFeatures}
               subclassSpellGrants={state.subclassSpellGrants}
+              migrationFeatures={state.subclassMigration.missedFeatures
+                .filter(item => item.adopted)
+                .map(item => item.feature)}
+              migrationSpellGrants={state.subclassMigration.missedSpellGrants}
               asiChoice={state.asiChoice}
               abilities={character.abilities}
               hpRollResult={state.hpRollResult}

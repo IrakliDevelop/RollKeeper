@@ -15,6 +15,8 @@ interface ConfirmationStepProps {
   features: ClassFeature[];
   subclassFeatures: ClassFeature[];
   subclassSpellGrants: SubclassSpellGrant[];
+  migrationFeatures?: ClassFeature[];
+  migrationSpellGrants?: SubclassSpellGrant[];
   asiChoice?: ASIChoice;
   abilities: CharacterAbilities;
   hpRollResult?: number;
@@ -37,6 +39,8 @@ export default function ConfirmationStep({
   features,
   subclassFeatures,
   subclassSpellGrants,
+  migrationFeatures = [],
+  migrationSpellGrants = [],
   asiChoice,
   abilities,
   hpRollResult,
@@ -48,12 +52,17 @@ export default function ConfirmationStep({
   cantripsKnownDelta,
   cantripUpgrades,
 }: ConfirmationStepProps) {
-  const displayFeatures = [...features, ...subclassFeatures].filter(
+  const displayFeatures = [
+    ...features,
+    ...subclassFeatures,
+    ...migrationFeatures,
+  ].filter(
     f => f.name !== 'Ability Score Improvement' && f.name !== 'Epic Boon'
   );
-  const autoGrantedSpells = subclassSpellGrants.filter(
-    g => g.grantType !== 'expanded'
-  );
+  const autoGrantedSpells = [
+    ...subclassSpellGrants,
+    ...migrationSpellGrants,
+  ].filter(g => g.grantType !== 'expanded');
   return (
     <div className="space-y-5">
       <div>
