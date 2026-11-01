@@ -127,7 +127,7 @@ export function InitiativePanel({
         title={isOpen ? 'Hide initiative' : 'Show initiative'}
         className={`relative self-center rounded-l-lg border-y-2 border-l-2 px-2.5 py-5 shadow-md transition-colors ${
           isMyTurn
-            ? 'border-accent-amber-border bg-accent-amber-bg text-accent-amber-text animate-pulse'
+            ? 'border-ember-border bg-ember-bg text-ember-text'
             : isOpen
               ? 'border-accent-red-border bg-accent-red-bg text-accent-red-text'
               : 'border-divider bg-surface-raised text-muted hover:text-body hover:bg-surface-secondary'

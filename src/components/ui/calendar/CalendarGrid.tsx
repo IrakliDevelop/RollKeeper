@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Plus, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/forms/button';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
 import { EventMarker } from './EventMarker';
@@ -94,6 +95,18 @@ function DayPopover({
   left = Math.max(0, Math.min(left, containerRect.width - popoverWidth));
   const top = anchorRect.bottom - containerRect.top + 4;
 
+  const handleDelete = async (event: CalendarEvent) => {
+    if (
+      await confirmDialog({
+        title: `Delete ${event.title}?`,
+        confirmLabel: 'Delete event',
+        cancelLabel: 'Cancel',
+        tone: 'danger',
+      })
+    )
+      onDeleteEvent(event.id);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -117,7 +130,7 @@ function DayPopover({
   return (
     <div
       ref={popoverRef}
-      className="bg-surface-raised border-divider absolute z-20 origin-top animate-[popover-in_150ms_ease-out] rounded-lg border shadow-lg"
+      className="bg-surface-elevated border-divider absolute z-20 rounded-md border"
       style={{ top, left, width: popoverWidth }}
     >
       <div className="border-divider flex items-center justify-between border-b px-3 py-2">
@@ -131,7 +144,7 @@ function DayPopover({
           onClick={onAddEvent}
           className="!h-6 !px-1.5 !text-xs"
         >
-          Add
+          Add event
         </Button>
       </div>
       <div className="max-h-32 overflow-y-auto">
@@ -144,21 +157,17 @@ function DayPopover({
                 key={event.id}
                 className="hover:bg-surface-secondary group flex items-center gap-1.5 rounded px-2 py-1.5 transition-colors duration-150"
               >
-                <EventMarker
-                  event={event}
-                  size="row"
-                  className="transition-transform duration-150 group-hover:scale-125"
-                />
+                <EventMarker event={event} size="row" />
                 <button
                   type="button"
                   onClick={() => onEditEvent(event)}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <span className="text-heading truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">
+                  <span className="text-heading truncate text-xs font-medium">
                     {event.title}
                   </span>
                 </button>
-                <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                <div className="ml-auto flex shrink-0 items-center gap-0.5">
                   {onMoveEvent && events.length > 1 && (
                     <>
                       <button
@@ -183,15 +192,17 @@ function DayPopover({
                   )}
                   <button
                     type="button"
+                    aria-label={`Edit ${event.title}`}
                     onClick={() => onEditEvent(event)}
-                    className="text-muted hover:text-heading rounded p-0.5 transition-colors"
+                    className="text-muted hover:text-heading rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   >
                     <Pencil size={10} />
                   </button>
                   <button
                     type="button"
-                    onClick={() => onDeleteEvent(event.id)}
-                    className="text-muted hover:text-accent-red-text rounded p-0.5 transition-colors"
+                    aria-label={`Delete ${event.title}`}
+                    onClick={() => void handleDelete(event)}
+                    className="text-blood-text rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   >
                     <Trash2 size={10} />
                   </button>

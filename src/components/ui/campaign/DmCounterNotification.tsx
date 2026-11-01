@@ -26,24 +26,16 @@ export function DmCounterNotification({
   const increased = delta > 0;
 
   return (
-    <div className="pointer-events-none fixed top-20 right-4 z-50 w-80 sm:w-96">
+    <div className="contents">
       <div
-        className={`pointer-events-auto rounded-lg border border-purple-300 bg-purple-50 p-4 text-purple-950 shadow-xl shadow-purple-200/40 transition-all duration-300 dark:border-purple-700 dark:bg-purple-950/90 dark:text-purple-100 dark:shadow-purple-900/30 ${
-          animatingOut
-            ? 'translate-x-full opacity-0'
-            : 'animate-in slide-in-from-right-full translate-x-0 opacity-100'
-        }`}
+        className={`border-divider bg-surface-elevated text-body pointer-events-auto rounded-md border p-4 transition-opacity duration-300 ${animatingOut ? 'opacity-0' : 'opacity-100'}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2.5">
-            <div className="mt-0.5 animate-pulse rounded-full bg-purple-200 p-1.5 text-purple-700 dark:bg-purple-800 dark:text-purple-300">
-              <Angry size={14} />
-            </div>
+            <Angry size={14} className="text-muted mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs font-medium text-purple-600 dark:text-purple-400">
-                {label}
-              </p>
-              <p className="mt-0.5 text-sm font-bold text-purple-900 dark:text-purple-100">
+              <p className="text-muted text-xs font-medium">{label}</p>
+              <p className="text-heading mt-0.5 text-sm font-bold">
                 {increased
                   ? `+${delta} — now at ${value}`
                   : `${delta} — now at ${value}`}
@@ -52,17 +44,15 @@ export function DmCounterNotification({
           </div>
           <button
             onClick={handleDismiss}
-            className="shrink-0 rounded p-0.5 text-purple-400 transition-colors hover:bg-purple-200 hover:text-purple-700 dark:text-purple-500 dark:hover:bg-purple-800 dark:hover:text-purple-200"
+            className="text-muted hover:text-heading shrink-0 rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             title="Dismiss"
+            aria-label="Dismiss DM counter notification"
           >
             <X size={16} />
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-purple-600 dark:text-purple-400">
-          <Angry size={10} className="mr-1 inline" />
-          Updated by your DM
-        </p>
+        <p className="text-muted mt-2 text-xs">Updated by your DM</p>
       </div>
     </div>
   );

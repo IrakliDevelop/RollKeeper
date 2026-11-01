@@ -1060,50 +1060,55 @@ export default function CharacterSheet() {
                 onUpdateCharacter={updateCharacter}
               />
 
-              {/* DM Effects (applied by DM in encounter) */}
-              {pendingEffectToasts.length > 0 && (
-                <DmEffectsNotification
-                  effects={pendingEffectToasts}
-                  onDismiss={() => setPendingEffectToasts([])}
-                />
-              )}
+              <aside
+                aria-label="Campaign notifications"
+                className="pointer-events-none fixed right-4 bottom-4 z-50 flex max-h-[70vh] w-[calc(100vw-2rem)] max-w-96 flex-col gap-2 overflow-y-auto"
+              >
+                {/* DM Effects (applied by DM in encounter) */}
+                {pendingEffectToasts.length > 0 && (
+                  <DmEffectsNotification
+                    effects={pendingEffectToasts}
+                    onDismiss={() => setPendingEffectToasts([])}
+                  />
+                )}
 
-              {/* DM Custom Counter change notification */}
-              {counterToast && (
-                <DmCounterNotification
-                  label={counterToast.label}
-                  value={counterToast.value}
-                  delta={counterToast.delta}
-                  onDismiss={() => setCounterToast(null)}
-                />
-              )}
+                {/* DM Custom Counter change notification */}
+                {counterToast && (
+                  <DmCounterNotification
+                    label={counterToast.label}
+                    value={counterToast.value}
+                    delta={counterToast.delta}
+                    onDismiss={() => setCounterToast(null)}
+                  />
+                )}
 
-              {/* DM Message Notifications */}
-              {(sharedState?.messages?.length ?? 0) > 0 && (
-                <DmMessageNotification
-                  messages={sharedState!.messages}
-                  onAccept={msg => {
-                    acknowledgeMessage(msg.id);
-                    switchToTab('character');
-                    setCharacterSubTab('notes');
-                  }}
-                  onDismiss={messageId => {
-                    acknowledgeMessage(messageId);
-                  }}
-                />
-              )}
+                {/* DM Message Notifications */}
+                {(sharedState?.messages?.length ?? 0) > 0 && (
+                  <DmMessageNotification
+                    messages={sharedState!.messages}
+                    onAccept={msg => {
+                      acknowledgeMessage(msg.id);
+                      switchToTab('character');
+                      setCharacterSubTab('notes');
+                    }}
+                    onDismiss={messageId => {
+                      acknowledgeMessage(messageId);
+                    }}
+                  />
+                )}
 
-              {/* Item Transfer Notifications */}
-              {pendingTransfers.length > 0 && (
-                <ItemTransferNotification
-                  transfers={pendingTransfers}
-                  onDismiss={clearPendingTransfer}
-                  onNavigateToInventory={() => {
-                    switchToTab('inventory');
-                    setInventorySubTab('items');
-                  }}
-                />
-              )}
+                {/* Item Transfer Notifications */}
+                {pendingTransfers.length > 0 && (
+                  <ItemTransferNotification
+                    transfers={pendingTransfers}
+                    onDismiss={clearPendingTransfer}
+                    onNavigateToInventory={() => {
+                      switchToTab('inventory');
+                      setInventorySubTab('items');
+                    }}
+                  />
+                )}
+              </aside>
 
               {/* Send Item Dialog */}
               <SendItemDialog

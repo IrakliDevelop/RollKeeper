@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, X, Zap } from 'lucide-react';
+import { X, Zap } from 'lucide-react';
 import type { DmEffect } from '@/types/sharedState';
 
 interface DmEffectsNotificationProps {
@@ -29,28 +29,20 @@ export function DmEffectsNotification({
       : additions.map(e => e.name).join(', ');
 
   return (
-    <div className="pointer-events-none fixed top-4 right-4 z-50 w-80 sm:w-96">
+    <div className="contents">
       <div
-        className={`pointer-events-auto rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-xl shadow-amber-200/40 transition-all duration-300 dark:border-amber-700 dark:bg-amber-950/90 dark:text-amber-100 dark:shadow-amber-900/30 ${
-          animatingOut
-            ? 'translate-x-full opacity-0'
-            : 'animate-in slide-in-from-right-full translate-x-0 opacity-100'
-        }`}
+        className={`border-divider bg-surface-elevated text-body pointer-events-auto rounded-md border p-4 transition-opacity duration-300 ${animatingOut ? 'opacity-0' : 'opacity-100'}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2.5">
-            <div className="mt-0.5 animate-pulse rounded-full bg-amber-200 p-1.5 text-amber-700 dark:bg-amber-800 dark:text-amber-300">
-              <Zap size={14} />
-            </div>
+            <Zap size={14} className="text-muted mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+              <p className="text-muted text-xs font-medium">
                 DM applied {additions.length === 1 ? 'an effect' : 'effects'}
               </p>
-              <p className="mt-0.5 text-sm font-bold text-amber-900 dark:text-amber-100">
-                {label}
-              </p>
+              <p className="text-heading mt-0.5 text-sm font-bold">{label}</p>
               {additions.length === 1 && additions[0].sourceSpell && (
-                <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-muted mt-0.5 text-xs">
                   Source: {additions[0].sourceSpell}
                 </p>
               )}
@@ -58,17 +50,15 @@ export function DmEffectsNotification({
           </div>
           <button
             onClick={handleDismiss}
-            className="shrink-0 rounded p-0.5 text-amber-400 transition-colors hover:bg-amber-200 hover:text-amber-700 dark:text-amber-500 dark:hover:bg-amber-800 dark:hover:text-amber-200"
+            className="text-muted hover:text-heading shrink-0 rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             title="Dismiss"
+            aria-label="Dismiss DM effect notification"
           >
             <X size={16} />
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-          <Sparkles size={10} className="mr-1 inline" />
-          Added to your conditions
-        </p>
+        <p className="text-muted mt-2 text-xs">Added to your conditions</p>
       </div>
     </div>
   );

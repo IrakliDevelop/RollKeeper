@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { ArrowLeft, Map as MapIcon, Loader2, X, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/feedback/dialog';
 import { useLocationSync } from '@/hooks/useLocationSync';
 import type { LocationMetadata, SyncedLocation } from '@/types/location';
 
@@ -14,7 +18,15 @@ interface PlayerLocationViewProps {
 
 /* ─── Fullscreen lightbox with pan / zoom ───────────────────── */
 
-function MapLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+function MapLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -155,75 +167,60 @@ function MapLightbox({ src, onClose }: { src: string; onClose: () => void }) {
     [getMidpoint, getDistance]
   );
 
-  // Close on backdrop click (click that didn't drag)
-  const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
-  const handleBackdropPointerDown = useCallback((e: React.PointerEvent) => {
-    pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
-  }, []);
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent) => {
-      // Only close if click target is the backdrop itself (not children)
-      if (e.target !== e.currentTarget) return;
-      // Only close if pointer didn't move (not a drag)
-      const down = pointerDownPosRef.current;
-      if (down) {
-        const dist = Math.sqrt(
-          (e.clientX - down.x) ** 2 + (e.clientY - down.y) ** 2
-        );
-        if (dist > 5) return;
-      }
-      onClose();
-    },
-    [onClose]
-  );
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80"
-      onPointerDown={handleBackdropPointerDown}
-      onClick={handleBackdropClick}
-    >
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+  return (
+    <Dialog open onOpenChange={open => !open && onClose()}>
+      <DialogContent
+        size="full"
+        showCloseButton={false}
+        className="h-[95vh] max-h-[95vh] overflow-hidden p-0"
       >
-        <X size={22} />
-      </button>
-
-      {/* Reset zoom */}
-      <button
-        onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
-        className="absolute right-4 bottom-4 z-10 rounded-md bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-      >
-        Reset zoom
-      </button>
-
-      {/* Pannable / zoomable image */}
-      <div
-        ref={containerRef}
-        className="h-full w-full cursor-grab touch-none overflow-hidden active:cursor-grabbing"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        <div
-          className="flex h-full w-full items-center justify-center"
-          style={{
-            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-          }}
+        <DialogTitle className="sr-only">{alt}</DialogTitle>
+        {/* Close button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10"
+          aria-label="Close map"
         >
-          <img
-            src={src}
-            alt="Location map"
-            draggable={false}
-            className="max-h-full max-w-full object-contain select-none"
-          />
+          <X size={22} />
+        </Button>
+
+        {/* Reset zoom */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
+          className="absolute right-4 bottom-4 z-10"
+        >
+          Reset zoom
+        </Button>
+
+        {/* Pannable / zoomable image */}
+        <div
+          ref={containerRef}
+          className="h-full w-full cursor-grab touch-none overflow-hidden active:cursor-grabbing"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          <div
+            className="flex h-full w-full items-center justify-center"
+            style={{
+              transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+            }}
+          >
+            <img
+              src={src}
+              alt={alt}
+              draggable={false}
+              className="max-h-full max-w-full object-contain select-none"
+            />
+          </div>
         </div>
-      </div>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -348,8 +345,10 @@ export default function PlayerLocationView({
           {!stateLoading && !stateError && displayImageUrl ? (
             <>
               {/* Fitted preview image */}
-              <div
-                className="group relative cursor-pointer"
+              <button
+                type="button"
+                aria-label={`Expand ${selectedLocation.name} map`}
+                className="group relative block w-full cursor-pointer"
                 onClick={() => setLightboxOpen(true)}
               >
                 <img
@@ -359,18 +358,19 @@ export default function PlayerLocationView({
                   style={{ maxHeight: '60vh' }}
                 />
                 {/* Expand overlay */}
-                <div className="absolute inset-0 flex items-center justify-center rounded-b-lg bg-black/0 transition-colors group-hover:bg-black/20">
-                  <div className="flex items-center gap-1.5 rounded-md bg-black/60 px-3 py-1.5 text-xs text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+                <div className="absolute inset-0 flex items-center justify-center rounded-b-lg">
+                  <span className="bg-surface-raised text-body flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-xs">
                     <Maximize2 size={13} />
-                    Click to expand
-                  </div>
+                    Expand map
+                  </span>
                 </div>
-              </div>
+              </button>
 
               {/* Fullscreen lightbox */}
               {lightboxOpen && (
                 <MapLightbox
                   src={displayImageUrl}
+                  alt={selectedLocation.name}
                   onClose={() => setLightboxOpen(false)}
                 />
               )}

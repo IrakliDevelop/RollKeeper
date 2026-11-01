@@ -33,7 +33,12 @@ export function CalendarNav({
 
   return (
     <div className="flex items-center justify-between">
-      <Button variant="ghost" size="sm" onClick={onPrevMonth}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onPrevMonth}
+        aria-label="Previous month"
+      >
         <ChevronLeft size={18} />
       </Button>
 
@@ -54,7 +59,12 @@ export function CalendarNav({
         )}
       </div>
 
-      <Button variant="ghost" size="sm" onClick={onNextMonth}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onNextMonth}
+        aria-label="Next month"
+      >
         <ChevronRight size={18} />
       </Button>
     </div>

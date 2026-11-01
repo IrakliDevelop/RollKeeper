@@ -540,6 +540,7 @@ export function PlayerCalendarView({
         <EventListView
           events={events}
           config={config}
+          showVisibility={false}
           onUpdateEvent={(eventId, updates) =>
             updateEvent(characterId, eventId, updates)
           }
@@ -551,6 +552,7 @@ export function PlayerCalendarView({
         <>
           <EventDialog
             open={eventDialogOpen}
+            showVisibility={false}
             onClose={() => setEventDialogOpen(false)}
             onSave={handleSaveEvent}
             onDelete={editingEvent ? handleDeleteEvent : undefined}
