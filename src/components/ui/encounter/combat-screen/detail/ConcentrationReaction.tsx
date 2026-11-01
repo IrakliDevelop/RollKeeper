@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Brain, ClockAlert } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { Switch } from '@/components/ui/forms/switch';
 import type { DetailSectionProps } from './DetailHeader';
 
 export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
+  const concentrationRef = useRef<HTMLInputElement>(null);
   if (entity.type === 'lair') return null;
   const isPlayer = entity.type === 'player';
 
@@ -34,6 +36,7 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
         ) : (
           <>
             <Input
+              ref={concentrationRef}
               type="text"
               value={entity.concentrationSpell ?? ''}
               onChange={e =>
@@ -49,7 +52,11 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
                 type="button"
                 variant="secondary"
                 size="xs"
-                onClick={() => actions.onSetConcentration(entity.id, null)}
+                onClick={() => {
+                  actions.onSetConcentration(entity.id, null);
+                  concentrationRef.current?.focus();
+                }}
+                aria-label={`Drop concentration on ${entity.concentrationSpell}`}
               >
                 Drop
               </Button>
@@ -65,7 +72,7 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
           className="text-muted shrink-0"
           aria-hidden="true"
         />
-        <span className="text-body text-xs">Reaction:</span>
+        {isPlayer && <span className="text-body text-xs">Reaction:</span>}
         {isPlayer ? (
           <span className="text-body text-xs">
             {entity.hasUsedReaction ? (
@@ -76,19 +83,14 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
             <span className="text-muted ml-1">(synced)</span>
           </span>
         ) : (
-          <Button
-            type="button"
-            variant="secondary"
-            size="xs"
-            selected={entity.hasUsedReaction}
-            onClick={() =>
-              actions.onUpdate(entity.id, {
-                hasUsedReaction: !entity.hasUsedReaction,
-              })
+          <Switch
+            label="Reaction used"
+            size="sm"
+            checked={entity.hasUsedReaction === true}
+            onCheckedChange={checked =>
+              actions.onUpdate(entity.id, { hasUsedReaction: checked })
             }
-          >
-            {entity.hasUsedReaction ? 'Used' : 'Available'}
-          </Button>
+          />
         )}
       </div>
     </>

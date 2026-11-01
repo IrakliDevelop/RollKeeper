@@ -137,7 +137,9 @@ beforeEach(() => {
 describe('CreatureDrawer parity — header', () => {
   it('renames the creature', async () => {
     const { actions, user } = renderDrawer();
-    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Captain Vex' })
+    );
     const input = screen.getByLabelText('Combatant name');
     await user.clear(input);
     await user.type(input, 'Vex the Bold{Enter}');
@@ -150,7 +152,7 @@ describe('CreatureDrawer parity — header', () => {
     renderConfirmDialogHost();
     const { actions, user } = renderDrawer();
     await user.click(
-      screen.getByRole('button', { name: 'Remove from combat' })
+      screen.getByRole('button', { name: 'Remove Captain Vex from combat' })
     );
     expect(actions.onRemove).not.toHaveBeenCalled();
     await clickConfirmDialogButton('Remove from combat');
@@ -159,7 +161,9 @@ describe('CreatureDrawer parity — header', () => {
 
   it('opens the NPC library record', async () => {
     const { actions, user } = renderDrawer();
-    await user.click(screen.getByRole('button', { name: 'View NPC details' }));
+    await user.click(
+      screen.getByRole('button', { name: 'View Captain Vex in NPC library' })
+    );
     expect(actions.onViewNPC).toHaveBeenCalledWith('npc-vex', ID);
   });
 });
@@ -210,20 +214,20 @@ describe('CreatureDrawer parity — vitals', () => {
 
     fireEvent.change(amount, { target: { value: '10' } });
     await user.click(
-      screen.getByRole('button', { name: 'Half damage (resistance)' })
+      screen.getByRole('button', { name: '½× Halve damage (resistance)' })
     );
     await user.click(screen.getByRole('button', { name: /^damage$/i }));
     expect(actions.onDamage).toHaveBeenCalledWith(ID, 5);
 
     fireEvent.change(amount, { target: { value: '3' } });
     await user.click(
-      screen.getByRole('button', { name: 'Double damage (vulnerability)' })
+      screen.getByRole('button', { name: '2× Double damage (vulnerability)' })
     );
     await user.click(screen.getByRole('button', { name: /^heal$/i }));
     expect(actions.onHeal).toHaveBeenCalledWith(ID, 6);
 
     fireEvent.change(amount, { target: { value: '4' } });
-    await user.click(screen.getByRole('button', { name: /\+ temp/i }));
+    await user.click(screen.getByRole('button', { name: 'Add temp HP' }));
     expect(actions.onAddTempHp).toHaveBeenCalledWith(ID, 4);
   });
 
@@ -287,10 +291,12 @@ describe('CreatureDrawer parity — vitals', () => {
     });
     expect(actions.onSetConcentration).toHaveBeenCalledWith(ID, 'Bless');
 
-    await user.click(screen.getByRole('button', { name: 'Drop' }));
+    await user.click(
+      screen.getByRole('button', { name: /^Drop concentration on/ })
+    );
     expect(actions.onSetConcentration).toHaveBeenCalledWith(ID, null);
 
-    await user.click(screen.getByRole('button', { name: 'Available' }));
+    await user.click(screen.getByRole('switch', { name: 'Reaction used' }));
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, {
       hasUsedReaction: true,
     });
@@ -361,7 +367,7 @@ describe('CreatureDrawer parity — Actions tab', () => {
   it('uses and restores entry uses, and spends inventory/resource costs', async () => {
     const { actions, user } = renderDrawer();
     await user.click(
-      screen.getByRole('button', { name: 'Use Volley (use 2 of 2)' })
+      screen.getByRole('button', { name: 'Use Volley (2 of 2)' })
     );
     expect(actions.onUseAbility).toHaveBeenCalledWith(ID, 'act-volley');
     await user.click(
@@ -482,7 +488,7 @@ describe('CreatureDrawer parity — Effects tab', () => {
 
     expect(screen.getByText('×2')).toBeInTheDocument();
     await user.click(
-      screen.getByRole('button', { name: 'Poisoned decrease rounds' })
+      screen.getByRole('button', { name: 'Decrease Poisoned rounds' })
     );
     expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
       ID,
@@ -490,7 +496,7 @@ describe('CreatureDrawer parity — Effects tab', () => {
       2
     );
     await user.click(
-      screen.getByRole('button', { name: 'Poisoned increase rounds' })
+      screen.getByRole('button', { name: 'Increase Poisoned rounds' })
     );
     expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
       ID,
@@ -498,10 +504,10 @@ describe('CreatureDrawer parity — Effects tab', () => {
       4
     );
     expect(
-      screen.getByRole('button', { name: 'Warded decrease rounds' })
+      screen.getByRole('button', { name: 'Decrease Warded rounds' })
     ).toBeDisabled();
     await user.click(
-      screen.getByRole('button', { name: 'Warded increase rounds' })
+      screen.getByRole('button', { name: 'Increase Warded rounds' })
     );
     expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
       ID,
@@ -512,7 +518,7 @@ describe('CreatureDrawer parity — Effects tab', () => {
     expect(actions.onRemoveCondition).toHaveBeenCalledWith(ID, 'cond-poison');
 
     await user.click(
-      screen.getByRole('button', { name: 'Webbed (from Giant Spider)' })
+      screen.getByRole('button', { name: 'Apply Webbed (from Giant Spider)' })
     );
     expect(actions.onAddCondition).toHaveBeenCalledWith(
       ID,

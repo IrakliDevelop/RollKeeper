@@ -65,9 +65,8 @@ export function DamageControls({
           onClick={() => {
             if (amount != null && amount > 0) setAmount(Math.floor(amount / 2));
           }}
-          aria-label="Half damage (resistance)"
         >
-          ½×
+          ½× <span className="sr-only">Halve damage (resistance)</span>
         </Button>
         <Button
           type="button"
@@ -76,9 +75,8 @@ export function DamageControls({
           onClick={() => {
             if (amount != null && amount > 0) setAmount(amount * 2);
           }}
-          aria-label="Double damage (vulnerability)"
         >
-          2×
+          2× <span className="sr-only">Double damage (vulnerability)</span>
         </Button>
       </div>
       <Button
@@ -110,7 +108,7 @@ export function DamageControls({
         onClick={handleTemp}
         disabled={!valid}
       >
-        + Temp HP
+        Add temp HP
       </Button>
     </div>
   );

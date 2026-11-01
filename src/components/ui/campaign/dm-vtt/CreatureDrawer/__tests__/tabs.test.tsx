@@ -275,7 +275,7 @@ describe('EffectsTab', () => {
         editing={false}
       />
     );
-    expect(screen.getByText('Active effects')).toBeInTheDocument();
+    expect(screen.getByText('Conditions and effects')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Blinded' })).toBeInTheDocument();
   });
 });

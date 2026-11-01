@@ -91,6 +91,7 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
         variant="ghost"
         size="xs"
         aria-label={hpToggleLabel}
+        selected={hpVisible}
         className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >
         <HeartPulse size={14} aria-hidden="true" />

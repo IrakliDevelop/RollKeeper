@@ -154,7 +154,7 @@ describe('MonsterStatBlockPanel — ability tracking', () => {
       />
     );
     expect(screen.getByLabelText('Restore Smite use 1')).toBeTruthy();
-    await user.click(screen.getByLabelText('Use Smite (use 2 of 3)'));
+    await user.click(screen.getByLabelText('Use Smite (2 of 3)'));
     expect(onUseAbilityEntry).toHaveBeenCalled();
   });
 

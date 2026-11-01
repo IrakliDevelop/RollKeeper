@@ -78,6 +78,12 @@ const monsterEntity: EncounterEntity = {
 };
 
 describe('DetailAbilityScores — saves column', () => {
+  it('clicking the visible Prof label toggles that saving throw proficiency', () => {
+    const actions = makeActions();
+    render(<DetailAbilityScores entity={monsterEntity} actions={actions} />);
+    fireEvent.click(screen.getAllByText('Prof')[0]);
+    expect(actions.onUpdate).toHaveBeenCalled();
+  });
   it('shows the parsed save for proficient abilities (amber) and the modifier fallback for the rest (faint)', () => {
     render(
       <DetailAbilityScores entity={monsterEntity} actions={makeActions()} />

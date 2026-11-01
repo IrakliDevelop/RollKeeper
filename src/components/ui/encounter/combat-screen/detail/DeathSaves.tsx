@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Skull } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import type { EncounterEntity } from '@/types/encounter';
@@ -13,6 +13,18 @@ interface DeathSavesProps {
 
 export function DeathSaves({ entity, actions }: DeathSavesProps) {
   const ds = entity.deathSaves;
+  const pendingStatusFocus = useRef<'stable' | 'dead' | null>(null);
+  const statusRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const status = pendingStatusFocus.current;
+    if (
+      (status === 'stable' && ds?.isStabilized) ||
+      (status === 'dead' && (ds?.failures ?? 0) >= 3)
+    ) {
+      statusRef.current?.focus();
+      pendingStatusFocus.current = null;
+    }
+  }, [ds]);
   if (!ds) return null;
 
   const isNpc = entity.type === 'npc' || entity.npcSourceId != null;
@@ -21,7 +33,9 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
     return (
       <div className="flex items-center gap-2">
         <Skull size={14} className="text-heading shrink-0" />
-        <Badge variant="success">Stabilized</Badge>
+        <span ref={statusRef} tabIndex={-1}>
+          <Badge variant="success">Stabilized</Badge>
+        </span>
       </div>
     );
   }
@@ -30,7 +44,9 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
     return (
       <div className="flex items-center gap-2">
         <Skull size={14} className="text-heading shrink-0" />
-        <Badge variant="danger">Dead</Badge>
+        <span ref={statusRef} tabIndex={-1}>
+          <Badge variant="danger">Dead</Badge>
+        </span>
       </div>
     );
   }
@@ -39,6 +55,7 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
     if (!isNpc) return;
     const filled = i <= ds.successes;
     const newSuccesses = filled ? i - 1 : i;
+    if (newSuccesses >= 3) pendingStatusFocus.current = 'stable';
     actions.onUpdate(entity.id, {
       deathSaves: {
         ...ds,
@@ -52,6 +69,7 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
     if (!isNpc) return;
     const filled = i <= ds.failures;
     const newFailures = filled ? i - 1 : i;
+    if (newFailures >= 3) pendingStatusFocus.current = 'dead';
     actions.onUpdate(entity.id, {
       deathSaves: { ...ds, failures: newFailures },
     });
@@ -69,7 +87,6 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
               key={`s-${i}`}
               type="button"
               aria-label={`${filled ? 'Clear' : 'Mark'} death save success ${i}`}
-              aria-pressed={filled}
               onClick={() => handleSuccess(i)}
               className="focus-visible:outline-ring flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
@@ -97,7 +114,6 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
               key={`f-${i}`}
               type="button"
               aria-label={`${filled ? 'Clear' : 'Mark'} death save failure ${i}`}
-              aria-pressed={filled}
               onClick={() => handleFailure(i)}
               className="focus-visible:outline-ring flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >

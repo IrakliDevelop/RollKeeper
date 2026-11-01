@@ -17,6 +17,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);
   const [maxInput, setMaxInput] = useState('');
   const cancelMax = useRef(false);
+  const maxHpButtonRef = useRef<HTMLButtonElement>(null);
 
   if (entity.type === 'lair') return null;
 
@@ -67,11 +68,12 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
                   setEditingMax(false);
                 }
               }}
-              className="bg-surface border-divider text-heading w-14 rounded-sm border px-1 py-1 text-center text-base font-medium"
+              className="bg-surface border-divider text-heading w-14 rounded-sm border px-1 py-1 text-center text-base font-medium pointer-coarse:min-h-11"
               autoFocus
             />
           ) : (
             <Button
+              ref={maxHpButtonRef}
               type="button"
               variant="ghost"
               size="xs"
@@ -79,7 +81,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
                 setMaxInput(entity.maxHp.toString());
                 setEditingMax(true);
               }}
-              aria-label={`Edit ${entity.name} max HP`}
+              aria-label={`${entity.maxHp}, edit ${entity.name} max HP`}
               className="tabular-nums pointer-coarse:min-h-11"
             >
               {entity.maxHp}
@@ -99,7 +101,10 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
                   type="button"
                   variant="ghost"
                   size="xs"
-                  onClick={() => actions.onUpdate(entity.id, { tempHp: 0 })}
+                  onClick={() => {
+                    actions.onUpdate(entity.id, { tempHp: 0 });
+                    maxHpButtonRef.current?.focus();
+                  }}
                   className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   aria-label={`Clear ${entity.name} temp HP`}
                 >

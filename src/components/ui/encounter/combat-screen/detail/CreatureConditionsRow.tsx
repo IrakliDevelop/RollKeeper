@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/forms/button';
 import { getConditionIcon } from '@/utils/conditionIcons';
+import { effectSummary } from './effectSummary';
 
 import type { CreatureCondition } from '@/utils/customConditions';
 
@@ -39,7 +40,7 @@ export function CreatureConditionsRow({
                 size="xs"
                 type="button"
                 disabled={activeNames.has(condition.name)}
-                aria-label={`${condition.name} (from ${sourceName})`}
+                aria-label={`Apply ${condition.name} (from ${sourceName})`}
                 onClick={() => onApply(item)}
               >
                 <Icon size={12} aria-hidden="true" />
@@ -47,8 +48,8 @@ export function CreatureConditionsRow({
               </Button>
               <span className="text-muted text-xs">From {sourceName}</span>
               {condition.description && (
-                <span className="text-muted text-xs">
-                  {condition.description}
+                <span className="text-muted line-clamp-1 min-w-0 flex-1 text-xs">
+                  {effectSummary(condition.description)}
                 </span>
               )}
             </div>

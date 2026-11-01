@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { SubTabs, type SubTabDefinition } from '@/components/ui/layout/SubTabs';
 import { ActiveEffectChip } from './ActiveEffectChip';
 import { CreatureConditionsRow } from './CreatureConditionsRow';
+import { effectSummary } from './effectSummary';
 import {
   buildEffectPalette,
   useConditionLibrary,
@@ -25,6 +26,8 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const tabId = useId();
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
+  const pendingPaletteFocus = useRef<string | null>(null);
+  const activePaletteRefs = useRef(new Map<string, HTMLSpanElement>());
   const library = useConditionLibrary();
   const { conditions: officialConditions, loading: officialConditionsLoading } =
     useOfficialConditions();
@@ -34,6 +37,13 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
 
   const activeConditions = entity.conditions ?? [];
   const activeNames = new Set(activeConditions.map(c => c.name));
+  useEffect(() => {
+    const name = pendingPaletteFocus.current;
+    if (name && activeNames.has(name)) {
+      activePaletteRefs.current.get(name)?.focus();
+      pendingPaletteFocus.current = null;
+    }
+  }, [activeConditions]);
   const palette = buildEffectPalette(
     tab,
     library,
@@ -49,6 +59,7 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
   };
 
   const handleApplyPalette = (entry: EffectPaletteEntry) => {
+    pendingPaletteFocus.current = entry.name;
     actions.onAddCondition(
       entity.id,
       entry.condition
@@ -75,19 +86,29 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
           const Icon = entry.condition
             ? getConditionIcon(entry.name, entry.kind, entry.condition.icon)
             : null;
-          const description = entry.condition?.description || entry.description;
+          const description = effectSummary(
+            entry.condition?.description || entry.description || ''
+          );
           return (
             <div
               key={entry.condition?.id ?? entry.name}
               className="border-divider flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-2 last:border-b-0"
             >
               {isActive ? (
-                <Badge
-                  variant={tab === 'buffs' ? 'success' : 'warning'}
-                  size="sm"
+                <span
+                  tabIndex={-1}
+                  ref={node => {
+                    if (node) activePaletteRefs.current.set(entry.name, node);
+                    else activePaletteRefs.current.delete(entry.name);
+                  }}
                 >
-                  {entry.name} · Active
-                </Badge>
+                  <Badge
+                    variant={tab === 'buffs' ? 'success' : 'warning'}
+                    size="sm"
+                  >
+                    {entry.name} · Active
+                  </Badge>
+                </span>
               ) : (
                 <Button
                   type="button"
@@ -101,7 +122,9 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
                 </Button>
               )}
               {description && (
-                <span className="text-muted text-xs">{description}</span>
+                <span className="text-muted line-clamp-1 min-w-0 flex-1 text-xs">
+                  {description}
+                </span>
               )}
             </div>
           );
@@ -150,7 +173,9 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
 
   return (
     <div className="border-divider space-y-3 border-t p-4">
-      <h3 className="type-label-heading text-heading">Active effects</h3>
+      <h3 className="type-label-heading text-heading">
+        Conditions and effects
+      </h3>
 
       {activeConditions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -178,7 +203,7 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
 
       <SubTabs
         tabs={tabs}
-        label="Effect palette"
+        label="Effects to add"
         value={tab}
         onValueChange={value => {
           if (value === 'conditions' || value === 'buffs') setTab(value);

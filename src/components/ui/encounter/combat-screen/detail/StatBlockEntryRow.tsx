@@ -145,7 +145,7 @@ export function StatBlockEntryRow({
                   aria-label={
                     isUsed
                       ? `Restore ${displayName} use ${i + 1}`
-                      : `Use ${displayName} (use ${i + 1} of ${max})`
+                      : `Use ${displayName} (${i + 1} of ${max})`
                   }
                   title={
                     isUsed

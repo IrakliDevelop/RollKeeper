@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FilePen } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -13,6 +13,18 @@ import { statBlockEntryHandlers } from './statBlockEntryHandlers';
 
 export function LairActionsSection({ entity, actions }: DetailSectionProps) {
   const lairActions = entity.lairActions;
+  const pendingFocus = useRef<string | null>(null);
+  const usedRefs = useRef(new Map<string, HTMLSpanElement>());
+  useEffect(() => {
+    const id = pendingFocus.current;
+    if (
+      id &&
+      lairActions?.some(action => action.id === id && action.usedThisRound)
+    ) {
+      usedRefs.current.get(id)?.focus();
+      pendingFocus.current = null;
+    }
+  }, [lairActions]);
   if (!lairActions || lairActions.length === 0) return null;
 
   return (
@@ -33,13 +45,24 @@ export function LairActionsSection({ entity, actions }: DetailSectionProps) {
             />
           </div>
           {la.usedThisRound ? (
-            <Badge variant="neutral">Used this round</Badge>
+            <span
+              tabIndex={-1}
+              ref={node => {
+                if (node) usedRefs.current.set(la.id, node);
+                else usedRefs.current.delete(la.id);
+              }}
+            >
+              <Badge variant="neutral">Used this round</Badge>
+            </span>
           ) : (
             <Button
               type="button"
               variant="secondary"
               size="xs"
-              onClick={() => actions.onUseLairAction(entity.id, la.id)}
+              onClick={() => {
+                pendingFocus.current = la.id;
+                actions.onUseLairAction(entity.id, la.id);
+              }}
               aria-label={`Use ${la.name}`}
             >
               Use

@@ -71,16 +71,13 @@ export function ActiveEffectChip({
       {cond.sourceSpell && (
         <span className="text-muted text-xs">From {cond.sourceSpell}</span>
       )}
-      {cond.description?.trim() && (
-        <span className="text-muted text-xs">{cond.description.trim()}</span>
-      )}
       <Button
         type="button"
         variant="ghost"
         size="xs"
         onClick={handleDecrease}
         disabled={!hasRounds}
-        aria-label={`${cond.name} decrease rounds`}
+        aria-label={`Decrease ${cond.name} rounds`}
         className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >
         <Minus size={12} aria-hidden="true" />
@@ -92,6 +89,7 @@ export function ActiveEffectChip({
           <InfinityIcon
             size={12}
             className="inline"
+            role="img"
             aria-label="No round limit"
           />
         )}
@@ -101,7 +99,7 @@ export function ActiveEffectChip({
         variant="ghost"
         size="xs"
         onClick={handleIncrease}
-        aria-label={`${cond.name} increase rounds`}
+        aria-label={`Increase ${cond.name} rounds`}
         className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >
         <Plus size={12} aria-hidden="true" />

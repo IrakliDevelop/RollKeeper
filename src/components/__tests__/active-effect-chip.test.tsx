@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { ActiveEffectChip } from '@/components/ui/encounter/combat-screen/detail/ActiveEffectChip';
 import type { EncounterCondition } from '@/types/encounter';
 
@@ -18,7 +18,7 @@ function renderChip(cond: EncounterCondition) {
 }
 
 describe('ActiveEffectChip', () => {
-  it('shows the custom icon and description in text', () => {
+  it('keeps the custom icon and excludes long rules text from the compact chip', () => {
     const { container } = renderChip({
       id: 'c1',
       name: 'Cursed Blood',
@@ -27,7 +27,7 @@ describe('ActiveEffectChip', () => {
       kind: 'debuff',
     });
     expect(container.querySelector('.lucide-droplet')).not.toBeNull();
-    expect(container).toHaveTextContent(
+    expect(container).not.toHaveTextContent(
       'Lose 1d4 HP at the start of each turn.'
     );
   });
@@ -42,16 +42,21 @@ describe('ActiveEffectChip', () => {
     expect(container.querySelector('svg.lucide-droplet')).toBeNull();
     expect(container.querySelector('span.rounded-full')).not.toBeNull();
     expect(container).toHaveTextContent('From Bless');
+    expect(
+      screen.getByRole('img', { name: 'No round limit' })
+    ).toBeInTheDocument();
   });
 
-  it('shows description and spell source, and omits a title tooltip', () => {
+  it('shows spell source without a rules paragraph or title tooltip', () => {
     const both = renderChip({
       id: 'c3',
       name: 'Hexed',
       description: 'Disadvantage on Wisdom checks.',
       sourceSpell: 'Hex',
     });
-    expect(both.container).toHaveTextContent('Disadvantage on Wisdom checks.');
+    expect(both.container).not.toHaveTextContent(
+      'Disadvantage on Wisdom checks.'
+    );
     expect(both.container).toHaveTextContent('From Hex');
     cleanup();
     const none = renderChip({ id: 'c4', name: 'Prone' });

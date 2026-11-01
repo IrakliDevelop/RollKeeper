@@ -236,7 +236,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     expect(screen.getByText('STR')).toBeInTheDocument();
     expect(screen.getByText('Combat details')).toBeInTheDocument();
     expect(screen.getByText(/legendary actions/i)).toBeInTheDocument();
-    expect(screen.getByText(/active effects/i)).toBeInTheDocument();
+    expect(screen.getByText(/conditions and effects/i)).toBeInTheDocument();
     expect(
       screen.getByRole('textbox', { name: 'Initiative modifier' })
     ).toBeInTheDocument();
@@ -317,7 +317,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     render(<CombatantDetail entity={monsterEntity} actions={actions} />);
 
     await user.click(
-      screen.getByRole('button', { name: 'Frightened increase rounds' })
+      screen.getByRole('button', { name: 'Increase Frightened rounds' })
     );
 
     expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
@@ -337,7 +337,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     render(<CombatantDetail entity={entityWithOneRound} actions={actions} />);
 
     await user.click(
-      screen.getByRole('button', { name: 'Blinded decrease rounds' })
+      screen.getByRole('button', { name: 'Decrease Blinded rounds' })
     );
 
     expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
@@ -357,7 +357,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     render(<CombatantDetail entity={entityWithInfinite} actions={actions} />);
 
     const decreaseBtn = screen.getByRole('button', {
-      name: 'Stunned decrease rounds',
+      name: 'Decrease Stunned rounds',
     });
     expect(decreaseBtn).toBeDisabled();
 

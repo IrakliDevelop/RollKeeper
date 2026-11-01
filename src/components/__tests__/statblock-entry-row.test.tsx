@@ -52,7 +52,7 @@ describe('StatBlockEntryRow', () => {
       view.getByRole('button', { name: 'Restore Smite use 1' })
     ).toBeVisible();
     expect(
-      view.getByRole('button', { name: 'Use Smite (use 2 of 3)' })
+      view.getByRole('button', { name: 'Use Smite (2 of 3)' })
     ).toBeVisible();
     cleanup();
     const readOnly = render(
@@ -89,7 +89,7 @@ describe('StatBlockEntryRow', () => {
     );
     screen.getByLabelText('Restore Smite use 1').click();
     expect(onRestore).toHaveBeenCalledWith(TRACKED_ENTRY);
-    screen.getByLabelText('Use Smite (use 2 of 3)').click();
+    screen.getByLabelText('Use Smite (2 of 3)').click();
     expect(onUse).toHaveBeenCalledWith(TRACKED_ENTRY);
   });
 
@@ -109,7 +109,7 @@ describe('StatBlockEntryRow', () => {
         onRestoreAbility={onRestore}
       />
     );
-    const availablePip = screen.getByLabelText('Use Smite (use 2 of 3)');
+    const availablePip = screen.getByLabelText('Use Smite (2 of 3)');
     expect((availablePip as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Needs 2 Wild Shape, 1 left')).toBeVisible();
     expect(availablePip.getAttribute('title')).toBe(
@@ -133,7 +133,7 @@ describe('StatBlockEntryRow', () => {
       />
     );
     const used = view.getByLabelText('Restore Smite use 1');
-    const available = view.getByLabelText('Use Smite (use 2 of 3)');
+    const available = view.getByLabelText('Use Smite (2 of 3)');
     expect(used).toHaveClass('pointer-coarse:min-h-11');
     expect(available).toHaveClass('pointer-coarse:min-w-11');
     expect(used.querySelector('span')).toHaveClass('border-divider-strong');
@@ -208,7 +208,7 @@ describe('StatBlockEntryRow', () => {
       />
     );
     expect(
-      screen.getByLabelText('Use Smite (use 1 of 3)').getAttribute('title')
+      screen.getByLabelText('Use Smite (1 of 3)').getAttribute('title')
     ).toBe('Use — spends 2 Wild Shape');
   });
 

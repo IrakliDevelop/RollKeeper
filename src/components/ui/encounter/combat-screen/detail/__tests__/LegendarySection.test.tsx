@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 
 import { LegendarySection } from '../LegendarySection';
+import { LairActionsSection } from '../DetailActions';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../../types';
 
@@ -93,5 +96,25 @@ describe('LegendarySection description rendering', () => {
     expect(screen.getByText(/Perception/)).toBeInTheDocument();
     expect(screen.queryByText(/<span/)).not.toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain('&lt;span');
+  });
+});
+
+describe('LairActionsSection focus', () => {
+  it('keeps focus on the used state when Use becomes a badge', async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [used, setUsed] = useState(false);
+      const entity = makeEntity({
+        type: 'lair',
+        lairActions: [
+          { id: 'mist', name: 'Mist', description: '', usedThisRound: used },
+        ],
+      });
+      const actions = makeActions({ onUseLairAction: () => setUsed(true) });
+      return <LairActionsSection entity={entity} actions={actions} />;
+    }
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Use Mist' }));
+    expect(screen.getByText('Used this round').parentElement).toHaveFocus();
   });
 });

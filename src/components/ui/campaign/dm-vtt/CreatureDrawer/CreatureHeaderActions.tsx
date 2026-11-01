@@ -87,8 +87,8 @@ export function CreatureHeaderActions({
           variant="outline"
           size="sm"
           onClick={handleRemove}
-          aria-label="Remove from combat"
-          title="Remove from combat"
+          aria-label={`Remove ${entity.name} from combat`}
+          title={`Remove ${entity.name} from combat`}
         >
           <Trash2 className="text-accent-red-text h-3.5 w-3.5" />
         </Button>
@@ -97,8 +97,8 @@ export function CreatureHeaderActions({
             variant="ghost"
             size="sm"
             onClick={() => onViewNPC(npcSourceId, entity.id)}
-            aria-label="View NPC details"
-            title="View NPC details"
+            aria-label={`View ${entity.name} in NPC library`}
+            title={`View ${entity.name} in NPC library`}
           >
             <Eye className="h-3.5 w-3.5" />
           </Button>

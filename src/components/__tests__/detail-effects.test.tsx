@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { DetailEffects } from '@/components/ui/encounter/combat-screen/detail/DetailEffects';
 import { useEncounterStore } from '@/store/encounterStore';
 import { createMockEncounter } from '@/test/helpers';
@@ -144,6 +145,60 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
     expect(screen.getByText('Marked by Fate')).toBeTruthy();
   });
 
+  it('shows a short plain summary instead of raw rules markup', () => {
+    useEncounterStore.setState({
+      combatConfig: {
+        ...DEFAULT_COMBAT_CONFIG,
+        customConditions: [
+          {
+            id: 'cc-markup',
+            name: 'Fogged',
+            icon: 'eye-off',
+            kind: 'debuff',
+            description:
+              "<strong>Can't See</strong> **Blinded.** A long rules paragraph.",
+          },
+        ],
+      },
+    });
+    render(<DetailEffects entity={entity} actions={makeActions()} />);
+    const summary = screen.getByText(/Can't See/);
+    expect(summary).toHaveClass('line-clamp-1');
+    expect(summary).not.toHaveTextContent(/<|\*\*/);
+  });
+
+  it('keeps focus on the applied effect when its button becomes an active badge', async () => {
+    const user = userEvent.setup();
+    useEncounterStore.setState({
+      combatConfig: {
+        ...DEFAULT_COMBAT_CONFIG,
+        customConditions: [
+          {
+            id: 'cc-web',
+            name: 'Webbed',
+            icon: 'link',
+            kind: 'debuff',
+            description: '',
+          },
+        ],
+      },
+    });
+    function Harness() {
+      const [active, setActive] = useState<EncounterEntity>(entity);
+      const actions = makeActions();
+      actions.onAddCondition = vi.fn((_id, condition) =>
+        setActive(previous => ({
+          ...previous,
+          conditions: [{ id: 'applied-web', ...condition }],
+        }))
+      );
+      return <DetailEffects entity={active} actions={actions} />;
+    }
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Webbed' }));
+    expect(screen.getByText('Webbed · Active').parentElement).toHaveFocus();
+  });
+
   const webbed: CustomCondition = {
     id: 'cc-web',
     name: 'Webbed',
@@ -248,7 +303,7 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
 
     expect(screen.getByText('From creatures')).toBeTruthy();
     const chips = screen.getAllByRole('button', {
-      name: 'Web Snare (from Giant Spider)',
+      name: 'Apply Web Snare (from Giant Spider)',
     });
     expect(chips).toHaveLength(1);
     await user.click(chips[0]);

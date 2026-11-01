@@ -87,14 +87,24 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
                 {signedModifier(score)}
               </span>
               {!isPlayer && (
-                <div className="text-muted flex items-center gap-0.5 text-xs font-semibold">
+                <div
+                  className="text-muted flex items-center gap-0.5 text-xs font-semibold"
+                  onClick={event => {
+                    if (
+                      event.target instanceof HTMLElement &&
+                      !event.target.closest('[role="checkbox"]')
+                    ) {
+                      setProficient(key, !proficient);
+                    }
+                  }}
+                >
                   <Checkbox
                     size="sm"
                     checked={proficient}
                     onCheckedChange={checked => setProficient(key, checked)}
-                    aria-label={`${ABILITY_LABELS[i]} saving throw proficiency`}
+                    aria-label={`Prof ${ABILITY_LABELS[i]} saving throw`}
+                    label="Prof"
                   />
-                  Prof
                 </div>
               )}
               {proficient ? (
