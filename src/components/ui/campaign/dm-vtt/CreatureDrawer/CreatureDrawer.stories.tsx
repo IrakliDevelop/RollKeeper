@@ -145,7 +145,7 @@ export const LibraryNpc: Story = {
   play: async () => {
     await expectDrawer(/captain vex sheet/i);
     await expect(
-      body().getByRole('button', { name: 'View NPC details' })
+      body().getByRole('button', { name: 'View Captain Vex in NPC library' })
     ).toBeInTheDocument();
   },
 };
@@ -210,8 +210,8 @@ export const TouchTargets: Story = {
       'Close sheet',
       'Short rest',
       'Long rest',
-      'Remove from combat',
-      'View NPC details',
+      'Remove Captain Vex from combat',
+      'View Captain Vex in NPC library',
     ]) {
       const box = drawer.getByRole('button', { name }).getBoundingClientRect();
       await expect(intersects(area, box)).toBe(false);
