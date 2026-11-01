@@ -108,19 +108,10 @@ export default function PlayerDashboardPage() {
     }, [addToast])
   );
 
-  // Check for migration on component mount
+  // Keep server and initial client rendering consistent.
   useEffect(() => {
     setHasMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (characters.length === 0) {
-      const migrated = migrateFromOldStorage();
-      if (migrated) {
-        console.log('Successfully migrated character from old storage');
-      }
-    }
-  }, [characters.length, migrateFromOldStorage]);
 
   const handlePlayCharacter = (character: PlayerCharacter) => {
     setActiveCharacter(character.id);
