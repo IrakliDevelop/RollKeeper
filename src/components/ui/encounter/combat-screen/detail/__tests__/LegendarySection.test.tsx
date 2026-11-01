@@ -50,6 +50,24 @@ function makeActions(overrides: Partial<EntityActions> = {}): EntityActions {
 afterEach(() => cleanup());
 
 describe('LegendarySection description rendering', () => {
+  it('shows the reason a legendary action cannot be used', () => {
+    render(
+      <LegendarySection
+        entity={makeEntity({
+          legendaryActions: {
+            maxActions: 3,
+            usedActions: 2,
+            actions: [
+              { id: 'wing', name: 'Wing Attack', cost: 2, description: '' },
+            ],
+          },
+        })}
+        actions={makeActions()}
+      />
+    );
+    expect(screen.getByText('Needs 2 actions, 1 left')).toBeVisible();
+  });
+
   it('renders a badge-span description as text, not literal markup', () => {
     render(
       <LegendarySection

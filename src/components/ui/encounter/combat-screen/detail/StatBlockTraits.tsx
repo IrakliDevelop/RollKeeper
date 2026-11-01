@@ -41,7 +41,7 @@ function TraitBlock({
       </h5>
       {entries.map((entry, i) => (
         <StatBlockEntryRow
-          key={entry.id ?? i}
+          key={entry.id ?? `${entry.name}-${i}`}
           entry={entry}
           ability={
             entry.id ? abilities?.find(a => a.id === entry.id) : undefined
@@ -82,13 +82,13 @@ function SpellcastingBlock({ spellcasting: sc }: SpellcastingBlockProps) {
         </p>
         {(sc.atWill ?? []).length > 0 && (
           <p>
-            <span className="text-heading font-semibold">At Will:</span>{' '}
+            <span className="text-heading font-semibold">At will:</span>{' '}
             {(sc.atWill ?? []).join(', ')}
           </p>
         )}
         {perDayEntries.map(([times, spells]) => (
           <p key={times}>
-            <span className="text-heading font-semibold">{times}/Day:</span>{' '}
+            <span className="text-heading font-semibold">{times}/day:</span>{' '}
             {spells.join(', ')}
           </p>
         ))}
