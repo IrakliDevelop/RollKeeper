@@ -194,6 +194,9 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               constitutionScore={wizard.prospectiveConstitution}
               hpRollResult={state.hpRollResult}
               hpGained={wizard.hpPreview?.gained}
+              newLevelHp={wizard.hpPreview?.newLevelGain}
+              retroactiveHp={wizard.hpPreview?.retroactiveGain}
+              minimumAdjustment={wizard.hpPreview?.minimumAdjustment}
               onRollResultChange={wizard.setHPRollResult}
             />
           )}
@@ -222,6 +225,9 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               hitDie={state.targetClass.hitDie}
               conModifier={calculateModifier(wizard.prospectiveConstitution)}
               hpGained={wizard.hpPreview?.gained}
+              newLevelHp={wizard.hpPreview?.newLevelGain}
+              retroactiveHp={wizard.hpPreview?.retroactiveGain}
+              minimumAdjustment={wizard.hpPreview?.minimumAdjustment}
               isCustomClass={state.isCustomClass}
               spellsKnownDelta={wizard.spellsKnownDelta}
               cantripsKnownDelta={wizard.cantripsKnownDelta}

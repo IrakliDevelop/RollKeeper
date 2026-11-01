@@ -9,6 +9,9 @@ interface HPStepProps {
   hpRollResult: number | undefined;
   onRollResultChange: (result: number | undefined) => void;
   hpGained?: number;
+  retroactiveHp?: number;
+  newLevelHp?: number;
+  minimumAdjustment?: number;
 }
 
 export default function HPStep({
@@ -17,6 +20,9 @@ export default function HPStep({
   hpRollResult,
   onRollResultChange,
   hpGained,
+  retroactiveHp = 0,
+  newLevelHp,
+  minimumAdjustment = 0,
 }: HPStepProps) {
   const conMod = calculateModifier(constitutionScore);
   const average = Math.ceil(hitDie / 2) + 1;
@@ -51,6 +57,23 @@ export default function HPStep({
               Roll: {hpRollResult} + CON modifier: {conMod >= 0 ? '+' : ''}
               {conMod}
             </p>
+            {newLevelHp !== undefined && (
+              <p className="type-caption text-muted">
+                This level: +{newLevelHp} HP
+                {hpRollResult + conMod < 1 ? ' (minimum 1)' : ''}
+              </p>
+            )}
+            {retroactiveHp !== 0 && (
+              <p className="type-caption text-muted">
+                Earlier levels (CON): {retroactiveHp > 0 ? '+' : ''}
+                {retroactiveHp} HP
+              </p>
+            )}
+            {minimumAdjustment !== 0 && (
+              <p className="type-caption text-muted">
+                Minimum HP adjustment: +{minimumAdjustment}
+              </p>
+            )}
             <p
               className={`type-ui font-semibold ${hpGained > 0 ? 'text-verdigris-text' : 'text-heading'}`}
             >

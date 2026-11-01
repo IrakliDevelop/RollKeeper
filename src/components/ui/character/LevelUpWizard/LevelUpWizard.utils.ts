@@ -62,8 +62,16 @@ export function calculateLevelUpHp({
   const retroactiveGain = (newModifier - oldModifier) * previousLevel;
   const maxAfter = Math.max(1, max + newLevelGain + retroactiveGain);
   const gained = maxAfter - max;
+  const minimumAdjustment = maxAfter - (max + newLevelGain + retroactiveGain);
   const currentAfter = Math.max(0, Math.min(maxAfter, current + gained));
-  return { max: maxAfter, current: currentAfter, gained };
+  return {
+    max: maxAfter,
+    current: currentAfter,
+    gained,
+    newLevelGain,
+    retroactiveGain,
+    minimumAdjustment,
+  };
 }
 
 export function getSubclassSelectionLevel(

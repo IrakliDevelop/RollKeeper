@@ -23,6 +23,9 @@ interface ConfirmationStepProps {
   hitDie: number;
   conModifier: number;
   hpGained?: number;
+  retroactiveHp?: number;
+  newLevelHp?: number;
+  minimumAdjustment?: number;
   isCustomClass: boolean;
   spellsKnownDelta: number;
   cantripsKnownDelta: number;
@@ -47,6 +50,9 @@ export default function ConfirmationStep({
   hitDie,
   conModifier,
   hpGained,
+  retroactiveHp = 0,
+  newLevelHp,
+  minimumAdjustment = 0,
   isCustomClass,
   spellsKnownDelta,
   cantripsKnownDelta,
@@ -162,11 +168,26 @@ export default function ConfirmationStep({
         {hpRollResult !== undefined && (
           <div className="flex flex-wrap justify-between gap-2 py-3">
             <dt className="type-ui text-heading font-semibold">HP</dt>
-            <dd className="type-ui text-body">
-              {hpGained !== undefined && hpGained >= 0 ? '+' : ''}
-              {hpGained} (d{hitDie}: {hpRollResult} + CON:{' '}
-              {conModifier >= 0 ? '+' : ''}
-              {conModifier})
+            <dd className="type-ui text-body text-right">
+              <p>
+                d{hitDie}: {hpRollResult} + CON {conModifier >= 0 ? '+' : ''}
+                {conModifier}
+              </p>
+              {newLevelHp !== undefined && <p>This level: +{newLevelHp} HP</p>}
+              {retroactiveHp !== 0 && (
+                <p>
+                  Earlier levels (CON): {retroactiveHp > 0 ? '+' : ''}
+                  {retroactiveHp} HP
+                </p>
+              )}
+              {minimumAdjustment !== 0 && (
+                <p>Minimum HP adjustment: +{minimumAdjustment}</p>
+              )}
+              <p>
+                Total HP gained:{' '}
+                {hpGained !== undefined && hpGained >= 0 ? '+' : ''}
+                {hpGained}
+              </p>
             </dd>
           </div>
         )}
