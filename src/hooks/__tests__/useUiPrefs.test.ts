@@ -25,7 +25,11 @@ describe('parseUiPrefs', () => {
     expect(parseUiPrefs('{"abilityDisplay":"score"}').abilityLayout).toBe(
       'classic'
     );
-    expect(parseUiPrefs('{"abilityLayout":"2024"}').abilityLayout).toBe('2024');
+    for (const abilityLayout of ['classic', '2014', '2024']) {
+      expect(
+        parseUiPrefs(JSON.stringify({ abilityLayout })).abilityLayout
+      ).toBe(abilityLayout);
+    }
     for (const abilityLayout of [true, 2024, 'unknown', null]) {
       expect(
         parseUiPrefs(JSON.stringify({ abilityLayout })).abilityLayout
@@ -129,28 +133,31 @@ describe('useUiPrefs', () => {
     vi.restoreAllMocks();
   });
 
-  it('changes layout independently, preserves unknown keys, restores it and follows another tab', async () => {
-    localStorage.setItem(KEY, '{"abilityDisplay":"score","future":1}');
-    const { useUiPrefs } = await load();
-    const first = renderHook(() => useUiPrefs());
-    act(() => first.result.current.setPref('abilityLayout', '2024'));
-    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({
-      abilityDisplay: 'score',
-      abilityLayout: '2024',
-      future: 1,
-    });
-    first.unmount();
-    const restored = renderHook(() => useUiPrefs());
-    expect(restored.result.current.prefs.abilityLayout).toBe('2024');
-    act(() =>
-      otherTabWrites(
-        '{"abilityDisplay":"score","abilityLayout":"classic","future":1}'
-      )
-    );
-    expect(restored.result.current.prefs.abilityLayout).toBe('classic');
-    expect(restored.result.current.prefs.abilityDisplay).toBe('score');
-    expect(restored.result.current.localChange).toBe(false);
-  });
+  it.each(['2014', '2024'] as const)(
+    'changes layout %s independently, preserves unknown keys, restores it and follows another tab',
+    async layout => {
+      localStorage.setItem(KEY, '{"abilityDisplay":"score","future":1}');
+      const { useUiPrefs } = await load();
+      const first = renderHook(() => useUiPrefs());
+      act(() => first.result.current.setPref('abilityLayout', layout));
+      expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({
+        abilityDisplay: 'score',
+        abilityLayout: layout,
+        future: 1,
+      });
+      first.unmount();
+      const restored = renderHook(() => useUiPrefs());
+      expect(restored.result.current.prefs.abilityLayout).toBe(layout);
+      act(() =>
+        otherTabWrites(
+          '{"abilityDisplay":"score","abilityLayout":"classic","future":1}'
+        )
+      );
+      expect(restored.result.current.prefs.abilityLayout).toBe('classic');
+      expect(restored.result.current.prefs.abilityDisplay).toBe('score');
+      expect(restored.result.current.localChange).toBe(false);
+    }
+  );
 
   it('starts from the defaults with nothing stored', async () => {
     const { useUiPrefs } = await load();

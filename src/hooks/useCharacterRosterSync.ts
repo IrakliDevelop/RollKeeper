@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   mergeAppliedTransferIds,
@@ -58,14 +58,27 @@ export function useCharacterRosterSync({
   );
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  useEffect(
-    () => () => {
+  const scheduleInitialLoadCompletion = useCallback(() => {
+    if (initialLoadTimerRef.current) {
+      clearTimeout(initialLoadTimerRef.current);
+    }
+    initialLoadTimerRef.current = setTimeout(() => {
+      setIsInitialLoad(false);
+      initialLoadTimerRef.current = null;
+    }, 50);
+  }, []);
+
+  useEffect(() => {
+    // StrictMode and hidden-route effect replay cancel the pending timer,
+    // while retaining the loaded-character ref. Resume completion without
+    // loading the character or running its migrations a second time.
+    if (initialLoadTimerRef.current) scheduleInitialLoadCompletion();
+    return () => {
       if (initialLoadTimerRef.current) {
         clearTimeout(initialLoadTimerRef.current);
       }
-    },
-    []
-  );
+    };
+  }, [scheduleInitialLoadCompletion]);
 
   // Latest-value ref for `character` — read (not reactively depended on) by
   // the load effect below. `character` is expected to change on nearly every
@@ -127,16 +140,16 @@ export function useCharacterRosterSync({
         lastSyncedCharacterRef.current = candidate;
 
         // Mark initial load as complete after state has been set
-        if (initialLoadTimerRef.current) {
-          clearTimeout(initialLoadTimerRef.current);
-        }
-        initialLoadTimerRef.current = setTimeout(() => {
-          setIsInitialLoad(false);
-          initialLoadTimerRef.current = null;
-        }, 50);
+        scheduleInitialLoadCompletion();
       }
     }
-  }, [playerCharacter, hasHydrated, loadCharacterState, onLoad]);
+  }, [
+    playerCharacter,
+    hasHydrated,
+    loadCharacterState,
+    onLoad,
+    scheduleInitialLoadCompletion,
+  ]);
 
   // Sync character data back to player store when it changes (skip during initial load)
   useEffect(() => {

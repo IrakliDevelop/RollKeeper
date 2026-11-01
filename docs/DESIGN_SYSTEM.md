@@ -117,12 +117,16 @@ children so nested sections keep a heading rule without a second frame.
 Outside the sheet, Section retains its usual unframed layout. Read-only
 information stays a semantic description list, without input roles or tab stops.
 
-The Stats tab offers an independent **2024 sheet layout** switch. It arranges
-abilities in outlined units with the score/modifier assembly above a saving
+The Stats tab offers a **Layout** selector, independently of **Scores large**.
+**Compact** keeps skills grouped under their abilities. **2014 sheet** groups
+the six ability scores together, puts all six saving throws in their own list,
+and lists all 18 skills alphabetically with their base ability abbreviations,
+inspired by the [official 2014 character sheet](https://media.dndbeyond.com/compendium-images/marketing/dnd_5e_charactersheet_formfillable.pdf).
+**2024 sheet** arranges abilities in outlined units with the score/modifier assembly above a saving
 throw band and ruled skill rows, inspired by the [official 2024 character
 sheet](https://media.dndbeyond.com/compendium-images/free-rules/downloads/2024-character-sheet.pdf). It changes presentation only: character rules, totals, proficiency
 and roll/edit handlers stay shared with the classic layout. **Scores large**
-continues to control number emphasis in either layout. Both choices persist
+continues to control number emphasis in every layout. Both choices persist
 per device in `rollkeeper-ui-prefs`, separately from character data.
 
 Prepared spell rows use a narrow primary-role rule and a subtle on-state
@@ -331,12 +335,18 @@ setting.
 ### Abilities on the Stats tab
 
 `AbilitiesSection` (`src/components/ui/character/AbilitiesSection/`, import
-by path) is the tab's abilities: a `Section` "Abilities" with the "Scores
-large" switch, then six blocks in one column, two from `sm` and three from
-`lg`. A block is a `Medallion`, the ability name (`h3`) over its save line,
+by path) is the tab's abilities: a `Section` "Abilities" with a Layout
+selector and the independent "Scores large" switch. Compact uses six blocks
+in one column, two from `sm` and three from `lg`. A block is a `Medallion`, the ability name (`h3`) over its save line,
 and its skills (dot, name, bonus); Constitution says "No skills". It takes
 `editing?: boolean` (default `true`); only the character page passes the
 sheet mode.
+
+The 2014 presentation uses `Abilities2014Layout`: six score-only medallions,
+a separate six-row saving throw list, and one alphabetical list of all 18
+skills with base ability abbreviations. Scores and saves sit to the left of
+skills from `md`; below it they stack in that order. It shares
+`SavingThrowRow`, `SkillRow`, all computed bonuses and the handlers below.
 
 - **Play mode:** the name rolls the check ("Roll Strength check"; the
   heading stays "Strength"), the save line rolls the save ("Roll Strength

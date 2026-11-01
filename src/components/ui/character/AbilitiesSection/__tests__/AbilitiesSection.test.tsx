@@ -439,13 +439,210 @@ describe('Scores large', () => {
   });
 });
 
-describe('2024 sheet layout', () => {
-  it('defaults to classic and remembers layout independently of number size', () => {
-    const { unmount } = setup({ editing: false });
-    const layout = screen.getByRole('switch', { name: '2024 sheet layout' });
-    expect(layout).not.toBeChecked();
+async function selectLayout(name: 'Compact' | '2014 sheet' | '2024 sheet') {
+  await userEvent.click(screen.getByRole('combobox', { name: 'Layout' }));
+  await userEvent.click(screen.getByRole('option', { name }));
+}
+
+describe('2014 sheet layout', () => {
+  it('separates all six scores and saves from one alphabetical skill list', () => {
+    localStorage.setItem('rollkeeper-ui-prefs', '{"abilityLayout":"2014"}');
+    const { container } = setup({ editing: false });
+    const scores = screen.getByRole('region', { name: 'Ability scores' });
+    const saves = screen.getByRole('region', { name: 'Saving throws' });
+    const skills = screen.getByRole('region', { name: 'Skills' });
+    expect(within(scores).getAllByRole('heading', { level: 4 })).toHaveLength(
+      6
+    );
+    expect(scores.querySelectorAll('[data-medallion]')).toHaveLength(6);
+    expect(
+      scores.querySelector('[data-saving-throw], [data-skill]')
+    ).toBeNull();
+    expect(
+      Array.from(saves.querySelectorAll('[data-saving-throw]'), row =>
+        row.getAttribute('data-saving-throw')
+      )
+    ).toEqual([
+      'strength',
+      'dexterity',
+      'constitution',
+      'intelligence',
+      'wisdom',
+      'charisma',
+    ]);
+    expect(within(skills).getAllByRole('list')).toHaveLength(1);
+    expect(
+      Array.from(skills.querySelectorAll('[data-skill]'), row =>
+        row.getAttribute('data-skill')
+      )
+    ).toEqual([
+      'acrobatics',
+      'animalHandling',
+      'arcana',
+      'athletics',
+      'deception',
+      'history',
+      'insight',
+      'intimidation',
+      'investigation',
+      'medicine',
+      'nature',
+      'perception',
+      'performance',
+      'persuasion',
+      'religion',
+      'sleightOfHand',
+      'stealth',
+      'survival',
+    ]);
+    expect(within(skills).getByText('Acrobatics (Dex)')).toBeVisible();
+    expect(within(skills).getByText('Athletics (Str)')).toBeVisible();
+    expect(within(skills).getByText('Animal Handling (Wis)')).toBeVisible();
+    expect(within(skills).getByText('Arcana (Int)')).toBeVisible();
+    expect(within(skills).getByText('Persuasion (Cha)')).toBeVisible();
+    const ids = Array.from(container.querySelectorAll('[id]'), node => node.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('uses the shared totals, proficiency states and play-mode roll handlers', () => {
+    localStorage.setItem('rollkeeper-ui-prefs', '{"abilityLayout":"2014"}');
+    const { handlers } = setup({
+      editing: false,
+      getSavingThrowModifier: () => 17,
+      getSkillModifier: () => 42,
+    });
+    const stealth = document.querySelector<HTMLElement>(
+      '[data-skill="stealth"]'
+    )!;
+    expect(stealth).toHaveTextContent('+42');
+    expect(
+      within(stealth).getByRole('img', { name: 'Expertise' })
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll Strength check' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll Strength Save +17, proficient' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll Stealth (Dex) check' })
+    );
+    expect(handlers.onRollAbilityCheck).toHaveBeenCalledWith('strength');
+    expect(handlers.onRollSavingThrow).toHaveBeenCalledWith('strength');
+    expect(handlers.onRollSkillCheck).toHaveBeenCalledWith('stealth');
+    expect(
+      screen.queryByRole('button', { name: /save proficiency$/ })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /^Strength: modifier/ })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /^Choose ability modifiers/ })
+    ).toBeNull();
+  });
+
+  it('keeps proficiency, expertise, Jack of All Trades, bonus abilities and score editing shared', async () => {
+    localStorage.setItem('rollkeeper-ui-prefs', '{"abilityLayout":"2014"}');
+    const { handlers } = setup({ editing: true, jackOfAllTrades: true });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Strength save proficiency' })
+    );
+    expect(handlers.onUpdateSavingThrowProficiency).toHaveBeenCalledWith(
+      'strength',
+      false
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Stealth: expertise. Remove proficiency.',
+      })
+    );
+    expect(handlers.onUpdateSkillExpertise).toHaveBeenCalledWith(
+      'stealth',
+      false
+    );
+    expect(handlers.onUpdateSkillProficiency).toHaveBeenCalledWith(
+      'stealth',
+      false
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Acrobatics: Jack of All Trades. Make proficient.',
+      })
+    );
+    expect(handlers.onUpdateSkillProficiency).toHaveBeenCalledWith(
+      'acrobatics',
+      true
+    );
+    expect(
+      screen.getAllByRole('switch', { name: 'Jack of All Trades' })
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole('switch', { name: 'Jack of All Trades' }));
+    expect(handlers.onToggleJackOfAllTrades).toHaveBeenCalledOnce();
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Choose ability modifiers for Sleight of Hand',
+      })
+    );
+    await userEvent.click(
+      within(
+        screen.getByRole('dialog', { name: 'Add ability modifiers:' })
+      ).getByRole('button', { name: 'WIS' })
+    );
+    expect(handlers.onToggleSkillBonusAbility).toHaveBeenCalledWith(
+      'sleightOfHand',
+      'wisdom'
+    );
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Strength: modifier +3, score 16' })
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Increase Strength score' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(handlers.onUpdateAbilityScore).toHaveBeenCalledWith('strength', 17);
+    expect(screen.queryByRole('button', { name: /^Roll / })).toBeNull();
+  });
+
+  it('persists 2014 independently of number emphasis and keeps both existing layouts available', async () => {
+    localStorage.setItem(
+      'rollkeeper-ui-prefs',
+      '{"abilityDisplay":"score","future":1}'
+    );
+    const { unmount, handlers } = setup({ editing: false });
+    await selectLayout('2014 sheet');
+    expect(screen.getByRole('switch', { name: 'Scores large' })).toBeChecked();
+    expect(JSON.parse(localStorage.getItem('rollkeeper-ui-prefs')!)).toEqual({
+      abilityDisplay: 'score',
+      abilityLayout: '2014',
+      future: 1,
+    });
+    unmount();
+    setup({ editing: false });
+    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent(
+      '2014 sheet'
+    );
     fireEvent.click(screen.getByRole('switch', { name: 'Scores large' }));
-    fireEvent.click(layout);
+    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent(
+      '2014 sheet'
+    );
+    await selectLayout('2024 sheet');
+    expect(block('strength')).toHaveClass('border');
+    await selectLayout('Compact');
+    expect(block('strength')).not.toHaveClass('border');
+    expect(handlers.onUpdateAbilityScore).not.toHaveBeenCalled();
+    expect(handlers.onUpdateSavingThrowProficiency).not.toHaveBeenCalled();
+  });
+});
+
+describe('2024 sheet layout', () => {
+  it('defaults to classic and remembers layout independently of number size', async () => {
+    const { unmount } = setup({ editing: false });
+    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent(
+      'Compact'
+    );
+    fireEvent.click(screen.getByRole('switch', { name: 'Scores large' }));
+    await selectLayout('2024 sheet');
     expect(block('strength')).toHaveClass('border');
     expect(
       screen.getByRole('img', { name: 'Strength: modifier +3, score 16' })
@@ -456,11 +653,11 @@ describe('2024 sheet layout', () => {
     });
     unmount();
     setup({ editing: false });
-    expect(
-      screen.getByRole('switch', { name: '2024 sheet layout' })
-    ).toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Layout' })).toHaveTextContent(
+      '2024 sheet'
+    );
     expect(screen.getByRole('switch', { name: 'Scores large' })).toBeChecked();
-    fireEvent.click(screen.getByRole('switch', { name: '2024 sheet layout' }));
+    await selectLayout('Compact');
     expect(block('strength')).not.toHaveClass('border');
     expect(screen.getByRole('switch', { name: 'Scores large' })).toBeChecked();
   });
