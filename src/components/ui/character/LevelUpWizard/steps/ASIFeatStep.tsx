@@ -187,7 +187,7 @@ function FeatPanel({
         aria-label="Feats"
         className="border-divider max-h-60 gap-0 overflow-y-auto border-t"
       >
-        {filtered.slice(0, 50).map(feat => {
+        {filtered.map(feat => {
           const expanded = expandedFeatId === feat.id;
           return (
             <div key={feat.id} className="border-divider border-b">
