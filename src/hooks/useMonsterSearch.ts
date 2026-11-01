@@ -23,6 +23,9 @@ export interface UseMonsterSearchResult {
   loading: boolean;
   /** Load-more request in flight. */
   loadingMore: boolean;
+  /** A request failed; an empty result is only a true no-match when false. */
+  error: boolean;
+  retry: () => void;
   loadMore: () => void;
 }
 
@@ -38,15 +41,18 @@ export function useMonsterSearch(): UseMonsterSearchResult {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(false);
   // Incremented per new search so stale responses are ignored.
   const searchIdRef = useRef(0);
 
   const search = useCallback(async (q: string) => {
     const searchId = ++searchIdRef.current;
+    setError(false);
+    setResults([]);
+    setTotal(0);
+    setHasMore(false);
     if (q.length < MIN_QUERY_LENGTH) {
-      setResults([]);
-      setTotal(0);
-      setHasMore(false);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -63,13 +69,14 @@ export function useMonsterSearch(): UseMonsterSearchResult {
           setTotal(data.total ?? 0);
           setHasMore(data.hasMore ?? false);
         }
+      } else if (searchId === searchIdRef.current) {
+        setError(true);
       }
     } catch {
-      // silently fail
+      if (searchId === searchIdRef.current) setError(true);
     } finally {
-      // Unconditional: a superseded search must never leave the flag
-      // stuck (the stale-response guard above still protects the data).
-      setLoading(false);
+      // An older response must not clear the newest request's loading state.
+      if (searchId === searchIdRef.current) setLoading(false);
     }
   }, []);
 
@@ -79,7 +86,7 @@ export function useMonsterSearch(): UseMonsterSearchResult {
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/api/bestiary/search?q=${encodeURIComponent(query)}&limit=${PAGE_SIZE}&offset=${results.length}`
+        `/api/bestiary/search?q=${encodeURIComponent(query.trim())}&limit=${PAGE_SIZE}&offset=${results.length}`
       );
       if (res.ok) {
         // Parse first, then guard: json() awaits the body, and a newer
@@ -102,8 +109,12 @@ export function useMonsterSearch(): UseMonsterSearchResult {
   }, [query, results.length, hasMore, loading, loadingMore]);
 
   useEffect(() => {
-    const t = setTimeout(() => search(query), DEBOUNCE_MS);
+    const t = setTimeout(() => search(query.trim()), DEBOUNCE_MS);
     return () => clearTimeout(t);
+  }, [query, search]);
+
+  const retry = useCallback(() => {
+    void search(query.trim());
   }, [query, search]);
 
   return {
@@ -114,6 +125,8 @@ export function useMonsterSearch(): UseMonsterSearchResult {
     hasMore,
     loading,
     loadingMore,
+    error,
+    retry,
     loadMore,
   };
 }

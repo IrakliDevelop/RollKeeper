@@ -13,6 +13,8 @@ interface MonsterSearchProps {
   hasMore: boolean;
   loading: boolean;
   loadingMore: boolean;
+  error: boolean;
+  onRetry: () => void;
   onSelect: (m: ProcessedMonster) => void;
   onLoadMore: () => void;
 }
@@ -25,6 +27,8 @@ export function MonsterSearch({
   hasMore,
   loading,
   loadingMore,
+  error,
+  onRetry,
   onSelect,
   onLoadMore,
 }: MonsterSearchProps) {
@@ -46,7 +50,20 @@ export function MonsterSearch({
       {loading && (
         <p className="text-muted py-8 text-center text-sm">Searching…</p>
       )}
-      {!loading && results.length === 0 && query.length >= 2 && (
+      {!loading && error && (
+        <div className="py-6 text-center">
+          <p className="text-body text-sm">Bestiary didn&apos;t load.</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onRetry}
+            className="mt-2"
+          >
+            Retry search
+          </Button>
+        </div>
+      )}
+      {!loading && !error && results.length === 0 && query.length >= 2 && (
         <p className="text-muted py-8 text-center text-sm">
           No creatures match &ldquo;{query}&rdquo;.
         </p>
@@ -77,7 +94,7 @@ export function MonsterSearch({
         })}
       </div>
 
-      {!loading && hasMore && (
+      {!loading && !error && hasMore && (
         <div className="flex flex-col items-center gap-1 pt-1">
           <p className="text-muted text-xs font-medium">
             Showing {results.length} of {total}
