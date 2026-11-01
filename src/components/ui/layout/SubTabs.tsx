@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
+import { cn } from '@/utils/cn';
 
 export interface SubTabDefinition {
   value: string;
@@ -17,12 +18,20 @@ export interface SubTabsProps {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
+  className?: string;
+  contentClassName?: string;
 }
 
 /** Unpersisted text tabs. Callers own values, stable ids and selection. */
-export function SubTabs({ tabs, label, ...props }: SubTabsProps) {
+export function SubTabs({
+  tabs,
+  label,
+  className,
+  contentClassName,
+  ...props
+}: SubTabsProps) {
   return (
-    <Tabs.Root {...props}>
+    <Tabs.Root className={className} {...props}>
       <Tabs.List
         aria-label={label}
         className="border-divider flex gap-1 overflow-x-auto overflow-y-hidden border-b"
@@ -46,7 +55,10 @@ export function SubTabs({ tabs, label, ...props }: SubTabsProps) {
           value={tab.value}
           id={`${tab.id}-panel`}
           aria-labelledby={tab.id}
-          className="focus-visible:ring-brass-fill pt-4 focus-visible:ring-2 focus-visible:outline-none"
+          className={cn(
+            'focus-visible:ring-brass-fill pt-4 focus-visible:ring-2 focus-visible:outline-none',
+            contentClassName
+          )}
         >
           {tab.content}
         </Tabs.Content>

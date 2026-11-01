@@ -74,6 +74,27 @@ describe('useMonsterSearch', () => {
     expect(result.current.loadingMore).toBe(false);
   });
 
+  it('surfaces a failed load-more request and retries it without dropping results', async () => {
+    const fetchFn = mockFetchSequence([
+      { status: 200, body: { monsters: [guard], total: 2, hasMore: true } },
+      { status: 500, body: { error: 'failed' } },
+      { status: 200, body: { monsters: [drake], total: 2, hasMore: false } },
+    ]);
+    const { result } = renderHook(() => useMonsterSearch());
+    act(() => result.current.setQuery('guard'));
+    await waitFor(() => expect(result.current.results).toHaveLength(1));
+    await act(async () => result.current.loadMore());
+    expect(result.current.loadMoreError).toBe(true);
+    expect(result.current.results.map(m => m.name)).toEqual(['Guard']);
+    await act(async () => result.current.retryLoadMore());
+    expect(result.current.results.map(m => m.name)).toEqual([
+      'Guard',
+      'Guard Drake',
+    ]);
+    expect(result.current.loadMoreError).toBe(false);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
   it('loadMore is a no-op when hasMore is false', async () => {
     const fetchFn = mockFetchResponse(200, {
       monsters: [guard],
@@ -220,13 +241,48 @@ describe('useMonsterSearch', () => {
     expect(result.current.hasMore).toBe(false);
   });
 
-  it('fails silently on fetch error', async () => {
-    mockFetchResponse(500, { error: 'boom' });
+  it('reports a failed search and retries the same query', async () => {
+    const fetchFn = mockFetchSequence([
+      { status: 500, body: { error: 'boom' } },
+      { status: 200, body: { monsters: [guard], total: 1, hasMore: false } },
+    ]);
     const { result } = renderHook(() => useMonsterSearch());
     act(() => result.current.setQuery('guard'));
-    await waitFor(() => expect(result.current.loading).toBe(false), {
-      timeout: 2000,
-    });
+    await waitFor(() => expect(result.current.error).toBe(true));
     expect(result.current.results).toEqual([]);
+    await act(async () => result.current.retry());
+    await waitFor(() => expect(result.current.results).toHaveLength(1));
+    expect(result.current.error).toBe(false);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps loading while the newest search is in flight after an older response settles', async () => {
+    const resolvers: Array<(value: unknown) => void> = [];
+    const fetchFn = vi.fn(
+      () => new Promise(resolve => resolvers.push(resolve))
+    );
+    global.fetch = fetchFn as unknown as typeof global.fetch;
+    const { result } = renderHook(() => useMonsterSearch());
+    act(() => result.current.setQuery('guard'));
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+    act(() => result.current.setQuery('drake'));
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      resolvers[0]({
+        ok: true,
+        json: async () => ({ monsters: [guard], total: 1, hasMore: false }),
+      });
+    });
+    expect(result.current.loading).toBe(true);
+    await act(async () => {
+      resolvers[1]({
+        ok: true,
+        json: async () => ({ monsters: [drake], total: 1, hasMore: false }),
+      });
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.results.map(monster => monster.name)).toEqual([
+      'Guard Drake',
+    ]);
   });
 });

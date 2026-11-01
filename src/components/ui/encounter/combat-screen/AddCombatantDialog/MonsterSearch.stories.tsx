@@ -28,8 +28,12 @@ const meta: Meta<typeof MonsterSearch> = {
     hasMore: true,
     loading: false,
     loadingMore: false,
+    loadMoreError: false,
+    error: false,
+    onRetry: fn(),
     onSelect: fn(),
     onLoadMore: fn(),
+    onRetryLoadMore: fn(),
   },
 };
 
@@ -63,5 +67,15 @@ export const Complete: Story = {
     await expect(
       canvas.queryByRole('button', { name: /load more/i })
     ).not.toBeInTheDocument();
+  },
+};
+
+export const Failed: Story = {
+  name: 'Failed search offers retry',
+  args: { error: true, results: [], hasMore: false },
+  play: async ({ canvas, args }) => {
+    await expect(canvas.getByText("Bestiary didn't load.")).toBeInTheDocument();
+    canvas.getByRole('button', { name: 'Retry search' }).click();
+    await expect(args.onRetry).toHaveBeenCalled();
   },
 };
