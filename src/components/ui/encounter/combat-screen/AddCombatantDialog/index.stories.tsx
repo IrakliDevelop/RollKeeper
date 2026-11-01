@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn, screen } from 'storybook/test';
+import { fn, screen, userEvent } from 'storybook/test';
 import { AddCombatantDialog } from './index';
 import type { CampaignNPC } from '@/types/encounter';
 
@@ -96,7 +96,7 @@ export const PlayerTab: Story = {
   play: async () => {
     // Dialog content renders in a Radix portal (outside canvasElement),
     // so query the whole document via `screen`.
-    screen.getByRole('button', { name: /player/i }).click();
+    screen.getByRole('tab', { name: /player/i }).click();
   },
 };
 
@@ -107,7 +107,7 @@ export const NpcTab: Story = {
     campaignPlayers: [],
   },
   play: async () => {
-    screen.getByRole('button', { name: /npc/i }).click();
+    screen.getByRole('tab', { name: /npc/i }).click();
   },
 };
 
@@ -127,6 +127,6 @@ export const CustomTab: Story = {
     campaignPlayers: [],
   },
   play: async () => {
-    screen.getByRole('button', { name: /custom/i }).click();
+    screen.getByRole('tab', { name: /custom/i }).click();
   },
 };

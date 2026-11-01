@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import React, { useId, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
+import { SubTabs, type SubTabDefinition } from '@/components/ui/layout/SubTabs';
 import type {
   EncounterEntity,
   CampaignNPC,
@@ -54,19 +55,6 @@ export interface AddCombatantDialogProps {
 
 type Tab = 'player' | 'npc' | 'monster' | 'custom';
 
-interface TabMeta {
-  id: Tab;
-  label: string;
-  dotClass: string;
-}
-
-const TABS: TabMeta[] = [
-  { id: 'player', label: 'Player', dotClass: 'bg-accent-blue-text' },
-  { id: 'npc', label: 'NPC', dotClass: 'bg-accent-amber-text' },
-  { id: 'monster', label: 'Monster', dotClass: 'bg-accent-purple-text' },
-  { id: 'custom', label: 'Custom', dotClass: 'bg-muted' },
-];
-
 export function AddCombatantDialog({
   open,
   onOpenChange,
@@ -76,6 +64,7 @@ export function AddCombatantDialog({
   npcs,
   playerColors,
 }: AddCombatantDialogProps) {
+  const tabId = useId();
   const [tab, setTab] = useState<Tab>('monster');
   const [monsterColorIdx, setMonsterColorIdx] = useState(0);
 
@@ -241,144 +230,136 @@ export function AddCombatantDialog({
   const showFooter =
     (tab === 'monster' && selMonster !== null) || tab === 'custom';
 
+  const tabs: SubTabDefinition[] = [
+    {
+      value: 'player',
+      id: `${tabId}-player`,
+      label: 'Player',
+      content: (
+        <PlayerTab
+          players={campaignPlayers}
+          playerColors={playerColors}
+          campaignCode={campaignCode}
+          onAdd={handleAdd}
+        />
+      ),
+    },
+    {
+      value: 'npc',
+      id: `${tabId}-npc`,
+      label: 'NPC',
+      content: (
+        <NpcTab npcs={npcs} campaignCode={campaignCode} onAdd={handleAdd} />
+      ),
+    },
+    {
+      value: 'monster',
+      id: `${tabId}-monster`,
+      label: 'Monster',
+      content: (
+        <MonsterTab
+          selected={selMonster}
+          onSelect={handleMonsterSelect}
+          hp={mHp}
+          onHpChange={setMHp}
+          ac={mAc}
+          onAcChange={setMAc}
+          count={mCount}
+          onCountChange={setMCount}
+          hideName={mHideName}
+          onHideNameChange={setMHideName}
+          playerAlias={mAlias}
+          onPlayerAliasChange={setMAlias}
+          disposition={mDisposition}
+          onDispositionChange={setMDisposition}
+          draft={mDraft}
+          editing={mEditing}
+          onEditStatBlock={handleEditStatBlock}
+          onDraftChange={setMDraft}
+          onEditorBack={() => setMEditing(false)}
+          onEditorReset={handleResetDraft}
+        />
+      ),
+    },
+    {
+      value: 'custom',
+      id: `${tabId}-custom`,
+      label: 'Custom',
+      content:
+        cEditing && cDraft ? (
+          <StatBlockEditor
+            monsterName={cName.trim() || 'custom combatant'}
+            draft={cDraft}
+            onDraftChange={handleCustomDraftChange}
+            onReset={() =>
+              setCDraft(createCustomEditDraft(parseInt(cInit) || 0))
+            }
+            onBack={() => setCEditing(false)}
+            resetLabel="Reset stat block"
+          />
+        ) : (
+          <CustomTab
+            customMonsters={customMonsters}
+            onAddSavedMonster={handleSavedMonsterAdd}
+            name={cName}
+            onNameChange={setCName}
+            type={cType}
+            onTypeChange={setCType}
+            hp={cHp}
+            onHpChange={setCHp}
+            ac={cAc}
+            onAcChange={setCAc}
+            initMod={cInit}
+            onInitModChange={handleCustomInitChange}
+            hideName={cHideName}
+            onHideNameChange={setCHideName}
+            playerAlias={cAlias}
+            onPlayerAliasChange={setCAlias}
+            disposition={cDisposition}
+            onDispositionChange={setCDisposition}
+            onEditStatBlock={handleCustomEditStatBlock}
+            hasStatBlockEdits={cDraft !== null}
+          />
+        ),
+    },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        showCloseButton={false}
-        className="bg-surface-secondary flex h-[min(660px,92vh)] max-h-none w-[min(640px,94vw)] flex-col gap-0 overflow-hidden rounded-[20px] p-0"
+        className="flex h-[min(660px,92vh)] w-[min(640px,94vw)] flex-col gap-0 overflow-hidden p-0"
+        aria-describedby={undefined}
       >
-        {/* Accessible title (visually hidden — custom heading below) */}
-        <DialogTitle className="sr-only">Add Combatant</DialogTitle>
-
-        {/* Header — anchored */}
-        <div className="shrink-0 px-6 pt-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-accent-amber-text-muted mb-0.5 text-[10px] font-extrabold tracking-[0.12em] uppercase">
-                Encounter Roster
-              </p>
-              <h2 className="font-display text-heading text-2xl font-extrabold tracking-tight">
-                Add Combatant
-              </h2>
-            </div>
-            <button
-              onClick={() => handleOpenChange(false)}
-              aria-label="Close"
-              className="border-divider bg-surface-raised text-muted hover:text-heading mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border transition-colors"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Tab bar — anchored */}
-          <div className="bg-surface-inset mt-4 mb-0 flex gap-[3px] rounded-[12px] p-1">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => handleTabChange(t.id)}
-                className={`flex flex-1 items-center justify-center gap-[7px] rounded-[9px] px-1.5 py-[9px] text-[13.5px] font-bold transition-all ${
-                  tab === t.id
-                    ? 'bg-surface-raised text-heading shadow-sm'
-                    : 'text-muted'
-                }`}
-              >
-                <span
-                  className={`h-[7px] w-[7px] shrink-0 rounded-full ${t.dotClass} ${tab === t.id ? 'opacity-100' : 'opacity-50'}`}
-                />
-                {t.label}
-              </button>
-            ))}
-          </div>
+        <DialogTitle className="shrink-0 px-5 pt-5 pr-16">
+          Add combatant
+        </DialogTitle>
+        <div className="flex min-h-0 flex-1 flex-col px-5">
+          <SubTabs
+            tabs={tabs}
+            label="Combatant type"
+            value={tab}
+            onValueChange={value => {
+              if (
+                value === 'player' ||
+                value === 'npc' ||
+                value === 'monster' ||
+                value === 'custom'
+              ) {
+                handleTabChange(value);
+              }
+            }}
+            className="flex min-h-0 flex-1 flex-col"
+            contentClassName="min-h-0 flex-1 overflow-y-auto pb-4"
+          />
         </div>
-
-        {/* Scrollable body — only this region scrolls */}
-        <div
-          className="flex-1 overflow-y-auto px-6 pt-[18px]"
-          data-testid="dialog-body"
-        >
-          {tab === 'player' && (
-            <PlayerTab
-              players={campaignPlayers}
-              playerColors={playerColors}
-              campaignCode={campaignCode}
-              onAdd={handleAdd}
-            />
-          )}
-          {tab === 'npc' && (
-            <NpcTab npcs={npcs} campaignCode={campaignCode} onAdd={handleAdd} />
-          )}
-          {tab === 'monster' && (
-            <MonsterTab
-              selected={selMonster}
-              onSelect={handleMonsterSelect}
-              hp={mHp}
-              onHpChange={setMHp}
-              ac={mAc}
-              onAcChange={setMAc}
-              count={mCount}
-              onCountChange={setMCount}
-              hideName={mHideName}
-              onHideNameChange={setMHideName}
-              playerAlias={mAlias}
-              onPlayerAliasChange={setMAlias}
-              disposition={mDisposition}
-              onDispositionChange={setMDisposition}
-              draft={mDraft}
-              editing={mEditing}
-              onEditStatBlock={handleEditStatBlock}
-              onDraftChange={setMDraft}
-              onEditorBack={() => setMEditing(false)}
-              onEditorReset={handleResetDraft}
-            />
-          )}
-          {tab === 'custom' &&
-            (cEditing && cDraft ? (
-              <StatBlockEditor
-                monsterName={cName.trim() || 'custom combatant'}
-                draft={cDraft}
-                onDraftChange={handleCustomDraftChange}
-                onReset={() => {
-                  const draft = createCustomEditDraft(parseInt(cInit) || 0);
-                  setCDraft(draft);
-                }}
-                onBack={() => setCEditing(false)}
-                resetLabel="Reset stat block"
-              />
-            ) : (
-              <CustomTab
-                customMonsters={customMonsters}
-                onAddSavedMonster={handleSavedMonsterAdd}
-                name={cName}
-                onNameChange={setCName}
-                type={cType}
-                onTypeChange={setCType}
-                hp={cHp}
-                onHpChange={setCHp}
-                ac={cAc}
-                onAcChange={setCAc}
-                initMod={cInit}
-                onInitModChange={handleCustomInitChange}
-                hideName={cHideName}
-                onHideNameChange={setCHideName}
-                playerAlias={cAlias}
-                onPlayerAliasChange={setCAlias}
-                disposition={cDisposition}
-                onDispositionChange={setCDisposition}
-                onEditStatBlock={handleCustomEditStatBlock}
-                hasStatBlockEdits={cDraft !== null}
-              />
-            ))}
-        </div>
-
-        {/* Anchored footer — shown only for monster (with selection) and custom */}
         {showFooter && (
           <div
-            className="border-divider shrink-0 border-t px-6 pt-3.5 pb-4"
+            className="border-divider shrink-0 border-t px-5 py-4"
             data-testid="dialog-footer"
           >
             {tab === 'monster' && selMonster && (
               <Button
-                variant="success"
+                variant="primary"
                 fullWidth
                 onClick={handleMonsterAdd}
                 leftIcon={<Plus size={16} />}
@@ -389,13 +370,13 @@ export function AddCombatantDialog({
             )}
             {tab === 'custom' && (
               <Button
-                variant="success"
+                variant="primary"
                 fullWidth
                 onClick={handleCustomAdd}
                 disabled={!cName.trim()}
                 leftIcon={<Plus size={16} />}
               >
-                Add {cType === 'npc' ? 'NPC' : 'Monster'}
+                Add {cType === 'npc' ? 'NPC' : 'monster'}
               </Button>
             )}
           </div>
