@@ -24,9 +24,6 @@ export default function ClassPickerStep({
         >
           Choose the class that gains a level
         </h3>
-        <p className="type-body text-muted mt-1">
-          Select the class you want to advance.
-        </p>
       </div>
       <RadioGroup
         value={selectedIndex >= 0 ? String(selectedIndex) : undefined}
@@ -36,10 +33,10 @@ export default function ClassPickerStep({
       >
         {classes.map((cls, index) => (
           <WizardChoiceRow
-            key={`${cls.className}-${index}`}
+            key={cls.className}
             value={String(index)}
             title={cls.className}
-            description={cls.subclass ? `(${cls.subclass})` : undefined}
+            description={cls.subclass || undefined}
             meta={`Level ${cls.level} → ${cls.level + 1}`}
           />
         ))}

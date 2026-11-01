@@ -73,9 +73,6 @@ export default function ConfirmationStep({
     <div className="space-y-5">
       <div>
         <h3 className="type-subheading text-heading">Review level-up</h3>
-        <p className="type-body text-muted mt-1">
-          Review your changes before applying.
-        </p>
       </div>
       <dl className="divide-divider border-divider divide-y border-t">
         <div className="flex flex-wrap justify-between gap-2 py-3">
@@ -198,8 +195,8 @@ export default function ConfirmationStep({
             </dt>
             <dd>
               <ul className="type-body text-body mt-2 list-disc pl-5">
-                {cantripUpgrades.map((upgrade, index) => (
-                  <li key={`${upgrade.name}-${index}`}>
+                {cantripUpgrades.map(upgrade => (
+                  <li key={upgrade.name}>
                     {upgrade.name}: {upgrade.from} → {upgrade.to}
                   </li>
                 ))}
