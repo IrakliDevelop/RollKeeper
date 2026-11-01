@@ -208,4 +208,12 @@ describe('SheetResources', () => {
       screen.getAllByRole('button', { name: /restore second wind/i })
     ).toHaveLength(2);
   });
+
+  it('uses the brass pool bar fill independent of the resource stored hue', () => {
+    paladin(4);
+    const { container } = render(<SheetResources />);
+    expect(container.querySelector('[data-resource-bar-fill]')).toHaveClass(
+      'bg-brass-fill'
+    );
+  });
 });

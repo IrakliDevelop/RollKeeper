@@ -93,7 +93,7 @@ export default function SpellCard({
           padding="md"
           interactive
           onClick={() => setIsDetailModalOpen(true)}
-          className="cursor-pointer transition-all hover:shadow-md"
+          className="cursor-pointer"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -179,7 +179,8 @@ export default function SpellCard({
               <div className="flex gap-2">
                 {onToggleFavorite && (
                   <Button
-                    variant={isFavorite ? 'warning' : 'outline'}
+                    variant="outline"
+                    selected={isFavorite}
                     size="sm"
                     onClick={handleToggleFavorite}
                     aria-label={
@@ -193,7 +194,8 @@ export default function SpellCard({
                   </Button>
                 )}
                 <Button
-                  variant={isInSpellbook ? 'success' : 'outline'}
+                  variant="outline"
+                  selected={isInSpellbook}
                   size="sm"
                   onClick={handleToggleSpellbook}
                   leftIcon={
@@ -240,7 +242,7 @@ export default function SpellCard({
         padding="md"
         interactive
         onClick={() => setIsDetailModalOpen(true)}
-        className="flex h-full cursor-pointer flex-col transition-all hover:shadow-md"
+        className="flex h-full cursor-pointer flex-col"
       >
         <div className="mb-3 flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -334,7 +336,8 @@ export default function SpellCard({
           <div className="flex gap-2">
             {onToggleFavorite && (
               <Button
-                variant={isFavorite ? 'warning' : 'outline'}
+                variant="outline"
+                selected={isFavorite}
                 size="sm"
                 onClick={handleToggleFavorite}
                 aria-label={
@@ -345,7 +348,8 @@ export default function SpellCard({
               </Button>
             )}
             <Button
-              variant={isInSpellbook ? 'success' : 'outline'}
+              variant="outline"
+              selected={isInSpellbook}
               size="sm"
               onClick={handleToggleSpellbook}
               leftIcon={

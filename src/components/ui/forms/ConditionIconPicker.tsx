@@ -10,12 +10,14 @@ import * as Popover from '@radix-ui/react-popover';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import {
   CONDITION_ICON_NAMES,
   CONDITION_ICON_REGISTRY,
   DEFAULT_CONDITION_ICON_BY_KIND,
   type ConditionIconName,
 } from '@/utils/conditionIconRegistry';
+import { cn } from '@/utils/cn';
 
 export interface ConditionIconPickerProps {
   value: ConditionIconName;
@@ -72,7 +74,7 @@ export function ConditionIconPicker({
       <Popover.Portal>
         <Popover.Content
           sideOffset={4}
-          className="bg-surface-raised border-divider z-50 w-64 rounded-lg border p-2 shadow-lg"
+          className={cn(OVERLAY_SURFACE, 'z-50 w-64 p-2')}
         >
           <Input
             value={query}
@@ -88,21 +90,25 @@ export function ConditionIconPicker({
             <div
               role="group"
               aria-label="Icons"
-              className="mt-2 grid max-h-56 grid-cols-6 gap-1 overflow-y-auto"
+              // As many columns as fit: a classic scrollbar or 44px touch
+              // cells drop one instead of scrolling sideways.
+              className="mt-2 grid max-h-56 grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] justify-items-center gap-1 overflow-x-hidden overflow-y-auto pointer-coarse:grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))]"
             >
               {names.map(name => {
                 const Icon = CONDITION_ICON_REGISTRY[name];
                 return (
                   <Button
                     key={name}
-                    variant={name === value ? 'secondary' : 'ghost'}
+                    variant="ghost"
+                    selected={name === value}
                     size="sm"
                     type="button"
                     aria-label={name}
                     aria-pressed={name === value}
                     title={name}
                     onClick={() => handlePick(name)}
-                    className="h-9 w-9 p-0"
+                    // Ring inside the cell (the grid clips edge cells), clear of the selected cell's border.
+                    className="h-9 w-9 p-0 focus-visible:-outline-offset-4"
                   >
                     <Icon size={16} aria-hidden />
                   </Button>

@@ -8,6 +8,7 @@ import {
   resolveCharacterCutoverNamespace,
 } from '@/lib/indexeddb/characterCutoverSelection';
 import { resolvePersistenceBootstrapMode } from '@/lib/indexeddb/characterBootstrapRouting';
+import { readBrowserLocalStorage } from '@/lib/browserStorage';
 import {
   isIndexedDbMigrationEnabled,
   runPersistenceBootstrap,
@@ -61,9 +62,16 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
   const [recoveryRequired, setRecoveryRequired] = useState(false);
 
   useEffect(() => {
+    const storage = readBrowserLocalStorage();
+    if (!storage) {
+      // The browser refused storage and no memory store could replace it, so
+      // there is nothing to migrate or bootstrap; the stores run in memory.
+      setReady(true);
+      return;
+    }
     const characterParticipant = isBrowserCharacterCutoverParticipant();
     const characterNamespace =
-      resolveCharacterCutoverNamespace(window.localStorage) ??
+      resolveCharacterCutoverNamespace(storage) ??
       (characterParticipant ? 'guest' : null);
     const mode = resolvePersistenceBootstrapMode({
       characterParticipant,
@@ -102,7 +110,7 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
             : undefined;
           return runIndexedDbMigration({
             factory: window.indexedDB,
-            storage: window.localStorage,
+            storage,
             namespace,
             runId: crypto.randomUUID(),
             ownerId: crypto.randomUUID(),
@@ -125,7 +133,7 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
     let active = true;
     let stopMonitor: (() => void) | undefined;
     const selection = readCharacterCutoverSelection(
-      window.localStorage,
+      storage,
       characterNamespace ?? 'guest'
     );
     void (async () => {
@@ -156,7 +164,7 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
         : undefined;
       const result = await bootstrapCharacterPersistence({
         factory: window.indexedDB,
-        storage: window.localStorage,
+        storage,
         namespace: characterNamespace ?? 'guest',
         runId: crypto.randomUUID(),
         ownerId: crypto.randomUUID(),
@@ -244,9 +252,7 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
           namespace="guest"
           runId={
             readCharacterCutoverSelection(
-              typeof localStorage === 'undefined'
-                ? { getItem: () => null }
-                : localStorage,
+              readBrowserLocalStorage() ?? { getItem: () => null },
               'guest'
             )?.activatedGeneration
           }

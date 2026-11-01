@@ -177,11 +177,16 @@ async function driveToCutoverReady(context: BrowserContext): Promise<Page> {
     .click();
   await expect(page.getByText(/entries/i)).toBeVisible();
 
-  page.once('dialog', dialog => dialog.accept());
   const downloadPromise = page.waitForEvent('download');
   const selectionReload = page.waitForEvent('domcontentloaded');
   await page
     .getByRole('button', { name: /download recovery and select migration/i })
+    .click();
+  await page
+    .getByRole('dialog', {
+      name: 'Prepare this browser for the new storage?',
+    })
+    .getByRole('button', { name: 'Prepare browser' })
     .click();
   await downloadPromise;
   await selectionReload;
@@ -324,14 +329,19 @@ test.describe('rewind-after-receipt rows', () => {
         // Representative rewind row: complete the cutover and re-run the
         // durable-integrity assertions from
         // e2e-indexeddb/indexeddb-migration.spec.ts (~lines 215-250).
-        page.once('dialog', dialog => dialog.accept());
         const activationReload = page.waitForEvent('domcontentloaded');
         await page
           .getByRole('button', { name: /confirm indexeddb cutover/i })
           .click();
+        await page
+          .getByRole('dialog', {
+            name: 'Switch character storage on this browser?',
+          })
+          .getByRole('button', { name: 'Switch storage' })
+          .click();
         await activationReload;
         await expect(
-          page.getByRole('heading', { name: /your characters/i }).first()
+          page.getByRole('heading', { name: 'Characters', exact: true }).first()
         ).toBeVisible();
 
         const durable = await page.evaluate(async () => {
@@ -425,7 +435,7 @@ test.describe('cold-interrupt rows', () => {
       // authority: 'indexedDB', which migrationEngine.ts's result() helper
       // never does before an actual cutover activation.
       await expect(
-        page.getByRole('heading', { name: /your characters/i })
+        page.getByRole('heading', { name: 'Characters', exact: true })
       ).toBeVisible();
 
       const after = await legacyBytes(page);
@@ -531,7 +541,7 @@ test('IDB_PRIMARY hydration: app hydrates from IndexedDB with the character pres
   await page.reload();
 
   await expect(
-    page.getByRole('heading', { name: /your characters/i })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
   await expect(page.getByText('Checkpoint Hero')).toBeVisible();
   await expect(page.getByText('Stale Mirror')).toHaveCount(0);

@@ -69,6 +69,7 @@ import {
   CardFooter 
 } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
 ```
 
 ### Feedback Components
@@ -85,21 +86,23 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/feedback/dialog';
+import { confirmDialog, alertDialog, promptDialog } from '@/components/ui/feedback/confirm-dialog';
 ```
 
 ### Design Tokens
-Import from `@/components/ui/primitives/`:
-
-```typescript
-import { colors, spacing, fontSize, shadows, borderRadius } from '@/components/ui/primitives';
-```
+Tokens are CSS variables in `src/app/globals.css`, used through Tailwind
+utilities (`bg-surface`, `text-heading`, `type-heading`). Storybook's
+Foundations pages show them. `AGENTS.md` lists the colour tokens;
+`docs/DESIGN_SYSTEM.md` has the type scale and the rest of the rules, and the
+`rollkeeper-design` skill (`.agents/skills/rollkeeper-design/SKILL.md`) has
+the recipes and the review checklist.
 
 ### Component Usage Guidelines
-- Use `Button` with appropriate `variant` (primary, secondary, success, danger, warning, outline, ghost, link)
+- Use `Button` with appropriate `variant` (primary once per view, secondary, outline, ghost, danger, danger-solid for a destructive dialog's confirm, link); `success`/`warning` are deprecated aliases of `secondary`
 - Use `Input` with `label`, `helperText`, and `error` props for form validation
-- Use `Card` for content containers with proper header/content/footer structure
+- Use `Section` to group content and `Card` only for a discrete object (a character, monster, spell, item or campaign)
 - Use `Badge` for status indicators and labels
-- Use `Dialog` for modals and overlays (NOT the legacy Modal component)
+- Use `Dialog` for modals and overlays, and `confirmDialog` for a yes/no question
 
 ---
 
@@ -238,4 +241,4 @@ import type { Player } from '@/types';
 ❌ **Don't** mix business logic with UI rendering
 ❌ **Don't** ignore ESLint warnings - fix or explicitly disable with comment
 ❌ **Don't** hardcode colors/spacing - use design tokens
-❌ **Don't** use the legacy `Modal` component - use `Dialog` from `@/components/ui/feedback/dialog`
+❌ **Don't** build modal overlays by hand - use `Dialog` from `@/components/ui/feedback/dialog`, or `confirmDialog` for a yes/no question

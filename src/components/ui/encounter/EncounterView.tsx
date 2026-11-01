@@ -423,11 +423,11 @@ export function EncounterView({
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <p className="text-muted mb-4">Encounter not found.</p>
-        <Link href={`/dm/campaign/${campaignCode}/encounters`}>
-          <Button variant="secondary" leftIcon={<ArrowLeft size={16} />}>
-            Back to Encounters
-          </Button>
-        </Link>
+        <Button asChild variant="secondary" leftIcon={<ArrowLeft size={16} />}>
+          <Link href={`/dm/campaign/${campaignCode}/encounters`}>
+            Back to encounters
+          </Link>
+        </Button>
       </div>
     );
   }

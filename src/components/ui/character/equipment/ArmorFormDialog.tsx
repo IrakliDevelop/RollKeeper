@@ -176,12 +176,12 @@ export function ArmorFormDialog({
     >
       <DialogContent size="xl">
         <DialogHeader>
-          <DialogTitle>{editingArmor ? 'Edit Armor' : 'Add Armor'}</DialogTitle>
-          <DialogDescription>
-            {editingArmor
-              ? 'Update armor details below.'
-              : 'Search the database or fill in manually.'}
-          </DialogDescription>
+          <DialogTitle>{editingArmor ? 'Edit armor' : 'Add armor'}</DialogTitle>
+          {!editingArmor && (
+            <DialogDescription>
+              Search the database or fill in manually.
+            </DialogDescription>
+          )}
         </DialogHeader>
         <DialogBody>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -196,8 +196,8 @@ export function ArmorFormDialog({
             )}
 
             <div className="space-y-4">
-              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                Basic Information
+              <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
+                Basic information
               </h4>
               <Input
                 label="Name"
@@ -208,7 +208,7 @@ export function ArmorFormDialog({
                 placeholder="e.g., Chain Mail, Leather Armor +1"
                 required
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <div>
                   <label className="text-body mb-2 block text-sm font-medium">
                     Category
@@ -252,10 +252,10 @@ export function ArmorFormDialog({
             </div>
 
             <div className="space-y-4">
-              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                Armor Stats
+              <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
+                Armor stats
               </h4>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
                 <NumberInput
                   label="Base AC"
                   value={formData.baseAC}
@@ -269,7 +269,7 @@ export function ArmorFormDialog({
                   max={30}
                 />
                 <NumberInput
-                  label="Max Dex Bonus"
+                  label="Max Dex bonus"
                   allowEmpty
                   value={formData.maxDexBonus}
                   onChange={v =>
@@ -298,14 +298,15 @@ export function ArmorFormDialog({
             </div>
 
             <div className="space-y-4">
-              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+              <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
                 Description
               </h4>
               <div>
                 <label className="text-body mb-2 block text-sm font-medium">
-                  Special Properties
+                  Special properties
                 </label>
                 <RichTextEditor
+                  ariaLabel="Special properties"
                   content={formData.description}
                   onChange={content =>
                     setFormData(prev => ({ ...prev, description: content }))
@@ -316,7 +317,7 @@ export function ArmorFormDialog({
             </div>
 
             <div className="space-y-4">
-              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+              <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
                 Properties
               </h4>
               <div className="flex flex-wrap gap-4">
@@ -331,7 +332,7 @@ export function ArmorFormDialog({
                     }
                   />
                   <span className="text-body text-sm font-medium">
-                    Currently Equipped
+                    Equipped
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-2">
@@ -345,7 +346,7 @@ export function ArmorFormDialog({
                     }
                   />
                   <span className="text-body text-sm font-medium">
-                    Stealth Disadvantage
+                    Stealth disadvantage
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-2">
@@ -360,7 +361,7 @@ export function ArmorFormDialog({
                     }
                   />
                   <span className="text-body text-sm font-medium">
-                    Requires Attunement
+                    Requires attunement
                   </span>
                 </label>
                 {formData.requiresAttunement && (
@@ -392,7 +393,7 @@ export function ArmorFormDialog({
                 Cancel
               </Button>
               <Button type="submit" variant="primary" size="md">
-                {editingArmor ? 'Update' : 'Add'} Armor
+                {editingArmor ? 'Save armor' : 'Add armor'}
               </Button>
             </div>
           </form>

@@ -30,21 +30,21 @@ describe('HitDiceTracker', { timeout: 10_000 }, () => {
 
   it('renders without crashing', async () => {
     await renderTracker();
-    expect(screen.getAllByText('Hit Dice').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Hit dice').length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays die types and remaining counts', async () => {
     await renderTracker();
-    expect(screen.getAllByText('D10').length).toBeGreaterThan(0);
-    expect(screen.getByText('3 / 5')).toBeInTheDocument();
-    expect(screen.getAllByText('D6').length).toBeGreaterThan(0);
-    expect(screen.getByText('3 / 3')).toBeInTheDocument();
+    expect(screen.getAllByText('d10').length).toBeGreaterThan(0);
+    expect(screen.getByText(/3 \/ 5/)).toBeInTheDocument();
+    expect(screen.getAllByText('d6').length).toBeGreaterThan(0);
+    expect(screen.getByText(/3 \/ 3/)).toBeInTheDocument();
   });
 
-  it('shows Long Rest button', async () => {
+  it('shows Restore all hit dice button', async () => {
     await renderTracker();
     expect(
-      screen.getByRole('button', { name: /Long Rest/i })
+      screen.getByRole('button', { name: /Restore all hit dice/i })
     ).toBeInTheDocument();
   });
 });
@@ -76,6 +76,24 @@ describe('ConditionBadge', () => {
     fireEvent.click(screen.getByRole('button', { name: /Remove Poisoned/i }));
     expect(onRemove).toHaveBeenCalledOnce();
   });
+
+  it('uses an ember badge for conditions and shows the source spell', async () => {
+    await renderBadge({ sourceSpell: 'Fear', onRemove: vi.fn() });
+    expect(screen.getByText('From Fear')).toBeVisible();
+    expect(
+      screen.getByText('Poisoned').closest('[data-variant]')
+    ).toHaveAttribute('data-variant', 'warning');
+    expect(screen.getByRole('button', { name: 'Remove Poisoned' })).toHaveClass(
+      'pointer-coarse:min-h-11'
+    );
+  });
+
+  it('uses a verdigris badge for buffs', async () => {
+    await renderBadge({ variant: 'buff' });
+    expect(
+      screen.getByText('Poisoned').closest('[data-variant]')
+    ).toHaveAttribute('data-variant', 'success');
+  });
 });
 
 // ── HPBar ───────────────────────────────────────────────────────────────────
@@ -104,6 +122,14 @@ describe('HPBar', () => {
 
   it('shows temp HP when provided', async () => {
     await renderBar({ temp: 5 });
-    expect(screen.getByText('+5')).toBeInTheDocument();
+    expect(screen.getByText('+5 temp HP')).toBeInTheDocument();
+  });
+
+  it('uses frost for a named temporary HP value and a neutral flat track', async () => {
+    const { container } = await renderBar({ temp: 5 });
+    expect(screen.getByText('+5 temp HP')).toHaveClass('text-frost-text');
+    const track = container.querySelector('[data-hp-track]');
+    expect(track).toHaveClass('bg-surface-inset');
+    expect(track).not.toHaveClass('shadow-inner');
   });
 });

@@ -55,4 +55,57 @@ describe('cn', () => {
   it('returns empty string with no arguments', () => {
     expect(cn()).toBe('');
   });
+
+  describe('type scale', () => {
+    it('keeps the last type step', () => {
+      expect(cn('type-heading', 'type-body')).toBe('type-body');
+      expect(cn('type-num-lg', 'type-num-md')).toBe('type-num-md');
+    });
+
+    it('lets a type step replace an earlier size, weight and family', () => {
+      expect(cn('text-sm font-bold font-sans leading-5', 'type-ui')).toBe(
+        'type-ui'
+      );
+    });
+
+    it('keeps a type step when a later class overrides one property', () => {
+      expect(cn('type-ui', 'text-lg')).toBe('type-ui text-lg');
+      expect(cn('type-heading', 'font-semibold')).toBe(
+        'type-heading font-semibold'
+      );
+    });
+
+    it('keeps numeric variants and the text colour next to a type step', () => {
+      expect(cn('type-num-md', 'tabular-nums', 'text-heading')).toBe(
+        'type-num-md tabular-nums text-heading'
+      );
+    });
+  });
+
+  describe('shadow-overlay', () => {
+    it('is replaced by a later shadow size', () => {
+      expect(cn('shadow-overlay', 'shadow-none')).toBe('shadow-none');
+    });
+
+    it('stays next to a later shadow colour', () => {
+      expect(cn('shadow-overlay', 'shadow-black/20')).toBe(
+        'shadow-overlay shadow-black/20'
+      );
+    });
+  });
+
+  it('keeps scrollbar-hide next to overflow utilities', () => {
+    expect(cn('scrollbar-hide', 'overflow-x-auto', 'overflow-y-hidden')).toBe(
+      'scrollbar-hide overflow-x-auto overflow-y-hidden'
+    );
+  });
+
+  it('lets an inset focus ring replace the outset one', () => {
+    expect(
+      cn(
+        'focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'focus-visible:-outline-offset-2'
+      )
+    ).toBe('focus-visible:outline-ring focus-visible:-outline-offset-2');
+  });
 });

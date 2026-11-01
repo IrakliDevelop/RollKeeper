@@ -1,6 +1,17 @@
+import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { InventoryManager } from '../InventoryManager';
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from '@testing-library/react';
+import { InventoryManager, inventoryLocationKey } from '../InventoryManager';
+import {
+  ConfirmDialogHost,
+  cancelAllDialogs,
+} from '@/components/ui/feedback/confirm-dialog';
 import { InventoryItem } from '@/types/character';
 
 vi.mock('@/hooks/useItemsData', () => ({
@@ -26,7 +37,9 @@ vi.mock('@/components/ui/layout/DragDropList', () => ({
 }));
 
 afterEach(() => {
+  cancelAllDialogs();
   cleanup();
+  localStorage.removeItem('rollkeeper-ui-prefs');
 });
 
 const mockItems: InventoryItem[] = [
@@ -91,66 +104,132 @@ describe('InventoryManager', () => {
     expect(screen.getAllByText('2 gp, 5 cp').length).toBeGreaterThan(0);
   });
 
+  it('shows and hides row details with the manager detail toggle', () => {
+    render(<InventoryManager items={mockItems} />);
+    expect(screen.queryByText('10 lb')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show item details' }));
+    expect(screen.getByText('10 lb')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Details: Rope' })
+    ).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Show item details' }));
+    expect(screen.queryByText('10 lb')).toBeNull();
+  });
+
+  it('keeps manager details visible when a filtered row remounts', () => {
+    render(<InventoryManager items={mockItems} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show item details' }));
+    const search = screen.getByRole('searchbox', { name: 'Search items' });
+    fireEvent.change(search, { target: { value: 'Torch' } });
+    expect(screen.queryByRole('button', { name: 'Details: Rope' })).toBeNull();
+    fireEvent.change(search, { target: { value: '' } });
+    expect(
+      screen.getByRole('button', { name: 'Details: Rope' })
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('10 lb')).toBeVisible();
+  });
+
   it('filters items by search query', () => {
     render(<InventoryManager items={mockItems} />);
-    const searchInput = screen.getByPlaceholderText('Search items...');
+    const searchInput = screen.getByPlaceholderText('Search items');
     fireEvent.change(searchInput, { target: { value: 'Rope' } });
     expect(screen.getAllByText('Rope').length).toBeGreaterThan(0);
     expect(screen.queryByText('Torch')).toBeNull();
     expect(screen.queryByText('Health Potion')).toBeNull();
   });
 
-  it('shows Add Item button when not readonly', () => {
+  it('uses search-only and field-filter no-match messages', () => {
+    render(<InventoryManager items={mockItems} />);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search items' }), {
+      target: { value: 'missing' },
+    });
+    expect(screen.getByText('No items match “missing”.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Category' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Consumable' }));
+    expect(
+      screen.getByText('No items match your search or filters.')
+    ).toBeVisible();
+  });
+
+  it('shows Add item button when not readonly', () => {
     const onAddItem = vi.fn();
     render(<InventoryManager items={mockItems} onAddItem={onAddItem} />);
-    const addButtons = screen.getAllByText('Add Item');
+    const addButtons = screen.getAllByText('Add item');
     expect(addButtons.length).toBeGreaterThan(0);
   });
 
-  it('calls onDeleteItem when delete button clicked', () => {
+  it('deletes only after confirming and leaves the item on cancel', async () => {
     const onDeleteItem = vi.fn();
     const onUpdateItem = vi.fn();
     render(
-      <InventoryManager
-        items={mockItems}
-        onDeleteItem={onDeleteItem}
-        onUpdateItem={onUpdateItem}
-      />
+      <>
+        <ConfirmDialogHost />
+        <InventoryManager
+          items={mockItems}
+          onDeleteItem={onDeleteItem}
+          onUpdateItem={onUpdateItem}
+        />
+      </>
     );
-    const deleteButtons = screen.getAllByTitle('Delete item');
-    fireEvent.click(deleteButtons[0]);
-    expect(onDeleteItem).toHaveBeenCalledWith('i1');
+    fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete item', description: 'Rope' })
+    );
+    expect(
+      screen.getByRole('alertdialog', { name: 'Delete Rope?' })
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onDeleteItem).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete item', description: 'Rope' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
+    await waitFor(() => expect(onDeleteItem).toHaveBeenCalledWith('i1'));
+  });
+
+  it('focuses Add item after a confirmed delete removes the row', async () => {
+    function Harness() {
+      const [items, setItems] = React.useState(mockItems);
+      return (
+        <InventoryManager
+          items={items}
+          onAddItem={vi.fn()}
+          onDeleteItem={id =>
+            setItems(previous => previous.filter(item => item.id !== id))
+          }
+        />
+      );
+    }
+    render(
+      <>
+        <ConfirmDialogHost />
+        <Harness />
+      </>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
+    const deleteButton = screen.getByRole('button', { name: 'Delete item' });
+    deleteButton.focus();
+    fireEvent.click(deleteButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Details: Rope' })).toBeNull()
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add item' })).toHaveFocus()
+    );
   });
 
   it('calls onQuantityChange when plus button clicked', () => {
     const onQuantityChange = vi.fn();
-    const { container } = render(
+    render(
       <InventoryManager items={mockItems} onQuantityChange={onQuantityChange} />
     );
-    // Plus buttons in ItemCard increase quantity by 1
-    // Each item with onQuantityChange gets +/- buttons
-    // Find the first Plus (increase) button via the SVG icon within Quantity row
-    const plusButtons = container.querySelectorAll('button[title=""]');
-    // The quantity +/- buttons don't have titles — use a different approach
-    // ItemCard renders Plus and Minus icons as quantity controls
-    // Let's find all buttons and filter by the ones that trigger quantity change
-    // Actually, the plus buttons for quantity have no title but are inside the quantity row
-    // Let me click directly on the first increment button
-    const allButtons = container.querySelectorAll('button');
-    // The quantity plus button is the one right after the quantity display
-    // Let's just check via callback: find a button that triggers onQuantityChange(id, qty+1)
-    // Rope has quantity 1, so clicking + should call onQuantityChange('i1', 2)
-    // Find the specific button within Rope's card
-    const ropeCard = screen.getAllByText('Rope')[0].closest('.group');
-    if (ropeCard) {
-      const buttons = ropeCard.querySelectorAll('button');
-      // The plus button for quantity increments — it's the one with Plus icon after the quantity number
-      for (const btn of buttons) {
-        fireEvent.click(btn);
-        if (onQuantityChange.mock.calls.length > 0) break;
-      }
-    }
-    expect(onQuantityChange).toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Increase quantity: Rope' })
+    );
+    expect(onQuantityChange).toHaveBeenCalledWith('i1', 2);
   });
 
   it('hides add/delete controls in readonly mode', () => {
@@ -164,8 +243,9 @@ describe('InventoryManager', () => {
         readonly
       />
     );
-    expect(screen.queryByText('Add Item')).toBeNull();
-    expect(screen.queryByTitle('Delete item')).toBeNull();
+    expect(screen.queryByText('Add item')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
+    expect(screen.queryByRole('button', { name: 'Delete item' })).toBeNull();
   });
 
   it('uses overrideTotalWeight and overrideTotalValue', () => {
@@ -194,6 +274,60 @@ describe('InventoryManager', () => {
 
   it('shows empty state when no items', () => {
     render(<InventoryManager items={[]} />);
-    expect(screen.getAllByText('No items found').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Add your first item').length).toBeGreaterThan(
+      0
+    );
+  });
+
+  it('shows the sheet totals explanation only for a sheet summary', () => {
+    const { rerender } = render(<InventoryManager items={mockItems} />);
+    expect(
+      screen.queryByText(/Weight and value include all weapons/)
+    ).toBeNull();
+    rerender(
+      <InventoryManager
+        items={mockItems}
+        sheetSummary
+        overrideTotalWeight={99.9}
+        overrideTotalValue={5000}
+      />
+    );
+    expect(
+      screen.getByText(/Weight and value include all weapons/)
+    ).toBeVisible();
+    fireEvent.change(screen.getByPlaceholderText('Search items'), {
+      target: { value: 'Rope' },
+    });
+    expect(screen.getByText('Matching quantity')).toBeVisible();
+    expect(screen.getByText('99.9')).toBeVisible();
+    expect(screen.getByText('50 gp')).toBeVisible();
+  });
+
+  it('keeps generic totals filtered when no sheet override is supplied', () => {
+    render(<InventoryManager items={mockItems} />);
+    fireEvent.change(screen.getByPlaceholderText('Search items'), {
+      target: { value: 'Rope' },
+    });
+    expect(screen.getByText('10.0')).toBeVisible();
+    expect(screen.getByText('1 gp')).toBeVisible();
+  });
+
+  it('scopes location collapse by encoded character ID and exact location', () => {
+    expect(inventoryLocationKey('a:b', 'Bag:Holding')).not.toBe(
+      inventoryLocationKey('a', 'b:Bag:Holding')
+    );
+    const { rerender } = render(
+      <InventoryManager items={mockItems} locationScopeId="character-a" />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Backpack' }));
+    expect(screen.queryByText('Rope')).toBeNull();
+    rerender(
+      <InventoryManager items={mockItems} locationScopeId="character-b" />
+    );
+    expect(screen.getByText('Rope')).toBeVisible();
+    rerender(
+      <InventoryManager items={mockItems} locationScopeId="character-a" />
+    );
+    expect(screen.queryByText('Rope')).toBeNull();
   });
 });

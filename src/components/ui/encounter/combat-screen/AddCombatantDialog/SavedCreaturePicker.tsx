@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { CircleUserRound, Search, Trash2 } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
+import { Button } from '@/components/ui/forms/button';
+import { stripTags } from '@/utils/parseEntriesToHtml';
+import { statBlockHtmlToPlainText } from '@/utils/statBlockText';
 import type { CampaignNPC } from '@/types/encounter';
 
 interface SavedCreaturePickerProps {
   creatures: CampaignNPC[];
   emptyMessage: string;
   onSelect: (creature: CampaignNPC) => void;
-  onDelete?: (creature: CampaignNPC) => void;
+  onDelete?: (creature: CampaignNPC) => Promise<boolean>;
+  onDeleteFallbackFocus?: () => void;
 }
 
 const ALL_GROUPS = '__all__';
@@ -22,8 +26,10 @@ export function SavedCreaturePicker({
   emptyMessage,
   onSelect,
   onDelete,
+  onDeleteFallbackFocus,
 }: SavedCreaturePickerProps) {
   const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
   const [group, setGroup] = useState(ALL_GROUPS);
 
   const groups = useMemo(
@@ -68,6 +74,7 @@ export function SavedCreaturePicker({
     <div className="space-y-3">
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
         <Input
+          ref={searchRef}
           value={query}
           onChange={event => setQuery(event.target.value)}
           placeholder="Search by name, group, or tag…"
@@ -100,20 +107,17 @@ export function SavedCreaturePicker({
           No saved creatures match these filters.
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="border-divider border-t">
           {filteredCreatures.map(creature => (
             <div
               key={creature.id}
-              className="border-divider bg-surface-raised hover:border-accent-amber-border flex items-center rounded-[14px] border-[1.5px] text-sm transition-all"
+              className="border-divider flex items-center gap-2 border-b text-sm"
             >
               <button
                 type="button"
                 onClick={() => onSelect(creature)}
-                className="flex min-w-0 flex-1 items-center gap-2 px-[14px] py-3 text-left"
+                className="hover:bg-surface-hover flex min-w-0 flex-1 items-center gap-2 py-3 text-left pointer-coarse:min-h-11"
               >
-                <div className="bg-accent-amber-bg text-accent-amber-text flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]">
-                  <CircleUserRound size={19} />
-                </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-heading truncate text-[14.5px] font-bold">
                     {creature.name}
@@ -125,8 +129,12 @@ export function SavedCreaturePicker({
                       </Badge>
                     )}
                     {creature.description && (
-                      <span className="text-muted truncate text-xs">
-                        {creature.description}
+                      <span className="text-muted line-clamp-1 text-xs">
+                        {statBlockHtmlToPlainText(
+                          stripTags(creature.description)
+                            .replace(/\*\*/g, '')
+                            .replace(/&nbsp;/gi, ' ')
+                        )}
                       </span>
                     )}
                   </div>
@@ -136,15 +144,21 @@ export function SavedCreaturePicker({
                 </div>
               </button>
               {onDelete && (
-                <button
+                <Button
                   type="button"
-                  onClick={() => onDelete(creature)}
-                  className="text-muted hover:text-accent-red-text shrink-0 p-2.5 transition-colors"
-                  title={`Delete ${creature.name}`}
+                  variant="danger"
+                  size="sm"
+                  onClick={async () => {
+                    if (await onDelete(creature)) {
+                      if (searchRef.current?.isConnected)
+                        searchRef.current.focus();
+                      else onDeleteFallbackFocus?.();
+                    }
+                  }}
                   aria-label={`Delete ${creature.name}`}
                 >
-                  <Trash2 size={14} />
-                </button>
+                  <Trash2 size={16} aria-hidden="true" />
+                </Button>
               )}
             </div>
           ))}

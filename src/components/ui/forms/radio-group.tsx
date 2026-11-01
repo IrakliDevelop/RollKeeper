@@ -89,10 +89,17 @@ const RadioGroupItem = React.forwardRef<
       size = 'md',
       variant = 'default',
       wrapperClassName,
+      'aria-labelledby': ariaLabelledBy,
+      'aria-describedby': ariaDescribedBy,
       ...props
     },
     ref
   ) => {
+    // The wrapping <label> would fold the description into the name, so
+    // name and describe the radio by id instead.
+    const textId = React.useId();
+    const labelId = label ? `${textId}-label` : undefined;
+    const descriptionId = description ? `${textId}-description` : undefined;
     const sizeStyle = sizeClasses[size];
 
     const radioElement = (
@@ -100,19 +107,27 @@ const RadioGroupItem = React.forwardRef<
         ref={ref}
         className={cn(
           sizeStyle.radio,
-          'border-divider-strong ring-offset-surface aspect-square shrink-0 rounded-full border-2 text-white transition-colors',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+          'border-input-border relative aspect-square shrink-0 rounded-full border transition-colors duration-120 ease-out',
+          'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          'data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600',
-          'hover:border-emerald-500',
+          'data-[state=checked]:border-brass-fill data-[state=checked]:bg-brass-fill',
+          // 44px hit area on touch, same visual size.
+          'after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 pointer-coarse:after:size-11',
           className
         )}
         disabled={disabled}
+        aria-labelledby={
+          ariaLabelledBy ?? (props['aria-label'] ? undefined : labelId)
+        }
+        aria-describedby={
+          [ariaDescribedBy, descriptionId].filter(Boolean).join(' ') ||
+          undefined
+        }
         {...props}
       >
         <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
           <Circle
-            className={cn(sizeStyle.indicator, 'fill-current text-white')}
+            className={cn(sizeStyle.indicator, 'text-on-brass fill-current')}
           />
         </RadioGroupPrimitive.Indicator>
       </RadioGroupPrimitive.Item>
@@ -135,6 +150,7 @@ const RadioGroupItem = React.forwardRef<
               )}
               {label && (
                 <span
+                  id={labelId}
                   className={cn(
                     sizeStyle.text,
                     'text-heading group-hover:text-body font-medium transition-colors'
@@ -146,7 +162,9 @@ const RadioGroupItem = React.forwardRef<
             </div>
           )}
           {description && (
-            <span className="text-body mt-1 text-xs">{description}</span>
+            <span id={descriptionId} className="text-body mt-1 text-xs">
+              {description}
+            </span>
           )}
         </div>
       </>
@@ -156,9 +174,10 @@ const RadioGroupItem = React.forwardRef<
       return (
         <label
           className={cn(
-            'group border-divider bg-surface-raised flex items-start rounded-lg border-2 p-4 transition-all',
-            'hover:border-divider-strong hover:shadow-sm',
-            'has-[:checked]:bg-accent-emerald-bg has-[:checked]:border-emerald-500',
+            'group border-divider bg-surface-raised flex items-start rounded-md border p-4 transition-colors duration-120 ease-out',
+            'hover:border-input-border',
+            // Radix renders no native input outside a form, so key on data-state.
+            'has-data-[state=checked]:border-brass-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
             sizeStyle.gap,
             wrapperClassName
@@ -173,6 +192,12 @@ const RadioGroupItem = React.forwardRef<
       <label
         className={cn(
           'group flex items-start',
+          // On touch a row is at least 44px and keeps the radio's 44px hit
+          // area inside it, so stacked rows don't overlap: a one-line row
+          // centres the radio, a described row pads its top instead so the
+          // radio stays beside the label.
+          'pointer-coarse:min-h-11',
+          description ? 'pointer-coarse:pt-3' : 'pointer-coarse:items-center',
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           sizeStyle.gap,
           wrapperClassName
@@ -222,35 +247,55 @@ const RadioGroupField = React.forwardRef<
       wrapperClassName,
       required,
       children,
+      'aria-describedby': ariaDescribedBy,
       ...props
     },
     ref
   ) => {
+    const fieldId = React.useId();
+    const labelId = label ? `${fieldId}-label` : undefined;
+    const messageId = `${fieldId}-message`;
+    const message = error || helperText;
+    const describedBy =
+      [ariaDescribedBy, message ? messageId : undefined]
+        .filter(Boolean)
+        .join(' ') || undefined;
+
     return (
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
-          <div className="text-heading mb-2 block text-sm font-medium">
+          <div
+            id={labelId}
+            className="text-heading mb-2 block text-sm font-medium"
+          >
             {label}
             {required && (
-              <span className="ml-1 text-red-500" aria-label="required">
+              <span className="text-blood-text ml-1" aria-label="required">
                 *
               </span>
             )}
           </div>
         )}
 
-        <RadioGroup {...props} ref={ref}>
+        <RadioGroup
+          aria-invalid={error ? true : undefined}
+          aria-labelledby={props['aria-label'] ? undefined : labelId}
+          aria-describedby={describedBy}
+          {...props}
+          ref={ref}
+        >
           {children}
         </RadioGroup>
 
-        {(error || helperText) && (
+        {message && (
           <p
+            id={messageId}
             className={cn(
               'mt-2 text-sm',
-              error ? 'text-red-600 dark:text-red-400' : 'text-body'
+              error ? 'text-blood-text' : 'text-body'
             )}
           >
-            {error || helperText}
+            {message}
           </p>
         )}
       </div>

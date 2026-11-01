@@ -74,7 +74,6 @@ export function StatusEffectTray() {
           <ConditionBadge
             name={condition.name}
             stackCount={condition.count}
-            sourceSpell={condition.source}
             size="md"
             variant={condition.kind === 'buff' ? 'buff' : 'condition'}
             onRemove={() => removeCondition(condition.id)}

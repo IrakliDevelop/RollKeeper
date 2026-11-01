@@ -1,6 +1,6 @@
 /**
  * Badge Component
- * 
+ *
  * A small label component for displaying status, categories, or tags.
  * Supports multiple variants and sizes.
  */
@@ -34,6 +34,7 @@ function Badge({
   return (
     <div
       className={cn(badgeVariants({ variant, size }), className)}
+      data-variant={variant ?? 'neutral'}
       {...props}
     >
       {leftIcon && (

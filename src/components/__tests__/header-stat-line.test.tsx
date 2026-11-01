@@ -96,8 +96,8 @@ describe('HeaderStatLine — non-player editing', () => {
     render(<HeaderStatLine entity={monsterEntity} actions={makeActions()} />);
 
     expect(screen.getByLabelText('Speed')).toHaveValue('30 ft.');
-    expect(screen.getByLabelText('Initiative Mod')).toHaveValue('1');
-    expect(screen.getByLabelText('Proficiency Bonus')).toHaveValue('2');
+    expect(screen.getByLabelText('Initiative modifier')).toHaveValue('1');
+    expect(screen.getByLabelText('Proficiency bonus')).toHaveValue('2');
   });
 
   it('editing Speed patches monsterStatBlock.speed on blur', async () => {
@@ -123,7 +123,7 @@ describe('HeaderStatLine — non-player editing', () => {
     const user = userEvent.setup();
     render(<HeaderStatLine entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Initiative Mod');
+    const input = screen.getByLabelText('Initiative modifier');
     await user.clear(input);
     await user.type(input, '7');
     await user.tab();
@@ -139,7 +139,7 @@ describe('HeaderStatLine — non-player editing', () => {
     const user = userEvent.setup();
     render(<HeaderStatLine entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Initiative Mod');
+    const input = screen.getByLabelText('Initiative modifier');
     await user.clear(input);
     await user.tab();
 
@@ -153,7 +153,7 @@ describe('HeaderStatLine — non-player editing', () => {
     const user = userEvent.setup();
     render(<HeaderStatLine entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Proficiency Bonus');
+    const input = screen.getByLabelText('Proficiency bonus');
     await user.clear(input);
     await user.tab();
 
@@ -169,7 +169,7 @@ describe('HeaderStatLine — non-player editing', () => {
     };
     render(<HeaderStatLine entity={noPb} actions={actions} />);
 
-    const input = screen.getByLabelText('Proficiency Bonus');
+    const input = screen.getByLabelText('Proficiency bonus');
     expect(input).toHaveValue('');
     await user.type(input, '3');
 
@@ -186,8 +186,8 @@ describe('HeaderStatLine — non-player editing', () => {
     render(<HeaderStatLine entity={noSb} actions={makeActions()} />);
 
     expect(screen.queryByLabelText('Speed')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Initiative Mod')).toBeInTheDocument();
-    expect(screen.getByLabelText('Proficiency Bonus')).toBeInTheDocument();
+    expect(screen.getByLabelText('Initiative modifier')).toBeInTheDocument();
+    expect(screen.getByLabelText('Proficiency bonus')).toBeInTheDocument();
   });
 
   it('with a stat block but empty speed, non-players still get an editable Speed input', () => {

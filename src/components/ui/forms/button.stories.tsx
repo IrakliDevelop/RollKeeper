@@ -1,21 +1,23 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
-import { Save, Download, Upload, Trash2, Plus, ArrowRight } from 'lucide-react';
+import { expect, fn, within } from 'storybook/test';
+import { Save, Trash2, ArrowRight, Star } from 'lucide-react';
 import { Button } from './button';
 
 /**
- * The Button component is a versatile action trigger supporting multiple variants,
- * sizes, icons, and loading states. Built with Radix UI Slot for composition.
+ * Felt and Brass buttons. `primary` is the one brass action per view,
+ * `danger-solid` is only for the confirm button of a destructive dialog, and
+ * everything else is an outline or plain text.
  */
 const meta: Meta<typeof Button> = {
   title: 'Forms/Button',
   component: Button,
   parameters: {
     layout: 'centered',
+    a11y: { test: 'error' },
     docs: {
       description: {
         component:
-          'A flexible button component with gradient variants, icon support, and loading states.',
+          'Primary is a brass fill, secondary and outline are a 1px outline, ghost is text only, danger is a blood outline and danger-solid a blood fill. success and warning are deprecated aliases of secondary. Use `selected` for the on state of an outline or ghost toggle.',
       },
     },
   },
@@ -26,12 +28,13 @@ const meta: Meta<typeof Button> = {
       options: [
         'primary',
         'secondary',
-        'success',
-        'danger',
-        'warning',
         'outline',
         'ghost',
+        'danger',
+        'danger-solid',
         'link',
+        'success',
+        'warning',
       ],
       description: 'Visual style variant',
     },
@@ -39,6 +42,10 @@ const meta: Meta<typeof Button> = {
       control: 'select',
       options: ['xs', 'sm', 'md', 'lg', 'xl'],
       description: 'Button size',
+    },
+    selected: {
+      control: 'boolean',
+      description: 'On state of an outline or ghost toggle',
     },
     fullWidth: {
       control: 'boolean',
@@ -61,123 +68,128 @@ const meta: Meta<typeof Button> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Default story
 export const Default: Story = {
   args: {
     children: 'Button',
-    variant: 'primary',
-    size: 'md',
   },
 };
 
-// All variants
-export const Variants: Story = {
-  render: () => (
+function VariantRow() {
+  return (
     <div className="flex flex-wrap gap-3">
       <Button variant="primary">Primary</Button>
       <Button variant="secondary">Secondary</Button>
-      <Button variant="success">Success</Button>
-      <Button variant="danger">Danger</Button>
-      <Button variant="warning">Warning</Button>
       <Button variant="outline">Outline</Button>
       <Button variant="ghost">Ghost</Button>
+      <Button variant="danger">Danger</Button>
+      <Button variant="danger-solid">Danger solid</Button>
       <Button variant="link">Link</Button>
+    </div>
+  );
+}
+
+export const Variants: Story = {
+  render: () => <VariantRow />,
+};
+
+export const VariantsDark: Story = {
+  render: () => <VariantRow />,
+  globals: { theme: 'dark' },
+};
+
+function ToggleRow() {
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Button variant="outline" selected>
+        Equipped
+      </Button>
+      <Button variant="outline">Equip</Button>
+      <Button
+        variant="ghost"
+        selected
+        aria-label="Favorite"
+        leftIcon={<Star className="h-4 w-4" />}
+      />
+      <Button
+        variant="ghost"
+        aria-label="Not favorite"
+        leftIcon={<Star className="h-4 w-4" />}
+      />
+    </div>
+  );
+}
+
+export const SelectedToggles: Story = {
+  render: () => <ToggleRow />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('button', { name: 'Equipped' })
+    ).toHaveAttribute('data-selected', 'true');
+    await expect(
+      canvas.getByRole('button', { name: 'Equip' })
+    ).not.toHaveAttribute('data-selected');
+  },
+};
+
+export const SelectedTogglesDark: Story = {
+  render: () => <ToggleRow />,
+  globals: { theme: 'dark' },
+};
+
+export const Sizes: Story = {
+  render: () => (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button size="xs">Extra small</Button>
+      <Button size="sm">Small</Button>
+      <Button size="md">Medium</Button>
+      <Button size="lg">Large</Button>
+      <Button size="xl">Extra large</Button>
     </div>
   ),
   parameters: {
     docs: {
       description: {
         story:
-          'All available button variants. Primary buttons have gradient backgrounds for emphasis.',
+          'On a coarse pointer every size grows to at least 44px tall and wide.',
       },
     },
   },
 };
 
-// All sizes
-export const Sizes: Story = {
-  render: () => (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button size="xs">Extra Small</Button>
-      <Button size="sm">Small</Button>
-      <Button size="md">Medium</Button>
-      <Button size="lg">Large</Button>
-      <Button size="xl">Extra Large</Button>
-    </div>
-  ),
-  parameters: {
-    docs: {
-      description: {
-        story: 'Buttons come in five sizes from extra small to extra large.',
-      },
-    },
-  },
-};
-
-// With left icon
-export const WithLeftIcon: Story = {
-  args: {
-    children: 'Save Changes',
-    leftIcon: <Save className="h-4 w-4" />,
-    variant: 'primary',
-  },
-};
-
-// With right icon
-export const WithRightIcon: Story = {
-  args: {
-    children: 'Continue',
-    rightIcon: <ArrowRight className="h-4 w-4" />,
-    variant: 'primary',
-  },
-};
-
-// Icon examples
-export const IconExamples: Story = {
+export const WithIcons: Story = {
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Button leftIcon={<Save className="h-4 w-4" />}>Save</Button>
-      <Button leftIcon={<Download className="h-4 w-4" />} variant="secondary">
-        Download
-      </Button>
-      <Button leftIcon={<Upload className="h-4 w-4" />} variant="outline">
-        Upload
-      </Button>
-      <Button leftIcon={<Trash2 className="h-4 w-4" />} variant="danger">
-        Delete
-      </Button>
-      <Button leftIcon={<Plus className="h-4 w-4" />} variant="success">
-        Add New
+      <Button variant="primary" leftIcon={<Save className="h-4 w-4" />}>
+        Save
       </Button>
       <Button rightIcon={<ArrowRight className="h-4 w-4" />}>Continue</Button>
+      <Button variant="danger" leftIcon={<Trash2 className="h-4 w-4" />}>
+        Delete
+      </Button>
     </div>
   ),
 };
 
-// Loading state
 export const Loading: Story = {
   args: {
-    children: 'Saving...',
+    children: 'Saving',
     loading: true,
     variant: 'primary',
   },
 };
 
-// Disabled state
 export const Disabled: Story = {
   args: {
     children: 'Disabled',
     disabled: true,
-    variant: 'primary',
   },
 };
 
-// Full width
 export const FullWidth: Story = {
   args: {
-    children: 'Full Width Button',
+    children: 'Full width button',
     fullWidth: true,
-    variant: 'primary',
   },
   decorators: [
     Story => (
@@ -188,49 +200,28 @@ export const FullWidth: Story = {
   ],
 };
 
-// Interactive states demo
-export const InteractiveStates: Story = {
-  render: () => (
-    <div className="space-y-4">
-      <div className="flex gap-3">
-        <Button variant="primary">Normal</Button>
-        <Button variant="primary" disabled>
-          Disabled
-        </Button>
-        <Button variant="primary" loading>
-          Loading
-        </Button>
-      </div>
-      <p className="text-sm text-gray-600">
-        Hover and focus on buttons to see interactive states. Try tabbing
-        through with keyboard.
-      </p>
+function DestructiveConfirmRow() {
+  return (
+    <div className="flex gap-3">
+      <Button variant="outline">Cancel</Button>
+      <Button variant="danger-solid">Delete template</Button>
     </div>
-  ),
+  );
+}
+
+export const DestructiveConfirm: Story = {
+  render: () => <DestructiveConfirmRow />,
   parameters: {
     docs: {
       description: {
         story:
-          'Demonstrates normal, disabled, and loading states side by side.',
+          'Only the confirm button inside a destructive dialog uses danger-solid. The button that opens the dialog uses danger.',
       },
     },
   },
 };
 
-// Danger actions
-export const DangerActions: Story = {
-  render: () => (
-    <div className="flex gap-3">
-      <Button variant="danger">Delete</Button>
-      <Button variant="outline">Cancel</Button>
-    </div>
-  ),
-  parameters: {
-    docs: {
-      description: {
-        story:
-          'Use danger variant for destructive actions. Pair with outline for cancel option.',
-      },
-    },
-  },
+export const DestructiveConfirmDark: Story = {
+  render: () => <DestructiveConfirmRow />,
+  globals: { theme: 'dark' },
 };

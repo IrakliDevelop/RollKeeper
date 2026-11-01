@@ -1,18 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import {
-  Plus,
-  Edit3,
-  Trash2,
-  BookOpen,
-  Search,
-  ArrowUpDown,
-} from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Plus, Edit3, Trash2, Search, ArrowUpDown } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
 import { RichTextRenderer } from '@/components/ui/utils';
 import { ToastData } from '@/components/ui/feedback/Toast';
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
 import { Input } from '@/components/ui/forms/input';
 import {
   Select,
@@ -22,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/forms/select';
 import NoteModal from './NoteModal';
+import { confirmNoteDeletion } from './confirmNoteDeletion';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
 type SortOption = 'newest' | 'oldest' | 'alphabetical' | 'manual';
@@ -56,12 +51,20 @@ export default function NotesManager({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [searchQuery, setSearchQuery] = useState('');
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingDeleteFocus = useRef(false);
+  useEffect(() => {
+    if (pendingDeleteFocus.current) {
+      pendingDeleteFocus.current = false;
+      addButtonRef.current?.focus();
+    }
+  }, [items]);
 
   const sortedItems = useMemo(() => {
     let filtered = safeItems;
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.trim().toLowerCase();
       filtered = filtered.filter(
         item =>
           item.title.toLowerCase().includes(q) ||
@@ -120,21 +123,29 @@ export default function NotesManager({
     }
   };
 
+  const handleDelete = async (item: RichTextContent) => {
+    if (await confirmNoteDeletion(item.title)) {
+      pendingDeleteFocus.current = true;
+      onDelete(item.id);
+    }
+  };
+
   return (
-    <div className={className}>
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-heading text-lg font-semibold">Session Notes</h2>
+    <Section
+      heading="Session notes"
+      className={className}
+      trailing={
         <Button
+          ref={addButtonRef}
           variant="primary"
           size="sm"
           leftIcon={<Plus size={14} />}
           onClick={() => setIsAddModalOpen(true)}
         >
-          Add Note
+          Add note
         </Button>
-      </div>
-
+      }
+    >
       {/* Search & Sort */}
       {safeItems.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -142,7 +153,8 @@ export default function NotesManager({
             <Input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search notes..."
+              placeholder="Search notes"
+              aria-label="Search notes"
               size="sm"
               leftIcon={<Search size={14} />}
               clearable
@@ -155,14 +167,17 @@ export default function NotesManager({
               value={sortBy}
               onValueChange={v => setSortBy(v as SortOption)}
             >
-              <SelectTrigger className="h-8 w-[140px] text-sm">
+              <SelectTrigger
+                aria-label="Sort notes"
+                className="h-8 min-w-32 text-sm"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
                 <SelectItem value="alphabetical">A–Z</SelectItem>
-                <SelectItem value="manual">Manual Order</SelectItem>
+                <SelectItem value="manual">Manual order</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -172,14 +187,10 @@ export default function NotesManager({
       {/* Notes List */}
       {sortedItems.length === 0 ? (
         <div className="text-muted py-12 text-center">
-          <BookOpen className="text-faint mx-auto mb-4 h-12 w-12" />
           <p className="mb-2 text-lg font-medium">
-            {searchQuery ? 'No matching notes' : 'No notes yet'}
-          </p>
-          <p className="text-sm">
             {searchQuery
-              ? 'Try a different search term.'
-              : "Click 'Add Note' to start taking notes about your adventures."}
+              ? `No notes match “${searchQuery.trim()}”.`
+              : 'Write your first note'}
           </p>
         </div>
       ) : (
@@ -188,28 +199,32 @@ export default function NotesManager({
           onReorder={handleReorder}
           keyExtractor={item => item.id}
           disabled={!onReorder || sortBy !== 'manual'}
-          className="space-y-3"
-          itemClassName="bg-surface-raised rounded-lg border-2 border-divider hover:border-divider-strong p-4 transition-all cursor-pointer hover:shadow-md"
+          className="divide-divider divide-y"
+          itemClassName="py-3"
           showDragHandle={Boolean(onReorder) && sortBy === 'manual'}
           dragHandlePosition="left"
           renderItem={item => (
             <div className="flex items-start justify-between gap-3">
-              <div
-                className="min-w-0 flex-1"
-                onClick={() => handleNoteClick(item)}
-              >
-                <h3 className="text-heading truncate text-sm font-semibold">
-                  {item.title}
+              <div className="min-w-0 flex-1">
+                <h3 className="text-heading text-sm font-semibold break-words">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-heading h-auto min-h-0 p-0 text-left whitespace-normal focus-visible:underline pointer-coarse:min-h-11"
+                    onClick={() => handleNoteClick(item)}
+                  >
+                    {item.title.trim() || 'Untitled note'}
+                  </Button>
                 </h3>
                 {item.content ? (
                   <div className="mt-1.5 line-clamp-2 text-xs">
                     <RichTextRenderer content={item.content} />
                   </div>
                 ) : (
-                  <p className="text-faint mt-1.5 text-xs italic">No content</p>
+                  <p className="text-muted mt-1.5 text-xs italic">No content</p>
                 )}
                 {item.updatedAt && (
-                  <p className="text-faint mt-2 text-[11px]">
+                  <p className="text-muted mt-2 text-xs">
                     Updated{' '}
                     {new Date(item.updatedAt).toLocaleDateString(undefined, {
                       month: 'short',
@@ -224,26 +239,24 @@ export default function NotesManager({
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleNoteClick(item);
-                  }}
-                  className="text-muted hover:text-accent-blue-text hover:bg-surface-hover rounded-md p-1.5 transition-colors"
-                  title="View / Edit"
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleNoteClick(item)}
+                  aria-label={`Edit ${item.title.trim() || 'untitled note'}`}
                 >
                   <Edit3 size={14} />
-                </button>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    onDelete(item.id);
-                  }}
-                  className="text-muted hover:text-accent-red-text hover:bg-accent-red-bg rounded-md p-1.5 transition-colors"
-                  title="Delete"
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  onClick={() => void handleDelete(item)}
+                  aria-label={`Delete ${item.title.trim() || 'untitled note'}`}
                 >
                   <Trash2 size={14} />
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -268,6 +281,6 @@ export default function NotesManager({
         onCreate={handleCreate}
         onAddToast={onAddToast}
       />
-    </div>
+    </Section>
   );
 }

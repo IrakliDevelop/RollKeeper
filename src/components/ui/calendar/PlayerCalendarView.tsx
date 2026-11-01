@@ -27,6 +27,12 @@ import { useCharacterStore } from '@/store/characterStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { useTimeAgo } from '@/hooks/useTimeAgo';
 import { CALENDAR_PRESETS } from '@/utils/calendarPresets';
+import { getRestSlots } from '@/utils/calculations';
+import {
+  advanceLocalCalendarForLongRest,
+  calendarRestDetails,
+  getSyncedCalendar,
+} from '@/utils/longRestCalendar';
 import {
   getMsPerDay,
   timeToDate,
@@ -38,7 +44,7 @@ import {
 import { WEATHER_OPTIONS, type WeatherType } from '@/types/calendar';
 import { AppIcon, WEATHER_ICONS, getIconName } from '@/components/ui/icons';
 import type { SelectedDay } from './CalendarGrid';
-import type { ToastData } from '@/components/ui/feedback/Toast';
+import { longRestToast, type ToastData } from '@/components/ui/feedback/Toast';
 import type { CalendarEvent, CalendarEventInput } from '@/types/calendar';
 
 type PlayerTab = 'calendar' | 'events';
@@ -159,13 +165,14 @@ export function PlayerCalendarView({
   const lastFetchedAgo = useTimeAgo(lastFetched);
 
   // Synced mode: campaign code exists AND DM has shared calendar data
-  const isSynced = !!campaignCode && !!sharedCalendar;
+  const syncedCalendar = getSyncedCalendar(campaignCode, sharedCalendar);
+  const isSynced = syncedCalendar !== null;
 
   // Derive date and config from shared state when synced
   const syncedDate = isSynced
-    ? timeToDate(sharedCalendar.currentTime, sharedCalendar.config)
+    ? timeToDate(syncedCalendar.currentTime, syncedCalendar.config)
     : null;
-  const syncedConfig = isSynced ? sharedCalendar.config : null;
+  const syncedConfig = isSynced ? syncedCalendar.config : null;
 
   // Effective values (synced or local)
   const date = syncedDate ?? localDate;
@@ -235,7 +242,7 @@ export function PlayerCalendarView({
 
   // Active state
   const events = isSynced
-    ? (sharedCalendar.events ?? []).map(event => ({ ...event, createdAt: 0 }))
+    ? (syncedCalendar.events ?? []).map(event => ({ ...event, createdAt: 0 }))
     : (calendar?.events ?? []);
   const displayYear = browseYear ?? date.year;
   const displayMonth = browseMonth ?? date.month;
@@ -243,9 +250,9 @@ export function PlayerCalendarView({
 
   const campaignDays = isSynced
     ? getCampaignDays(
-        sharedCalendar.currentTime,
-        sharedCalendar.startTime,
-        sharedCalendar.config
+        syncedCalendar.currentTime,
+        syncedCalendar.startTime,
+        syncedCalendar.config
       )
     : calendar
       ? getCampaignDays(calendar.currentTime, calendar.startTime ?? 0, config)
@@ -253,29 +260,20 @@ export function PlayerCalendarView({
 
   const handleLongRest = () => {
     takeLongRest();
-    if (!isSynced) {
-      advanceTime(characterId, getMsPerDay(config));
-    }
+    const advanced = advanceLocalCalendarForLongRest({
+      synced: isSynced,
+      calendar,
+      advance: ms => advanceTime(characterId, ms),
+    });
     setBrowseYear(null);
     setBrowseMonth(null);
-    const details = [
-      'All abilities restored',
-      'All spell slots restored',
-      'Hit points fully restored',
-      'Hit dice partially restored',
-    ];
-    if (!isSynced) {
-      details.push('Calendar advanced by 1 day');
-    }
-    addToast?.({
-      type: 'rest',
-      title: '\u{1F319} Long Rest Complete',
-      message:
-        'Your character has taken a long rest' +
-        (isSynced ? '' : ' and a new day begins'),
-      details,
-      duration: 6000,
-    });
+    // The same toast as the rest dialog's, plus the day when it moved.
+    addToast?.(
+      longRestToast(
+        getRestSlots(useCharacterStore.getState().character),
+        calendarRestDetails(advanced)
+      )
+    );
   };
 
   const handlePrevMonth = () => {
@@ -406,8 +404,8 @@ export function PlayerCalendarView({
             </>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-col items-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {/* Hide Start Date, Prev Day, Reset in synced mode */}
             {!isSynced && (
               <>
@@ -447,7 +445,11 @@ export function PlayerCalendarView({
               <>
                 {confirmingReset ? (
                   <div className="flex items-center gap-1">
-                    <Button variant="danger" size="sm" onClick={handleReset}>
+                    <Button
+                      variant="danger-solid"
+                      size="sm"
+                      onClick={handleReset}
+                    >
                       Confirm
                     </Button>
                     <Button
@@ -538,6 +540,7 @@ export function PlayerCalendarView({
         <EventListView
           events={events}
           config={config}
+          showVisibility={false}
           onUpdateEvent={(eventId, updates) =>
             updateEvent(characterId, eventId, updates)
           }
@@ -549,6 +552,7 @@ export function PlayerCalendarView({
         <>
           <EventDialog
             open={eventDialogOpen}
+            showVisibility={false}
             onClose={() => setEventDialogOpen(false)}
             onSave={handleSaveEvent}
             onDelete={editingEvent ? handleDeleteEvent : undefined}

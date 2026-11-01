@@ -33,6 +33,49 @@ describe('CombatRow', () => {
     expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
   });
 
+  it('shows "Defeated" and "Down", never a band word, when a payload still carries one at 0 HP', () => {
+    // A DM tab opened before 02a and not reloaded, but holding the upgraded
+    // bands, still sends the lowest band's word on dead rows.
+    const enemy: SharedTurnEntry = {
+      entityId: 'gob-1',
+      displayName: 'Goblin',
+      type: 'monster',
+      disposition: 'enemy',
+      hpState: 'Critical',
+      isDead: true,
+    };
+    const player: SharedTurnEntry = {
+      entityId: 'pc-9',
+      displayName: 'Caleb',
+      type: 'player',
+      playerCharacterId: 'char-caleb',
+      hpMode: 'label',
+      hpState: 'Critical',
+      isDead: true,
+    };
+    render(
+      <>
+        <CombatRow
+          entry={enemy}
+          characterId="char-viewer"
+          isCurrent={false}
+          enemyHpMode="label"
+          onEndTurn={noop}
+        />
+        <CombatRow
+          entry={player}
+          characterId="char-viewer"
+          isCurrent={false}
+          enemyHpMode="label"
+          onEndTurn={noop}
+        />
+      </>
+    );
+    expect(screen.getByText('Defeated')).toBeInTheDocument();
+    expect(screen.getByText('Down')).toBeInTheDocument();
+    expect(screen.queryByText('Critical')).not.toBeInTheDocument();
+  });
+
   it('still shows the HP bar for a player who shares HP', () => {
     const entry: SharedTurnEntry = {
       entityId: 'pc-2',

@@ -374,7 +374,11 @@ export default function DmLocationToolOptions({
                 </div>
               </div>
               <Button
-                variant="primary"
+                variant={
+                  fogControls.pendingAction === 'enable'
+                    ? 'primary'
+                    : 'danger-solid'
+                }
                 onClick={fogControls.confirmAction}
                 className="min-h-[44px] px-3 text-xs"
               >

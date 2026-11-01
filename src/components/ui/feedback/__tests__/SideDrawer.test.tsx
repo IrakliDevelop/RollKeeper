@@ -7,8 +7,10 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { useState } from 'react';
+import userEvent from '@testing-library/user-event';
 
 import { SideDrawer } from '@/components/ui/feedback/SideDrawer';
+import { InPlaceField } from '@/components/ui/forms/InPlaceField';
 
 afterEach(() => cleanup());
 
@@ -23,6 +25,25 @@ describe('SideDrawer', () => {
       screen.getByRole('dialog', { name: 'Kaelen sheet' })
     ).toBeInTheDocument();
     expect(screen.getByText('body')).toBeInTheDocument();
+  });
+
+  it('floats on the elevated surface with the overlay shadow and no radius', () => {
+    render(
+      <SideDrawer open onOpenChange={vi.fn()} title="Kaelen sheet">
+        <p>body</p>
+      </SideDrawer>
+    );
+
+    const drawer = screen.getByRole('dialog', { name: 'Kaelen sheet' });
+    expect(drawer).toHaveClass(
+      'bg-surface-elevated',
+      'border-l',
+      'border-divider',
+      'shadow-overlay'
+    );
+    expect(drawer.className).not.toMatch(
+      /shadow-2xl|bg-surface-raised|rounded/
+    );
   });
 
   it('renders nothing when closed', () => {
@@ -125,5 +146,23 @@ describe('SideDrawer', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalled());
     expect(opener).not.toHaveFocus();
+  });
+
+  it('keeps the drawer open on the first Escape of an in-place edit, closes on the second', async () => {
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <SideDrawer open onOpenChange={onOpenChange} title="Goblin sheet">
+        <InPlaceField label="Speed" value={30} editing onCommit={vi.fn()} />
+      </SideDrawer>
+    );
+    const speed = screen.getByRole('textbox', { name: 'Speed' });
+    await user.click(speed);
+    await user.type(speed, '5');
+    await user.keyboard('{Escape}');
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(speed).toHaveValue('30');
+    await user.keyboard('{Escape}');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

@@ -1,20 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  Minus,
-  Plus,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  Brain,
-  X,
-} from 'lucide-react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
+import { Minus, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Summon } from '@/types/summon';
 import type { EncounterCondition } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import { Badge } from '@/components/ui/layout/badge';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
 
@@ -54,34 +47,57 @@ export function SummonCard({
   onRemoveCondition,
   onDismiss,
 }: SummonCardProps) {
-  const [hpInput, setHpInput] = useState('');
+  const [hpInput, setHpInput] = useState<number | undefined>();
+  const conditionRefs = useRef<Record<string, HTMLSpanElement | null>>({});
+  const addConditionRef = useRef<HTMLButtonElement>(null);
+  const focusAfterConditionRemoval = useRef<string | 'add' | null>(null);
   const [showStatBlock, setShowStatBlock] = useState(false);
   const [showConditions, setShowConditions] = useState(false);
 
   const { entity } = summon;
   const isDead = entity.currentHp <= 0;
 
+  useLayoutEffect(() => {
+    const target = focusAfterConditionRemoval.current;
+    if (!target) return;
+    const button =
+      target === 'add'
+        ? addConditionRef.current
+        : conditionRefs.current[target]?.querySelector('button');
+    button?.focus();
+    focusAfterConditionRemoval.current = null;
+  }, [entity.conditions]);
+
+  const handleRemoveCondition = (id: string) => {
+    const index = entity.conditions.findIndex(condition => condition.id === id);
+    focusAfterConditionRemoval.current =
+      entity.conditions[index + 1]?.id ??
+      entity.conditions[index - 1]?.id ??
+      'add';
+    onRemoveCondition(summon.id, id);
+  };
+
   const handleDamage = () => {
-    const amount = parseInt(hpInput);
-    if (!isNaN(amount) && amount > 0) {
+    const amount = hpInput;
+    if (amount !== undefined && amount > 0) {
       onDamage(summon.id, amount);
-      setHpInput('');
+      setHpInput(undefined);
     }
   };
 
   const handleHeal = () => {
-    const amount = parseInt(hpInput);
-    if (!isNaN(amount) && amount > 0) {
+    const amount = hpInput;
+    if (amount !== undefined && amount > 0) {
       onHeal(summon.id, amount);
-      setHpInput('');
+      setHpInput(undefined);
     }
   };
 
   const handleAddTempHp = () => {
-    const amount = parseInt(hpInput);
-    if (!isNaN(amount) && amount > 0) {
+    const amount = hpInput;
+    if (amount !== undefined && amount > 0) {
       onAddTempHp(summon.id, amount);
-      setHpInput('');
+      setHpInput(undefined);
     }
   };
 
@@ -101,29 +117,19 @@ export function SummonCard({
         ? 'Wild Shape'
         : 'Summon';
 
-  const typeBadgeVariant =
-    summon.type === 'familiar'
-      ? 'info'
-      : summon.type === 'wild-shape'
-        ? 'success'
-        : 'warning';
-
   return (
     <div
-      className={`border-divider bg-surface-raised rounded-lg border shadow-sm ${isDead ? 'opacity-60' : ''}`}
+      className={`border-divider bg-surface-raised rounded-md border ${isDead ? 'opacity-60' : ''}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-heading text-sm font-semibold">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h3 className="text-heading min-w-0 text-sm font-semibold break-words">
             {summon.customName || entity.name}
           </h3>
-          <Badge variant={typeBadgeVariant}>{typeLabel}</Badge>
+          <Badge variant="neutral">{typeLabel}</Badge>
           {summon.requiresConcentration && (
-            <span className="bg-accent-orange-bg text-accent-orange-text flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-              <Brain className="h-3 w-3" />
-              Conc.
-            </span>
+            <ConditionChip name="Concentration" kind="concentration" />
           )}
           {isDead && <Badge variant="danger">Dead</Badge>}
         </div>
@@ -131,7 +137,8 @@ export function SummonCard({
           variant="ghost"
           onClick={() => onDismiss(summon.id)}
           className="h-7 w-7 p-0"
-          title="Dismiss summon"
+          data-summon-dismiss
+          aria-label={`Dismiss ${summon.customName || entity.name}`}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -148,13 +155,14 @@ export function SummonCard({
       </div>
 
       {/* Quick Stats */}
-      <div className="border-divider flex items-center gap-4 border-t px-3 py-2 text-xs">
+      <div className="border-divider flex flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
         <span className="text-body">
           <span className="text-muted">AC</span> {entity.armorClass}
         </span>
         {summon.castAtLevel && (
           <span className="text-body">
-            <span className="text-muted">Cast at</span> Lv{summon.castAtLevel}
+            <span className="text-muted">Cast at level</span>{' '}
+            {summon.castAtLevel}
           </span>
         )}
         {summon.duration && (
@@ -169,26 +177,26 @@ export function SummonCard({
           {entity.conditions.map(c => (
             <span
               key={c.id}
-              className="bg-accent-red-bg text-accent-red-text inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
+              ref={element => {
+                conditionRefs.current[c.id] = element;
+              }}
             >
-              {c.name}
-              <button
-                onClick={() => onRemoveCondition(summon.id, c.id)}
-                className="hover:text-accent-red-text/80"
-              >
-                <X className="h-3 w-3" />
-              </button>
+              <ConditionChip
+                name={c.name}
+                onRemove={() => handleRemoveCondition(c.id)}
+              />
             </span>
           ))}
         </div>
       )}
 
       {/* HP Controls */}
-      <div className="border-divider flex items-center gap-1.5 border-t px-3 py-2">
-        <Input
-          type="number"
+      <div className="border-divider flex flex-wrap items-center gap-1.5 border-t px-3 py-2">
+        <NumberInput
+          aria-label="HP amount"
           value={hpInput}
-          onChange={e => setHpInput(e.target.value)}
+          onChange={setHpInput}
+          allowEmpty
           placeholder="HP"
           className="h-7 text-xs"
           wrapperClassName="w-16 shrink-0"
@@ -201,16 +209,16 @@ export function SummonCard({
           variant="danger"
           onClick={handleDamage}
           className="h-7 px-2 text-xs"
-          disabled={!hpInput}
+          disabled={!hpInput || hpInput <= 0}
         >
           <Minus className="mr-0.5 h-3 w-3" />
-          Dmg
+          Damage
         </Button>
         <Button
           variant="success"
           onClick={handleHeal}
           className="h-7 px-2 text-xs"
-          disabled={!hpInput}
+          disabled={!hpInput || hpInput <= 0}
         >
           <Plus className="mr-0.5 h-3 w-3" />
           Heal
@@ -219,10 +227,10 @@ export function SummonCard({
           variant="outline"
           onClick={handleAddTempHp}
           className="h-7 px-2 text-xs"
-          disabled={!hpInput}
-          title="Add temp HP"
+          disabled={!hpInput || hpInput <= 0}
+          aria-label="Add temp HP"
         >
-          +THP
+          Temp HP
         </Button>
       </div>
 
@@ -230,14 +238,17 @@ export function SummonCard({
       <div className="border-divider flex items-center gap-1 border-t px-3 py-2">
         <Button
           variant="ghost"
+          ref={addConditionRef}
+          aria-expanded={showConditions}
           onClick={() => setShowConditions(!showConditions)}
           className="h-7 px-2 text-xs"
         >
-          + Condition
+          Add condition
         </Button>
         {entity.monsterStatBlock && (
           <Button
             variant="ghost"
+            aria-expanded={showStatBlock}
             onClick={() => setShowStatBlock(!showStatBlock)}
             className="h-7 px-2 text-xs"
           >
@@ -246,7 +257,7 @@ export function SummonCard({
             ) : (
               <ChevronDown className="mr-1 h-3 w-3" />
             )}
-            Stats
+            Stat block
           </Button>
         )}
       </div>
@@ -261,7 +272,7 @@ export function SummonCard({
               <button
                 key={c}
                 onClick={() => handleAddCondition(c)}
-                className="bg-surface-secondary text-body hover:bg-surface-elevated rounded px-2 py-0.5 text-xs transition-colors"
+                className="bg-surface text-body hover:bg-surface-hover border-divider rounded-sm border px-2 py-0.5 text-xs transition-colors pointer-coarse:min-h-11"
               >
                 {c}
               </button>
@@ -273,7 +284,7 @@ export function SummonCard({
       {/* Stat Block */}
       {showStatBlock && entity.monsterStatBlock && (
         <div className="border-divider border-t px-3 py-2">
-          <MonsterStatBlockPanel statBlock={entity.monsterStatBlock} />
+          <MonsterStatBlockPanel statBlock={entity.monsterStatBlock} bare />
         </div>
       )}
     </div>

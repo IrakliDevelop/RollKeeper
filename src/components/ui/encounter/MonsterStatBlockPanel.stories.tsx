@@ -143,3 +143,19 @@ export const LegendaryMonsterDark: Story = {
   ...LegendaryMonster,
   globals: { theme: 'dark' },
 };
+
+export const BareInSummon: Story = {
+  args: { statBlock: simpleMonster, bare: true, readOnly: true },
+  decorators: [
+    Story => (
+      <div className="border-divider bg-surface-raised w-[390px] rounded-md border p-3">
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+export const BareInSummonDark: Story = {
+  ...BareInSummon,
+  globals: { theme: 'dark' },
+};

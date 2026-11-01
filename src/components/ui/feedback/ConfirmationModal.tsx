@@ -1,17 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogBody,
-  DialogFooter,
-} from '@/components/ui/feedback/dialog';
-import { Button } from '@/components/ui/forms/button';
+import { ConfirmDialogView } from '@/components/ui/feedback/confirm-dialog';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -24,6 +14,10 @@ interface ConfirmationModalProps {
   type?: 'danger' | 'warning' | 'info';
 }
 
+/**
+ * State-driven form of the shared confirm dialog, for screens that keep
+ * the pending action in state. New code can await confirmDialog instead.
+ */
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isOpen,
   onClose,
@@ -33,57 +27,19 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   type = 'danger',
-}) => {
-  const handleConfirm = () => {
-    onConfirm();
-    onClose();
-  };
-
-  const confirmVariant = type === 'danger' ? 'danger' : 'primary';
-
-  const iconContainerClass =
-    type === 'danger'
-      ? 'bg-accent-red-bg'
-      : type === 'warning'
-        ? 'bg-accent-amber-bg'
-        : 'bg-accent-blue-bg';
-  const iconClass =
-    type === 'danger'
-      ? 'text-accent-red-text-muted'
-      : type === 'warning'
-        ? 'text-accent-amber-text-muted'
-        : 'text-accent-blue-text-muted';
-
-  return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={open => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent size="sm">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className={`rounded-lg p-2 ${iconContainerClass}`}>
-              <AlertTriangle size={20} className={iconClass} />
-            </div>
-            <DialogTitle>{title}</DialogTitle>
-          </div>
-        </DialogHeader>
-        <DialogBody>
-          <DialogDescription className="leading-relaxed">
-            {message}
-          </DialogDescription>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            {cancelText}
-          </Button>
-          <Button variant={confirmVariant} onClick={handleConfirm}>
-            {confirmText}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
+}) => (
+  <ConfirmDialogView
+    open={isOpen}
+    kind="confirm"
+    title={title}
+    message={message}
+    tone={type === 'danger' ? 'danger' : 'default'}
+    confirmLabel={confirmText}
+    cancelLabel={cancelText}
+    onConfirm={() => {
+      onConfirm();
+      onClose();
+    }}
+    onCancel={onClose}
+  />
+);

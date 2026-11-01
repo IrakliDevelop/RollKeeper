@@ -104,7 +104,7 @@ export const ActionsTab: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole('button', { name: /actions & traits/i })
+      canvas.getByRole('tab', { name: /actions and traits/i })
     );
     await expect(canvas.getByDisplayValue('Scimitar')).toBeInTheDocument();
     await expect(canvas.getByDisplayValue('Nimble Escape')).toBeInTheDocument();

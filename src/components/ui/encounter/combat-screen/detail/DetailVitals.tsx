@@ -1,24 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Shield, Plus, X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
+import { Button } from '@/components/ui/forms/button';
 import { effectiveAc } from '@/utils/calculations';
+import { getHpNumberColor } from '@/utils/hpColor';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import type { DetailSectionProps } from './DetailHeader';
 import { DamageControls } from './DamageControls';
 import { DeathSaves } from './DeathSaves';
 import { ConcentrationReaction } from './ConcentrationReaction';
-import {
-  canSpendHitDie,
-  hpColorClass,
-  showDeathSaves,
-  spendHitDie,
-} from './hitDie';
+import { canSpendHitDie, showDeathSaves, spendHitDie } from './hitDie';
 
 export function DetailVitals({ entity, actions }: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);
   const [maxInput, setMaxInput] = useState('');
+  const cancelMax = useRef(false);
+  const maxHpButtonRef = useRef<HTMLButtonElement>(null);
 
   if (entity.type === 'lair') return null;
 
@@ -34,12 +33,12 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
   };
 
   return (
-    <div className="bg-surface-secondary border-divider space-y-3 rounded-xl border p-4">
+    <div className="border-divider space-y-3 border-t p-4">
       {/* HP display row */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-wrap items-baseline gap-1">
           <span
-            className={`font-display text-3xl font-bold tabular-nums ${hpColorClass(entity.currentHp, entity.maxHp)}`}
+            className={`font-display text-3xl font-bold tabular-nums ${getHpNumberColor(entity.currentHp, entity.maxHp)}`}
           >
             {entity.currentHp}
           </span>
@@ -50,46 +49,67 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
             </span>
           ) : editingMax ? (
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              aria-label="Max HP"
               value={maxInput}
               onChange={e => setMaxInput(e.target.value)}
-              onBlur={() => commitMaxHp(maxInput)}
+              data-in-place-dirty=""
+              onBlur={() => {
+                if (!cancelMax.current) commitMaxHp(maxInput);
+                cancelMax.current = false;
+              }}
               onKeyDown={e => {
                 if (e.key === 'Enter') commitMaxHp(maxInput);
-                if (e.key === 'Escape') setEditingMax(false);
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  cancelMax.current = true;
+                  setEditingMax(false);
+                }
               }}
-              className="bg-surface-raised text-heading w-14 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
+              className="bg-surface border-divider text-heading w-14 rounded-sm border px-1 py-1 text-center text-base font-medium pointer-coarse:min-h-11"
               autoFocus
             />
           ) : (
-            <button
+            <Button
+              ref={maxHpButtonRef}
+              type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => {
                 setMaxInput(entity.maxHp.toString());
                 setEditingMax(true);
               }}
-              className="text-muted hover:text-body text-sm tabular-nums transition-colors"
-              title="Edit max HP"
+              aria-label={`${entity.maxHp}, edit ${entity.name} max HP`}
+              className="tabular-nums pointer-coarse:min-h-11"
             >
               {entity.maxHp}
-            </button>
+            </Button>
           )}
 
           {/* Temp HP pill */}
           {entity.tempHp > 0 &&
             (isPlayer ? (
-              <span className="text-faint ml-1 text-xs">
-                (+{entity.tempHp} temp, synced)
+              <span className="text-muted ml-1 text-xs">
+                +{entity.tempHp} temp HP · synced
               </span>
             ) : (
-              <span className="bg-accent-blue-bg text-accent-blue-text ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
-                +{entity.tempHp} temp
-                <button
-                  onClick={() => actions.onUpdate(entity.id, { tempHp: 0 })}
-                  className="text-accent-blue-text hover:text-accent-red-text ml-0.5 transition-colors"
-                  aria-label="Clear temp HP"
+              <span className="text-frost-text ml-1 inline-flex items-center gap-1 text-xs font-medium">
+                +{entity.tempHp} temp HP
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    actions.onUpdate(entity.id, { tempHp: 0 });
+                    maxHpButtonRef.current?.focus();
+                  }}
+                  className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                  aria-label={`Clear ${entity.name} temp HP`}
                 >
                   <X size={11} aria-hidden />
-                </button>
+                </Button>
               </span>
             ))}
         </div>
@@ -102,7 +122,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
               <span className="text-heading font-bold tabular-nums">
                 {entity.armorClass}
               </span>
-              <p className="text-faint text-[10px]">synced</p>
+              <p className="text-muted text-xs">synced</p>
             </div>
           ) : (
             <div className="flex items-center gap-1">
@@ -112,11 +132,11 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
                   actions.onUpdate(entity.id, { armorClass: v ?? 0 })
                 }
                 min={0}
-                className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
+                className="bg-surface border-divider text-heading w-12 rounded-sm border px-1 py-1 text-center text-base font-bold pointer-coarse:min-h-11"
                 aria-label="Armor class"
                 title="Base armor class"
               />
-              <span className="text-faint text-xs">+</span>
+              <span className="text-muted text-xs">+</span>
               <NumberField
                 value={entity.tempAc}
                 onChange={v =>
@@ -126,16 +146,14 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
                 }
                 min={0}
                 allowEmpty
-                className="bg-surface-raised text-accent-blue-text w-10 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
+                className="bg-surface border-divider text-heading w-10 rounded-sm border px-1 py-1 text-center text-base font-medium pointer-coarse:min-h-11"
                 aria-label="Temporary AC bonus"
                 title="Temporary AC bonus"
               />
               {(entity.tempAc ?? 0) > 0 && (
-                <span
-                  className="text-accent-blue-text text-xs font-semibold"
-                  title="Effective AC"
-                >
-                  = {effectiveAc(entity.armorClass, entity.tempAc)}
+                <span className="text-heading text-xs font-semibold">
+                  <span className="sr-only">Effective AC </span>={' '}
+                  {effectiveAc(entity.armorClass, entity.tempAc)}
                 </span>
               )}
             </div>
@@ -172,13 +190,15 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
 
       {/* Spend hit die */}
       {canSpendHitDie(entity) && (
-        <button
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => spendHitDie(entity, actions)}
-          className="text-accent-purple-text bg-accent-purple-bg hover:bg-accent-purple-bg-strong flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
         >
           <Plus size={11} aria-hidden />
-          Spend Hit Die ({entity.hitDice?.dieType})
-        </button>
+          Spend hit die ({entity.hitDice?.dieType})
+        </Button>
       )}
     </div>
   );

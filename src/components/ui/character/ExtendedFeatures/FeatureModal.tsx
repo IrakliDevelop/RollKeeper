@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogBody,
 } from '@/components/ui/feedback/dialog';
+import { Button } from '@/components/ui/forms/button';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 
 interface FeatureModalProps {
@@ -155,7 +156,7 @@ export default function FeatureModal({
                       className="bg-accent-indigo-text text-inverse hover:bg-accent-indigo-text-muted focus:ring-accent-indigo-border-strong flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
                     >
                       <Zap className="h-4 w-4" />
-                      Use Feature
+                      Use feature
                     </button>
                   )}
                   <button
@@ -165,13 +166,13 @@ export default function FeatureModal({
                     <Edit3 className="h-4 w-4" />
                     Edit
                   </button>
-                  <button
+                  <Button
+                    variant="danger"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted focus:ring-accent-red-border-strong flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                    leftIcon={<Trash2 className="h-4 w-4" />}
                   >
-                    <Trash2 className="h-4 w-4" />
                     Delete
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -189,7 +190,7 @@ export default function FeatureModal({
                     className="bg-accent-green-text text-inverse hover:bg-accent-green-text-muted focus:ring-accent-green-border-strong flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Save className="h-4 w-4" />
-                    Save Changes
+                    Save changes
                   </button>
                 </div>
               )}
@@ -203,7 +204,7 @@ export default function FeatureModal({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-heading mb-2 text-lg font-semibold">
-                        Usage Information
+                        Usage information
                       </h4>
                       {feature.isPassive ? (
                         <div className="flex items-center gap-2">
@@ -301,13 +302,13 @@ export default function FeatureModal({
                 {/* Edit Form */}
                 <div className="border-divider bg-surface-raised rounded-lg border p-6">
                   <h4 className="text-heading mb-6 text-lg font-semibold">
-                    Basic Information
+                    Basic information
                   </h4>
 
                   <div className="space-y-4">
                     <div>
                       <label className="text-body mb-2 block text-sm font-semibold">
-                        Feature Name *
+                        Feature name *
                       </label>
                       <input
                         type="text"
@@ -536,19 +537,19 @@ export default function FeatureModal({
                       features and special traits sections.
                     </p>
                     <div className="flex gap-3">
-                      <button
+                      <Button
+                        variant="danger-solid"
                         onClick={handleDelete}
-                        className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted focus:ring-accent-red-border-strong flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                        leftIcon={<Trash2 className="h-4 w-4" />}
                       >
-                        <Trash2 className="h-4 w-4" />
                         Delete Feature
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="border-divider-strong bg-surface-raised text-body hover:bg-surface-hover focus:ring-border-secondary rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>

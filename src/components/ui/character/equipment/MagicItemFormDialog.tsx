@@ -119,13 +119,13 @@ export function MagicItemFormDialog({
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>
-            {editingItem ? 'Edit Magic Item' : 'Add Magic Item'}
+            {editingItem ? 'Edit magic item' : 'Add magic item'}
           </DialogTitle>
-          <DialogDescription>
-            {editingItem
-              ? 'Update item details below.'
-              : 'Search the database or fill in manually.'}
-          </DialogDescription>
+          {!editingItem && (
+            <DialogDescription>
+              Search the database or fill in manually.
+            </DialogDescription>
+          )}
         </DialogHeader>
         <DialogBody>
           <MagicItemForm

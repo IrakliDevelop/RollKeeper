@@ -36,12 +36,12 @@ function TraitBlock({
   if (!entries || entries.length === 0) return null;
   return (
     <div className="space-y-1.5">
-      <h5 className="text-heading border-divider border-b pb-0.5 text-xs font-semibold tracking-wider uppercase">
+      <h5 className="type-label-heading text-heading border-divider border-b pb-1">
         {title}
       </h5>
       {entries.map((entry, i) => (
         <StatBlockEntryRow
-          key={entry.id ?? i}
+          key={entry.id ?? `${entry.name}-${i}`}
           entry={entry}
           ability={
             entry.id ? abilities?.find(a => a.id === entry.id) : undefined
@@ -63,10 +63,10 @@ interface SpellcastingBlockProps {
 }
 
 function SpellcastingBlock({ spellcasting: sc }: SpellcastingBlockProps) {
-  const perDayEntries = Object.entries(sc.perDay);
+  const perDayEntries = Object.entries(sc.perDay ?? {});
   return (
     <div className="space-y-1.5">
-      <h5 className="text-heading border-divider border-b pb-0.5 text-xs font-semibold tracking-wider uppercase">
+      <h5 className="type-label-heading text-heading border-divider border-b pb-1">
         Spellcasting
       </h5>
       <div className="text-body space-y-0.5 text-xs">
@@ -80,15 +80,15 @@ function SpellcastingBlock({ spellcasting: sc }: SpellcastingBlockProps) {
           <span className="text-heading font-semibold">Attack:</span> +
           {sc.toHit}
         </p>
-        {sc.atWill.length > 0 && (
+        {(sc.atWill ?? []).length > 0 && (
           <p>
-            <span className="text-heading font-semibold">At Will:</span>{' '}
-            {sc.atWill.join(', ')}
+            <span className="text-heading font-semibold">At will:</span>{' '}
+            {(sc.atWill ?? []).join(', ')}
           </p>
         )}
         {perDayEntries.map(([times, spells]) => (
           <p key={times}>
-            <span className="text-heading font-semibold">{times}/Day:</span>{' '}
+            <span className="text-heading font-semibold">{times}/day:</span>{' '}
             {spells.join(', ')}
           </p>
         ))}
@@ -139,7 +139,7 @@ export function StatBlockTraits({
     <div className="space-y-3">
       <TraitBlock
         title="Traits"
-        entries={statBlock.traits}
+        entries={statBlock.traits ?? []}
         resources={resources}
         inventory={inventory}
         abilities={abilities}
@@ -149,7 +149,7 @@ export function StatBlockTraits({
       />
       <TraitBlock
         title="Actions"
-        entries={statBlock.actions}
+        entries={statBlock.actions ?? []}
         resources={resources}
         inventory={inventory}
         abilities={abilities}
@@ -158,8 +158,8 @@ export function StatBlockTraits({
         onRestoreAbilityEntry={onRestoreAbilityEntry}
       />
       <TraitBlock
-        title="Bonus Actions"
-        entries={statBlock.bonusActions}
+        title="Bonus actions"
+        entries={statBlock.bonusActions ?? []}
         resources={resources}
         inventory={inventory}
         abilities={abilities}
@@ -169,7 +169,7 @@ export function StatBlockTraits({
       />
       <TraitBlock
         title="Reactions"
-        entries={statBlock.reactions}
+        entries={statBlock.reactions ?? []}
         resources={resources}
         inventory={inventory}
         abilities={abilities}
@@ -178,8 +178,8 @@ export function StatBlockTraits({
         onRestoreAbilityEntry={onRestoreAbilityEntry}
       />
       <TraitBlock
-        title="Lair Actions"
-        entries={statBlock.lairActions}
+        title="Lair actions"
+        entries={statBlock.lairActions ?? []}
         resources={resources}
         inventory={inventory}
         abilities={abilities}

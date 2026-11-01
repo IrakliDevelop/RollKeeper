@@ -148,13 +148,15 @@ describe('CreatureStatusRow', () => {
         })}
       />
     );
-    expect(screen.getByLabelText('Death save success 1')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Clear death save success 1')
+    ).toBeInTheDocument();
   });
 
   it('does not show death saves above 0 HP', () => {
     render(<CreatureStatusRow {...baseProps()} />);
     expect(
-      screen.queryByLabelText('Death save success 1')
+      screen.queryByLabelText('Mark death save success 1')
     ).not.toBeInTheDocument();
   });
 

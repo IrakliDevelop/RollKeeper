@@ -9,6 +9,7 @@ import type { ToastData } from '@/components/ui/feedback/Toast';
 import { Button } from '@/components/ui/forms/button';
 import { useSheetRoll } from '@/hooks/useSheetRoll';
 import { useCharacterStore } from '@/store/characterStore';
+import { getRestSlots } from '@/utils/calculations';
 
 import { SheetAbilities } from './SheetAbilities';
 import {
@@ -50,6 +51,11 @@ export function OwnSheet({
   const name = useCharacterStore(s => s.character.name);
   const takeShortRest = useCharacterStore(s => s.takeShortRest);
   const takeLongRest = useCharacterStore(s => s.takeLongRest);
+  // Booleans, so spending a slot doesn't re-render the whole sheet.
+  const pactMagic = useCharacterStore(s => getRestSlots(s.character).pactMagic);
+  const spellSlots = useCharacterStore(
+    s => getRestSlots(s.character).spellSlots
+  );
 
   const [locked, setLocked] = useState(true);
   const [restType, setRestType] = useState<'short' | 'long' | null>(null);
@@ -84,8 +90,7 @@ export function OwnSheet({
           <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex items-center gap-2 border-b px-5 py-2 text-xs">
             <Unlock className="h-3.5 w-3.5 shrink-0" />
             <span className="flex-1">
-              Editing unlocked. Changes save to {name}&apos;s sheet and sync to
-              the DM.
+              Editing {name}&apos;s sheet. Changes save and sync to the DM.
             </span>
             <Button variant="ghost" size="sm" onClick={() => setLocked(true)}>
               Done
@@ -131,6 +136,7 @@ export function OwnSheet({
 
       <RestDialog
         restType={restType}
+        slots={{ pactMagic, spellSlots }}
         onClose={() => setRestType(null)}
         onConfirm={() => {
           if (restType === 'short') takeShortRest();

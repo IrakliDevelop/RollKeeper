@@ -38,6 +38,7 @@ import { MagicItemLibrarySection } from './MagicItemLibrary/MagicItemLibrarySect
 import { NpcSyncControls } from './NpcSyncControls';
 import type { SendItemTarget } from './SendItemDialog';
 import type { MagicItem } from '@/types/character';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface NPCSectionProps {
   campaignCode: string;
@@ -129,11 +130,16 @@ export function NPCSection({
     }
   };
 
-  const handleDelete = (npc: CampaignNPC) => {
-    if (confirm(`Delete "${npc.name}"? This cannot be undone.`)) {
-      deleteNPC(campaignCode, npc.id);
-      setSelectedNpc(null);
-    }
+  const handleDelete = async (npc: CampaignNPC) => {
+    const confirmed = await confirmDialog({
+      title: `Delete ${npc.name}?`,
+      message: "This can't be undone.",
+      confirmLabel: 'Delete NPC',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    deleteNPC(campaignCode, npc.id);
+    setSelectedNpc(null);
   };
 
   const handleDuplicate = (npc: CampaignNPC) => {
@@ -295,9 +301,8 @@ export function NPCSection({
             </span>
             <div className="bg-surface-raised border-divider inline-flex rounded-md border p-1">
               <Button
-                variant={
-                  spellSlotDisplayMode === 'inline' ? 'secondary' : 'ghost'
-                }
+                variant="ghost"
+                selected={spellSlotDisplayMode === 'inline'}
                 size="xs"
                 onClick={() =>
                   setDmDashboardUi(campaignCode, {
@@ -309,9 +314,8 @@ export function NPCSection({
                 Inline
               </Button>
               <Button
-                variant={
-                  spellSlotDisplayMode === 'tracker' ? 'secondary' : 'ghost'
-                }
+                variant="ghost"
+                selected={spellSlotDisplayMode === 'tracker'}
                 size="xs"
                 onClick={() =>
                   setDmDashboardUi(campaignCode, {

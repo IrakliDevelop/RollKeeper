@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 
 import { LegendarySection } from '../LegendarySection';
+import { LairActionsSection } from '../DetailActions';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../../types';
 
@@ -50,6 +53,24 @@ function makeActions(overrides: Partial<EntityActions> = {}): EntityActions {
 afterEach(() => cleanup());
 
 describe('LegendarySection description rendering', () => {
+  it('shows the reason a legendary action cannot be used', () => {
+    render(
+      <LegendarySection
+        entity={makeEntity({
+          legendaryActions: {
+            maxActions: 3,
+            usedActions: 2,
+            actions: [
+              { id: 'wing', name: 'Wing Attack', cost: 2, description: '' },
+            ],
+          },
+        })}
+        actions={makeActions()}
+      />
+    );
+    expect(screen.getByText('Needs 2 actions, 1 left')).toBeVisible();
+  });
+
   it('renders a badge-span description as text, not literal markup', () => {
     render(
       <LegendarySection
@@ -75,5 +96,25 @@ describe('LegendarySection description rendering', () => {
     expect(screen.getByText(/Perception/)).toBeInTheDocument();
     expect(screen.queryByText(/<span/)).not.toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain('&lt;span');
+  });
+});
+
+describe('LairActionsSection focus', () => {
+  it('keeps focus on the used state when Use becomes a badge', async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [used, setUsed] = useState(false);
+      const entity = makeEntity({
+        type: 'lair',
+        lairActions: [
+          { id: 'mist', name: 'Mist', description: '', usedThisRound: used },
+        ],
+      });
+      const actions = makeActions({ onUseLairAction: () => setUsed(true) });
+      return <LairActionsSection entity={entity} actions={actions} />;
+    }
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Use Mist' }));
+    expect(screen.getByText('Used this round').parentElement).toHaveFocus();
   });
 });

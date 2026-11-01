@@ -4,6 +4,92 @@ import type {
   ProcessedSubclass,
 } from '@/types/classes';
 import type { WizardStepConfig } from './LevelUpWizard.types';
+import type { ASIChoice, SubclassSpellGrant } from './LevelUpWizard.types';
+import type { CharacterAbilities } from '@/types/character';
+import { calculateModifier } from '@/utils/calculations';
+
+/** A selection changes the edition's data, not the wizard's navigation shape. */
+/** The granted spells apply will actually add: not expanded-list entries,
+ * not spells the character already has, and only spells found in the data. */
+export function grantsThatWillBeAdded(
+  grants: SubclassSpellGrant[],
+  allSpells: { name: string }[],
+  existingSpells: { name: string }[]
+): SubclassSpellGrant[] {
+  const existing = new Set(existingSpells.map(s => s.name.toLowerCase()));
+  const known = new Set(allSpells.map(s => s.name.toLowerCase()));
+  return grants.filter(grant => {
+    const name = grant.spellName.toLowerCase();
+    return (
+      grant.grantType !== 'expanded' && !existing.has(name) && known.has(name)
+    );
+  });
+}
+
+export function shouldShowEditionStep(
+  classSource: string | undefined,
+  optionCount: number
+): boolean {
+  return !classSource && optionCount > 1;
+}
+
+export function isValidASIChoice(
+  choice: ASIChoice | undefined,
+  abilities: CharacterAbilities
+): boolean {
+  if (!choice) return false;
+  if (choice.type === 'feat') return !!choice.feat;
+  const seen = new Set<string>();
+  let points = 0;
+  for (const increase of choice.increases) {
+    if (seen.has(increase.ability)) return false;
+    seen.add(increase.ability);
+    const base = abilities[increase.ability as keyof CharacterAbilities];
+    if (
+      typeof base !== 'number' ||
+      !Number.isInteger(increase.amount) ||
+      increase.amount < 1 ||
+      increase.amount > 2 ||
+      base + increase.amount > 20
+    )
+      return false;
+    points += increase.amount;
+  }
+  return points === 2;
+}
+
+export function calculateLevelUpHp({
+  max,
+  current,
+  previousLevel,
+  oldConstitution,
+  newConstitution,
+  roll,
+}: {
+  max: number;
+  current: number;
+  previousLevel: number;
+  oldConstitution: number;
+  newConstitution: number;
+  roll: number;
+}) {
+  const oldModifier = calculateModifier(oldConstitution);
+  const newModifier = calculateModifier(newConstitution);
+  const newLevelGain = Math.max(1, roll + newModifier);
+  const retroactiveGain = (newModifier - oldModifier) * previousLevel;
+  const maxAfter = Math.max(1, max + newLevelGain + retroactiveGain);
+  const gained = maxAfter - max;
+  const minimumAdjustment = maxAfter - (max + newLevelGain + retroactiveGain);
+  const currentAfter = Math.max(0, Math.min(maxAfter, current + gained));
+  return {
+    max: maxAfter,
+    current: currentAfter,
+    gained,
+    newLevelGain,
+    retroactiveGain,
+    minimumAdjustment,
+  };
+}
 
 export function getSubclassSelectionLevel(
   processedClass: ProcessedClass
@@ -101,17 +187,17 @@ export function computeWizardSteps(params: {
 
   if (params.isCustomClass) {
     if (params.needsHPInput) {
-      steps.push({ id: 'hp', label: 'Hit Points' });
+      steps.push({ id: 'hp', label: 'Hit points' });
     }
     steps.push({ id: 'confirm', label: 'Confirm' });
     return steps;
   }
 
-  if (params.needsEditionPicker) {
-    steps.push({ id: 'edition', label: 'Edition' });
-  }
   if (params.isMulticlassed) {
     steps.push({ id: 'class', label: 'Class' });
+  }
+  if (params.needsEditionPicker) {
+    steps.push({ id: 'edition', label: 'Edition' });
   }
   if (params.needsSubclassMigration) {
     steps.push({ id: 'subclass-migration', label: 'Subclass' });
@@ -123,10 +209,10 @@ export function computeWizardSteps(params: {
     steps.push({ id: 'features', label: 'Features' });
   }
   if (params.requiresASI) {
-    steps.push({ id: 'asi', label: 'Ability Score' });
+    steps.push({ id: 'asi', label: 'Ability scores' });
   }
   if (params.needsHPInput) {
-    steps.push({ id: 'hp', label: 'Hit Points' });
+    steps.push({ id: 'hp', label: 'Hit points' });
   }
   steps.push({ id: 'confirm', label: 'Confirm' });
 

@@ -62,6 +62,7 @@ import {
 } from '@/utils/calculations';
 import { migrateToMulticlass, calculateHitDicePools } from '@/utils/multiclass';
 import {
+  getDeathSavesAfterDamage,
   applyDamage,
   applyHealing,
   addTemporaryHP,
@@ -86,6 +87,23 @@ import {
 import { characterWriterLock } from '@/lib/characterWriterLock';
 import { readCharacterEnvelope } from '@/lib/characterCanonicalStorage';
 import { isStrictlyFresher } from '@/lib/characterFreshness';
+
+function reorderEquipmentById<T extends { id: string; updatedAt?: string }>(
+  items: T[],
+  sourceId: string,
+  destinationId: string
+): T[] | null {
+  if (sourceId === destinationId) return null;
+  const sourceIndex = items.findIndex(item => item.id === sourceId);
+  const destinationIndex = items.findIndex(item => item.id === destinationId);
+  if (sourceIndex < 0 || destinationIndex < 0) return null;
+
+  const reordered = [...items];
+  const [moved] = reordered.splice(sourceIndex, 1);
+  reordered.splice(destinationIndex, 0, moved);
+  const updatedAt = new Date().toISOString();
+  return reordered.map(item => ({ ...item, updatedAt }));
+}
 
 // Function to migrate weapon damage from old format to new array format
 function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
@@ -489,6 +507,7 @@ interface CharacterStore {
     ability: keyof CharacterState['savingThrows'],
     proficient: boolean
   ) => void;
+  setCurrentHitPoints: (value: number) => void;
   updateHitPoints: (updates: Partial<CharacterState['hitPoints']>) => void;
   updateInitiative: (value: number, isOverride: boolean) => void;
   resetInitiativeToDefault: () => void;
@@ -608,6 +627,7 @@ interface CharacterStore {
   removeDisease: (diseaseId: string) => void;
   setExhaustionVariant: (variant: ExhaustionVariant) => void;
   clearAllConditions: () => void;
+  clearNonBuffConditions: () => void;
   clearAllDiseases: () => void;
 
   // XP management
@@ -656,11 +676,7 @@ interface CharacterStore {
   deleteExtendedFeature: (id: string) => void;
   useExtendedFeature: (id: string) => void;
   resetExtendedFeatures: (restType: 'short' | 'long') => void;
-  reorderExtendedFeatures: (
-    sourceIndex: number,
-    destinationIndex: number,
-    sourceType?: string
-  ) => void;
+  reorderExtendedFeatures: (sourceId: string, targetId: string) => void;
   toggleFavoriteFeature: (id: string) => void;
   setSheetFavorite: (
     kind: SheetFavoriteKind,
@@ -732,7 +748,7 @@ interface CharacterStore {
   updateWeapon: (id: string, updates: Partial<Weapon>) => void;
   deleteWeapon: (id: string) => void;
   equipWeapon: (id: string, equipped: boolean) => void;
-  reorderWeapons: (sourceIndex: number, destinationIndex: number) => void;
+  reorderWeapons: (sourceId: string, destinationId: string) => void;
   expendWeaponCharge: (weaponId: string, chargeId: string) => void;
   restoreWeaponCharge: (weaponId: string, chargeId: string) => void;
   setWeaponChargeUsed: (
@@ -752,7 +768,7 @@ interface CharacterStore {
   deleteMagicItem: (id: string) => void;
   attuneMagicItem: (id: string, attuned: boolean) => void;
   updateAttunementSlots: (max: number) => void;
-  reorderMagicItems: (sourceIndex: number, destinationIndex: number) => void;
+  reorderMagicItems: (sourceId: string, destinationId: string) => void;
   expendMagicItemCharge: (itemId: string, chargeId: string) => void;
   restoreMagicItemCharge: (itemId: string, chargeId: string) => void;
   setMagicItemChargeUsed: (
@@ -771,7 +787,7 @@ interface CharacterStore {
   updateArmorItem: (id: string, updates: Partial<ArmorItem>) => void;
   deleteArmorItem: (id: string) => void;
   equipArmorItem: (id: string, equipped: boolean) => void;
-  reorderArmorItems: (sourceIndex: number, destinationIndex: number) => void;
+  reorderArmorItems: (sourceId: string, destinationId: string) => void;
 
   // Inventory management
   addInventoryItem: (
@@ -1160,6 +1176,34 @@ export const useCharacterStore = create<CharacterStore>()(
             hasUnsavedChanges: true,
             saveStatus: 'saving',
           }));
+        },
+
+        setCurrentHitPoints: value => {
+          if (!Number.isFinite(value)) return;
+          set(state => {
+            const hp = state.character.hitPoints;
+            const current = Math.max(0, Math.min(hp.max, value));
+            if (current === hp.current) return state;
+            const deathSaves =
+              current < hp.current
+                ? getDeathSavesAfterDamage(
+                    hp.deathSaves,
+                    hp.current,
+                    hp.current - current,
+                    hp.max
+                  )
+                : hp.current === 0
+                  ? undefined
+                  : hp.deathSaves;
+            return {
+              character: {
+                ...state.character,
+                hitPoints: { ...hp, current, deathSaves },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
         },
 
         updateHitPoints: updates => {
@@ -2596,31 +2640,66 @@ export const useCharacterStore = create<CharacterStore>()(
         },
 
         clearAllConditions: () => {
-          set(state => ({
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeConditions: [],
+          set(state => {
+            if (
+              state.character.conditionsAndDiseases.activeConditions.length ===
+              0
+            )
+              return {};
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeConditions: [],
+                },
               },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          }));
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        clearNonBuffConditions: () => {
+          set(state => {
+            const activeConditions =
+              state.character.conditionsAndDiseases.activeConditions;
+            if (!activeConditions.some(condition => condition.kind !== 'buff'))
+              return {};
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeConditions: activeConditions.filter(
+                    condition => condition.kind === 'buff'
+                  ),
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
         },
 
         clearAllDiseases: () => {
-          set(state => ({
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeDiseases: [],
+          set(state => {
+            if (
+              state.character.conditionsAndDiseases.activeDiseases.length === 0
+            )
+              return {};
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeDiseases: [],
+                },
               },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          }));
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
         },
 
         // XP management
@@ -3215,74 +3294,33 @@ export const useCharacterStore = create<CharacterStore>()(
           });
         },
 
-        reorderExtendedFeatures: (
-          sourceIndex,
-          destinationIndex,
-          sourceType
-        ) => {
+        reorderExtendedFeatures: (sourceId, targetId) => {
           set(state => {
-            const features = [...(state.character.extendedFeatures || [])];
+            const current = state.character.extendedFeatures || [];
+            const sourceIndex = current.findIndex(f => f.id === sourceId);
+            const targetIndex = current.findIndex(f => f.id === targetId);
+            if (
+              sourceIndex < 0 ||
+              targetIndex < 0 ||
+              sourceIndex === targetIndex
+            )
+              return state;
 
-            if (sourceType) {
-              // Reorder within a specific source type
-              const filteredFeatures = features.filter(
-                f => f.sourceType === sourceType
-              );
-              const otherFeatures = features.filter(
-                f => f.sourceType !== sourceType
-              );
+            const reordered = [...current];
+            const [movedFeature] = reordered.splice(sourceIndex, 1);
+            reordered.splice(targetIndex, 0, movedFeature);
+            const updatedAt = new Date().toISOString();
+            const features = reordered.map((feature, index) =>
+              feature.displayOrder === index
+                ? feature
+                : { ...feature, displayOrder: index, updatedAt }
+            );
 
-              if (
-                sourceIndex >= filteredFeatures.length ||
-                destinationIndex >= filteredFeatures.length
-              ) {
-                return state;
-              }
-
-              const [movedFeature] = filteredFeatures.splice(sourceIndex, 1);
-              filteredFeatures.splice(destinationIndex, 0, movedFeature);
-
-              // Update display orders
-              filteredFeatures.forEach((feature, index) => {
-                feature.displayOrder = index;
-                feature.updatedAt = new Date().toISOString();
-              });
-
-              return {
-                character: {
-                  ...state.character,
-                  extendedFeatures: [...otherFeatures, ...filteredFeatures],
-                },
-                hasUnsavedChanges: true,
-                saveStatus: 'saving',
-              };
-            } else {
-              // Reorder all features
-              if (
-                sourceIndex >= features.length ||
-                destinationIndex >= features.length
-              ) {
-                return state;
-              }
-
-              const [movedFeature] = features.splice(sourceIndex, 1);
-              features.splice(destinationIndex, 0, movedFeature);
-
-              // Update display orders
-              features.forEach((feature, index) => {
-                feature.displayOrder = index;
-                feature.updatedAt = new Date().toISOString();
-              });
-
-              return {
-                character: {
-                  ...state.character,
-                  extendedFeatures: features,
-                },
-                hasUnsavedChanges: true,
-                saveStatus: 'saving',
-              };
-            }
+            return {
+              character: { ...state.character, extendedFeatures: features },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
           });
         },
 
@@ -4175,17 +4213,14 @@ export const useCharacterStore = create<CharacterStore>()(
           }));
         },
 
-        reorderWeapons: (sourceIndex: number, destinationIndex: number) => {
+        reorderWeapons: (sourceId: string, destinationId: string) => {
           set(state => {
-            const weapons = [...state.character.weapons];
-            const [removed] = weapons.splice(sourceIndex, 1);
-            weapons.splice(destinationIndex, 0, removed);
-
-            // Update all weapons with new timestamps
-            const updatedWeapons = weapons.map(weapon => ({
-              ...weapon,
-              updatedAt: new Date().toISOString(),
-            }));
+            const updatedWeapons = reorderEquipmentById(
+              state.character.weapons,
+              sourceId,
+              destinationId
+            );
+            if (!updatedWeapons) return state;
 
             return {
               character: {
@@ -4488,17 +4523,14 @@ export const useCharacterStore = create<CharacterStore>()(
           }));
         },
 
-        reorderMagicItems: (sourceIndex: number, destinationIndex: number) => {
+        reorderMagicItems: (sourceId: string, destinationId: string) => {
           set(state => {
-            const magicItems = [...(state.character.magicItems || [])];
-            const [removed] = magicItems.splice(sourceIndex, 1);
-            magicItems.splice(destinationIndex, 0, removed);
-
-            // Update all magic items with new timestamps
-            const updatedMagicItems = magicItems.map(item => ({
-              ...item,
-              updatedAt: new Date().toISOString(),
-            }));
+            const updatedMagicItems = reorderEquipmentById(
+              state.character.magicItems || [],
+              sourceId,
+              destinationId
+            );
+            if (!updatedMagicItems) return state;
 
             return {
               character: {
@@ -4785,17 +4817,14 @@ export const useCharacterStore = create<CharacterStore>()(
           }));
         },
 
-        reorderArmorItems: (sourceIndex: number, destinationIndex: number) => {
+        reorderArmorItems: (sourceId: string, destinationId: string) => {
           set(state => {
-            const armorItems = [...state.character.armorItems];
-            const [removed] = armorItems.splice(sourceIndex, 1);
-            armorItems.splice(destinationIndex, 0, removed);
-
-            // Update all armor items with new timestamps
-            const updatedArmorItems = armorItems.map(item => ({
-              ...item,
-              updatedAt: new Date().toISOString(),
-            }));
+            const updatedArmorItems = reorderEquipmentById(
+              state.character.armorItems,
+              sourceId,
+              destinationId
+            );
+            if (!updatedArmorItems) return state;
 
             return {
               character: {

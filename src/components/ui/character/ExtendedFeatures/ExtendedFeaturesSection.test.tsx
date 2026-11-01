@@ -1,0 +1,357 @@
+import { useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import ExtendedFeaturesSection from './ExtendedFeaturesSection';
+import type { ExtendedFeature } from '@/types/character';
+import { makeCharacter } from '@/utils/__tests__/test-utils';
+
+const { confirmDialog } = vi.hoisted(() => ({
+  confirmDialog: vi.fn(async () => true),
+}));
+vi.mock('@/components/ui/feedback/confirm-dialog', () => ({ confirmDialog }));
+vi.mock('./UnifiedFeatureModal', () => ({
+  default: ({
+    isOpen,
+    feature,
+  }: {
+    isOpen: boolean;
+    feature?: ExtendedFeature;
+  }) =>
+    isOpen ? <div role="dialog">{feature?.name || 'Add feature'}</div> : null,
+}));
+vi.mock('@/components/ui/layout/DragDropList', () => ({
+  default: ({
+    items,
+    onReorder,
+    renderItem,
+    dragHandlePosition,
+  }: {
+    dragHandlePosition?: string;
+    items: ExtendedFeature[];
+    onReorder: (source: number, target: number) => void;
+    renderItem: (
+      feature: ExtendedFeature,
+      index: number,
+      dragging: boolean
+    ) => React.ReactNode;
+  }) => (
+    <div data-handle-position={dragHandlePosition}>
+      {items.map((feature, index) => (
+        <div key={feature.id}>{renderItem(feature, index, false)}</div>
+      ))}
+      {items.length > 1 && (
+        <button onClick={() => onReorder(0, 1)}>Drag first to second</button>
+      )}
+    </div>
+  ),
+}));
+
+afterEach(() => {
+  cleanup();
+  confirmDialog.mockClear();
+});
+
+function feature(
+  id: string,
+  name: string,
+  overrides: Partial<ExtendedFeature> = {}
+): ExtendedFeature {
+  return {
+    id,
+    name,
+    description: '<p>Extra action</p>',
+    sourceType: 'class',
+    source: 'Fighter',
+    sourceDetail: 'Fighter 9',
+    maxUses: 2,
+    usedUses: 1,
+    restType: 'short',
+    isPassive: false,
+    displayOrder: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function renderSection(
+  features: ExtendedFeature[],
+  { editing = false }: { editing?: boolean } = {}
+) {
+  const callbacks = {
+    onAddFeature: vi.fn(),
+    onUpdateFeature: vi.fn(),
+    onDeleteFeature: vi.fn(),
+    onUseFeature: vi.fn(),
+    onResetFeatures: vi.fn(),
+    onReorderFeatures: vi.fn(),
+    onToggleFavoriteFeature: vi.fn(),
+  };
+  render(
+    <ExtendedFeaturesSection
+      features={features}
+      character={makeCharacter({ extendedFeatures: features })}
+      favoriteFeatureIds={[]}
+      editing={editing}
+      {...callbacks}
+    />
+  );
+  return callbacks;
+}
+
+describe('03h1 Abilities list', () => {
+  it('has one primary Add feature action and one plain empty state', () => {
+    renderSection([]);
+    expect(screen.getAllByRole('button', { name: 'Add feature' })).toHaveLength(
+      1
+    );
+    expect(screen.getByText('No features yet')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Class features, racial traits and feats you add appear here.'
+      )
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-variant="primary"]')).toHaveLength(
+      1
+    );
+  });
+
+  it('keeps a flat row with source, full name and details', () => {
+    const longName =
+      'Superiority Die — Precision Attack and Tactical Assessment';
+    renderSection([feature('one', longName)]);
+    const row = document.querySelector(
+      '[data-feature-row="one"]'
+    ) as HTMLElement;
+    expect(row).toBeTruthy();
+    expect(within(row).getByText(longName)).toBeInTheDocument();
+    expect(within(row).getByText('Fighter 9')).toBeInTheDocument();
+    expect(within(row).queryByText('Extra action')).not.toBeInTheDocument();
+    fireEvent.click(
+      within(row).getByRole('button', { name: `Open ${longName}` })
+    );
+    expect(screen.getByRole('dialog')).toHaveTextContent(longName);
+  });
+
+  it('searches name, description and source without losing the detail path', () => {
+    renderSection([
+      feature('one', 'Second Wind', { description: '<p>Regain HP</p>' }),
+      feature('two', 'Action Surge', { sourceDetail: 'Fighter 9' }),
+      feature('three', 'Fey Ancestry', { source: 'Elf' }),
+    ]);
+    const search = screen.getByRole('searchbox', { name: 'Search features' });
+    fireEvent.change(search, { target: { value: 'Regain' } });
+    expect(document.querySelectorAll('[data-feature-row]')).toHaveLength(1);
+    expect(screen.getByText('Second Wind')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: 'Elf' } });
+    expect(screen.getByText('Fey Ancestry')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: 'Action' } });
+    expect(screen.getByText('Action Surge')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: 'No match' } });
+    expect(
+      screen.getByText('No features match “No match”.')
+    ).toBeInTheDocument();
+  });
+
+  it('spends and restores one use with direct named pips', () => {
+    const callbacks = renderSection([feature('one', 'Second Wind')]);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Spend a use of Second Wind' })
+    );
+    expect(callbacks.onUpdateFeature).toHaveBeenCalledWith('one', {
+      usedUses: 2,
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Restore a use of Second Wind' })
+    );
+    expect(callbacks.onUpdateFeature).toHaveBeenCalledWith('one', {
+      usedUses: 0,
+    });
+  });
+
+  it('keeps focus on a moved feature at the list end', () => {
+    function Features() {
+      const [features, setFeatures] = useState([
+        feature('one', 'Second Wind'),
+        feature('two', 'Action Surge'),
+      ]);
+      return (
+        <ExtendedFeaturesSection
+          features={features}
+          character={makeCharacter({ extendedFeatures: features })}
+          editing
+          onAddFeature={vi.fn()}
+          onUpdateFeature={vi.fn()}
+          onDeleteFeature={vi.fn()}
+          onUseFeature={vi.fn()}
+          onResetFeatures={vi.fn()}
+          onReorderFeatures={(source, target) =>
+            setFeatures(current => {
+              const next = [...current];
+              const from = next.findIndex(item => item.id === source);
+              const to = next.findIndex(item => item.id === target);
+              next.splice(to, 0, next.splice(from, 1)[0]);
+              return next;
+            })
+          }
+        />
+      );
+    }
+    render(<Features />);
+    const row = document.querySelector(
+      '[data-feature-row="one"]'
+    ) as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Move down' }));
+    expect(within(row).getByRole('button', { name: 'Move up' })).toHaveFocus();
+  });
+
+  it('forgets a rejected move before an unrelated feature update', async () => {
+    const features = [
+      feature('one', 'Second Wind'),
+      feature('two', 'Action Surge'),
+    ];
+    const callbacks = {
+      onAddFeature: vi.fn(),
+      onUpdateFeature: vi.fn(),
+      onDeleteFeature: vi.fn(),
+      onUseFeature: vi.fn(),
+      onResetFeatures: vi.fn(),
+      onReorderFeatures: vi.fn(),
+    };
+    const { rerender } = render(
+      <ExtendedFeaturesSection
+        features={features}
+        character={makeCharacter({ extendedFeatures: features })}
+        editing
+        {...callbacks}
+      />
+    );
+    fireEvent.click(
+      within(
+        document.querySelector('[data-feature-row="one"]') as HTMLElement
+      ).getByRole('button', { name: 'Move down' })
+    );
+    const search = screen.getByRole('searchbox', { name: 'Search features' });
+    search.focus();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const updated = [{ ...features[0], usedUses: 2 }, features[1]];
+    rerender(
+      <ExtendedFeaturesSection
+        features={updated}
+        character={makeCharacter({ extendedFeatures: updated })}
+        editing
+        {...callbacks}
+      />
+    );
+    expect(search).toHaveFocus();
+  });
+
+  it('fills available pips first and wraps long use pools', () => {
+    renderSection([
+      feature('one', 'Lay on Hands', { maxUses: 20, usedUses: 3 }),
+    ]);
+    const pips = screen.getAllByRole('button', {
+      name: /a use of Lay on Hands$/,
+    });
+    expect(pips).toHaveLength(20);
+    expect(pips.slice(0, 17).map(p => p.getAttribute('aria-label'))).toEqual(
+      Array(17).fill('Spend a use of Lay on Hands')
+    );
+    expect(pips.slice(17).map(p => p.getAttribute('aria-label'))).toEqual(
+      Array(3).fill('Restore a use of Lay on Hands')
+    );
+    const group = pips[0].parentElement as HTMLElement;
+    expect(group).toHaveClass('flex-wrap', 'min-w-0');
+    expect(group).not.toHaveClass('shrink-0');
+  });
+
+  it('names the rest type and keeps one favorite name with pressed state', () => {
+    renderSection([feature('one', 'Second Wind')]);
+    const row = document.querySelector(
+      '[data-feature-row="one"]'
+    ) as HTMLElement;
+    expect(within(row).getByText('short')).toHaveClass('capitalize');
+    const favorite = within(row).getByRole('button', {
+      name: 'Add to quick actions',
+    });
+    expect(favorite).toHaveAttribute('aria-pressed', 'false');
+    expect(favorite).toHaveAccessibleDescription('Second Wind');
+  });
+
+  it('puts the drag handle in the right gutter the row reserves', () => {
+    renderSection([feature('one', 'Second Wind')]);
+    expect(document.querySelector('[data-feature-row="one"]')).toHaveClass(
+      'pr-7'
+    );
+    expect(document.querySelector('[data-handle-position]')).toHaveAttribute(
+      'data-handle-position',
+      'right'
+    );
+  });
+
+  it('changes only one use even when a later pip is chosen', () => {
+    const callbacks = renderSection([
+      feature('one', 'Second Wind', { maxUses: 3, usedUses: 0 }),
+    ]);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Spend a use of Second Wind' })[2]
+    );
+    expect(callbacks.onUpdateFeature).toHaveBeenCalledWith('one', {
+      usedUses: 1,
+    });
+  });
+
+  it('keeps Edit and Delete in play, asks before deleting, and returns focus to Add', async () => {
+    const callbacks = renderSection([feature('one', 'Second Wind')]);
+    const row = document.querySelector(
+      '[data-feature-row="one"]'
+    ) as HTMLElement;
+    expect(
+      within(row).getByRole('button', { name: 'Edit feature' })
+    ).toBeInTheDocument();
+    const deleteButton = within(row).getByRole('button', {
+      name: 'Delete feature',
+    });
+    deleteButton.focus();
+    fireEvent.click(deleteButton);
+    await waitFor(() =>
+      expect(confirmDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Delete Second Wind?',
+          confirmLabel: 'Delete feature',
+          tone: 'danger',
+        })
+      )
+    );
+    await waitFor(() =>
+      expect(callbacks.onDeleteFeature).toHaveBeenCalledWith('one')
+    );
+    expect(screen.getByRole('button', { name: 'Add feature' })).toHaveFocus();
+  });
+
+  it('maps drag and edit-mode Move controls to feature IDs', () => {
+    const callbacks = renderSection(
+      [feature('one', 'Second Wind'), feature('two', 'Action Surge')],
+      { editing: true }
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Drag first to second' })
+    );
+    expect(callbacks.onReorderFeatures).toHaveBeenCalledWith('one', 'two');
+    const first = document.querySelector(
+      '[data-feature-row="one"]'
+    ) as HTMLElement;
+    fireEvent.click(within(first).getByRole('button', { name: 'Move down' }));
+    expect(callbacks.onReorderFeatures).toHaveBeenCalledWith('one', 'two');
+    expect(
+      within(first).getByRole('button', { name: 'Move up' })
+    ).toBeDisabled();
+  });
+});

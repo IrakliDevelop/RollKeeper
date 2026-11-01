@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { formatRarity } from '@/utils/formatRarity';
 import type { ProcessedItem, ProcessedMagicItem } from '@/types/items';
 
 export type CompendiumItem =
@@ -48,7 +50,7 @@ export function AllItemsAutocomplete({
   }, [magicItems, mundaneItems, query]);
 
   return (
-    <div className="relative space-y-2">
+    <div className="relative min-w-0 space-y-2">
       <Input
         label="Start from any compendium item"
         value={query}
@@ -62,7 +64,9 @@ export function AllItemsAutocomplete({
         disabled={loading}
       />
       {query && (
-        <div className="border-divider bg-surface-raised absolute z-50 max-h-72 w-full overflow-y-auto rounded-lg border shadow-lg">
+        <div
+          className={`${OVERLAY_SURFACE} absolute z-50 max-h-72 w-full overflow-y-auto`}
+        >
           {results.length === 0 ? (
             <p className="text-muted p-4 text-sm">No matching items.</p>
           ) : (
@@ -74,21 +78,20 @@ export function AllItemsAutocomplete({
                   onSelect(result);
                   setQuery('');
                 }}
-                className="border-divider hover:bg-surface-secondary flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-b-0"
+                className="border-divider hover:bg-surface-secondary flex w-full min-w-0 items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-b-0 pointer-coarse:min-h-11"
               >
                 <div className="min-w-0">
-                  <p className="text-heading truncate text-sm font-medium">
+                  <p className="text-heading text-sm font-medium break-words">
                     {result.item.name}
                   </p>
                   <p className="text-muted text-xs">
                     {result.item.category} · {result.item.source}
                   </p>
                 </div>
-                <Badge
-                  variant={result.kind === 'magic' ? 'primary' : 'neutral'}
-                  size="sm"
-                >
-                  {result.kind === 'magic' ? result.item.rarity : 'Mundane'}
+                <Badge variant="neutral" size="sm">
+                  {result.kind === 'magic'
+                    ? formatRarity(result.item.rarity)
+                    : 'Mundane'}
                 </Badge>
               </button>
             ))

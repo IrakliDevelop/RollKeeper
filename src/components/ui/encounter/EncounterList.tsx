@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -18,10 +18,12 @@ import { useBattleMapStore } from '@/store/battleMapStore';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
+import { Card } from '@/components/ui/layout/card';
 import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
 import type { BattleMap } from '@/types/battlemap';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface EncounterListProps {
   campaignCode: string;
@@ -33,13 +35,26 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+
+  useEffect(() => {
+    if (!isCreating && returnFocus.current) {
+      createButtonRef.current?.focus();
+      returnFocus.current = false;
+    }
+  }, [isCreating]);
+
+  const handleCloseCreate = () => {
+    returnFocus.current = true;
+    setIsCreating(false);
+  };
 
   const handleCreate = () => {
     if (!newName.trim()) return;
-    const id = createEncounter(newName.trim(), campaignCode);
+    createEncounter(newName.trim(), campaignCode);
     setNewName('');
-    setIsCreating(false);
-    // Navigate programmatically handled by parent page
+    handleCloseCreate();
   };
 
   const filtered = encounters.filter(e => e.campaignCode === campaignCode);
@@ -49,44 +64,46 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header row: Create button / form + gear button */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         {isCreating ? (
-          <div className="bg-surface-raised border-divider flex flex-1 items-center gap-3 rounded-lg border p-4">
+          <form
+            className="flex min-w-0 flex-1 flex-wrap items-end gap-2"
+            onSubmit={event => {
+              event.preventDefault();
+              handleCreate();
+            }}
+          >
             <Input
+              label="Encounter name"
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              placeholder="Encounter name..."
+              placeholder="Goblin ambush"
               onKeyDown={e => {
-                if (e.key === 'Enter') handleCreate();
-                if (e.key === 'Escape') setIsCreating(false);
+                if (e.key === 'Escape') handleCloseCreate();
               }}
               autoFocus
-              className="flex-1"
+              wrapperClassName="min-w-48 flex-1"
             />
             <Button
               variant="primary"
               size="sm"
-              onClick={handleCreate}
+              type="submit"
               disabled={!newName.trim()}
             >
-              Create
+              Create encounter
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsCreating(false)}
-            >
+            <Button size="sm" type="button" onClick={handleCloseCreate}>
               Cancel
             </Button>
-          </div>
+          </form>
         ) : (
           <Button
+            ref={createButtonRef}
             variant="primary"
             onClick={() => setIsCreating(true)}
             leftIcon={<Plus size={18} />}
           >
-            New Encounter
+            Create encounter
           </Button>
         )}
 
@@ -94,7 +111,6 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
           variant="ghost"
           size="sm"
           onClick={() => setConfigOpen(true)}
-          title="Combat configuration"
           aria-label="Open combat configuration"
         >
           <Settings size={16} className="text-muted" />
@@ -103,15 +119,13 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
 
       <CombatConfigDialog open={configOpen} onOpenChange={setConfigOpen} />
 
-      {/* Encounter list */}
       {sorted.length === 0 ? (
-        <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-12 text-center">
-          <Swords size={48} className="text-faint mx-auto mb-4" />
-          <h3 className="text-heading mb-2 text-lg font-semibold">
-            No Encounters Yet
-          </h3>
-          <p className="text-muted mb-4">
-            Create your first encounter to start tracking combat.
+        <div className="py-12 text-center">
+          <h2 className="type-subheading text-heading">
+            Create your first encounter
+          </h2>
+          <p className="type-body text-muted mt-2">
+            Add combatants and track initiative here.
           </p>
         </div>
       ) : (
@@ -122,12 +136,14 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
               encounter={encounter}
               campaignCode={campaignCode}
               linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
-              onDelete={() => {
-                if (
-                  confirm(`Delete "${encounter.name}"? This cannot be undone.`)
-                ) {
-                  deleteEncounter(encounter.id);
-                }
+              onDelete={async () => {
+                const confirmed = await confirmDialog({
+                  title: `Delete ${encounter.name}?`,
+                  message: "This can't be undone.",
+                  confirmLabel: 'Delete encounter',
+                  tone: 'danger',
+                });
+                if (confirmed) deleteEncounter(encounter.id);
               }}
             />
           ))}
@@ -157,10 +173,10 @@ function EncounterCard({
   const npcCount = encounter.entities.filter(e => e.type === 'npc').length;
 
   return (
-    <div className="border-divider bg-surface-raised hover:bg-surface-secondary flex h-full flex-col rounded-lg border shadow-sm transition-all hover:shadow-md">
-      <div className="flex flex-1 flex-col p-4">
+    <Card className="flex h-full flex-col">
+      <div className="flex flex-1 flex-col">
         <div className="mb-3 flex items-start justify-between">
-          <h3 className="text-heading truncate text-lg font-semibold">
+          <h3 className="type-subheading text-heading min-w-0 break-words">
             {encounter.name}
           </h3>
           {encounter.isActive ? (
@@ -205,7 +221,7 @@ function EncounterCard({
           {encounter.entities.length === 0 && <span>Empty</span>}
         </div>
 
-        <div className="text-faint mb-3 flex items-center gap-1 text-xs">
+        <div className="text-muted mb-3 flex items-center gap-1 text-xs">
           <Clock size={10} />
           {new Date(encounter.updatedAt).toLocaleDateString()}
         </div>
@@ -214,7 +230,7 @@ function EncounterCard({
           <Link
             href={`/dm/campaign/${campaignCode}/battlemaps/${linkedBattleMap.id}`}
             onClick={e => e.stopPropagation()}
-            className="text-accent-orange-text hover:text-accent-orange-text mb-3 flex items-center gap-1.5 text-xs font-medium"
+            className="text-body hover:text-heading mb-3 flex items-center gap-1.5 text-xs underline underline-offset-2"
           >
             <MapIcon size={12} />
             Map: {linkedBattleMap.name}
@@ -222,19 +238,19 @@ function EncounterCard({
         )}
 
         <div className="mt-auto flex items-center gap-2 pt-1">
-          <Link
-            href={`/dm/campaign/${campaignCode}/encounters/${encounter.id}`}
-            className="flex-1"
-          >
-            <Button variant="secondary" size="sm" fullWidth>
-              Open
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={onDelete} title="Delete">
+          <Button asChild variant="secondary" size="sm" className="flex-1">
+            <Link
+              href={`/dm/campaign/${campaignCode}/encounters/${encounter.id}`}
+            >
+              Open <span className="sr-only">{encounter.name}</span>
+            </Link>
+          </Button>
+          <Button variant="danger" size="sm" onClick={onDelete}>
             <Trash2 size={14} />
+            Delete <span className="sr-only">{encounter.name}</span>
           </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

@@ -803,26 +803,20 @@ describe('MarkerDetailPanel', () => {
   /**
    * Scans a dialog subtree's raw HTML for banned Tailwind colour classes.
    * Uses `outerHTML`, not `innerHTML`, so the dialog node's own class
-   * attribute is in scope too. Only one token is stripped, globally, rather
-   * than excluding whole `<button>` subtrees: `text-white`. Every filled
-   * `Button` variant this panel is required to use (`primary` Save, `danger`
-   * Delete) sets `text-white` in the shared `buttonVariants` for contrast
-   * against its gradient fill — a pre-existing, repo-wide design-system
-   * convention this component does not control and cannot avoid while still
-   * using `Button` as instructed. Because only that one token is stripped
-   * (not the button markup), a raw colour the component itself passes down
-   * to a `Button`'s `className` (e.g. `bg-gray-800`) stays visible to the
-   * scan.
+   * attribute is in scope too. Nothing is stripped, so the filled `Button`
+   * variants this panel uses (`primary` Save, `danger` Delete) are scanned
+   * with their real classes, as is any raw colour the component passes down
+   * to a `Button`'s `className` (e.g. `bg-gray-800`).
    *
    * `[role="dialog"]` already excludes the shared `DialogOverlay` scrim
-   * (`bg-black/50`), a sibling node outside this component's authored
+   * (`bg-surface-overlay`), a sibling node outside this component's authored
    * markup.
    */
   function dialogHtmlForColorScan(dialog: Element): string {
-    return dialog.outerHTML.replaceAll('text-white', '');
+    return dialog.outerHTML;
   }
 
-  it('never emits raw Tailwind colour classes (other than the unavoidable text-white on Buttons), in dm or player mode', () => {
+  it('never emits raw Tailwind colour classes, in dm or player mode', () => {
     const data = buildMarkerData({ kind: 'door', ref: 'ref-1' });
     const readyState: MarkerPanelState = {
       kind: 'ready',

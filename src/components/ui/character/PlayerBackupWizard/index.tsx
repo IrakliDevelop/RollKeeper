@@ -2,9 +2,10 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, ShieldCheck, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { AppHeader } from '@/components/ui/layout/AppHeader';
 import {
   Dialog,
   DialogBody,
@@ -26,10 +27,8 @@ import { SafetyFileStep } from './steps/SafetyFileStep';
 
 function SetupRail({ view }: Pick<PlayerBackupWizardProps, 'view'>) {
   return (
-    <aside className="border-divider bg-surface-secondary hidden w-[232px] shrink-0 flex-col gap-0.5 rounded-lg border p-3 lg:flex">
-      <p className="text-muted mb-1.5 px-1.5 text-[11px] font-bold tracking-wide uppercase">
-        Setup
-      </p>
+    <aside className="border-divider hidden w-[232px] shrink-0 flex-col gap-0.5 border-r pr-4 lg:flex">
+      <p className="text-muted mb-1.5 px-1.5 text-[11px] font-bold">Setup</p>
       {view.rail.map(item => (
         <div
           key={item.key}
@@ -40,9 +39,9 @@ function SetupRail({ view }: Pick<PlayerBackupWizardProps, 'view'>) {
           <span
             className={`size-2 shrink-0 rounded-full ${
               item.state === 'done'
-                ? 'bg-accent-emerald-text'
+                ? 'bg-verdigris-fill'
                 : item.state === 'now'
-                  ? 'bg-accent-amber-text'
+                  ? 'bg-brass-fill'
                   : 'bg-surface-elevated'
             }`}
             aria-hidden="true"
@@ -56,9 +55,7 @@ function SetupRail({ view }: Pick<PlayerBackupWizardProps, 'view'>) {
           </span>
           <span
             className={`shrink-0 text-[11px] ${
-              item.state === 'done'
-                ? 'text-accent-emerald-text'
-                : 'text-accent-amber-text'
+              item.state === 'done' ? 'text-verdigris-text' : 'text-ember-text'
             }`}
           >
             {item.statusLabel}
@@ -66,21 +63,21 @@ function SetupRail({ view }: Pick<PlayerBackupWizardProps, 'view'>) {
         </div>
       ))}
       <div className="border-divider mt-2.5 border-t pt-2.5">
-        <p className="text-faint mb-1.5 px-1.5 text-[11px]">Your characters</p>
+        <p className="text-muted mb-1.5 px-1.5 text-[11px]">Your characters</p>
         <ul className="flex flex-col gap-1 px-1.5">
           {view.railCharacters.map(character => (
             <li key={character.id} className="flex items-center gap-2">
               <span
                 className={`size-1.5 shrink-0 rounded-full ${
                   character.included
-                    ? 'bg-accent-emerald-text'
+                    ? 'bg-verdigris-fill'
                     : 'bg-surface-elevated'
                 }`}
                 aria-hidden="true"
               />
               <span
                 className={`min-w-0 flex-1 truncate text-xs ${
-                  character.included ? 'text-body' : 'text-faint'
+                  character.included ? 'text-body' : 'text-muted'
                 }`}
               >
                 {character.name}
@@ -99,9 +96,9 @@ function ActionErrorBanner({ message }: { message: string | null }) {
     <div
       role="alert"
       tabIndex={-1}
-      className="border-accent-red-border bg-accent-red-bg rounded-lg border p-3.5"
+      className="border-blood-border bg-blood-bg rounded-md border p-3.5"
     >
-      <p className="text-accent-red-text text-[13px]">{message}</p>
+      <p className="text-blood-text text-[13px]">{message}</p>
     </div>
   );
 }
@@ -131,31 +128,25 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
 
   return (
     <div className="bg-surface min-h-screen overflow-x-hidden">
-      <header className="border-divider bg-surface-secondary border-b">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-8">
-          <div className="flex min-w-0 items-center">
-            <Button variant="ghost" asChild>
-              <Link href="/player">
-                <ArrowLeft size={20} aria-hidden="true" />
-                {COPY.chrome.back}
-              </Link>
-            </Button>
-            <div className="ml-6 flex min-w-0 items-center gap-3">
-              <ShieldCheck
-                size={24}
-                className="text-accent-purple-text shrink-0"
-                aria-hidden="true"
-              />
-              <h1 className="text-heading truncate text-xl font-bold">
-                {view.pageTitle}
-              </h1>
-            </div>
-          </div>
-          <p className="text-muted hidden text-xs sm:inline-flex">
+      <AppHeader
+        leading={
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            leftIcon={<ArrowLeft size={20} aria-hidden />}
+          >
+            <Link href="/player">{COPY.chrome.back}</Link>
+          </Button>
+        }
+        title={<h1 className="type-heading text-heading">{view.pageTitle}</h1>}
+        actions={
+          <p className="type-small text-muted hidden min-w-0 break-all sm:block">
             {view.headerNote}
           </p>
-        </div>
-      </header>
+        }
+        wrapControls
+      />
 
       {view.liveStatus ? (
         <div role="status" aria-live="polite" className="sr-only">
@@ -177,7 +168,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
           >
             <button
               type="button"
-              className="text-muted hover:bg-surface-secondary absolute top-4 right-4 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg"
+              className="text-muted hover:bg-surface-secondary absolute top-4 right-4 inline-flex min-h-11 min-w-11 items-center justify-center rounded-md"
               aria-label={COPY.chrome.close}
               onClick={actions.onClose}
             >
@@ -238,7 +229,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
                 <div className="flex items-center gap-2.5">
                   <div className="bg-surface-elevated h-1.5 w-[132px] overflow-hidden rounded-full">
                     <div
-                      className="bg-accent-emerald-text h-1.5 rounded-full"
+                      className="bg-verdigris-fill h-1.5 rounded-full"
                       style={{ width: `${view.footer.progressPercent}%` }}
                     />
                   </div>
@@ -246,7 +237,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
                     {view.footer.progressText}
                   </span>
                 </div>
-                <p className="text-faint mt-1 text-xs">
+                <p className="text-muted mt-1 text-xs">
                   {view.footer.progressNote}
                 </p>
               </div>
@@ -272,7 +263,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
         </Dialog>
       ) : (
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-          <div className="border-divider bg-surface-raised flex flex-col gap-4 rounded-xl border-2 p-6 shadow-2xl">
+          <div className="flex flex-col gap-4">
             <ActionErrorBanner message={view.actionError} />
             {view.surface === 'manage' ? (
               <PlayerBackupManager view={view} actions={actions} />

@@ -2,36 +2,18 @@
 
 import React from 'react';
 import { Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
-import {
-  CLASS_RESOURCE_ICONS,
-  CLASS_RESOURCE_COLORS,
-} from '@/components/ui/character/classResourceStyles';
-import {
-  CLASS_RESOURCE_DEFINITIONS,
-  type ClassResourceColor,
-} from '@/utils/classResources';
+import { Section } from '@/components/ui/layout/section';
+import { CLASS_RESOURCE_DEFINITIONS } from '@/utils/classResources';
 import {
   isResourceDraftValid,
   type NpcResourceDraft,
 } from '@/utils/npcResources';
 
 const ADD_CUSTOM = '__custom__';
-const COLORS: ClassResourceColor[] = [
-  'indigo',
-  'red',
-  'amber',
-  'emerald',
-  'blue',
-  'orange',
-  'violet',
-  'yellow',
-  'green',
-  'purple',
-];
-
 function generateResourceId(): string {
   return (
     'res-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -94,13 +76,16 @@ export function NpcResourcesEditor({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-heading text-sm font-medium">
-          Class Resources
-        </label>
-        <div className="w-56">
-          <SelectField value="__placeholder__" onValueChange={handleAdd}>
+    <Section
+      heading="Class resources"
+      level={3}
+      trailing={
+        <div className="w-44">
+          <SelectField
+            value="__placeholder__"
+            onValueChange={handleAdd}
+            triggerProps={{ size: 'lg', 'aria-label': 'Add resource…' }}
+          >
             <SelectItem value="__placeholder__" disabled>
               Add resource…
             </SelectItem>
@@ -112,18 +97,16 @@ export function NpcResourcesEditor({
             <SelectItem value={ADD_CUSTOM}>Custom resource…</SelectItem>
           </SelectField>
         </div>
-      </div>
-
+      }
+    >
       {resources.length === 0 ? (
         <p className="text-faint text-xs">
           No class resources — add Wild Shape, Channel Divinity, or a custom
           pool, then link entries to it below.
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-divider divide-y">
           {resources.map(res => {
-            const Icon = CLASS_RESOURCE_ICONS[res.icon];
-            const colorClasses = CLASS_RESOURCE_COLORS[res.color];
             const valid = isResourceDraftValid(res);
             const isCustom = res.definitionId == null;
             const shortMode =
@@ -134,21 +117,13 @@ export function NpcResourcesEditor({
                   : 'custom';
 
             return (
-              <div
-                key={res.id}
-                className="border-divider bg-surface-raised space-y-2 rounded-lg border p-2"
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded ${colorClasses.iconBg}`}
-                  >
-                    <Icon size={14} aria-hidden />
-                  </span>
+              <div key={res.id} className="space-y-2 py-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.75rem] items-end gap-2">
                   <Input
                     value={res.name}
                     onChange={e => update(res.id, { name: e.target.value })}
-                    placeholder="Resource name"
-                    className="flex-1"
+                    label="Resource name"
+                    size="lg"
                     aria-label="Resource name"
                   />
                   <NumberInput
@@ -156,88 +131,83 @@ export function NpcResourcesEditor({
                     value={res.maxUses}
                     onChange={v => update(res.id, { maxUses: v })}
                     allowEmpty
-                    placeholder="Max"
-                    className="w-18"
+                    label="Max uses"
+                    size="lg"
                     aria-label="Resource max uses"
                     title="Maximum uses (required)"
                   />
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onDeleteResource(res.id)}
-                    className="text-muted hover:text-accent-red-text p-1 transition-colors"
+                    className="text-blood-text min-w-11 px-0 pointer-coarse:min-h-11"
                     aria-label={`Delete resource ${res.name || 'unnamed'}`}
                   >
-                    <Trash2 size={14} />
-                  </button>
+                    <Trash2 size={16} aria-hidden="true" />
+                  </Button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="w-40">
-                    <SelectField
-                      label="Short rest restores"
-                      value={shortMode}
-                      onValueChange={v =>
-                        update(res.id, {
-                          shortRestReset:
-                            v === 'all' ? 'all' : v === 'none' ? 0 : 1,
-                        })
-                      }
-                    >
-                      <SelectItem value="all">All uses</SelectItem>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="custom">Custom amount</SelectItem>
-                    </SelectField>
+                <div
+                  className={`grid gap-2 ${isCustom ? 'grid-cols-[minmax(0,1fr)_9rem]' : 'grid-cols-1'}`}
+                >
+                  <div className="flex min-w-0 items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <SelectField
+                        label="Short rest restores"
+                        value={shortMode}
+                        triggerProps={{ size: 'lg' }}
+                        onValueChange={v =>
+                          update(res.id, {
+                            shortRestReset:
+                              v === 'all' ? 'all' : v === 'none' ? 0 : 1,
+                          })
+                        }
+                      >
+                        <SelectItem value="all">All uses</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="custom">Custom amount</SelectItem>
+                      </SelectField>
+                    </div>
+                    {shortMode === 'custom' && (
+                      <NumberInput
+                        min={1}
+                        max={res.maxUses}
+                        value={
+                          typeof res.shortRestReset === 'number'
+                            ? res.shortRestReset
+                            : undefined
+                        }
+                        onChange={v =>
+                          update(res.id, { shortRestReset: v ?? 1 })
+                        }
+                        size="lg"
+                        wrapperClassName="w-14 shrink-0"
+                        aria-label="Short rest restore amount"
+                      />
+                    )}
                   </div>
-                  {shortMode === 'custom' && (
-                    <NumberInput
-                      min={1}
-                      max={res.maxUses}
-                      value={
-                        typeof res.shortRestReset === 'number'
-                          ? res.shortRestReset
-                          : undefined
-                      }
-                      onChange={v => update(res.id, { shortRestReset: v ?? 1 })}
-                      className="w-18 self-end"
-                      aria-label="Short rest restore amount"
-                    />
-                  )}
                   {isCustom && (
-                    <>
-                      <div className="w-32">
-                        <SelectField
-                          label="Color"
-                          value={res.color}
-                          onValueChange={v =>
-                            update(res.id, { color: v as ClassResourceColor })
-                          }
-                        >
-                          {COLORS.map(c => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectField>
-                      </div>
-                      <div className="w-32">
-                        <SelectField
-                          label="Display"
-                          value={res.displayStyle}
-                          onValueChange={v =>
-                            update(res.id, {
-                              displayStyle: v as 'pips' | 'pool',
-                            })
-                          }
-                        >
-                          <SelectItem value="pips">Pips</SelectItem>
-                          <SelectItem value="pool">Pool (n/max)</SelectItem>
-                        </SelectField>
-                      </div>
-                    </>
+                    <div className="min-w-0">
+                      <SelectField
+                        label="Display"
+                        value={res.displayStyle}
+                        triggerProps={{ size: 'lg' }}
+                        onValueChange={v =>
+                          update(res.id, {
+                            displayStyle: v as 'pips' | 'pool',
+                          })
+                        }
+                      >
+                        <SelectItem value="pips">Pips</SelectItem>
+                        <SelectItem value="pool">Pool (n/max)</SelectItem>
+                      </SelectField>
+                    </div>
                   )}
                 </div>
 
                 {!valid && (
-                  <p className="text-accent-red-text text-xs">
+                  <p className="type-ui text-blood-text">
                     {!res.name.trim()
                       ? 'Name and max uses are required.'
                       : res.maxUses == null ||
@@ -252,6 +222,6 @@ export function NpcResourcesEditor({
           })}
         </div>
       )}
-    </div>
+    </Section>
   );
 }

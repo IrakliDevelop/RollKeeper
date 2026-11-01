@@ -25,6 +25,7 @@ import {
   type StagedRecoveryGeneration,
 } from '@/lib/deviceRecovery';
 import { APP_VERSION } from '@/utils/constants';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export function DeviceRecoveryControls() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -111,15 +112,15 @@ export function DeviceRecoveryControls() {
     }
   };
 
-  const handleRestore = () => {
+  const handleRestore = async () => {
     if (!generation || !activated || selectedKeys.size === 0) return;
-    if (
-      !window.confirm(
-        'Restore selected missing values? Existing values and conflicts will not be overwritten.'
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: 'Restore the selected entries?',
+      message:
+        'Only entries missing from this browser are restored. Existing entries and conflicts are left as they are.',
+      confirmLabel: 'Restore entries',
+    });
+    if (!confirmed) return;
     const result = restoreRecoveryEntries(
       generation.bundle,
       window.localStorage,
@@ -170,7 +171,7 @@ export function DeviceRecoveryControls() {
         />
       </div>
       {status && <p className="text-muted mt-2 text-sm">{status}</p>}
-      {error && <p className="text-accent-red-text mt-2 text-sm">{error}</p>}
+      {error && <p className="text-blood-text mt-2 text-sm">{error}</p>}
 
       <Dialog
         open={generation !== null}
@@ -188,7 +189,7 @@ export function DeviceRecoveryControls() {
           </DialogHeader>
           {generation && (
             <DialogBody className="space-y-4">
-              <div className="border-divider bg-surface-secondary grid grid-cols-2 gap-3 rounded-lg border p-4 text-sm sm:grid-cols-4">
+              <div className="border-divider bg-surface-secondary grid grid-cols-2 gap-3 rounded-md border p-4 text-sm sm:grid-cols-4">
                 <span>{generation.preview.entryCount} entries</span>
                 <span>{generation.preview.conflictCount} conflicts</span>
                 <span>{generation.preview.quarantineCount} quarantined</span>

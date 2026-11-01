@@ -29,6 +29,15 @@ const eslintConfig = [
       "react-hooks/void-use-memo": "off",
     },
   },
+  {
+    // Native confirm/alert/prompt are replaced by the shared in-app dialog
+    // (confirmDialog, alertDialog, promptDialog in
+    // src/components/ui/feedback/confirm-dialog).
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-alert": "error",
+    },
+  },
   globalIgnores([
     "storybook-static/**",
     "claude_design/**",

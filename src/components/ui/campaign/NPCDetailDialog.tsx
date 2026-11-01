@@ -56,6 +56,7 @@ import type {
 } from '@/types/encounter';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import { parseArmorClass, parseAcBonus } from '@/utils/calculations';
+import { getHpNumberColor } from '@/utils/hpColor';
 import {
   npcInventoryItemToFormData,
   formDataToNpcInventoryPatch,
@@ -65,6 +66,7 @@ import { NPCShopTab } from './NPCShopTab';
 import { useNPCStore } from '@/store/npcStore';
 import { NPCCurrencyStrip } from './NPCCurrencyStrip';
 import type { Currency } from '@/types/character';
+import { formatRarity } from '@/utils/formatRarity';
 
 type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore' | 'shop';
 
@@ -200,14 +202,8 @@ function formatMod(value: number): string {
 function CombatSummaryBar({ npc }: { npc: CampaignNPC }) {
   const currentHp = npc.currentHp ?? npc.maxHp;
   const initMod = getInitiativeModifier(npc);
-  const hpRatio = npc.maxHp > 0 ? currentHp / npc.maxHp : 1;
-
   const hpColor =
-    hpRatio > 0.5
-      ? 'text-accent-emerald-text'
-      : hpRatio > 0.25
-        ? 'text-accent-amber-text'
-        : 'text-accent-red-text';
+    npc.maxHp > 0 ? getHpNumberColor(currentHp, npc.maxHp) : 'text-heading';
 
   return (
     <div className="space-y-2">
@@ -471,7 +467,7 @@ function NPCItemViewModal({
                   variant={RARITY_VARIANTS[item.rarity] || 'neutral'}
                   size="md"
                 >
-                  {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
+                  {formatRarity(item.rarity)}
                 </Badge>
               )}
               {item.type && (

@@ -34,21 +34,19 @@ describe('ConditionCard', () => {
     expect(container.querySelector('.lucide-droplet')).not.toBeNull();
   });
 
-  it('keeps the default warning glyph for a missing or unknown icon', () => {
+  it('does not invent an icon when the condition has none or an unknown icon', () => {
     const plain = renderCard(base);
-    const heading = plain.container.querySelector('h4');
     expect(plain.container.querySelector('.lucide-droplet')).toBeNull();
-    // The glyph is the heading's previous sibling in the header row.
-    expect(heading?.previousElementSibling?.tagName.toLowerCase()).toBe('svg');
+    expect(
+      plain.container.querySelector('[data-effect-row] svg')
+    ).not.toBeNull();
     cleanup();
 
     const unknown = renderCard({ ...base, icon: 'not-an-icon' });
     expect(unknown.container.querySelector('.lucide-droplet')).toBeNull();
     expect(
-      unknown.container
-        .querySelector('h4')
-        ?.previousElementSibling?.tagName.toLowerCase()
-    ).toBe('svg');
+      unknown.container.querySelector('.lucide-triangle-alert')
+    ).toBeNull();
     expect(screen.getByText('Cursed Blood')).toBeTruthy();
   });
 });

@@ -96,7 +96,9 @@ test('OTP session, direct navigation, sign-out, and account switch preserve ever
   expect(await snapshotStorage(page)).toEqual(before);
 
   await page.goto('/player');
-  await expect(page.getByText(firstEmail, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: `Account menu for ${firstEmail}` })
+  ).toBeVisible();
   expect(await snapshotStorage(page)).toEqual(before);
 
   await page.goto('/account');

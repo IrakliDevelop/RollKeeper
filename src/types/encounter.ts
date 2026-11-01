@@ -301,7 +301,8 @@ export type EnemyHpDisplay = 'off' | 'label' | 'bar' | 'percent' | 'exact';
 export type EnemyConditionsDisplay = 'on' | 'off';
 
 // A named HP band shown to players when enemyHpDisplay is 'label'. `minPercent`
-// is the lowest HP percentage (inclusive) at which this label applies.
+// is the lowest HP percentage (inclusive) at which this label applies. A
+// creature at 0 HP shows "Down" or "Defeated" instead, whatever the bands say.
 export interface HpStateBand {
   minPercent: number;
   label: string;
@@ -319,13 +320,11 @@ export interface CombatConfig {
   customConditions?: CustomCondition[];
 }
 
+// The HP tiers' own words and thresholds (see hpTier in src/utils/hpState.ts).
 export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
-  { minPercent: 100, label: 'Unharmed' },
   { minPercent: 75, label: 'Healthy' },
-  { minPercent: 50, label: 'Injured' },
   { minPercent: 25, label: 'Bloodied' },
-  { minPercent: 1, label: 'Near Death' },
-  { minPercent: 0, label: 'Down' },
+  { minPercent: 0, label: 'Critical' },
 ];
 
 export const DEFAULT_COMBAT_CONFIG: CombatConfig = {

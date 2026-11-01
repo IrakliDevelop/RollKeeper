@@ -20,8 +20,8 @@ export function RowVitals({
 }: RowVitalsProps) {
   const showHp = entity.type !== 'lair';
   const isHpHidden = hidePlayerHp && entity.type === 'player';
-  const buffs = entity.conditions.filter(c => c.kind === 'buff');
-  const conditions = entity.conditions.filter(c => c.kind !== 'buff');
+  const buffs = (entity.conditions ?? []).filter(c => c.kind === 'buff');
+  const conditions = (entity.conditions ?? []).filter(c => c.kind !== 'buff');
   const showPlayerHint =
     entity.type !== 'player' &&
     ((entity.isHidden ?? false) || !!entity.playerAlias);
@@ -41,7 +41,7 @@ export function RowVitals({
         ))}
 
       {showPlayerHint && (
-        <div className="text-faint text-[10px]">
+        <div className="text-muted text-xs">
           Players see:{' '}
           <span className="font-medium">
             {entity.playerAlias?.trim() ||
@@ -50,24 +50,20 @@ export function RowVitals({
         </div>
       )}
 
-      {entity.type === 'lair' &&
-        entity.lairActions &&
-        entity.lairActions.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {entity.lairActions.map(la => (
-              <span
-                key={la.id}
-                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                  la.usedThisRound
-                    ? 'bg-surface-secondary text-faint line-through'
-                    : 'bg-accent-emerald-bg text-accent-emerald-text'
-                }`}
-              >
-                {la.name}
-              </span>
-            ))}
-          </div>
-        )}
+      {entity.type === 'lair' && (entity.lairActions ?? []).length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {(entity.lairActions ?? []).map(la => (
+            <span
+              key={la.id}
+              className={`rounded-sm px-1.5 py-0.5 text-xs ${
+                la.usedThisRound ? 'text-muted line-through' : 'text-body'
+              }`}
+            >
+              {la.name}
+            </span>
+          ))}
+        </div>
+      )}
 
       <EffectStrip
         effects={conditions}
@@ -116,8 +112,12 @@ function EffectStrip({
         />
       ))}
       {overflowCount > 0 && (
-        <span className="bg-surface-secondary text-faint inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+        <span className="text-muted inline-flex shrink-0 items-center text-xs">
           +{overflowCount}
+          <span className="sr-only">
+            {' '}
+            more {variant === 'buff' ? 'buffs' : 'conditions'}
+          </span>
         </span>
       )}
     </div>

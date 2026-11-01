@@ -27,7 +27,29 @@ const base: SharedInitiativeState = {
 const noop = () => {};
 
 describe('InitiativePanel', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    localStorage.removeItem('rollkeeper-initiative-panel-y');
+    vi.unstubAllGlobals();
+  });
+
+  it('clamps a saved low position above the sheet floating stack', () => {
+    localStorage.setItem('rollkeeper-initiative-panel-y', '700');
+    vi.stubGlobal('innerHeight', 800);
+    render(
+      <InitiativePanel
+        state={base}
+        characterId="char-a"
+        onEndTurn={noop}
+        bottomReservedHeight={400}
+      />
+    );
+    const panel = screen
+      .getByRole('button', { name: /initiative/i })
+      .closest('.fixed');
+    expect(panel).toHaveStyle({ top: '280px' });
+    expect(localStorage.getItem('rollkeeper-initiative-panel-y')).toBe('700');
+  });
 
   it('renders nothing when there is no active initiative', () => {
     const { container } = render(
@@ -160,6 +182,43 @@ describe('InitiativePanel', () => {
     expect(screen.getByText('42%')).toBeInTheDocument();
   });
 
+  it('shows "Defeated" and "Down", never a band word, when a payload still carries one at 0 HP', () => {
+    // A DM tab opened before 02a and not reloaded, but holding the upgraded
+    // bands, still sends the lowest band's word on dead rows.
+    render(
+      <InitiativePanel
+        state={{
+          ...base,
+          enemyHpMode: 'label',
+          turnOrder: [
+            {
+              entityId: 'g',
+              displayName: 'Goblin',
+              type: 'monster',
+              disposition: 'enemy',
+              hpState: 'Critical',
+              isDead: true,
+            },
+            {
+              entityId: 'c',
+              displayName: 'Caleb',
+              type: 'player',
+              playerCharacterId: 'char-c',
+              hpMode: 'label',
+              hpState: 'Critical',
+              isDead: true,
+            },
+          ],
+        }}
+        characterId="char-b"
+        onEndTurn={noop}
+      />
+    );
+    expect(screen.getByText('Defeated')).toBeInTheDocument();
+    expect(screen.getByText('Down')).toBeInTheDocument();
+    expect(screen.queryByText('Critical')).not.toBeInTheDocument();
+  });
+
   it('shows the HP-state word (not exact HP) for a player who opted out of sharing', () => {
     render(
       <InitiativePanel
@@ -185,6 +244,6 @@ describe('InitiativePanel', () => {
     expect(screen.getByText('Bloodied')).toBeInTheDocument();
     expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
     // Tier-coloured, like an enemy's label row — not the neutral player shade.
-    expect(screen.getByText('Bloodied')).toHaveClass('text-accent-orange-text');
+    expect(screen.getByText('Bloodied')).toHaveClass('text-ember-text');
   });
 });

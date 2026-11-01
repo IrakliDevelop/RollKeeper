@@ -39,6 +39,33 @@ const ability = (used = 1): MonsterAbility => ({
 });
 
 describe('StatBlockEntryRow', () => {
+  it('names pip actions and exposes read-only pips as images', () => {
+    const view = render(
+      <StatBlockEntryRow
+        entry={TRACKED_ENTRY}
+        ability={ability(1)}
+        onUseAbility={vi.fn()}
+        onRestoreAbility={vi.fn()}
+      />
+    );
+    expect(
+      view.getByRole('button', { name: 'Restore Smite use 1' })
+    ).toBeVisible();
+    expect(
+      view.getByRole('button', { name: 'Use Smite (2 of 3)' })
+    ).toBeVisible();
+    cleanup();
+    const readOnly = render(
+      <StatBlockEntryRow entry={TRACKED_ENTRY} ability={ability(1)} readOnly />
+    );
+    expect(
+      readOnly.getByRole('img', { name: 'Smite use 1, used' })
+    ).toBeVisible();
+    expect(
+      readOnly.getByRole('img', { name: 'Smite use 2, available' })
+    ).toBeVisible();
+  });
+
   it('description is always a separate block below the header line', () => {
     const { container } = render(
       <StatBlockEntryRow entry={TRACKED_ENTRY} ability={ability()} />
@@ -60,9 +87,9 @@ describe('StatBlockEntryRow', () => {
         onRestoreAbility={onRestore}
       />
     );
-    screen.getByLabelText('Smite use 1 (used)').click();
+    screen.getByLabelText('Restore Smite use 1').click();
     expect(onRestore).toHaveBeenCalledWith(TRACKED_ENTRY);
-    screen.getByLabelText('Smite use 2 (available)').click();
+    screen.getByLabelText('Use Smite (2 of 3)').click();
     expect(onUse).toHaveBeenCalledWith(TRACKED_ENTRY);
   });
 
@@ -82,14 +109,89 @@ describe('StatBlockEntryRow', () => {
         onRestoreAbility={onRestore}
       />
     );
-    const availablePip = screen.getByLabelText('Smite use 2 (available)');
+    const availablePip = screen.getByLabelText('Use Smite (2 of 3)');
     expect((availablePip as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Needs 2 Wild Shape, 1 left')).toBeVisible();
+    expect(availablePip.getAttribute('title')).toBe(
+      'Needs 2 Wild Shape, 1 left'
+    );
     availablePip.click();
     expect(onUse).not.toHaveBeenCalled();
-    const usedPip = screen.getByLabelText('Smite use 1 (used)');
+    const usedPip = screen.getByLabelText('Restore Smite use 1');
     expect(usedPip.getAttribute('title')).toContain('does not refund');
     usedPip.click();
     expect(onRestore).toHaveBeenCalled();
+  });
+
+  it('uses brass available pips, neutral spent pips and coarse pointer targets', () => {
+    const view = render(
+      <StatBlockEntryRow
+        entry={TRACKED_ENTRY}
+        ability={ability(1)}
+        onUseAbility={vi.fn()}
+        onRestoreAbility={vi.fn()}
+      />
+    );
+    const used = view.getByLabelText('Restore Smite use 1');
+    const available = view.getByLabelText('Use Smite (2 of 3)');
+    expect(used).toHaveClass('pointer-coarse:min-h-11');
+    expect(available).toHaveClass('pointer-coarse:min-w-11');
+    expect(used.querySelector('span')).toHaveClass('border-divider-strong');
+    expect(available.querySelector('span')).toHaveClass('border-brass-border');
+  });
+
+  it('names the secondary Use action for its entry and shows the cost', () => {
+    const entry = {
+      ...TRACKED_ENTRY,
+      resourceCost: { resourceId: 'res-1', amount: 2 },
+    };
+    const view = render(
+      <StatBlockEntryRow
+        entry={entry}
+        resources={[RESOURCE]}
+        onSpendCost={vi.fn()}
+      />
+    );
+    expect(view.getByRole('button', { name: 'Use Smite' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    expect(
+      view.getByText(/Wild Shape/).closest('[data-variant]')
+    ).toHaveAttribute('data-variant', 'neutral');
+  });
+
+  it('says how many items an inventory cost needs and how many are left', () => {
+    const entry: StatBlockEntry = {
+      id: 'entry-arrows',
+      name: 'Volley',
+      text: '',
+      inventoryCost: { inventoryItemId: 'arrows', quantity: 3 },
+    };
+    const view = render(
+      <StatBlockEntryRow
+        entry={entry}
+        inventory={[{ id: 'arrows', name: 'Arrows', quantity: 1 } as never]}
+        onSpendCost={vi.fn()}
+      />
+    );
+    expect(view.getByText('Needs 3 Arrows, 1 left')).toBeVisible();
+  });
+
+  it('names a missing inventory item instead of a generic shortage', () => {
+    const entry: StatBlockEntry = {
+      id: 'entry-missing',
+      name: 'Quaff potion',
+      text: '',
+      inventoryCost: { inventoryItemId: 'item-gone', quantity: 1 },
+    };
+    const view = render(
+      <StatBlockEntryRow entry={entry} inventory={[]} onSpendCost={vi.fn()} />
+    );
+    expect(view.getByText('Inventory item removed')).toBeVisible();
+    expect(
+      view.getByRole('button', { name: 'Use Quaff potion' })
+    ).toBeDisabled();
   });
 
   it('trackable + cost with sufficient resource: pip title names the spend', () => {
@@ -106,7 +208,7 @@ describe('StatBlockEntryRow', () => {
       />
     );
     expect(
-      screen.getByLabelText('Smite use 1 (available)').getAttribute('title')
+      screen.getByLabelText('Use Smite (1 of 3)').getAttribute('title')
     ).toBe('Use — spends 2 Wild Shape');
   });
 
@@ -125,7 +227,7 @@ describe('StatBlockEntryRow', () => {
         onSpendCost={onSpendCost}
       />
     );
-    screen.getByRole('button', { name: 'Use' }).click();
+    screen.getByRole('button', { name: 'Use Rally' }).click();
     expect(onSpendCost).toHaveBeenCalledWith(entry);
 
     cleanup();
@@ -134,7 +236,7 @@ describe('StatBlockEntryRow', () => {
     );
     expect(dangling.getByText('Unknown resource')).toBeTruthy();
     expect(
-      (dangling.getByRole('button', { name: 'Use' }) as HTMLButtonElement)
+      (dangling.getByRole('button', { name: 'Use Rally' }) as HTMLButtonElement)
         .disabled
     ).toBe(true);
   });
@@ -189,7 +291,9 @@ describe('StatBlockEntryRow', () => {
     expect(screen.getByText(/3\/Day/)).toBeTruthy();
     expect(screen.queryByText(/9\/Day/)).toBeNull();
     // And exactly three pips.
-    expect(screen.getAllByLabelText(/Smite use \d/)).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /Use Smite/ })).toHaveLength(
+      3
+    );
   });
 
   it('parsed usage inside an entity-edited NAME cannot contradict the authoritative label', () => {
@@ -217,6 +321,8 @@ describe('StatBlockEntryRow', () => {
     // Name renders cleaned, label derives from the ability config.
     expect(screen.getByText(/Teleport \(3\/Day\)/)).toBeTruthy();
     expect(screen.queryByText(/9\/Day/)).toBeNull();
-    expect(screen.getAllByLabelText(/Teleport.*use \d/)).toHaveLength(3);
+    expect(
+      screen.getAllByRole('button', { name: /Use Teleport/ })
+    ).toHaveLength(3);
   });
 });

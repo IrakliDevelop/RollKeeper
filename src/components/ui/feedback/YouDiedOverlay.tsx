@@ -150,7 +150,7 @@ export function YouDiedOverlay({
       {/* Main "YOU DIED" text */}
       <h1
         style={{
-          fontFamily: 'var(--font-cinzel-decorative), serif',
+          fontFamily: 'var(--font-heading-family)',
           fontSize: 'clamp(3rem, 12vw, 8rem)',
           fontWeight: 400,
           color: '#8B0000',
@@ -184,7 +184,7 @@ export function YouDiedOverlay({
       {characterName && (
         <p
           style={{
-            fontFamily: 'var(--font-cinzel-decorative), serif',
+            fontFamily: 'var(--font-heading-family)',
             fontSize: 'clamp(0.875rem, 3vw, 1.5rem)',
             fontWeight: 400,
             color: '#666',
@@ -212,7 +212,7 @@ export function YouDiedOverlay({
           style={{
             position: 'absolute',
             bottom: '3rem',
-            fontFamily: 'var(--font-cinzel-decorative), serif',
+            fontFamily: 'var(--font-heading-family)',
             fontSize: '0.875rem',
             color: '#444',
             letterSpacing: '0.1em',

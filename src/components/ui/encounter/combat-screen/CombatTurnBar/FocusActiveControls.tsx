@@ -31,28 +31,26 @@ export function FocusActiveControls({
         variant="outline"
         size="sm"
         onClick={onPrevTurn}
-        className="h-9 w-9 shrink-0 p-0"
-        title="Previous turn"
+        className="shrink-0"
+        aria-label="Previous turn"
       >
         <SkipBack size={16} />
       </Button>
 
-      <div className="mx-3 min-w-0 flex-1">
-        <span className="text-accent-amber-text-muted block text-xs font-bold tracking-widest uppercase">
-          Round {encounter.round} · Now Playing
+      <div className="min-w-0 flex-1">
+        <span className="text-muted type-caption block">
+          Round {encounter.round} · Now playing
         </span>
         {activeEntity && (
-          <span className="font-display text-heading block truncate text-base font-bold">
+          <span className="type-subheading text-heading block truncate">
             {activeEntity.name}
           </span>
         )}
       </div>
 
       {onDeckEntity && (
-        <div className="mr-3 flex shrink-0 flex-col items-end">
-          <span className="text-muted text-xs font-bold tracking-widest uppercase">
-            Up Next
-          </span>
+        <div className="flex shrink-0 flex-col items-end">
+          <span className="text-muted type-caption">Up next</span>
           <span className="text-body text-sm font-medium">
             {onDeckEntity.name}
           </span>
@@ -65,26 +63,25 @@ export function FocusActiveControls({
         onClick={onNextTurn}
         rightIcon={<SkipForward size={16} />}
       >
-        Next
+        Next turn
       </Button>
 
-      <div className="flex w-full items-center justify-end gap-2 pt-1">
+      <div className="flex w-full flex-wrap items-center justify-end gap-2 pt-1">
         <Button
-          variant={hidePlayerHp ? 'warning' : 'ghost'}
+          variant="ghost"
+          selected={hidePlayerHp}
           size="sm"
           onClick={onToggleHidePlayerHp}
           aria-label={hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
           leftIcon={hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />}
         />
         <Button
-          variant="ghost"
+          variant="secondary"
           size="sm"
           onClick={onEndCombat}
-          aria-label="End combat"
-          className="bg-accent-red-bg text-accent-red-text hover:bg-accent-red-bg-strong"
           leftIcon={<Square size={14} />}
         >
-          End
+          End combat
         </Button>
       </div>
     </>

@@ -13,418 +13,266 @@
    hardcoded color classes like bg-white or text-gray-800.
    ============================================================ */
 
-:root {
+/* Paper (light) theme: the default when <html> has no data-theme, and the
+   scope of any nested [data-theme='light'] wrapper inside a felt page. */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
   /* --- Font families --- */
-  --font-body-family: Arial, Helvetica, sans-serif;
-  --font-display-family: var(--font-geist-sans);
+  --font-body-family: var(--font-barlow, 'Barlow'), system-ui, sans-serif;
+  --font-display-family:
+    var(--font-barlow-condensed, 'Barlow Condensed'), system-ui, sans-serif;
+  --font-heading-family: var(--font-vollkorn, 'Vollkorn'), Georgia, serif;
 
-  /* --- Core backgrounds --- */
-  --background: #f8fafc; /* slate-50 — off-white base reduces glare */
-  --foreground: #171717;
-  --surface: #f8fafc; /* slate-50 — matches base background */
-  --surface-secondary: #f1f5f9; /* slate-100 — stronger alternate surface */
-  --surface-raised: #ffffff; /* pure white — cards float above off-white bg */
-  --surface-inset: #e2e8f0; /* slate-200 — deeper recessed areas */
-  --surface-hover: #e2e8f0; /* slate-200 — more visible hover feedback */
-  --surface-overlay: rgba(0, 0, 0, 0.5);
+  /* --- Neutrals --- */
+  --surface: #e9ebe4; /* page canvas */
+  --surface-secondary: #eef0ea; /* alternate band, table header, subtle well */
+  --surface-raised: #f4f5f0; /* cards: a character, monster, spell, item */
+  --surface-elevated: #fbfbf8; /* popovers, menus, dialogs, drawers */
+  --surface-inset: #e1e4db; /* inputs, wells */
+  --surface-hover: #e4e7df; /* row and ghost hover */
+  --surface-overlay: rgba(28, 36, 32, 0.35); /* dialog scrim */
+  /* The one shadow: floating layers only (popover, menu, dialog, drawer). */
+  --overlay-shadow:
+    0 8px 24px rgb(28 36 32 / 0.16), 0 2px 6px rgb(28 36 32 / 0.1);
 
-  /* --- Text --- */
-  --heading: #1e293b; /* slate-800 */
-  --body: #475569; /* slate-600 */
-  --muted: #64748b; /* slate-500 */
-  --faint: #94a3b8; /* slate-400 */
-  --inverse: #ffffff;
+  --heading: #1c2420; /* primary text */
+  --body: #4b544d; /* secondary text */
+  --muted: #5f675e; /* captions, metadata, placeholders */
+  --faint: #8b9287; /* decorative and disabled only */
+  --inverse: #fbfbf8; /* text on a role-coloured fill (older badges) */
 
-  /* --- Borders / Dividers --- */
-  --divider: #cbd5e1; /* slate-300 — slightly stronger borders */
-  --divider-strong: #94a3b8; /* slate-400 — more definition for strong borders */
-  --ring: #3b82f6; /* blue-500 */
+  --divider: #cbd0c4; /* hairlines */
+  --divider-strong: #a9b0a2; /* emphasis rules */
+  --input-border: #78806f; /* control boundaries */
 
-  /* --- Accent surfaces (emerald) --- */
-  --accent-emerald-bg: #ecfdf5; /* emerald-50 */
-  --accent-emerald-bg-strong: #d1fae5; /* emerald-100 */
-  --accent-emerald-border: #a7f3d0; /* emerald-200 */
-  --accent-emerald-border-strong: #6ee7b7; /* emerald-300 */
-  --accent-emerald-text: #065f46; /* emerald-800 */
-  --accent-emerald-text-muted: #047857; /* emerald-700 */
+  /* --- Roles: each colour has exactly one job --- */
+  --brass-text: #7a5b17; /* primary action, focus, proficiency, on-state */
+  --brass-fill: #a07b2c;
+  --brass-border: #a07b2c;
+  --brass-bg: #f2eee4;
+  --on-brass: #1a1405;
+  --blood-text: #9e2f28; /* harm, damage, destructive, critical HP */
+  --blood-fill: #9e2f28;
+  --blood-border: #9e2f28;
+  --blood-bg: #f2e7e3;
+  --on-blood: #ffffff;
+  --verdigris-text: #276c56; /* healing, success, healthy HP */
+  --verdigris-fill: #276c56;
+  --verdigris-border: #276c56;
+  --verdigris-bg: #e6ede8;
+  --lapis-text: #3e5a9e; /* magic: slots, concentration, spell attacks */
+  --lapis-fill: #3e5a9e;
+  --lapis-border: #3e5a9e;
+  --lapis-bg: #e8ebef;
+  --ember-text: #8e4c14; /* conditions, warnings, bloodied HP */
+  --ember-fill: #8e4c14;
+  --ember-border: #8e4c14;
+  --ember-bg: #f0eae1;
+  --frost-text: #3d6a85; /* temporary HP */
+  --frost-fill: #3d6a85;
+  --frost-border: #3d6a85;
+  --frost-bg: #e8eded;
 
-  /* --- Accent surfaces (blue) --- */
-  --accent-blue-bg: #eff6ff; /* blue-50 */
-  --accent-blue-bg-strong: #dbeafe; /* blue-100 */
-  --accent-blue-border: #bfdbfe; /* blue-200 */
-  --accent-blue-border-strong: #93c5fd; /* blue-300 */
-  --accent-blue-text: #1e40af; /* blue-800 */
-  --accent-blue-text-muted: #1d4ed8; /* blue-700 */
-
-  /* --- Accent surfaces (amber) --- */
-  --accent-amber-bg: #fffbeb; /* amber-50 */
-  --accent-amber-bg-strong: #fef3c7; /* amber-100 */
-  --accent-amber-border: #fde68a; /* amber-200 */
-  --accent-amber-border-strong: #fcd34d; /* amber-300 */
-  --accent-amber-text: #92400e; /* amber-800 */
-  --accent-amber-text-muted: #b45309; /* amber-700 */
-
-  /* --- Accent surfaces (red) --- */
-  --accent-red-bg: #fef2f2; /* red-50 */
-  --accent-red-bg-strong: #fee2e2; /* red-100 */
-  --accent-red-border: #fecaca; /* red-200 */
-  --accent-red-border-strong: #fca5a5; /* red-300 */
-  --accent-red-text: #991b1b; /* red-800 */
-  --accent-red-text-muted: #b91c1c; /* red-700 */
-
-  /* --- Accent surfaces (purple) --- */
-  --accent-purple-bg: #faf5ff; /* purple-50 */
-  --accent-purple-bg-strong: #f3e8ff; /* purple-100 */
-  --accent-purple-border: #e9d5ff; /* purple-200 */
-  --accent-purple-border-strong: #d8b4fe; /* purple-300 */
-  --accent-purple-text: #6b21a8; /* purple-800 */
-  --accent-purple-text-muted: #7c3aed; /* purple-700 */
-
-  /* --- Accent surfaces (indigo) --- */
-  --accent-indigo-bg: #eef2ff; /* indigo-50 */
-  --accent-indigo-bg-strong: #e0e7ff; /* indigo-100 */
-  --accent-indigo-border: #c7d2fe; /* indigo-200 */
-  --accent-indigo-border-strong: #a5b4fc; /* indigo-300 */
-  --accent-indigo-text: #3730a3; /* indigo-800 */
-  --accent-indigo-text-muted: #4f46e5; /* indigo-600 */
-
-  /* --- Accent surfaces (green) --- */
-  --accent-green-bg: #f0fdf4; /* green-50 */
-  --accent-green-bg-strong: #dcfce7; /* green-100 */
-  --accent-green-border: #bbf7d0; /* green-200 */
-  --accent-green-border-strong: #86efac; /* green-300 */
-  --accent-green-text: #166534; /* green-800 */
-  --accent-green-text-muted: #15803d; /* green-700 */
-
-  /* --- Accent surfaces (orange) --- */
-  --accent-orange-bg: #fff7ed; /* orange-50 */
-  --accent-orange-bg-strong: #ffedd5; /* orange-100 */
-  --accent-orange-border: #fed7aa; /* orange-200 */
-  --accent-orange-border-strong: #fb923c; /* orange-400 */
-  --accent-orange-text: #9a3412; /* orange-800 */
-  --accent-orange-text-muted: #c2410c; /* orange-700 */
-
-  /* --- Accent surfaces (yellow) --- */
-  --accent-yellow-bg: #fefce8; /* yellow-50 */
-  --accent-yellow-bg-strong: #fef9c3; /* yellow-100 */
-  --accent-yellow-border: #fde047; /* yellow-300 */
-  --accent-yellow-border-strong: #facc15; /* yellow-400 */
-  --accent-yellow-text: #854d0e; /* yellow-800 */
-  --accent-yellow-text-muted: #a16207; /* yellow-700 */
-
-  /* --- Accent surfaces (violet) --- */
-  --accent-violet-bg: #f5f3ff; /* violet-50 */
-  --accent-violet-bg-strong: #ede9fe; /* violet-100 */
-  --accent-violet-border: #c4b5fd; /* violet-300 */
-  --accent-violet-border-strong: #a78bfa; /* violet-400 */
-  --accent-violet-text: #5b21b6; /* violet-800 */
-  --accent-violet-text-muted: #6d28d9; /* violet-700 */
-
-  /* --- Gradient endpoints --- */
-  --gradient-slate-from: #f8fafc;
-  --gradient-slate-to: #f1f5f9;
-  --gradient-blue-from: #eff6ff;
-  --gradient-blue-to: #e0e7ff;
-  --gradient-green-from: #f0fdf4;
-  --gradient-green-to: #d1fae5;
-  --gradient-purple-from: #faf5ff;
-  --gradient-purple-to: #fce7f3;
-  --gradient-emerald-from: #ecfdf5;
-  --gradient-emerald-to: #ccfbf1;
-  --gradient-amber-from: #fffbeb;
-  --gradient-amber-to: #fef9c3;
-  --gradient-red-from: #fef2f2;
-  --gradient-red-to: #fce7f3;
-  --gradient-indigo-from: #eef2ff;
-  --gradient-indigo-to: #e0e7ff;
-  --gradient-page-from: #f1f5f9; /* deeper gradient start */
-  --gradient-page-via: #e8f0fe; /* more visible mid-gradient */
-  --gradient-page-to: #e0e7ff; /* deeper gradient end */
-
-  /* --- Input-specific --- */
-  --input-bg: #f1f5f9; /* slate-100 — softer than white, gentle inset look */
-  --input-text: #111827; /* gray-900 */
-  --input-placeholder: #6b7280; /* gray-500 */
-  --input-border: #cbd5e1; /* slate-300 — matches divider for consistency */
-  --input-border-focus: #10b981; /* emerald-500 */
+  /* --- Deprecated accent bridge only (see the bridge block) --- */
+  --bridge-verdigris-bg-strong: #d5e1db;
+  --bridge-blood-bg-strong: #ead6d3;
+  --bridge-lapis-bg-strong: #d9dee8;
+  --bridge-ember-bg-strong: #e7dccf;
+  --bridge-verdigris-border: #acc5ba;
+  --bridge-blood-border: #d6b0aa;
+  --bridge-lapis-border: #b4bfd3;
+  --bridge-ember-border: #d0baa3;
 }
-
-/* Popover/menu/drawer layer. Resolved per theme scope, including nested
-   [data-theme] wrappers. Until Phase 1a gives it felt/paper values it reuses
-   each theme's hover surface, so it is visible on raised surfaces in light,
-   dark and parchment alike. */
+/* Tokens defined in terms of other tokens. Declared on every theme scope so
+   they re-resolve inside nested [data-theme] wrappers (Storybook, previews).
+   Theme blocks declare literals only, never these names. */
 :root,
 [data-theme] {
-  --surface-elevated: var(--surface-hover);
+  --background: var(--surface);
+  --foreground: var(--heading);
+  --ring: var(--brass-fill);
+  --input-bg: var(--surface-inset);
+  --input-text: var(--heading);
+  --input-placeholder: var(--muted);
+  --input-border-focus: var(--brass-fill);
 }
+/* DEPRECATED accent bridge (Felt and Brass Phase 1a). The hue-named accent
+   tokens and --gradient-* variables are retired: new code uses the role
+   tokens above. Until the Phase 3 sweeps remove every use, each one points
+   at its nearest role so the interim look stays coherent. */
+:root,
+[data-theme] {
+  /* emerald -> verdigris */
+  --accent-emerald-bg: var(--verdigris-bg);
+  --accent-emerald-bg-strong: var(--bridge-verdigris-bg-strong);
+  --accent-emerald-border: var(--bridge-verdigris-border);
+  --accent-emerald-border-strong: var(--verdigris-border);
+  --accent-emerald-text: var(--verdigris-text);
+  --accent-emerald-text-muted: var(--verdigris-text);
+  /* green -> verdigris */
+  --accent-green-bg: var(--verdigris-bg);
+  --accent-green-bg-strong: var(--bridge-verdigris-bg-strong);
+  --accent-green-border: var(--bridge-verdigris-border);
+  --accent-green-border-strong: var(--verdigris-border);
+  --accent-green-text: var(--verdigris-text);
+  --accent-green-text-muted: var(--verdigris-text);
+  /* red -> blood */
+  --accent-red-bg: var(--blood-bg);
+  --accent-red-bg-strong: var(--bridge-blood-bg-strong);
+  --accent-red-border: var(--bridge-blood-border);
+  --accent-red-border-strong: var(--blood-border);
+  --accent-red-text: var(--blood-text);
+  --accent-red-text-muted: var(--blood-text);
+  /* purple -> lapis */
+  --accent-purple-bg: var(--lapis-bg);
+  --accent-purple-bg-strong: var(--bridge-lapis-bg-strong);
+  --accent-purple-border: var(--bridge-lapis-border);
+  --accent-purple-border-strong: var(--lapis-border);
+  --accent-purple-text: var(--lapis-text);
+  --accent-purple-text-muted: var(--lapis-text);
+  /* violet -> lapis */
+  --accent-violet-bg: var(--lapis-bg);
+  --accent-violet-bg-strong: var(--bridge-lapis-bg-strong);
+  --accent-violet-border: var(--bridge-lapis-border);
+  --accent-violet-border-strong: var(--lapis-border);
+  --accent-violet-text: var(--lapis-text);
+  --accent-violet-text-muted: var(--lapis-text);
+  /* indigo -> lapis */
+  --accent-indigo-bg: var(--lapis-bg);
+  --accent-indigo-bg-strong: var(--bridge-lapis-bg-strong);
+  --accent-indigo-border: var(--bridge-lapis-border);
+  --accent-indigo-border-strong: var(--lapis-border);
+  --accent-indigo-text: var(--lapis-text);
+  --accent-indigo-text-muted: var(--lapis-text);
+  /* blue -> lapis */
+  --accent-blue-bg: var(--lapis-bg);
+  --accent-blue-bg-strong: var(--bridge-lapis-bg-strong);
+  --accent-blue-border: var(--bridge-lapis-border);
+  --accent-blue-border-strong: var(--lapis-border);
+  --accent-blue-text: var(--lapis-text);
+  --accent-blue-text-muted: var(--lapis-text);
+  /* amber -> ember */
+  --accent-amber-bg: var(--ember-bg);
+  --accent-amber-bg-strong: var(--bridge-ember-bg-strong);
+  --accent-amber-border: var(--bridge-ember-border);
+  --accent-amber-border-strong: var(--ember-border);
+  --accent-amber-text: var(--ember-text);
+  --accent-amber-text-muted: var(--ember-text);
+  /* yellow -> ember */
+  --accent-yellow-bg: var(--ember-bg);
+  --accent-yellow-bg-strong: var(--bridge-ember-bg-strong);
+  --accent-yellow-border: var(--bridge-ember-border);
+  --accent-yellow-border-strong: var(--ember-border);
+  --accent-yellow-text: var(--ember-text);
+  --accent-yellow-text-muted: var(--ember-text);
+  /* orange -> ember */
+  --accent-orange-bg: var(--ember-bg);
+  --accent-orange-bg-strong: var(--bridge-ember-bg-strong);
+  --accent-orange-border: var(--bridge-ember-border);
+  --accent-orange-border-strong: var(--ember-border);
+  --accent-orange-text: var(--ember-text);
+  --accent-orange-text-muted: var(--ember-text);
 
+  /* Gradients are retired: each endpoint becomes a flat surface or wash. */
+  --gradient-slate-from: var(--surface-secondary);
+  --gradient-slate-to: var(--surface-secondary);
+  --gradient-blue-from: var(--lapis-bg);
+  --gradient-blue-to: var(--lapis-bg);
+  --gradient-indigo-from: var(--lapis-bg);
+  --gradient-indigo-to: var(--lapis-bg);
+  --gradient-purple-from: var(--lapis-bg);
+  --gradient-purple-to: var(--lapis-bg);
+  --gradient-green-from: var(--verdigris-bg);
+  --gradient-green-to: var(--verdigris-bg);
+  --gradient-emerald-from: var(--verdigris-bg);
+  --gradient-emerald-to: var(--verdigris-bg);
+  --gradient-amber-from: var(--ember-bg);
+  --gradient-amber-to: var(--ember-bg);
+  --gradient-red-from: var(--blood-bg);
+  --gradient-red-to: var(--blood-bg);
+  --gradient-page-from: var(--background);
+  --gradient-page-via: var(--background);
+  --gradient-page-to: var(--background);
+}
+/* Felt (dark) theme. */
 [data-theme='dark'] {
-  /* --- Core backgrounds --- */
-  --background: #0f172a; /* slate-900 */
-  --foreground: #e2e8f0; /* slate-200 */
-  --surface: #0f172a; /* slate-900 */
-  --surface-secondary: #1e293b; /* slate-800 */
-  --surface-raised: #1e293b; /* slate-800 */
-  --surface-inset: #020617; /* slate-950 */
-  --surface-hover: #334155; /* slate-700 */
-  --surface-overlay: rgba(0, 0, 0, 0.7);
+  color-scheme: dark;
 
-  /* --- Text --- */
-  --heading: #f1f5f9; /* slate-100 */
-  --body: #cbd5e1; /* slate-300 */
-  --muted: #94a3b8; /* slate-400 */
-  --faint: #64748b; /* slate-500 */
-  --inverse: #0f172a; /* slate-900 */
+  /* --- Neutrals --- */
+  --surface: #111915;
+  --surface-secondary: #151f1a;
+  --surface-raised: #18221d;
+  --surface-elevated: #1f2b25;
+  --surface-inset: #0c120f;
+  --surface-hover: #22302a;
+  --surface-overlay: rgba(5, 8, 6, 0.6);
+  --overlay-shadow: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
 
-  /* --- Borders / Dividers --- */
-  --divider: #334155; /* slate-700 */
-  --divider-strong: #475569; /* slate-600 */
-  --ring: #60a5fa; /* blue-400 */
+  --heading: #e9e4d4;
+  --body: #b4b6a6;
+  --muted: #949a8a;
+  --faint: #6e7568; /* decorative and disabled only */
+  --inverse: #111915;
 
-  /* --- Accent surfaces (emerald) --- */
-  --accent-emerald-bg: rgba(6, 78, 59, 0.25);
-  --accent-emerald-bg-strong: rgba(6, 78, 59, 0.4);
-  --accent-emerald-border: #065f46; /* emerald-800 */
-  --accent-emerald-border-strong: #047857; /* emerald-700 */
-  --accent-emerald-text: #6ee7b7; /* emerald-300 */
-  --accent-emerald-text-muted: #34d399; /* emerald-400 */
+  --divider: #2a3830;
+  --divider-strong: #3a4a42;
+  --input-border: #68776e;
 
-  /* --- Accent surfaces (blue) --- */
-  --accent-blue-bg: rgba(30, 58, 138, 0.25);
-  --accent-blue-bg-strong: rgba(30, 58, 138, 0.4);
-  --accent-blue-border: #1e3a8a; /* blue-900 */
-  --accent-blue-border-strong: #1d4ed8; /* blue-700 */
-  --accent-blue-text: #93c5fd; /* blue-300 */
-  --accent-blue-text-muted: #60a5fa; /* blue-400 */
+  /* --- Roles --- */
+  --brass-text: #c8a14b;
+  --brass-fill: #c8a14b;
+  --brass-border: #c8a14b;
+  --brass-bg: #2b2c1d;
+  --on-brass: #1a1405;
+  --blood-text: #e27a70;
+  --blood-fill: #c24a40;
+  --blood-border: #c24a40;
+  --blood-bg: #2a201b;
+  --on-blood: #ffffff;
+  --verdigris-text: #6fb3a0;
+  --verdigris-fill: #6fb3a0;
+  --verdigris-border: #6fb3a0;
+  --verdigris-bg: #1e2f28;
+  --lapis-text: #93a7d6;
+  --lapis-fill: #93a7d6;
+  --lapis-border: #93a7d6;
+  --lapis-bg: #232d30;
+  --ember-text: #d99a5b;
+  --ember-fill: #d99a5b;
+  --ember-border: #d99a5b;
+  --ember-bg: #2d2b1f;
+  --frost-text: #8fb3c9;
+  --frost-fill: #8fb3c9;
+  --frost-border: #8fb3c9;
+  --frost-bg: #232f2e;
 
-  /* --- Accent surfaces (amber) --- */
-  --accent-amber-bg: rgba(120, 53, 15, 0.25);
-  --accent-amber-bg-strong: rgba(120, 53, 15, 0.4);
-  --accent-amber-border: #78350f; /* amber-900 */
-  --accent-amber-border-strong: #b45309; /* amber-700 */
-  --accent-amber-text: #fcd34d; /* amber-300 */
-  --accent-amber-text-muted: #fbbf24; /* amber-400 */
-
-  /* --- Accent surfaces (red) --- */
-  --accent-red-bg: rgba(127, 29, 29, 0.25);
-  --accent-red-bg-strong: rgba(127, 29, 29, 0.4);
-  --accent-red-border: #7f1d1d; /* red-900 */
-  --accent-red-border-strong: #b91c1c; /* red-700 */
-  --accent-red-text: #fca5a5; /* red-300 */
-  --accent-red-text-muted: #f87171; /* red-400 */
-
-  /* --- Accent surfaces (purple) --- */
-  --accent-purple-bg: rgba(88, 28, 135, 0.25);
-  --accent-purple-bg-strong: rgba(88, 28, 135, 0.4);
-  --accent-purple-border: #581c87; /* purple-900 */
-  --accent-purple-border-strong: #7c3aed; /* purple-700 */
-  --accent-purple-text: #d8b4fe; /* purple-300 */
-  --accent-purple-text-muted: #c084fc; /* purple-400 */
-
-  /* --- Accent surfaces (indigo) --- */
-  --accent-indigo-bg: rgba(55, 48, 163, 0.25);
-  --accent-indigo-bg-strong: rgba(55, 48, 163, 0.4);
-  --accent-indigo-border: #312e81; /* indigo-900 */
-  --accent-indigo-border-strong: #4f46e5; /* indigo-700 */
-  --accent-indigo-text: #a5b4fc; /* indigo-300 */
-  --accent-indigo-text-muted: #818cf8; /* indigo-400 */
-
-  /* --- Accent surfaces (green) --- */
-  --accent-green-bg: rgba(22, 101, 52, 0.25);
-  --accent-green-bg-strong: rgba(22, 101, 52, 0.4);
-  --accent-green-border: #14532d; /* green-900 */
-  --accent-green-border-strong: #15803d; /* green-700 */
-  --accent-green-text: #86efac; /* green-300 */
-  --accent-green-text-muted: #4ade80; /* green-400 */
-
-  /* --- Accent surfaces (orange) --- */
-  --accent-orange-bg: rgba(154, 52, 18, 0.25);
-  --accent-orange-bg-strong: rgba(154, 52, 18, 0.4);
-  --accent-orange-border: #7c2d12; /* orange-900 */
-  --accent-orange-border-strong: #c2410c; /* orange-700 */
-  --accent-orange-text: #fdba74; /* orange-300 */
-  --accent-orange-text-muted: #fb923c; /* orange-400 */
-
-  /* --- Accent surfaces (yellow) --- */
-  --accent-yellow-bg: rgba(113, 63, 18, 0.25);
-  --accent-yellow-bg-strong: rgba(113, 63, 18, 0.4);
-  --accent-yellow-border: #713f12; /* yellow-900 */
-  --accent-yellow-border-strong: #a16207; /* yellow-700 */
-  --accent-yellow-text: #fde047; /* yellow-300 */
-  --accent-yellow-text-muted: #facc15; /* yellow-400 */
-
-  /* --- Accent surfaces (violet) --- */
-  --accent-violet-bg: rgba(91, 33, 182, 0.25);
-  --accent-violet-bg-strong: rgba(91, 33, 182, 0.4);
-  --accent-violet-border: #4c1d95; /* violet-900 */
-  --accent-violet-border-strong: #6d28d9; /* violet-700 */
-  --accent-violet-text: #c4b5fd; /* violet-300 */
-  --accent-violet-text-muted: #a78bfa; /* violet-400 */
-
-  /* --- Gradient endpoints (dark) --- */
-  --gradient-slate-from: #1e293b;
-  --gradient-slate-to: #334155;
-  --gradient-blue-from: rgba(30, 58, 138, 0.3);
-  --gradient-blue-to: rgba(49, 46, 129, 0.3);
-  --gradient-green-from: rgba(6, 95, 70, 0.3);
-  --gradient-green-to: rgba(6, 78, 59, 0.3);
-  --gradient-purple-from: rgba(88, 28, 135, 0.3);
-  --gradient-purple-to: rgba(131, 24, 67, 0.3);
-  --gradient-emerald-from: rgba(6, 78, 59, 0.3);
-  --gradient-emerald-to: rgba(19, 78, 74, 0.3);
-  --gradient-amber-from: rgba(120, 53, 15, 0.3);
-  --gradient-amber-to: rgba(113, 63, 18, 0.3);
-  --gradient-red-from: rgba(127, 29, 29, 0.3);
-  --gradient-red-to: rgba(131, 24, 67, 0.3);
-  --gradient-indigo-from: rgba(55, 48, 163, 0.3);
-  --gradient-indigo-to: rgba(49, 46, 129, 0.3);
-  --gradient-page-from: #0f172a;
-  --gradient-page-via: #0f172a;
-  --gradient-page-to: #0f172a;
-
-  /* --- Input-specific --- */
-  --input-bg: #1e293b; /* slate-800 */
-  --input-text: #f1f5f9; /* slate-100 */
-  --input-placeholder: #94a3b8; /* slate-400 */
-  --input-border: #475569; /* slate-600 */
-  --input-border-focus: #34d399; /* emerald-400 */
+  --bridge-verdigris-bg-strong: #263b34;
+  --bridge-blood-bg-strong: #38241e;
+  --bridge-lapis-bg-strong: #2e383f;
+  --bridge-ember-bg-strong: #3d3524;
+  --bridge-verdigris-border: #36554b;
+  --bridge-blood-border: #543029;
+  --bridge-lapis-border: #43515e;
+  --bridge-ember-border: #5c4c33;
 }
 
-[data-theme='parchment'] {
-  /* --- Font families --- */
-  --font-body-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
-  --font-display-family:
-    var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
-
-  /* --- Core backgrounds --- */
-  --background: #f4f2ed;
-  --foreground: #221f1a;
-  --surface: #f4f2ed;
-  --surface-secondary: #f4f3ef;
-  --surface-raised: #ffffff;
-  --surface-inset: #eae6dc;
-  --surface-hover: #ece8df;
-  --surface-overlay: rgba(34, 31, 26, 0.42);
-
-  /* --- Text --- */
-  --heading: #221f1a;
-  --body: #6b6459;
-  --muted: #8a8377;
-  --faint: #b0a99b;
-  --inverse: #ffffff;
-
-  /* --- Borders / Dividers --- */
-  --divider: #ebe7dd;
-  --divider-strong: #e0dbcf;
-  --ring: #2f6fd0;
-
-  /* --- Accent surfaces (emerald) --- */
-  --accent-emerald-bg: #eaf6f0;
-  --accent-emerald-bg-strong: #d5ede2;
-  --accent-emerald-border: #b9decc;
-  --accent-emerald-border-strong: #7fc4a6;
-  --accent-emerald-text: #0c6344;
-  --accent-emerald-text-muted: #12855c;
-
-  /* --- Accent surfaces (blue) --- */
-  --accent-blue-bg: #eaf1fc;
-  --accent-blue-bg-strong: #d8e6f9;
-  --accent-blue-border: #bdd4f2;
-  --accent-blue-border-strong: #8ab2e6;
-  --accent-blue-text: #245aab;
-  --accent-blue-text-muted: #2f6fd0;
-
-  /* --- Accent surfaces (amber) --- */
-  --accent-amber-bg: #fef6e0;
-  --accent-amber-bg-strong: #fbedc6;
-  --accent-amber-border: #f0dfb0;
-  --accent-amber-border-strong: #f4c430;
-  --accent-amber-text: #8f5e18;
-  --accent-amber-text-muted: #b7791f;
-
-  /* --- Accent surfaces (red) --- */
-  --accent-red-bg: #fbeae7;
-  --accent-red-bg-strong: #f7d8d2;
-  --accent-red-border: #efbcb3;
-  --accent-red-border-strong: #dd8677;
-  --accent-red-text: #9c2e22;
-  --accent-red-text-muted: #c0392b;
-
-  /* --- Accent surfaces (purple) --- */
-  --accent-purple-bg: #f1ebfa;
-  --accent-purple-bg-strong: #e5daf4;
-  --accent-purple-border: #d2bfea;
-  --accent-purple-border-strong: #b394dc;
-  --accent-purple-text: #633d99;
-  --accent-purple-text-muted: #7c4dbc;
-
-  /* --- Accent surfaces (indigo) --- */
-  --accent-indigo-bg: #eceefa;
-  --accent-indigo-bg-strong: #dce0f5;
-  --accent-indigo-border: #c2c8ec;
-  --accent-indigo-border-strong: #98a2de;
-  --accent-indigo-text: #3c4a9e;
-  --accent-indigo-text-muted: #4b5cc4;
-
-  /* --- Accent surfaces (green) --- */
-  --accent-green-bg: #ecf5ea;
-  --accent-green-bg-strong: #daecd7;
-  --accent-green-border: #bfddba;
-  --accent-green-border-strong: #8fc488;
-  --accent-green-text: #2f6b2a;
-  --accent-green-text-muted: #3d8b37;
-
-  /* --- Accent surfaces (orange) --- */
-  --accent-orange-bg: #fbefe6;
-  --accent-orange-bg-strong: #f7dfce;
-  --accent-orange-border: #efc7a9;
-  --accent-orange-border-strong: #e09b6b;
-  --accent-orange-text: #9a4419;
-  --accent-orange-text-muted: #c0561f;
-
-  /* --- Accent surfaces (yellow) --- */
-  --accent-yellow-bg: #fdf8e3;
-  --accent-yellow-bg-strong: #faf0c4;
-  --accent-yellow-border: #f1df95;
-  --accent-yellow-border-strong: #e3c64b;
-  --accent-yellow-text: #7e4d06;
-  --accent-yellow-text-muted: #a16207;
-
-  /* --- Accent surfaces (violet) --- */
-  --accent-violet-bg: #efebfa;
-  --accent-violet-bg-strong: #e1daf5;
-  --accent-violet-border: #cbbfec;
-  --accent-violet-border-strong: #a896de;
-  --accent-violet-text: #573e9e;
-  --accent-violet-text-muted: #6d4fc4;
-
-  /* --- Gradient endpoints --- */
-  --gradient-slate-from: #fcfbf8;
-  --gradient-slate-to: #f4f3ef;
-  --gradient-blue-from: #eaf1fc;
-  --gradient-blue-to: #d8e6f9;
-  --gradient-green-from: #ecf5ea;
-  --gradient-green-to: #daecd7;
-  --gradient-purple-from: #f1ebfa;
-  --gradient-purple-to: #e5daf4;
-  --gradient-emerald-from: #eaf6f0;
-  --gradient-emerald-to: #d5ede2;
-  --gradient-amber-from: #fef6e0;
-  --gradient-amber-to: #fbedc6;
-  --gradient-red-from: #fbeae7;
-  --gradient-red-to: #f7d8d2;
-  --gradient-indigo-from: #eceefa;
-  --gradient-indigo-to: #dce0f5;
-  --gradient-page-from: #f4f2ed;
-  --gradient-page-via: #faf6ec;
-  --gradient-page-to: #fef6e0;
-
-  /* --- Input-specific --- */
-  --input-bg: #fcfbf8;
-  --input-text: #221f1a;
-  --input-placeholder: #b0a99b;
-  --input-border: #e0dbcf;
-  --input-border-focus: #12855c;
+/* Type scale (Felt and Brass). Sizes only; the type-* utilities below add
+   family, line height and weight. Not under --text-*, which would clash
+   with the text-heading colour utility. */
+:root {
+  --type-title-size: 1.75rem;
+  --type-heading-size: 1.375rem;
+  --type-subheading-size: 1.125rem;
+  --type-label-heading-size: 1rem;
+  --type-body-size: 0.9375rem;
+  --type-ui-size: 0.875rem;
+  --type-small-size: 0.8125rem;
+  --type-caption-size: 0.75rem;
+  --type-num-xl-size: 2.125rem;
+  --type-num-lg-size: 1.625rem;
+  --type-num-md-size: 1.25rem;
 }
 
 /* ============================================================
@@ -445,6 +293,9 @@
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
 
+  /* Elevation: floating layers only; the design ratchet keeps it there. */
+  --shadow-overlay: var(--overlay-shadow);
+
   /* Text */
   --color-heading: var(--heading);
   --color-body: var(--body);
@@ -457,6 +308,33 @@
   --color-divider-strong: var(--divider-strong);
   --color-ring: var(--ring);
 
+  /* Roles */
+  --color-brass-text: var(--brass-text);
+  --color-brass-fill: var(--brass-fill);
+  --color-brass-border: var(--brass-border);
+  --color-brass-bg: var(--brass-bg);
+  --color-blood-text: var(--blood-text);
+  --color-blood-fill: var(--blood-fill);
+  --color-blood-border: var(--blood-border);
+  --color-blood-bg: var(--blood-bg);
+  --color-verdigris-text: var(--verdigris-text);
+  --color-verdigris-fill: var(--verdigris-fill);
+  --color-verdigris-border: var(--verdigris-border);
+  --color-verdigris-bg: var(--verdigris-bg);
+  --color-lapis-text: var(--lapis-text);
+  --color-lapis-fill: var(--lapis-fill);
+  --color-lapis-border: var(--lapis-border);
+  --color-lapis-bg: var(--lapis-bg);
+  --color-ember-text: var(--ember-text);
+  --color-ember-fill: var(--ember-fill);
+  --color-ember-border: var(--ember-border);
+  --color-ember-bg: var(--ember-bg);
+  --color-frost-text: var(--frost-text);
+  --color-frost-fill: var(--frost-fill);
+  --color-frost-border: var(--frost-border);
+  --color-frost-bg: var(--frost-bg);
+  --color-on-brass: var(--on-brass);
+  --color-on-blood: var(--on-blood);
   /* Accent emerald */
   --color-accent-emerald-bg: var(--accent-emerald-bg);
   --color-accent-emerald-bg-strong: var(--accent-emerald-bg-strong);
@@ -545,25 +423,15 @@
   --color-input-border-focus: var(--input-border-focus);
 
   /* Fonts */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-cinzel: var(--font-cinzel-decorative);
+  --font-sans: var(--font-body-family);
+  --font-heading: var(--font-heading-family);
   --font-display: var(--font-display-family);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* ============================================================
    ANIMATIONS
    ============================================================ */
-
-@keyframes condition-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 var(--accent-red-border-strong, #ef4444);
-  }
-  50% {
-    box-shadow: 0 0 8px 4px var(--accent-red-border-strong, #ef4444);
-  }
-}
 
 @keyframes popover-in {
   0% {
@@ -576,8 +444,126 @@
   }
 }
 
-@utility animate-condition-pulse {
-  animation: condition-pulse 2s ease-in-out infinite;
+/* Toast countdown: the role bar shrinks to the left over the toast's life. */
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Hides a scroll container's scrollbar but keeps it scrollable (wheel,
+   swipe, keyboard). Only for strips with their own scroll cue, such as the
+   sheet tabs' chevrons. */
+@utility scrollbar-hide {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* A thin native scrollbar; the theme's color-scheme colours it. For toolbars
+   whose scrollbar is their only scroll cue. */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+/* Type scale: one class sets family, size, line height and weight. The
+   num-* steps go through Tailwind's numeric variables, so adding
+   tabular-nums or slashed-zero next to them composes instead of fighting. */
+@utility type-title {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-title-size);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+@utility type-heading {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-heading-size);
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+@utility type-subheading {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-subheading-size);
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+@utility type-label-heading {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-label-heading-size);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+@utility type-body {
+  font-family: var(--font-body-family);
+  font-size: var(--type-body-size);
+  line-height: 1.55;
+  font-weight: 400;
+}
+
+@utility type-ui {
+  font-family: var(--font-body-family);
+  font-size: var(--type-ui-size);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+@utility type-small {
+  font-family: var(--font-body-family);
+  font-size: var(--type-small-size);
+  line-height: 1.45;
+  font-weight: 400;
+}
+
+@utility type-caption {
+  font-family: var(--font-body-family);
+  font-size: var(--type-caption-size);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+@utility type-num-xl {
+  font-family: var(--font-display-family);
+  font-size: var(--type-num-xl-size);
+  line-height: 1;
+  font-weight: 600;
+  --tw-numeric-figure: lining-nums;
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,)
+    var(--tw-numeric-figure,) var(--tw-numeric-spacing,)
+    var(--tw-numeric-fraction,);
+}
+
+@utility type-num-lg {
+  font-family: var(--font-display-family);
+  font-size: var(--type-num-lg-size);
+  line-height: 1;
+  font-weight: 600;
+  --tw-numeric-figure: lining-nums;
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,)
+    var(--tw-numeric-figure,) var(--tw-numeric-spacing,)
+    var(--tw-numeric-fraction,);
+}
+
+@utility type-num-md {
+  font-family: var(--font-display-family);
+  font-size: var(--type-num-md-size);
+  line-height: 1;
+  font-weight: 600;
+  --tw-numeric-figure: lining-nums;
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,)
+    var(--tw-numeric-figure,) var(--tw-numeric-spacing,)
+    var(--tw-numeric-fraction,);
 }
 
 /* ============================================================
@@ -603,13 +589,88 @@ button {
   select {
     color: var(--input-text);
     background-color: var(--input-bg);
-    border-radius: 0.5rem; /* rounded-lg default for all inputs */
+  }
+
+  /* Controls take the 4px radius; checkboxes, radios, sliders and pickers
+     keep their own shape. */
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='color']
+  ),
+  textarea,
+  select {
+    border-radius: 0.25rem;
   }
 
   input::placeholder,
   textarea::placeholder {
     color: var(--input-placeholder);
     opacity: 1;
+  }
+
+  /* No spin buttons on number fields: the arrows are a few pixels tall and
+     invite stray changes. Arrow keys still step. */
+  input[type='number'] {
+    appearance: textfield;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  /* Touch: a field without a size utility is at least 16px, so iOS Safari
+     doesn't zoom in on focus. 1em is the inherited size. */
+  @media (pointer: coarse) {
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='file'],
+      [type='color'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image'],
+      [type='hidden']
+    ),
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
+  }
+}
+
+/* Touch: the small text steps resolve to 16px inside text fields, so
+   text-xs, text-sm and the small type-* steps stop iOS Safari zooming on
+   focus while larger sizes (ability scores, HP) keep theirs. The variables
+   are set on the field itself, which beats the value inherited from :root
+   in any layer. */
+@media (pointer: coarse) {
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='color'],
+    [type='button'],
+    [type='submit'],
+    [type='reset'],
+    [type='image'],
+    [type='hidden']
+  ),
+  textarea,
+  select {
+    --text-xs: 1rem;
+    --text-sm: 1rem;
+    --type-body-size: 1rem;
+    --type-ui-size: 1rem;
+    --type-small-size: 1rem;
+    --type-caption-size: 1rem;
   }
 }
 
@@ -939,6 +1000,38 @@ form select {
 
 .animate-rk-otp-shake {
   animation: rk-otp-shake 420ms ease-in-out;
+}
+
+/* The large-number switch: each ability number starts from the other
+   number's place and size (--rk-swap-from, set per element) and settles in
+   its own. Transform only, so both numbers keep their own type at rest. */
+@keyframes rk-number-swap {
+  from {
+    transform: var(--rk-swap-from, none);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.animate-rk-number-swap {
+  animation: rk-number-swap 180ms ease-out;
+}
+
+/* Damage on the HUD's HP readout: a layer behind its numbers starts at
+   blood and fades out in 180ms, once per hit. The layer is 30% opaque, so
+   the peak is a blood wash over the tile (--blood-bg on its own is too
+   close to surface-raised to register in 180ms) and the numbers stay
+   readable through it. */
+@keyframes rk-hp-flash {
+  from {
+    background-color: var(--blood-fill);
+  }
+}
+
+.animate-rk-hp-flash {
+  animation: rk-hp-flash 180ms ease-out;
+  opacity: 0.3;
 }
 
 /* Respect the OS "reduce motion" setting for every CSS animation and

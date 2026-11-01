@@ -1,86 +1,51 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Currency } from '@/types/character';
-import { Coins, Plus, Minus, Info } from 'lucide-react';
+import { useId, useState } from 'react';
+import type { Currency } from '@/types/character';
 import { Button } from '@/components/ui/forms/button';
-import { Badge } from '@/components/ui/layout/badge';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Section } from '@/components/ui/layout/section';
 
-const CURRENCY_TYPES: {
-  [key in keyof Currency]: {
-    name: string;
-    abbr: string;
-    color: string;
-    boxClasses: string;
-    badgeVariant: 'secondary' | 'warning' | 'success' | 'neutral' | 'danger';
-  };
-} = {
-  platinum: {
-    name: 'Platinum',
-    abbr: 'pp',
-    color: 'text-indigo-900 dark:text-indigo-100',
-    boxClasses:
-      'border-slate-200 bg-gradient-to-b from-white to-slate-50 dark:border-slate-500 dark:from-slate-700 dark:to-slate-750',
-    badgeVariant: 'neutral',
-  },
-  gold: {
-    name: 'Gold',
-    abbr: 'gp',
-    color: 'text-amber-900 dark:text-amber-200',
-    boxClasses:
-      'border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong',
-    badgeVariant: 'warning',
-  },
-  electrum: {
-    name: 'Electrum',
-    abbr: 'ep',
-    color: 'text-emerald-900 dark:text-emerald-200',
-    boxClasses:
-      'border-accent-emerald-border from-accent-emerald-bg to-accent-emerald-bg-strong',
-    badgeVariant: 'success',
-  },
-  silver: {
-    name: 'Silver',
-    abbr: 'sp',
-    color: 'text-blue-900 dark:text-blue-100',
-    boxClasses:
-      'border-slate-200 bg-gradient-to-b from-gray-50 to-slate-100 dark:border-slate-500 dark:from-slate-600 dark:to-slate-700',
-    badgeVariant: 'secondary',
-  },
-  copper: {
-    name: 'Copper',
-    abbr: 'cp',
-    color: 'text-orange-900 dark:text-orange-200',
-    boxClasses:
-      'border-accent-orange-border from-accent-orange-bg to-accent-orange-bg-strong',
-    badgeVariant: 'danger',
-  },
-};
-
-// Currency conversion rates (all relative to copper)
-const CURRENCY_VALUES = {
-  platinum: 1000,
-  gold: 100,
-  electrum: 50,
-  silver: 10,
-  copper: 1,
-};
+const CURRENCY_TYPES: Array<{
+  type: keyof Currency;
+  name: string;
+  abbr: string;
+  copper: number;
+}> = [
+  { type: 'platinum', name: 'Platinum', abbr: 'pp', copper: 1000 },
+  { type: 'gold', name: 'Gold', abbr: 'gp', copper: 100 },
+  { type: 'electrum', name: 'Electrum', abbr: 'ep', copper: 50 },
+  { type: 'silver', name: 'Silver', abbr: 'sp', copper: 10 },
+  { type: 'copper', name: 'Copper', abbr: 'cp', copper: 1 },
+];
 
 interface CurrencyManagerProps {
   currency: Currency;
   onAddCurrency?: (type: keyof Currency, amount: number) => void;
   onSubtractCurrency?: (type: keyof Currency, amount: number) => void;
-
-  // Display options
   readonly?: boolean;
   compact?: boolean;
   hideControls?: boolean;
   hideConversionInfo?: boolean;
   showOnlyTotal?: boolean;
   hideIndividualCurrencies?: boolean;
-
   className?: string;
+}
+
+function wealthBreakdown(totalCopper: number) {
+  if (totalCopper === 0) return '0 gp';
+  const result: string[] = [];
+  let remaining = totalCopper;
+  if (remaining >= 100) {
+    result.push(`${Math.floor(remaining / 100)} gp`);
+    remaining %= 100;
+  }
+  if (remaining >= 10) {
+    result.push(`${Math.floor(remaining / 10)} sp`);
+    remaining %= 10;
+  }
+  if (remaining > 0) result.push(`${remaining} cp`);
+  return result.join(', ');
 }
 
 export function CurrencyManager({
@@ -95,300 +60,135 @@ export function CurrencyManager({
   hideIndividualCurrencies = false,
   className = '',
 }: CurrencyManagerProps) {
-  const [currencyAmounts, setCurrencyAmounts] = useState<Currency>({
+  const id = useId();
+  const [amounts, setAmounts] = useState<Currency>({
     copper: 0,
     silver: 0,
     electrum: 0,
     gold: 0,
     platinum: 0,
   });
-
-  // Calculate total wealth in copper pieces
-  const totalWealthInCopper = Object.entries(currency).reduce(
-    (total, [type, amount]) => {
-      return total + amount * CURRENCY_VALUES[type as keyof Currency];
-    },
+  const totalCopper = CURRENCY_TYPES.reduce(
+    (sum, coin) => sum + (currency[coin.type] || 0) * coin.copper,
     0
   );
-
-  // Convert total wealth to gold-based denominations
-  const getWealthBreakdown = (totalCopper: number) => {
-    if (totalCopper === 0) return 'No wealth';
-
-    const breakdown = [];
-    let remaining = totalCopper;
-
-    // Use gold as the primary denomination
-    if (remaining >= CURRENCY_VALUES.gold) {
-      const gp = Math.floor(remaining / CURRENCY_VALUES.gold);
-      breakdown.push(`${gp} gp`);
-      remaining %= CURRENCY_VALUES.gold;
-    }
-
-    if (remaining >= CURRENCY_VALUES.silver) {
-      const sp = Math.floor(remaining / CURRENCY_VALUES.silver);
-      breakdown.push(`${sp} sp`);
-      remaining %= CURRENCY_VALUES.silver;
-    }
-
-    if (remaining > 0) {
-      breakdown.push(`${remaining} cp`);
-    }
-
-    return breakdown.join(', ');
-  };
-
-  const handleCurrencyChange = (
+  const canTransact =
+    !readonly && !hideControls && !!(onAddCurrency || onSubtractCurrency);
+  const transact = (
     type: keyof Currency,
-    value: number | undefined
+    action: ((type: keyof Currency, amount: number) => void) | undefined
   ) => {
-    setCurrencyAmounts(prev => ({ ...prev, [type]: value ?? 0 }));
-  };
-
-  const addCurrencyAmount = (type: keyof Currency) => {
-    const amount = currencyAmounts[type];
-    if (amount > 0 && onAddCurrency) {
-      onAddCurrency(type, amount);
-      setCurrencyAmounts(prev => ({ ...prev, [type]: 0 }));
+    const amount = amounts[type];
+    if (amount > 0 && action) {
+      action(type, amount);
+      setAmounts(previous => ({ ...previous, [type]: 0 }));
     }
   };
-
-  const subtractCurrencyAmount = (type: keyof Currency) => {
-    const amount = currencyAmounts[type];
-    if (amount > 0 && onSubtractCurrency) {
-      onSubtractCurrency(type, amount);
-      setCurrencyAmounts(prev => ({ ...prev, [type]: 0 }));
-    }
-  };
-
-  const containerClasses = compact
-    ? `bg-surface-raised rounded-lg shadow-sm border-2 border-accent-amber-border p-4 ${className}`
-    : `bg-surface-raised rounded-lg shadow-sm border-2 border-accent-amber-border p-6 ${className}`;
 
   return (
-    <div className={containerClasses}>
-      <div className="border-accent-amber-border mb-6 flex items-center justify-between border-b-2 pb-4">
-        <h2
-          className={`text-accent-amber-text flex items-center gap-2 font-bold ${compact ? 'text-base' : 'text-xl'}`}
-        >
-          <Coins className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
-          {compact ? 'Currency' : 'Currency & Wealth'}
-        </h2>
-        <Badge variant="warning" size="md">
-          {totalWealthInCopper.toLocaleString()} cp
-        </Badge>
-      </div>
-
-      {/* Show only total wealth */}
-      {showOnlyTotal ? (
-        <div className="border-accent-amber-border-strong from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border-2 bg-gradient-to-r p-6 text-center">
-          <div
-            className={`text-accent-amber-text font-bold ${compact ? 'mb-2 text-sm' : 'mb-2 text-lg'}`}
-          >
-            Total Wealth
-          </div>
-          <div
-            className={`text-accent-amber-text font-bold ${compact ? 'text-xl' : 'text-2xl'}`}
-          >
-            {getWealthBreakdown(totalWealthInCopper)}
-          </div>
-          {!compact && (
-            <Badge variant="warning" size="md" className="mt-3">
-              {totalWealthInCopper.toLocaleString()} copper pieces
-            </Badge>
-          )}
+    <Section heading="Currency" className={className}>
+      <div className="space-y-5">
+        <div>
+          <p className="text-muted type-small">Total</p>
+          <p className="text-heading type-subheading">
+            {wealthBreakdown(totalCopper)}
+          </p>
+          <p className="text-muted type-small">
+            {totalCopper.toLocaleString()} cp
+          </p>
         </div>
-      ) : (
-        <>
-          {/* Current Currency Display */}
-          {!hideIndividualCurrencies && (
-            <div
-              className={`grid gap-4 ${compact ? 'mb-4 grid-cols-3' : 'mb-6 grid-cols-2 sm:grid-cols-5'}`}
-            >
-              {Object.entries(CURRENCY_TYPES).map(([type, config]) => (
-                <div key={type} className="text-center">
-                  <div
-                    className={`rounded-lg border-2 bg-gradient-to-b transition-all hover:shadow-md ${config.boxClasses} ${compact ? 'p-3' : 'p-4'}`}
-                  >
-                    <div
-                      className={`font-bold ${config.color} ${compact ? 'mb-1 text-2xl' : 'mb-2 text-4xl'}`}
+
+        {!showOnlyTotal && (!hideIndividualCurrencies || canTransact) && (
+          <div className="border-divider border-t">
+            {canTransact && (
+              <h3 className="text-heading type-label-heading pt-3">
+                Add or spend coins
+              </h3>
+            )}
+            {CURRENCY_TYPES.map(coin => {
+              const inputId = `${id}-${coin.type}`;
+              return (
+                <div
+                  key={coin.type}
+                  className="border-divider flex min-w-0 flex-col gap-2 border-b py-3 sm:flex-row sm:items-center sm:gap-4"
+                >
+                  <div className="flex min-w-0 items-baseline justify-between gap-4 sm:w-44 sm:shrink-0">
+                    <label
+                      htmlFor={canTransact ? inputId : undefined}
+                      className="text-heading font-medium"
                     >
-                      {currency[type as keyof Currency] || 0}
-                    </div>
-                    <Badge variant={config.badgeVariant} size="sm">
-                      {config.abbr}
-                    </Badge>
-                    {!compact && (
-                      <div className="text-muted mt-2 text-xs font-medium">
-                        {config.name}
-                      </div>
+                      {compact ? coin.abbr : coin.name}
+                    </label>
+                    {!hideIndividualCurrencies && (
+                      <span className="text-heading font-semibold tabular-nums">
+                        {currency[coin.type] || 0}{' '}
+                        <span className="text-muted font-normal">
+                          {coin.abbr}
+                        </span>
+                      </span>
                     )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Total Wealth */}
-          <div
-            className={`border-accent-amber-border-strong from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border-2 bg-gradient-to-r p-6 text-center ${compact ? 'mb-4' : 'mb-6'}`}
-          >
-            <div
-              className={`text-accent-amber-text font-bold ${compact ? 'mb-2 text-sm' : 'mb-2 text-lg'}`}
-            >
-              Total Wealth
-            </div>
-            <div
-              className={`text-accent-amber-text font-bold ${compact ? 'text-xl' : 'text-2xl'}`}
-            >
-              {getWealthBreakdown(totalWealthInCopper)}
-            </div>
-            {!compact && (
-              <Badge variant="warning" size="md" className="mt-3">
-                {totalWealthInCopper.toLocaleString()} copper pieces
-              </Badge>
-            )}
-          </div>
-
-          {/* Add/Subtract Currency */}
-          {!readonly &&
-            !hideControls &&
-            (onAddCurrency || onSubtractCurrency) && (
-              <div
-                className={`border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border-2 bg-gradient-to-r ${compact ? 'p-4' : 'p-6'}`}
-              >
-                <h3
-                  className={`text-accent-amber-text font-bold ${compact ? 'mb-4 text-sm tracking-wide uppercase' : 'border-accent-amber-border mb-4 border-b-2 pb-2 text-base tracking-wide uppercase'}`}
-                >
-                  Manage Currency
-                </h3>
-                <div
-                  className={`grid gap-4 ${compact ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-5'}`}
-                >
-                  {Object.entries(CURRENCY_TYPES).map(([type, config]) => (
-                    <div key={type} className="space-y-2">
-                      <label
-                        className={`text-accent-amber-text block font-bold ${compact ? 'text-xs' : 'text-sm'}`}
-                      >
-                        {config.name}
-                      </label>
+                  {canTransact && (
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-1">
                       <NumberInput
+                        id={inputId}
                         allowEmpty
-                        value={
-                          currencyAmounts[type as keyof Currency] || undefined
-                        }
-                        onChange={v =>
-                          handleCurrencyChange(type as keyof Currency, v)
-                        }
-                        placeholder="0"
                         min={0}
-                        className="text-center"
+                        placeholder="0"
+                        aria-label={`${coin.name} amount`}
+                        value={amounts[coin.type] || undefined}
+                        onChange={value =>
+                          setAmounts(previous => ({
+                            ...previous,
+                            [coin.type]: value ?? 0,
+                          }))
+                        }
+                        className="min-w-0 text-center"
+                        wrapperClassName="min-w-0 flex-[1_1_7rem]"
                       />
-                      <div className="flex gap-1">
-                        {onAddCurrency && (
-                          <Button
-                            onClick={() =>
-                              addCurrencyAmount(type as keyof Currency)
-                            }
-                            variant="success"
-                            size="xs"
-                            fullWidth
-                            leftIcon={<Plus size={12} />}
-                            disabled={
-                              currencyAmounts[type as keyof Currency] <= 0
-                            }
-                          >
-                            Add
-                          </Button>
-                        )}
-                        {onSubtractCurrency && (
-                          <Button
-                            onClick={() =>
-                              subtractCurrencyAmount(type as keyof Currency)
-                            }
-                            variant="danger"
-                            size="xs"
-                            fullWidth
-                            leftIcon={<Minus size={12} />}
-                            disabled={
-                              currencyAmounts[type as keyof Currency] <= 0
-                            }
-                          >
-                            Spend
-                          </Button>
-                        )}
-                      </div>
+                      {onAddCurrency && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Add ${coin.type}`}
+                          disabled={amounts[coin.type] <= 0}
+                          onClick={() => transact(coin.type, onAddCurrency)}
+                        >
+                          Add
+                        </Button>
+                      )}
+                      {onSubtractCurrency && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Spend ${coin.type}`}
+                          disabled={amounts[coin.type] <= 0}
+                          onClick={() =>
+                            transact(coin.type, onSubtractCurrency)
+                          }
+                        >
+                          Spend
+                        </Button>
+                      )}
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })}
+          </div>
+        )}
 
-          {/* Currency Conversion Helper */}
-          {!hideConversionInfo && !compact && (
-            <div className="border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong mt-6 rounded-lg border-2 bg-gradient-to-r p-5">
-              <h4 className="text-accent-amber-text border-accent-amber-border mb-3 flex items-center gap-2 border-b-2 pb-2 text-base font-bold tracking-wide uppercase">
-                <Info className="h-4 w-4" />
-                Currency Conversion
-              </h4>
-              <div className="text-accent-amber-text space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Badge variant="neutral" size="sm">
-                    1 pp
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="warning" size="sm">
-                    10 gp
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="secondary" size="sm">
-                    100 sp
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="danger" size="sm">
-                    1,000 cp
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="warning" size="sm">
-                    1 gp
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="secondary" size="sm">
-                    10 sp
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="danger" size="sm">
-                    100 cp
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="success" size="sm">
-                    1 ep
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="secondary" size="sm">
-                    5 sp
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="danger" size="sm">
-                    50 cp
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" size="sm">
-                    1 sp
-                  </Badge>
-                  <span>=</span>
-                  <Badge variant="danger" size="sm">
-                    10 cp
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
+        {!showOnlyTotal && !hideConversionInfo && !compact && (
+          <div>
+            <h3 className="text-heading type-label-heading">Conversion</h3>
+            <p className="text-muted mt-1 text-sm">
+              10 cp = 1 sp · 5 sp = 1 ep · 10 sp = 1 gp · 10 gp = 1 pp
+            </p>
+          </div>
+        )}
+      </div>
+    </Section>
   );
 }

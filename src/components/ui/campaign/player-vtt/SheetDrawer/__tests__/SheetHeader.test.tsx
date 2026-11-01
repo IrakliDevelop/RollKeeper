@@ -37,7 +37,7 @@ describe('SheetHeader', () => {
   it('toggles lock, closes, and requests rests', () => {
     const p = props();
     render(<SheetHeader {...p} />);
-    fireEvent.click(screen.getByRole('button', { name: /locked/i }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
     fireEvent.click(screen.getByRole('button', { name: /close sheet/i }));
     fireEvent.click(screen.getByRole('button', { name: /short rest/i }));
     fireEvent.click(screen.getByRole('button', { name: /long rest/i }));
@@ -45,13 +45,6 @@ describe('SheetHeader', () => {
     expect(p.onClose).toHaveBeenCalled();
     expect(p.onShortRest).toHaveBeenCalled();
     expect(p.onLongRest).toHaveBeenCalled();
-  });
-
-  it('labels the lock button Editing when unlocked', () => {
-    render(<SheetHeader {...props()} locked={false} />);
-    expect(
-      screen.getByRole('button', { name: /editing/i })
-    ).toBeInTheDocument();
   });
 
   it('pins the level badge to the portrait wrapper, which does not stretch', () => {
@@ -63,16 +56,24 @@ describe('SheetHeader', () => {
     );
   });
 
-  it('exposes the lock toggle as pressed only while editing', () => {
+  it('shows the Edit sheet switch off while locked and on while editing', () => {
     const { rerender } = render(<SheetHeader {...props()} />);
-    expect(screen.getByRole('button', { name: /locked/i })).toHaveAttribute(
-      'aria-pressed',
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
       'false'
     );
     rerender(<SheetHeader {...props()} locked={false} />);
-    expect(screen.getByRole('button', { name: /editing/i })).toHaveAttribute(
-      'aria-pressed',
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
       'true'
     );
+  });
+
+  it('has no Locked or Editing button any more', () => {
+    render(<SheetHeader {...props()} />);
+    expect(
+      screen.queryByRole('button', { name: /locked|editing/i })
+    ).toBeNull();
+    expect(screen.queryByTitle(/unlock to edit|lock the sheet/i)).toBeNull();
   });
 });

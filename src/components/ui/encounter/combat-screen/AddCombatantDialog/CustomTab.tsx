@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useId } from 'react';
 import { FilePen } from 'lucide-react';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Input } from '@/components/ui/forms/input';
 import { Button } from '@/components/ui/forms/button';
 import type { CampaignNPC, PlayerDisposition } from '@/types/encounter';
 import { SharedOptions } from './SharedOptions';
@@ -53,6 +54,7 @@ export function CustomTab({
   onEditStatBlock,
   hasStatBlockEdits,
 }: CustomTabProps) {
+  const typeLabelId = useId();
   return (
     <div className="space-y-3 pb-4">
       <div className="space-y-2">
@@ -71,55 +73,40 @@ export function CustomTab({
         />
       </div>
 
-      <div className="flex items-center gap-3 py-1" aria-hidden="true">
-        <div className="bg-divider h-px flex-1" />
-        <span className="text-faint text-[10px] font-bold tracking-wide uppercase">
-          One-off combatant
-        </span>
-        <div className="bg-divider h-px flex-1" />
-      </div>
-
-      {/* Name */}
-      <div>
-        <label className="text-body mb-1.5 block text-[11px] font-extrabold tracking-[0.06em] uppercase">
-          Name
-        </label>
-        <input
+      <div className="border-divider space-y-3 border-t pt-4">
+        <h3 className="text-heading text-sm font-medium">One-off combatant</h3>
+        <Input
           value={name}
-          onChange={e => onNameChange(e.target.value)}
+          onChange={event => onNameChange(event.target.value)}
           placeholder="e.g. Cursed Statue"
-          className="border-divider bg-surface-raised focus:border-accent-amber-border w-full rounded-[11px] border-[1.5px] px-[14px] py-3 text-sm focus:outline-none"
+          label="Name"
         />
-      </div>
-
-      {/* Type segment */}
-      <div>
-        <label className="text-body mb-1.5 block text-[11px] font-extrabold tracking-[0.06em] uppercase">
-          Type
-        </label>
-        <div className="bg-surface-secondary inline-flex rounded-[10px] p-[3px]">
-          <button
-            type="button"
-            onClick={() => onTypeChange('npc')}
-            className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold transition-colors ${
-              type === 'npc'
-                ? 'bg-surface-raised text-accent-amber-text shadow-sm'
-                : 'text-muted'
-            }`}
-          >
-            NPC
-          </button>
-          <button
-            type="button"
-            onClick={() => onTypeChange('monster')}
-            className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold transition-colors ${
-              type === 'monster'
-                ? 'bg-surface-raised text-accent-purple-text shadow-sm'
-                : 'text-muted'
-            }`}
-          >
-            Monster
-          </button>
+        <div role="group" aria-labelledby={typeLabelId} className="space-y-2">
+          <p id={typeLabelId} className="text-body text-sm font-medium">
+            Type
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              selected={type === 'npc'}
+              aria-pressed={type === 'npc'}
+              onClick={() => onTypeChange('npc')}
+            >
+              NPC
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              selected={type === 'monster'}
+              aria-pressed={type === 'monster'}
+              onClick={() => onTypeChange('monster')}
+            >
+              Monster
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -143,7 +130,7 @@ export function CustomTab({
           value={initMod === '' ? undefined : Number(initMod)}
           onChange={v => onInitModChange(v === undefined ? '' : String(v))}
           allowEmpty
-          label="Init Mod"
+          label="Initiative modifier"
         />
       </div>
 

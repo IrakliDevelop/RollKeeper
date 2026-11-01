@@ -9,11 +9,13 @@
 
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
+import * as Popover from '@radix-ui/react-popover';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { Upload, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/forms';
 import { ImageLightbox } from '@/components/ui/feedback/ImageLightbox';
 import { cn } from '@/utils/cn';
-import { MAX_AVATAR_SIZE_MB, MAX_AVATAR_SIZE_BYTES } from '@/utils/constants';
+import { MAX_AVATAR_SIZE_BYTES } from '@/utils/constants';
 
 export interface AvatarUploadProps {
   avatar?: string; // S3 URL or base64 encoded image (for backwards compatibility)
@@ -51,34 +53,30 @@ export function AvatarUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
 
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    console.log('File selected:', file);
 
     if (!file) {
-      console.log('No file selected');
       return;
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      console.log('Invalid file type:', file.type);
-      setError('Please select an image file');
+      setError("That file isn't an image. Choose a PNG, JPG or WebP.");
       return;
     }
 
     // Validate file size
     if (file.size > MAX_AVATAR_SIZE_BYTES) {
-      console.log('File too large:', file.size, 'bytes');
-      setError(`Image must be smaller than ${MAX_AVATAR_SIZE_MB}MB`);
+      setError('Up to 5 MB.');
       return;
     }
 
-    console.log('File validation passed, uploading to S3...');
     setIsLoading(true);
     setError(null);
 
@@ -100,11 +98,9 @@ export function AvatarUpload({
       }
 
       const { url } = await response.json();
-      console.log('Upload successful! URL:', url);
 
       // Delete old avatar from S3 if it exists and is an S3 URL
       if (avatar && avatar.includes('s3.amazonaws.com')) {
-        console.log('Deleting old avatar from S3...');
         await fetch(`/api/avatar/delete?url=${encodeURIComponent(avatar)}`, {
           method: 'DELETE',
         });
@@ -113,7 +109,6 @@ export function AvatarUpload({
       onAvatarChange(url);
       setIsLoading(false);
     } catch (err) {
-      console.log('Upload error:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload avatar');
       setIsLoading(false);
     }
@@ -125,14 +120,12 @@ export function AvatarUpload({
   const handleRemoveAvatar = async () => {
     // Delete from S3 if it's an S3 URL
     if (avatar && avatar.includes('s3.amazonaws.com')) {
-      console.log('Deleting avatar from S3...');
       try {
         await fetch(`/api/avatar/delete?url=${encodeURIComponent(avatar)}`, {
           method: 'DELETE',
         });
-        console.log('Avatar deleted from S3');
-      } catch (err) {
-        console.log('Failed to delete from S3:', err);
+      } catch {
+        // Local removal is still available when remote deletion fails.
       }
     }
 
@@ -144,102 +137,116 @@ export function AvatarUpload({
     fileInputRef.current?.click();
   };
 
+  const portrait = (
+    <button
+      type="button"
+      className={cn(
+        'border-divider bg-surface-inset relative overflow-hidden rounded-md border-2',
+        sizeClasses[size],
+        avatar && 'hover:border-input-border cursor-pointer transition-colors',
+        isLoading && 'opacity-50'
+      )}
+      onClick={event => {
+        event.stopPropagation();
+        if (editable) setMenuOpen(!menuOpen);
+        else if (avatar) setShowFullImage(true);
+      }}
+      aria-label={
+        editable
+          ? avatar
+            ? `Change ${characterName} avatar`
+            : `Upload ${characterName} avatar`
+          : avatar
+            ? `View ${characterName} image full size`
+            : `${characterName} has no avatar`
+      }
+      disabled={!editable && !avatar}
+    >
+      {avatar ? (
+        <Image
+          src={avatar}
+          alt={`${characterName} avatar`}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <User size={iconSizeClasses[size]} className="text-muted" />
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="bg-surface-overlay absolute inset-0 flex items-center justify-center">
+          <div className="border-heading h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" />
+        </div>
+      )}
+    </button>
+  );
   return (
     <div className={cn('flex flex-col items-center gap-3', className)}>
       <div className="relative">
-        {/* Avatar Display */}
-        <button
-          type="button"
-          className={cn(
-            'border-border-secondary from-surface-secondary to-surface-inset relative overflow-hidden rounded-full border-2 bg-gradient-to-br',
-            sizeClasses[size],
-            avatar &&
-              'hover:border-accent-blue-border-strong cursor-pointer transition-colors',
-            isLoading && 'opacity-50'
-          )}
-          onClick={event => {
-            event.stopPropagation();
-            if (editable) handleUploadClick();
-            else if (avatar) setShowFullImage(true);
-          }}
-          aria-label={
-            editable
-              ? avatar
-                ? `Change ${characterName} avatar`
-                : `Upload ${characterName} avatar`
-              : avatar
-                ? `View ${characterName} image full size`
-                : `${characterName} has no avatar`
-          }
-          disabled={!editable && !avatar}
-        >
-          {avatar ? (
-            <Image
-              src={avatar}
-              alt={`${characterName} avatar`}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
+        <Popover.Root open={editable && menuOpen} onOpenChange={setMenuOpen}>
+          {editable ? (
+            <Popover.Trigger asChild>{portrait}</Popover.Trigger>
           ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <User size={iconSizeClasses[size]} className="text-muted" />
-            </div>
+            portrait
           )}
-
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
-            </div>
+          {editable && (
+            <Popover.Portal>
+              <Popover.Content
+                aria-label={avatar ? 'Change avatar' : 'Upload avatar'}
+                sideOffset={8}
+                className={`${OVERLAY_SURFACE} z-50 max-w-[calc(100vw-1rem)] p-3`}
+              >
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUploadClick}
+                    disabled={isLoading}
+                    leftIcon={<Upload size={14} aria-hidden />}
+                  >
+                    {avatar ? 'Change avatar' : 'Upload avatar'}
+                  </Button>
+                  {avatar && (
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      aria-label="Remove avatar"
+                      disabled={isLoading}
+                      onClick={() => {
+                        void handleRemoveAvatar();
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <X size={16} aria-hidden />
+                    </Button>
+                  )}
+                </div>
+                {!error && (
+                  <p className="type-small text-muted mt-2">Up to 5 MB.</p>
+                )}
+                {error && (
+                  <p role="alert" className="type-small text-blood-text mt-2">
+                    {error}
+                  </p>
+                )}
+              </Popover.Content>
+            </Popover.Portal>
           )}
-        </button>
-
-        {/* Remove Button (only show if avatar exists and is editable) */}
-        {avatar && editable && !isLoading && (
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              handleRemoveAvatar();
-            }}
-            className="absolute -top-1 -right-1 rounded-full bg-red-500 p-1 text-white shadow-lg transition-colors hover:bg-red-600"
-            title="Remove avatar"
-          >
-            <X size={16} />
-          </button>
-        )}
+        </Popover.Root>
       </div>
-
-      {/* Upload Button (only show if editable) */}
       {editable && (
-        <>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleUploadClick}
-            disabled={isLoading}
-            leftIcon={<Upload size={14} />}
-          >
-            {avatar ? 'Change Avatar' : 'Upload Avatar'}
-          </Button>
-        </>
-      )}
-
-      {/* Error Message */}
-      {error && <p className="text-xs text-red-600">{error}</p>}
-
-      {/* Helper Text */}
-      {editable && !error && (
-        <p className="text-muted text-center text-xs">
-          Max {MAX_AVATAR_SIZE_MB}MB • Uploaded to cloud storage
-        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
       )}
 
       {showFullImage && avatar && (

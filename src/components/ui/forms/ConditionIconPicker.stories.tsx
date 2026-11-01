@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { ConditionIconPicker } from './ConditionIconPicker';
 import type { ConditionIconName } from '@/utils/conditionIconRegistry';
 
@@ -23,8 +25,87 @@ const meta: Meta<typeof PickerDemo> = {
 export default meta;
 type Story = StoryObj<typeof PickerDemo>;
 
-export const Light: Story = {};
+/** The grid fits the popover: no sideways scrolling, no overlapping cells. */
+async function expectGridFits(grid: HTMLElement, minCell: number) {
+  await expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth);
+  const cells = within(grid).getAllByRole('button');
+  const [first, second] = cells.map(cell => cell.getBoundingClientRect());
+  await expect(first.width).toBeGreaterThanOrEqual(minCell);
+  await expect(second.left).toBeGreaterThanOrEqual(first.right);
+}
+
+/**
+ * The keyboard focus ring sits inside the cell: the grid clips anything
+ * outside it, which cut the ring off on edge cells.
+ */
+async function expectFocusRingInside(cell: HTMLElement) {
+  await expect(cell).toHaveFocus();
+  await expect(cell.matches(':focus-visible')).toBe(true);
+  const style = getComputedStyle(cell);
+  await expect(style.outlineStyle).toBe('solid');
+  await expect(
+    parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth)
+  ).toBeLessThanOrEqual(0);
+}
+
+/** Tab in from the search field so the browser treats focus as keyboard focus. */
+async function tabToFirstCell(grid: HTMLElement) {
+  const first = within(grid).getAllByRole('button')[0];
+  for (let i = 0; i < 10 && document.activeElement !== first; i++) {
+    await userEvent.tab();
+  }
+  return first;
+}
+
+/**
+ * The selected cell has a 1px brass border of its own: the ring must start
+ * past it, with a gap, instead of drawing on top of it.
+ */
+async function expectGapInsideSelectedBorder(grid: HTMLElement) {
+  const selected = within(grid).getByRole('button', { pressed: true });
+  selected.focus();
+  await expectFocusRingInside(selected);
+  const style = getComputedStyle(selected);
+  await expect(parseFloat(style.borderTopWidth)).toBeGreaterThan(0);
+  await expect(parseFloat(style.outlineOffset)).toBeLessThan(
+    -(parseFloat(style.borderTopWidth) + parseFloat(style.outlineWidth))
+  );
+}
+
+async function checkGrid(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  const page = within(document.body);
+  await userEvent.click(canvas.getByRole('button', { name: /Condition icon/ }));
+  const grid = await page.findByRole('group', { name: 'Icons' });
+  await expectGridFits(grid, 36);
+  await expectFocusRingInside(await tabToFirstCell(grid));
+  await expectGapInsideSelectedBorder(grid);
+
+  // A classic scrollbar (Windows, Linux) takes about 15px from the grid.
+  // Storybook's headless browser hides scrollbars, so take the width away.
+  grid.style.width = `${grid.clientWidth - 15}px`;
+  try {
+    await expectGridFits(grid, 36);
+  } finally {
+    grid.style.width = '';
+  }
+
+  const restore = emulateCoarsePointer();
+  try {
+    await expectGridFits(grid, 44);
+  } finally {
+    restore();
+  }
+
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() => expect(page.queryByRole('group')).toBeNull());
+}
+
+export const Light: Story = {
+  play: ({ canvasElement }) => checkGrid(canvasElement),
+};
 
 export const Dark: Story = {
   globals: { theme: 'dark' },
+  play: ({ canvasElement }) => checkGrid(canvasElement),
 };

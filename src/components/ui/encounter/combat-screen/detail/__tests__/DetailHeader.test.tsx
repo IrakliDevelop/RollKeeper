@@ -49,23 +49,20 @@ function makeActions(overrides: Partial<EntityActions> = {}): EntityActions {
 
 afterEach(() => cleanup());
 
-describe('DetailHeader library hint chip', () => {
-  it('shows the Library chip for a library-linked NPC', () => {
+describe('DetailHeader library status', () => {
+  it('shows the sync explanation for a library-linked NPC', () => {
     render(
       <DetailHeader
         entity={makeEntity({ type: 'npc', npcSourceId: 'npc-1' })}
         actions={makeActions({ onViewNPC: vi.fn() })}
       />
     );
-    const chip = screen.getByTitle('Stat edits sync to the NPC library record');
-    expect(chip).toBeInTheDocument();
-    expect(chip).toHaveTextContent(
-      'Library: stat edits sync to the NPC library record'
-    );
-    expect(chip).not.toHaveAttribute('aria-label');
+    expect(
+      screen.getByText('Stat edits sync to the NPC library record')
+    ).toBeVisible();
   });
 
-  it('does not show the Library chip for a bestiary monster with no npcSourceId', () => {
+  it('does not show the sync explanation for a bestiary monster with no npcSourceId', () => {
     render(
       <DetailHeader
         entity={makeEntity({ type: 'monster' })}
@@ -73,11 +70,11 @@ describe('DetailHeader library hint chip', () => {
       />
     );
     expect(
-      screen.queryByTitle('Stat edits sync to the NPC library record')
+      screen.queryByText('Stat edits sync to the NPC library record')
     ).not.toBeInTheDocument();
   });
 
-  it('does not show the Library chip for a player, even with npcSourceId set', () => {
+  it('does not show the sync explanation for a player, even with npcSourceId set', () => {
     render(
       <DetailHeader
         entity={makeEntity({ type: 'player', npcSourceId: 'npc-1' })}
@@ -85,7 +82,7 @@ describe('DetailHeader library hint chip', () => {
       />
     );
     expect(
-      screen.queryByTitle('Stat edits sync to the NPC library record')
+      screen.queryByText('Stat edits sync to the NPC library record')
     ).not.toBeInTheDocument();
   });
 });

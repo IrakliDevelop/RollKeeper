@@ -140,7 +140,7 @@ describe('EventDialog marker section', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Dot' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ color: '#3b82f6', emoji: undefined })
     );
@@ -156,7 +156,7 @@ describe('EventDialog marker section', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Emoji' }));
-    const save = screen.getByRole('button', { name: 'Save Changes' });
+    const save = screen.getByRole('button', { name: 'Save changes' });
     expect(save).toBeDisabled();
 
     // switching back to Dot re-enables Save

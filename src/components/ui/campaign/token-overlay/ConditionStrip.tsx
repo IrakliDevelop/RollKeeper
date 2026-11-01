@@ -29,6 +29,9 @@ export function ConditionStrip({
   onInspect,
 }: ConditionStripProps) {
   const inset = Math.max(2, 0.05 * cell);
+  // The icon Buttons are sized in camera-scaled world px. Their className adds
+  // pointer-coarse:min-h-0/min-w-0 so the Button's 44px touch minimum doesn't
+  // inflate them on touch; ChipRow has the full-size "View conditions" target.
   const size = 0.26 * cell;
   const gap = 0.03 * cell;
   const available = Math.max(size, rect.w - 2 * inset);
@@ -68,7 +71,7 @@ export function ConditionStrip({
                 aria-haspopup="dialog"
                 onPointerDown={event => event.stopPropagation()}
                 onClick={onInspect}
-                className="bg-surface-raised/90 border-divider text-body pointer-events-auto relative shrink-0 rounded-full border p-0"
+                className="bg-surface-raised/90 border-divider text-body pointer-events-auto relative shrink-0 rounded-full border p-0 pointer-coarse:min-h-0 pointer-coarse:min-w-0"
                 style={{ width: size, height: size }}
               >
                 <Icon style={{ width: size * 0.7, height: size * 0.7 }} />
@@ -96,7 +99,7 @@ export function ConditionStrip({
             aria-haspopup="dialog"
             onPointerDown={event => event.stopPropagation()}
             onClick={onInspect}
-            className="bg-surface-raised/90 border-divider text-body pointer-events-auto shrink-0 rounded-full border p-0 font-semibold"
+            className="bg-surface-raised/90 border-divider text-body pointer-events-auto shrink-0 rounded-full border p-0 font-semibold pointer-coarse:min-h-0 pointer-coarse:min-w-0"
             style={{
               height: size,
               width: size,

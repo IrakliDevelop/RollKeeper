@@ -192,7 +192,7 @@ export function NPCSpellListEditor({
             <DialogTitle>Add Spell</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+            <div>
               <SpellAutocomplete
                 spells={dbSpells}
                 onSelect={handleAddFromDb}

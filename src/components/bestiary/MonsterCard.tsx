@@ -16,7 +16,7 @@ export default function MonsterCard({ monster, onClick }: MonsterCardProps) {
       padding="md"
       interactive
       onClick={onClick}
-      className="flex h-full flex-col justify-between transition-all hover:shadow-md"
+      className="flex h-full flex-col justify-between"
     >
       <CardContent className="p-0">
         <div className="mb-3 flex items-start justify-between gap-2">

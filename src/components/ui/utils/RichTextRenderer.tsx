@@ -34,8 +34,7 @@ export default function RichTextRenderer({
       <style jsx global>{`
         .rich-text-renderer .rich-text-content {
           color: var(--body);
-          font-family:
-            -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: var(--font-body-family);
           line-height: 1.7;
         }
 

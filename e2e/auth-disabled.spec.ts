@@ -21,7 +21,7 @@ test('disabled auth makes zero Supabase calls and leaves local routes available'
   ).toBeVisible();
   await page.goto('/player');
   await expect(
-    page.getByRole('heading', { name: 'Player Dashboard' })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
 
   expect(supabaseRequests).toEqual([]);

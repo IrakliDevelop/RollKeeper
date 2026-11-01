@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { Button } from '@/components/ui/forms/button';
 
 interface DamageControlsProps {
   entityId: string;
@@ -54,51 +55,61 @@ export function DamageControls({
         placeholder="Amount"
         aria-label="Amount"
         min={0}
-        className="bg-surface-raised text-body placeholder:text-faint w-24 rounded-lg px-2.5 py-1.5 text-sm shadow-sm"
+        className="bg-surface border-divider text-body w-24 rounded-sm border px-2.5 py-1.5 text-base pointer-coarse:min-h-11"
       />
       <div className="flex gap-1">
-        <button
+        <Button
+          type="button"
+          variant="secondary"
+          size="xs"
           onClick={() => {
             if (amount != null && amount > 0) setAmount(Math.floor(amount / 2));
           }}
-          className="bg-surface-raised text-muted hover:text-heading rounded-md px-2.5 py-1.5 text-xs font-bold shadow-sm transition-colors"
-          title="Half damage (resistance)"
         >
-          ½×
-        </button>
-        <button
+          ½× <span className="sr-only">Halve damage (resistance)</span>
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="xs"
           onClick={() => {
             if (amount != null && amount > 0) setAmount(amount * 2);
           }}
-          className="bg-surface-raised text-muted hover:text-heading rounded-md px-2.5 py-1.5 text-xs font-bold shadow-sm transition-colors"
-          title="Double damage (vulnerability)"
         >
-          2×
-        </button>
+          2× <span className="sr-only">Double damage (vulnerability)</span>
+        </Button>
       </div>
-      <button
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
         onClick={handleDamage}
         disabled={!valid}
-        className="bg-accent-red-bg text-accent-red-text hover:bg-accent-red-bg-strong rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+        className="text-blood-text"
       >
         <Minus size={11} className="mr-1 inline" aria-hidden />
         Damage
-      </button>
-      <button
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
         onClick={handleHeal}
         disabled={!valid}
-        className="bg-accent-emerald-bg text-accent-emerald-text hover:bg-accent-emerald-bg-strong rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+        className="text-verdigris-text"
       >
         <Plus size={11} className="mr-1 inline" aria-hidden />
         Heal
-      </button>
-      <button
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
         onClick={handleTemp}
         disabled={!valid}
-        className="border-divider bg-surface-raised text-body rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
       >
-        + Temp
-      </button>
+        Add temp HP
+      </Button>
     </div>
   );
 }

@@ -181,7 +181,7 @@ describe('characterStore — extended features', () => {
     updated.forEach(f => expect(f.usedUses).toBe(0));
   });
 
-  it('reorderExtendedFeatures (no sourceType) reorders all features', () => {
+  it('reorderExtendedFeatures resolves feature IDs against the current order', () => {
     useCharacterStore
       .getState()
       .addExtendedFeature({ ...baseFeature, name: 'Feature A' });
@@ -191,15 +191,16 @@ describe('characterStore — extended features', () => {
     useCharacterStore
       .getState()
       .addExtendedFeature({ ...baseFeature, name: 'Feature C' });
-    // Move index 0 to index 2
-    useCharacterStore.getState().reorderExtendedFeatures(0, 2);
+    const [first, , last] =
+      useCharacterStore.getState().character.extendedFeatures;
+    useCharacterStore.getState().reorderExtendedFeatures(first.id, last.id);
     const { extendedFeatures } = useCharacterStore.getState().character;
     expect(extendedFeatures[0].name).toBe('Feature B');
     expect(extendedFeatures[1].name).toBe('Feature C');
     expect(extendedFeatures[2].name).toBe('Feature A');
   });
 
-  it('reorderExtendedFeatures (with sourceType) reorders within source type only', () => {
+  it('reorderExtendedFeatures keeps untouched mixed-source features in order', () => {
     useCharacterStore.getState().addExtendedFeature({
       ...baseFeature,
       name: 'Class A',
@@ -215,15 +216,28 @@ describe('characterStore — extended features', () => {
       name: 'Feat A',
       sourceType: 'feat' as const,
     });
-    useCharacterStore.getState().reorderExtendedFeatures(0, 1, 'class');
+    const [first, second, third] =
+      useCharacterStore.getState().character.extendedFeatures;
+    useCharacterStore.getState().reorderExtendedFeatures(third.id, first.id);
     const { extendedFeatures } = useCharacterStore.getState().character;
-    const classFeatures = extendedFeatures.filter(
-      f => f.sourceType === 'class'
-    );
-    expect(classFeatures[0].name).toBe('Class B');
-    expect(classFeatures[1].name).toBe('Class A');
-    // Feat feature should still be present
-    expect(extendedFeatures.find(f => f.name === 'Feat A')).toBeTruthy();
+    expect(extendedFeatures.map(f => f.id)).toEqual([
+      third.id,
+      first.id,
+      second.id,
+    ]);
+    expect(extendedFeatures.map(f => f.displayOrder)).toEqual([0, 1, 2]);
+  });
+
+  it('reorderExtendedFeatures ignores stale or identical IDs without a state change', () => {
+    useCharacterStore.getState().addExtendedFeature(baseFeature);
+    useCharacterStore.getState().addExtendedFeature(longRestFeature);
+    const [first, second] =
+      useCharacterStore.getState().character.extendedFeatures;
+    const before = useCharacterStore.getState().character;
+    useCharacterStore.getState().reorderExtendedFeatures('missing', second.id);
+    expect(useCharacterStore.getState().character).toBe(before);
+    useCharacterStore.getState().reorderExtendedFeatures(first.id, first.id);
+    expect(useCharacterStore.getState().character).toBe(before);
   });
 
   it('toggleFavoriteFeature adds id to favoriteFeatureIds', () => {

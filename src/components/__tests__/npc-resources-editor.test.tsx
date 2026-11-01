@@ -51,7 +51,7 @@ function Harness({
 describe('NpcResourcesEditor', () => {
   it('renders with an empty resource list', () => {
     render(<Harness initial={[]} />);
-    expect(screen.getByText('Class Resources')).toBeInTheDocument();
+    expect(screen.getByText('Class resources')).toBeInTheDocument();
     expect(screen.getByText(/No class resources/)).toBeInTheDocument();
   });
 
@@ -138,5 +138,15 @@ describe('NpcResourcesEditor', () => {
     render(<Harness initial={[draft()]} onDeleteResource={onDelete} />);
     screen.getByRole('button', { name: 'Delete resource Wild Shape' }).click();
     expect(onDelete).toHaveBeenCalledWith('res-1');
+  });
+
+  it('keeps compact fields labelled and hides the dormant color picker', () => {
+    render(<Harness initial={[draft()]} />);
+    expect(screen.getByText('Resource name')).toBeVisible();
+    expect(screen.getByText('Max uses')).toBeVisible();
+    expect(screen.queryByText('Color')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete resource Wild Shape' })
+    ).toHaveClass('pointer-coarse:min-h-11');
   });
 });

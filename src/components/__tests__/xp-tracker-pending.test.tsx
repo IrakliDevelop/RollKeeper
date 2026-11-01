@@ -28,7 +28,7 @@ describe('XPTracker pending level-up', () => {
         onSetXP={mockHandlers.onSetXP}
       />
     );
-    expect(screen.getByText(/level up available/i)).toBeTruthy();
+    expect(screen.getByText(/Enough XP for level/i)).toBeTruthy();
   });
 
   it('hides the badge when hideLevelUpAlert is set', () => {
@@ -42,7 +42,7 @@ describe('XPTracker pending level-up', () => {
         onSetXP={mockHandlers.onSetXP}
       />
     );
-    expect(screen.queryByText(/level up available/i)).toBeNull();
+    expect(screen.queryByText(/Enough XP for level/i)).toBeNull();
   });
 
   it('shows no badge when not pending', () => {
@@ -54,7 +54,7 @@ describe('XPTracker pending level-up', () => {
         onSetXP={mockHandlers.onSetXP}
       />
     );
-    expect(screen.queryByText(/level up available/i)).toBeNull();
+    expect(screen.queryByText(/Enough XP for level/i)).toBeNull();
   });
 
   it('replaces the to-next-level figure with a pending label while pending', () => {
@@ -68,7 +68,7 @@ describe('XPTracker pending level-up', () => {
         hideThresholds
       />
     );
-    const pendingLabels = screen.getAllByText(/level-up pending/i);
+    const pendingLabels = screen.getAllByText(/Enough XP for level/i);
     expect(pendingLabels.length).toBeGreaterThan(0);
     // Verify that the numeric "0 XP" to-next-level figure is suppressed
     expect(screen.queryByText(/0 XP/)).toBeNull();

@@ -38,8 +38,8 @@ export function DataSafetyBanner({ onExport }: DataSafetyBannerProps) {
   };
 
   return (
-    <div className="border-accent-amber-border bg-accent-amber-bg mb-6 flex items-start gap-3 rounded-lg border p-4">
-      <AlertTriangle className="text-accent-amber-text mt-0.5 h-5 w-5 shrink-0" />
+    <div className="border-ember-border bg-ember-bg mb-6 flex flex-wrap items-start gap-3 rounded-lg border p-4">
+      <AlertTriangle className="text-ember-text mt-0.5 h-5 w-5 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="text-heading text-sm font-medium">
           Your characters are saved only in this browser
@@ -50,12 +50,12 @@ export function DataSafetyBanner({ onExport }: DataSafetyBannerProps) {
         </p>
       </div>
       <Button
-        variant="warning"
+        variant="secondary"
         size="sm"
         leftIcon={<Download size={16} />}
         onClick={onExport}
       >
-        Export All
+        Export all
       </Button>
       <Button
         variant="ghost"

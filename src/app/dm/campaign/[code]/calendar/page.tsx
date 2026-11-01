@@ -101,7 +101,11 @@ export default function CalendarPage() {
                 >
                   Cancel
                 </Button>
-                <Button variant="danger" size="sm" onClick={handleConfirmReset}>
+                <Button
+                  variant="danger-solid"
+                  size="sm"
+                  onClick={handleConfirmReset}
+                >
                   Reset Calendar
                 </Button>
               </div>

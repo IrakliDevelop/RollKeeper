@@ -35,7 +35,7 @@ test('untouched profile keeps byte-compatible localStorage behavior and makes ze
   const page = await context.newPage();
   await page.goto('/player');
   await expect(
-    page.getByRole('heading', { name: /your characters/i })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
   expect(
     await page.evaluate(() => localStorage.getItem('rollkeeper-player-data'))
@@ -51,7 +51,7 @@ test('untouched profile keeps byte-compatible localStorage behavior and makes ze
   });
   await page.reload();
   await expect(
-    page.getByRole('heading', { name: /your characters/i })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
   expect(await databaseNames(page)).not.toContain('rollkeeper-local');
   expect(
@@ -73,30 +73,40 @@ test.describe('explicitly selected profile', () => {
       .click();
     await expect(page.getByText(/2 entries/i)).toBeVisible();
 
-    page.once('dialog', dialog => dialog.accept());
     const downloadPromise = page.waitForEvent('download');
     const selectionReload = page.waitForEvent('domcontentloaded');
     await page
       .getByRole('button', { name: /download recovery and select migration/i })
+      .click();
+    await page
+      .getByRole('dialog', {
+        name: 'Prepare this browser for the new storage?',
+      })
+      .getByRole('button', { name: 'Prepare browser' })
       .click();
     const download = await downloadPromise;
     await selectionReload;
     expect(download.suggestedFilename()).toMatch(/^rollkeeper-browser-backup_/);
 
     await expect(
-      page.getByRole('heading', { name: /your characters/i }).first()
+      page.getByRole('heading', { name: 'Characters', exact: true }).first()
     ).toBeVisible();
     await expect(
       page.getByRole('button', { name: /confirm indexeddb cutover/i })
     ).toBeVisible({ timeout: 30_000 });
-    page.once('dialog', dialog => dialog.accept());
     const activationReload = page.waitForEvent('domcontentloaded');
     await page
       .getByRole('button', { name: /confirm indexeddb cutover/i })
       .click();
+    await page
+      .getByRole('dialog', {
+        name: 'Switch character storage on this browser?',
+      })
+      .getByRole('button', { name: 'Switch storage' })
+      .click();
     await activationReload;
     await expect(
-      page.getByRole('heading', { name: /your characters/i }).first()
+      page.getByRole('heading', { name: 'Characters', exact: true }).first()
     ).toBeVisible();
 
     const createdId = await page.evaluate(() =>
@@ -142,7 +152,7 @@ test.describe('explicitly selected profile', () => {
     }, createdId);
     await page.reload();
     await expect(
-      page.getByRole('heading', { name: /your characters/i }).first()
+      page.getByRole('heading', { name: 'Characters', exact: true }).first()
     ).toBeVisible();
     const hydrationEvidence = await page.evaluate(async () => ({
       names: window
@@ -261,11 +271,16 @@ test.describe('explicitly selected profile', () => {
     await page
       .getByRole('button', { name: /preview character migration/i })
       .click();
-    page.once('dialog', dialog => dialog.accept());
     const downloadPromise = page.waitForEvent('download');
     const selectionReload = page.waitForEvent('domcontentloaded');
     await page
       .getByRole('button', { name: /download recovery and select migration/i })
+      .click();
+    await page
+      .getByRole('dialog', {
+        name: 'Prepare this browser for the new storage?',
+      })
+      .getByRole('button', { name: 'Prepare browser' })
       .click();
     await downloadPromise;
     await selectionReload;

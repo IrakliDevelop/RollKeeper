@@ -5,7 +5,7 @@ import {
   getBuffSpeedBonus,
 } from '@/utils/calculations';
 import { characterSubtitle } from '@/utils/characterSummary';
-import { hpStateLabel } from '@/utils/hpState';
+import { HP_STATUS_LABELS, hpStateLabel } from '@/utils/hpState';
 
 /**
  * Read-only "limited view" of a party member's sheet, shown to other party
@@ -57,10 +57,12 @@ export function buildPartyPublicSheet(
   const hp = c.hitPoints;
   // A band is meaningless without a positive max (missing/zero-max HP on
   // malformed or not-yet-initialized persisted data) — show nothing rather
-  // than a misleading "Down".
+  // than a misleading "Down". At 0 HP the member is down, not "Critical".
   const hpState =
     hp && hp.max > 0
-      ? hpStateLabel(hp.current ?? 0, hp.max, DEFAULT_HP_STATE_BANDS)
+      ? (hp.current ?? 0) <= 0
+        ? HP_STATUS_LABELS.down
+        : hpStateLabel(hp.current ?? 0, hp.max, DEFAULT_HP_STATE_BANDS)
       : '';
 
   return {

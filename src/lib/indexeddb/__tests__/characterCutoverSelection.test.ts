@@ -134,6 +134,22 @@ describe('character cutover opt-in', () => {
     vi.unstubAllGlobals();
   });
 
+  it('is not a browser participant when reading localStorage throws', () => {
+    vi.stubEnv('NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED', 'true');
+    const original = Object.getOwnPropertyDescriptor(window, 'localStorage')!;
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('sandboxed', 'SecurityError');
+      },
+    });
+    try {
+      expect(isBrowserCharacterCutoverParticipant()).toBe(false);
+    } finally {
+      Object.defineProperty(window, 'localStorage', original);
+    }
+  });
+
   it('writes a recovered marker from evidence and refuses backup authorization or mismatched continuation', () => {
     const values = new Map<string, string>();
     const storage = {

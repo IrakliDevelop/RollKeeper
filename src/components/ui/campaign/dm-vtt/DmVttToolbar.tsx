@@ -216,7 +216,8 @@ export function DmVttToolbar({
         </div>
         <div className="border-divider flex shrink-0 items-center gap-1 border-l pl-3">
           <Button
-            variant={hiddenPlacementActive ? 'warning' : 'ghost'}
+            variant="ghost"
+            selected={hiddenPlacementActive}
             onClick={onToggleHiddenPlacement}
             className="min-h-[44px] px-2"
             title={
@@ -252,7 +253,8 @@ export function DmVttToolbar({
           {selectedElementId && (
             <Button
               data-testid="dm-vtt-dm-only-toggle"
-              variant={selectedElementIsDmOnly ? 'warning' : 'ghost'}
+              variant="ghost"
+              selected={selectedElementIsDmOnly}
               onClick={onToggleSelectedDmOnly}
               className="min-h-[44px] px-2"
               // A marker's audience moves every sibling pin sharing its ref,

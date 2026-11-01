@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ProcessedItem, ProcessedMagicItem } from '@/types/items';
-import { Search, X, Loader2, Package } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import {
   AppIcon,
@@ -54,27 +55,16 @@ function magicItemToProcessed(mi: ProcessedMagicItem): ProcessedItem {
   };
 }
 
-const CATEGORY_VARIANTS: Record<
-  string,
-  'primary' | 'info' | 'success' | 'warning' | 'secondary'
-> = {
-  weapon: 'danger' as 'primary',
-  armor: 'info',
-  tool: 'success',
-  misc: 'secondary',
-  magic: 'warning',
-  consumable: 'success',
-};
-
 export function ItemAutocomplete({
   items,
   magicItems,
   onSelect,
   loading = false,
   disabled = false,
-  placeholder = 'Search D&D items database...',
+  placeholder = 'Search items',
   className = '',
 }: ItemAutocompleteProps) {
+  const searchId = React.useId();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -192,19 +182,16 @@ export function ItemAutocomplete({
   };
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative min-w-0 ${className}`}>
       <div className="mb-2 flex items-center gap-2">
-        <Package className="text-accent-purple-text-muted h-5 w-5" />
-        <h4 className="text-body text-sm font-semibold">
-          Search Item Database
-        </h4>
-        {loading && (
-          <Loader2 className="text-accent-purple-text-muted h-4 w-4 animate-spin" />
-        )}
+        <label htmlFor={searchId} className="text-body text-sm font-semibold">
+          Search items
+        </label>
+        {loading && <Loader2 className="text-muted h-4 w-4 animate-spin" />}
       </div>
 
       {selectedItem && (
-        <div className="border-accent-purple-border-strong bg-accent-purple-bg mb-2 flex items-center justify-between rounded-lg border-2 px-3 py-2">
+        <div className="border-divider mb-2 flex min-w-0 items-center justify-between border-b px-3 py-2">
           <div className="flex items-center gap-2">
             <AppIcon
               name={getIconName(
@@ -220,7 +207,7 @@ export function ItemAutocomplete({
                 {selectedItem.category.charAt(0).toUpperCase() +
                   selectedItem.category.slice(1)}
                 {selectedItem.weight !== undefined &&
-                  ` • ${selectedItem.weight} lbs`}
+                  ` • ${selectedItem.weight} lb`}
                 {selectedItem.value !== undefined &&
                   ` • ${formatCurrencyFromCopper(selectedItem.value)}`}
               </p>
@@ -228,7 +215,8 @@ export function ItemAutocomplete({
           </div>
           <button
             onClick={handleClear}
-            className="text-accent-purple-text-muted hover:bg-accent-purple-bg-strong hover:text-accent-purple-text rounded p-1"
+            aria-label="Clear selected item"
+            className="text-muted hover:bg-surface-hover hover:text-body inline-flex min-h-6 min-w-6 items-center justify-center rounded-sm pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             type="button"
           >
             <X className="h-4 w-4" />
@@ -241,6 +229,7 @@ export function ItemAutocomplete({
           <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <input
             ref={inputRef}
+            id={searchId}
             type="text"
             value={query}
             onChange={handleInputChange}
@@ -248,12 +237,13 @@ export function ItemAutocomplete({
             onFocus={() => query && setIsOpen(true)}
             placeholder={placeholder}
             disabled={disabled || loading}
-            className="border-divider-strong text-heading focus:border-accent-purple-border-strong focus:ring-accent-purple-bg/20 disabled:bg-surface-inset w-full rounded-lg border py-2 pr-10 pl-10 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
+            className="border-divider text-heading disabled:bg-surface-inset focus-visible:outline-ring w-full min-w-0 rounded-sm border py-2 pr-10 pl-10 text-sm focus-visible:outline-2 disabled:cursor-not-allowed"
           />
           {query && (
             <button
               onClick={handleClear}
-              className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
+              aria-label="Clear item search"
+              className="text-muted hover:bg-surface-hover hover:text-body absolute top-1/2 right-1 inline-flex min-h-6 min-w-6 -translate-y-1/2 items-center justify-center rounded-sm pointer-coarse:min-h-11 pointer-coarse:min-w-11"
               type="button"
             >
               <X className="h-4 w-4" />
@@ -264,7 +254,7 @@ export function ItemAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border shadow-lg"
+            className={`${OVERLAY_SURFACE} absolute z-50 mt-1 max-h-96 w-full overflow-y-auto`}
           >
             {filteredItems.length > 0 ? (
               <ul className="py-1">
@@ -273,9 +263,9 @@ export function ItemAutocomplete({
                     <button
                       type="button"
                       onClick={() => handleSelect(item)}
-                      className={`w-full px-4 py-2 text-left transition-colors ${
+                      className={`w-full min-w-0 px-4 py-2 text-left transition-colors pointer-coarse:min-h-11 ${
                         index === selectedIndex
-                          ? 'bg-accent-purple-bg-strong'
+                          ? 'bg-surface-hover'
                           : 'hover:bg-surface-hover'
                       }`}
                     >
@@ -289,22 +279,16 @@ export function ItemAutocomplete({
                           className="h-5 w-5 shrink-0"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-heading truncate font-medium">
+                          <p className="text-heading font-medium break-words">
                             {item.name}
                           </p>
                           <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                CATEGORY_VARIANTS[item.category] || 'secondary'
-                              }
-                              size="sm"
-                            >
+                            <Badge variant="neutral" size="sm">
                               {item.category.charAt(0).toUpperCase() +
                                 item.category.slice(1)}
                             </Badge>
                             <span className="text-muted text-xs">
-                              {item.weight !== undefined &&
-                                `${item.weight} lbs`}
+                              {item.weight !== undefined && `${item.weight} lb`}
                               {item.weight !== undefined &&
                                 item.value !== undefined &&
                                 ' • '}
@@ -323,8 +307,7 @@ export function ItemAutocomplete({
               </ul>
             ) : (
               <div className="text-muted px-4 py-8 text-center text-sm">
-                <p>No items found</p>
-                <p className="mt-1 text-xs">Try a different search term</p>
+                <p>No items match “{query}”.</p>
               </div>
             )}
           </div>
@@ -333,8 +316,8 @@ export function ItemAutocomplete({
 
       <p className="text-muted mt-2 text-xs">
         {selectedItem
-          ? 'Item details loaded. You can edit any field below.'
-          : 'Search and select an item to auto-fill the form, or fill manually.'}
+          ? `Filled in from ${selectedItem.name}. Change anything below.`
+          : 'Pick one to fill in the form, or fill it in yourself.'}
       </p>
     </div>
   );

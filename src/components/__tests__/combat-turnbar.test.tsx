@@ -90,8 +90,15 @@ describe('CombatTurnBar — pre-combat', () => {
   it('renders Roll Initiatives button', () => {
     render(<CombatTurnBar {...baseProps} encounter={emptyEncounter} />);
     expect(
-      screen.getByRole('button', { name: /roll initiatives/i })
+      screen.getByRole('button', { name: /roll NPC and monster initiative/i })
     ).toBeInTheDocument();
+  });
+
+  it('keeps Start combat secondary when the list is empty', () => {
+    render(<CombatTurnBar {...baseProps} encounter={emptyEncounter} />);
+    expect(
+      screen.getByRole('button', { name: /start combat/i })
+    ).toHaveAttribute('data-variant', 'secondary');
   });
 });
 
@@ -230,10 +237,67 @@ describe('CombatAppBar — rename behavior', () => {
         onOpenConfig={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByTitle('Click to rename'));
-    const input = screen.getByRole('textbox');
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Old Name' }));
+    const input = screen.getByRole('textbox', { name: 'Encounter name' });
     fireEvent.change(input, { target: { value: 'New Name' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onRename).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('button', { name: 'Rename Old Name' })
+    ).toHaveFocus();
+  });
+
+  it('renders a direct back link and only makes Add combatant primary while empty', () => {
+    const { rerender } = render(
+      <CombatAppBar
+        name="Goblin ambush"
+        backHref="/encounters"
+        addPrimary
+        onRename={vi.fn()}
+        onOpenAdd={vi.fn()}
+        onOpenConfig={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Back' }).getAttribute('href')
+    ).toBe('/encounters');
+    expect(
+      screen.getByRole('button', { name: 'Add combatant' })
+    ).toHaveAttribute('data-variant', 'primary');
+    rerender(
+      <CombatAppBar
+        name="Goblin ambush"
+        backHref="/encounters"
+        addPrimary={false}
+        onRename={vi.fn()}
+        onOpenAdd={vi.fn()}
+        onOpenConfig={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Add combatant' })
+    ).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('saves a renamed encounter and restores focus to Rename', () => {
+    const onRename = vi.fn();
+    render(
+      <CombatAppBar
+        name="Old Name"
+        backHref="/"
+        onRename={onRename}
+        onOpenAdd={vi.fn()}
+        onOpenConfig={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Old Name' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Encounter name' }), {
+      target: { value: 'New Name' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }));
+    expect(onRename).toHaveBeenCalledWith('New Name');
+    expect(
+      screen.getByRole('button', { name: 'Rename Old Name' })
+    ).toHaveFocus();
   });
 });

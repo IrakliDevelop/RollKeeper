@@ -244,7 +244,8 @@ export default function DmLocationToolbar({
           </Button>
           {onToggleArrangeMaps && (
             <Button
-              variant={arrangeMapsActive ? 'warning' : 'ghost'}
+              variant="ghost"
+              selected={arrangeMapsActive}
               onClick={onToggleArrangeMaps}
               title={
                 arrangeMapsActive
@@ -265,7 +266,8 @@ export default function DmLocationToolbar({
         {liveControls && (
           <>
             <Button
-              variant={hiddenPlacementActive ? 'warning' : 'ghost'}
+              variant="ghost"
+              selected={hiddenPlacementActive}
               onClick={onToggleHiddenPlacement}
               title={
                 hiddenPlacementActive
@@ -403,7 +405,8 @@ export default function DmLocationToolbar({
           )}
           {mode === 'battlemap' && (
             <Button
-              variant={sharedWithPlayers ? 'success' : 'outline'}
+              variant="outline"
+              selected={sharedWithPlayers}
               onClick={onToggleShareWithPlayers}
               className="flex items-center gap-1.5 px-3 py-1 text-xs"
               title={

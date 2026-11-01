@@ -45,7 +45,7 @@ describe('XpAwardControl', () => {
     );
     expect(screen.getByText('1,200')).toBeTruthy();
     expect(screen.getByText('1,500 XP')).toBeTruthy();
-    expect(screen.getByText('16.7% to Level 4')).toBeTruthy();
+    expect(screen.getByText('16.7% to level 4')).toBeTruthy();
     expect(
       screen.getByRole('progressbar', { name: /xp progress to level 4/i })
     ).toHaveAttribute('aria-valuenow', '16.7');

@@ -53,13 +53,19 @@ export const BardicInspiration: Story = {
     const canvas = within(canvasElement);
     const id = args.resource.definition.id;
 
-    await userEvent.click(canvas.getAllByTitle('Click to expend')[0]);
+    await userEvent.click(
+      canvas.getAllByRole('button', { name: 'Spend 1 Bardic Inspiration' })[0]
+    );
     await expect(args.onUse).toHaveBeenCalledWith(id, 1);
 
-    await userEvent.click(canvas.getByTitle('Click to restore'));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Restore 1 Bardic Inspiration' })
+    );
     await expect(args.onRestore).toHaveBeenCalledWith(id, 1);
 
-    await userEvent.click(canvas.getByTitle('Reset (Long Rest)'));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Restore all Bardic Inspiration' })
+    );
     await expect(args.onReset).toHaveBeenCalledWith(id);
   },
 };

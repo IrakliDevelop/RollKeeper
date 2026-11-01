@@ -11,6 +11,7 @@ import React, {
   useMemo,
 } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '@/utils/cn';
 
 export interface BookmarkTabItem {
   id: string;
@@ -31,16 +32,28 @@ interface BookmarkTabsProps {
 }
 
 export interface BookmarkTabsRef {
-  switchToTab: (tabId: string) => void;
+  switchToTab: (tabId: string, options?: { scroll?: boolean }) => void;
   getCurrentTab: () => string;
 }
 
 const PERSIST_PREFIX = 'bookmark-tabs-';
 
+const SCROLL_BUTTON =
+  'bg-surface text-muted hover:text-body transition-colors duration-120 ease-out absolute top-0 bottom-px z-10 flex w-8 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring pointer-coarse:w-11';
+
 const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
   ({ tabs, defaultTab, persistKey, className = '', onTabChange }, ref) => {
+    const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(
+      () => () => {
+        if (scrollTimerRef.current !== null)
+          clearTimeout(scrollTimerRef.current);
+      },
+      []
+    );
     const rootRef = useRef<HTMLDivElement>(null);
     const navRef = useRef<HTMLDivElement>(null);
+    const tabRefs = useRef(new Map<string, HTMLButtonElement>());
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
 
@@ -120,22 +133,60 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
     useImperativeHandle(
       ref,
       () => ({
-        switchToTab: (tabId: string) => {
+        switchToTab: (tabId: string, options?: { scroll?: boolean }) => {
+          if (scrollTimerRef.current !== null) {
+            clearTimeout(scrollTimerRef.current);
+            scrollTimerRef.current = null;
+          }
           const tab = visibleTabs.find(t => t.id === tabId && !t.disabled);
           if (tab) {
             handleTabChange(tabId);
-            setTimeout(() => {
-              rootRef.current?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start',
-              });
-            }, 100);
+            if (options?.scroll !== false)
+              scrollTimerRef.current = setTimeout(() => {
+                scrollTimerRef.current = null;
+                rootRef.current?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+              }, 100);
           }
         },
         getCurrentTab: () => activeTab,
       }),
       [activeTab, visibleTabs, handleTabChange]
     );
+
+    // Arrow keys, Home and End move to the next enabled tab and open it,
+    // wrapping at the ends (automatic activation, like the VTT tab bars).
+    const handleTabListKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+      // Alt/Ctrl/Meta + arrows belong to the browser (history, text).
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const enabled = visibleTabs.filter(t => !t.disabled);
+      const index = enabled.findIndex(t => t.id === activeTab);
+      if (index < 0) return;
+      let next: BookmarkTabItem;
+      switch (event.key) {
+        case 'ArrowRight':
+          next = enabled[(index + 1) % enabled.length];
+          break;
+        case 'ArrowLeft':
+          next = enabled[(index - 1 + enabled.length) % enabled.length];
+          break;
+        case 'Home':
+          next = enabled[0];
+          break;
+        case 'End':
+          next = enabled[enabled.length - 1];
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      handleTabChange(next.id);
+      const button = tabRefs.current.get(next.id);
+      button?.focus();
+      button?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    };
 
     const scrollNav = (direction: 'left' | 'right') => {
       const nav = navRef.current;
@@ -166,12 +217,12 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
     return (
       <div ref={rootRef} className={`w-full ${className}`}>
         {/* Tab Navigation */}
-        <div className="relative flex items-end">
+        <div className="relative">
           {/* Left scroll indicator */}
           {canScrollLeft && (
             <button
               onClick={() => scrollNav('left')}
-              className="bg-surface-raised/90 text-muted hover:text-body absolute top-0 bottom-0 left-0 z-10 flex w-8 items-center justify-center backdrop-blur-sm"
+              className={cn(SCROLL_BUTTON, 'left-0')}
               aria-label="Scroll tabs left"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -180,14 +231,20 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
 
           <nav
             ref={navRef}
-            className="scrollbar-hide flex items-end gap-0.5 overflow-x-auto overflow-y-hidden px-1 pt-2"
+            // scroll-px keeps a tab scrolled into view clear of the chevrons.
+            className="scrollbar-hide border-divider flex scroll-px-8 gap-1 overflow-x-auto overflow-y-hidden border-b pointer-coarse:scroll-px-11"
             role="tablist"
+            onKeyDown={handleTabListKeyDown}
           >
             {visibleTabs.map(tab => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  ref={node => {
+                    if (node) tabRefs.current.set(tab.id, node);
+                    else tabRefs.current.delete(tab.id);
+                  }}
                   id={tabButtonId(tab.id)}
                   role="tab"
                   aria-selected={isActive}
@@ -197,13 +254,15 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
                   tabIndex={isActive ? 0 : -1}
                   onClick={() => !tab.disabled && handleTabChange(tab.id)}
                   disabled={tab.disabled}
-                  className={`relative flex min-w-0 shrink-0 items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                  className={cn(
+                    'relative flex min-w-0 shrink-0 items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-120 ease-out',
+                    'focus-visible:outline-ring focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11',
                     isActive
-                      ? 'bg-surface-raised text-heading border-r-divider border-l-divider z-10 -mb-px border-t-2 border-r border-l border-t-blue-500 shadow-sm'
+                      ? 'border-brass-fill text-heading'
                       : tab.disabled
-                        ? 'text-faint cursor-not-allowed opacity-50'
-                        : 'bg-surface-secondary text-muted hover:bg-surface-hover hover:text-body border border-transparent'
-                  } focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none`}
+                        ? 'text-faint cursor-not-allowed border-transparent opacity-50'
+                        : 'text-muted hover:text-body border-transparent'
+                  )}
                 >
                   {tab.icon && (
                     <span className="text-base" role="img" aria-hidden="true">
@@ -221,7 +280,7 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
           {canScrollRight && (
             <button
               onClick={() => scrollNav('right')}
-              className="bg-surface-raised/90 text-muted hover:text-body absolute top-0 right-0 bottom-0 z-10 flex w-8 items-center justify-center backdrop-blur-sm"
+              className={cn(SCROLL_BUTTON, 'right-0')}
               aria-label="Scroll tabs right"
             >
               <ChevronRight className="h-4 w-4" />
@@ -229,31 +288,30 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
           )}
         </div>
 
-        {/* Tab Panels — visited tabs stay mounted but hidden */}
-        <div className="border-divider bg-surface-raised rounded-tr-lg rounded-b-lg border shadow-lg">
-          <div className="p-4 sm:p-6">
-            {!isMounted ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-muted">Loading...</div>
-              </div>
-            ) : (
-              visibleTabs.map(tab => {
-                const isActive = activeTab === tab.id;
-                if (!visitedTabs.has(tab.id)) return null;
-                return (
-                  <div
-                    key={tab.id}
-                    role="tabpanel"
-                    id={tabPanelId(tab.id)}
-                    aria-labelledby={tabButtonId(tab.id)}
-                    hidden={!isActive}
-                  >
-                    {tab.content}
-                  </div>
-                );
-              })
-            )}
-          </div>
+        {/* Tab Panels — visited tabs stay mounted but hidden. They sit on
+            the page canvas, with no box of their own. */}
+        <div className="py-4 sm:py-6">
+          {!isMounted ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-muted">Loading...</div>
+            </div>
+          ) : (
+            visibleTabs.map(tab => {
+              const isActive = activeTab === tab.id;
+              if (!visitedTabs.has(tab.id)) return null;
+              return (
+                <div
+                  key={tab.id}
+                  role="tabpanel"
+                  id={tabPanelId(tab.id)}
+                  aria-labelledby={tabButtonId(tab.id)}
+                  hidden={!isActive}
+                >
+                  {tab.content}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     );

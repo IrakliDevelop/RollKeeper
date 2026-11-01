@@ -62,6 +62,10 @@ export function MonsterTab({
     hasMore,
     loading,
     loadingMore,
+    loadMoreError,
+    retryLoadMore,
+    error,
+    retry,
     loadMore,
   } = useMonsterSearch();
 
@@ -116,8 +120,12 @@ export function MonsterTab({
       hasMore={hasMore}
       loading={loading}
       loadingMore={loadingMore}
+      loadMoreError={loadMoreError}
+      error={error}
+      onRetry={retry}
       onSelect={handleSelect}
       onLoadMore={loadMore}
+      onRetryLoadMore={retryLoadMore}
     />
   );
 }

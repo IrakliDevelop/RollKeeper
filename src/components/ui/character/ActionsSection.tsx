@@ -1,8 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { AppIcon, type IconName } from '@/components/ui/icons';
+import React, { useMemo } from 'react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
 import { QuickSpells } from '@/components/QuickSpells';
@@ -10,11 +8,14 @@ import { QuickFeatures } from '@/components/QuickFeatures';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
+import { Section } from '@/components/ui/layout/section';
 import ClassResourceTracker from '@/components/ui/character/ClassResourceTracker';
 import { getActiveClassResources } from '@/utils/classResources';
+import { cn } from '@/utils/cn';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
+  editing?: boolean;
   character: CharacterState;
   showAttackRoll: (
     name: string,
@@ -42,73 +43,22 @@ interface ActionsSectionProps {
   onUseClassResource?: (id: string, amount?: number) => void;
   onRestoreClassResource?: (id: string, amount?: number) => void;
   onResetClassResource?: (id: string) => void;
+  spellSlotsPanel?: React.ReactNode;
 }
 
-// Simple collapsible component for subsections
-interface CollapsibleSubsectionProps {
-  title: string;
-  icon: IconName;
-  children: React.ReactNode;
-  defaultExpanded?: boolean;
-  persistKey: string;
-  badge?: React.ReactNode;
-  extraContent?: React.ReactNode;
-}
-
-const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
-  title,
-  icon,
-  children,
-  defaultExpanded = true,
-  persistKey,
-  badge,
-  extraContent,
-}) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
-  useEffect(() => {
-    const savedState = localStorage.getItem(`subsection-${persistKey}`);
-    if (savedState !== null) {
-      setIsExpanded(JSON.parse(savedState));
-    }
-  }, [persistKey]);
-
-  const toggleExpanded = () => {
-    const newState = !isExpanded;
-    setIsExpanded(newState);
-    localStorage.setItem(`subsection-${persistKey}`, JSON.stringify(newState));
-  };
-
+function ActionsLoadFallback({ thing }: { thing: string }) {
   return (
-    <div className="border-divider bg-surface-raised rounded-lg border shadow">
-      <div className="flex w-full items-center justify-between p-4">
-        <button
-          onClick={toggleExpanded}
-          className="flex flex-1 items-center gap-2 text-left transition-colors hover:opacity-80"
-          aria-expanded={isExpanded}
-        >
-          <AppIcon name={icon} className="h-5 w-5 shrink-0" />
-          <h3 className="text-heading text-lg font-bold">{title}</h3>
-          {isExpanded ? (
-            <ChevronDown size={20} className="ml-2" />
-          ) : (
-            <ChevronRight size={20} className="ml-2" />
-          )}
-        </button>
-        <div className="ml-4 flex items-center gap-2">
-          {badge}
-          {extraContent}
-        </div>
-      </div>
-
-      {isExpanded && (
-        <div className="border-divider border-t p-4">{children}</div>
-      )}
+    <div className="flex flex-wrap items-center gap-2 py-3">
+      <p className="text-ember-text text-sm">{thing} didn&apos;t load.</p>
+      <Button variant="link" size="sm" onClick={() => window.location.reload()}>
+        Reload page
+      </Button>
     </div>
   );
-};
+}
 
 export default function ActionsSection({
+  editing = false,
   character,
   showAttackRoll,
   showSavingThrow,
@@ -120,6 +70,7 @@ export default function ActionsSection({
   onUseClassResource,
   onRestoreClassResource,
   onResetClassResource,
+  spellSlotsPanel,
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
   // Intentionally narrow deps: only recompute when fields that affect
@@ -151,160 +102,128 @@ export default function ActionsSection({
 
   return (
     <div className="space-y-6">
-      {/* Ready Weapons - Collapsible */}
-      <CollapsibleSubsection
-        title="Ready Weapons"
-        icon="weapon"
-        persistKey="ready-weapons"
-        defaultExpanded={true}
-        badge={
+      <Section
+        heading="Ready weapons"
+        level={3}
+        collapsible="actions-ready-weapons"
+        trailing={
           equippedWeapons.length > 0 && (
-            <span className="bg-accent-blue-bg text-accent-blue-text rounded-full px-2 py-1 text-sm font-medium">
+            <span className="text-muted text-sm">
               {equippedWeapons.length} equipped
             </span>
           )
         }
       >
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
-              <p className="text-accent-red-text-muted">
-                Unable to load equipped weapons
-              </p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<ActionsLoadFallback thing="Ready weapons" />}>
           <EquippedWeapons
+            editing={editing}
             showAttackRoll={showAttackRoll}
             showDamageRoll={showDamageRoll}
             animateRoll={animateRoll}
           />
         </ErrorBoundary>
-      </CollapsibleSubsection>
+      </Section>
 
-      {/* Class Resources - Collapsible */}
-      {classResources.length > 0 &&
-        onUseClassResource &&
-        onRestoreClassResource &&
-        onResetClassResource && (
-          <CollapsibleSubsection
-            title="Class Resources"
-            icon="damage"
-            persistKey="class-resources"
-            defaultExpanded={true}
-            badge={
-              <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-2 py-1 text-sm font-medium">
-                {classResources.length}
-              </span>
-            }
-          >
-            <div className="space-y-4">
-              {classResources.map((resource, index) => (
-                <div
-                  key={resource.definition.id}
-                  className={
-                    index > 0 ? 'border-divider border-t pt-4' : undefined
-                  }
-                >
-                  <ClassResourceTracker
-                    resource={resource}
-                    onUse={onUseClassResource}
-                    onRestore={onRestoreClassResource}
-                    onReset={onResetClassResource}
-                  />
+      {(spellSlotsPanel ||
+        (classResources.length > 0 &&
+          onUseClassResource &&
+          onRestoreClassResource &&
+          onResetClassResource)) && (
+        <div
+          className={cn(
+            spellSlotsPanel &&
+              classResources.length > 0 &&
+              'grid items-start gap-6 lg:grid-cols-2'
+          )}
+        >
+          {spellSlotsPanel}
+          {classResources.length > 0 &&
+            onUseClassResource &&
+            onRestoreClassResource &&
+            onResetClassResource && (
+              <Section
+                heading="Class resources"
+                level={3}
+                collapsible="class-resources"
+              >
+                <div className="divide-divider divide-y">
+                  {classResources.map(resource => (
+                    <div key={resource.definition.id} className="py-3">
+                      <ClassResourceTracker
+                        resource={resource}
+                        onUse={onUseClassResource}
+                        onRestore={onRestoreClassResource}
+                        onReset={onResetClassResource}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CollapsibleSubsection>
-        )}
+              </Section>
+            )}
+        </div>
+      )}
 
-      {/* Quick Features - Collapsible */}
       {(character.favoriteFeatureIds || []).length > 0 && (
-        <CollapsibleSubsection
-          title="Quick Features"
-          icon="abilities"
-          persistKey="quick-features"
-          defaultExpanded={true}
-          badge={
-            <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-2 py-1 text-sm font-medium">
-              {(character.favoriteFeatureIds || []).length} pinned
-            </span>
-          }
-          extraContent={
-            <Button
-              onClick={e => {
-                e.stopPropagation();
-                switchToTab('features');
-              }}
-              variant="ghost"
-              size="xs"
-              className="bg-accent-amber-bg text-accent-amber-text-muted hover:bg-accent-amber-bg-strong hover:text-accent-amber-text"
-            >
-              Manage
-            </Button>
+        <Section
+          heading="Quick features"
+          level={3}
+          collapsible="actions-quick-features"
+          trailing={
+            <>
+              <span className="text-muted text-sm">
+                {(character.favoriteFeatureIds || []).length} pinned
+              </span>
+              <Button
+                onClick={e => {
+                  e.stopPropagation();
+                  switchToTab('features');
+                }}
+                variant="ghost"
+                size="xs"
+              >
+                Manage
+              </Button>
+            </>
           }
         >
           <ErrorBoundary
-            fallback={
-              <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
-                <p className="text-accent-red-text-muted">
-                  Unable to load quick features
-                </p>
-              </div>
-            }
+            fallback={<ActionsLoadFallback thing="Quick features" />}
           >
             <QuickFeatures />
           </ErrorBoundary>
-        </CollapsibleSubsection>
+        </Section>
       )}
 
-      {/* Quick Spells - Collapsible */}
-      <CollapsibleSubsection
-        title="Quick Spells"
-        icon="features"
-        persistKey="quick-spells"
-        defaultExpanded={true}
-        badge={
+      <Section
+        heading="Quick spells"
+        level={3}
+        collapsible="actions-quick-spells"
+        trailing={
           <div className="flex items-center gap-2">
             {actionSpells.length > 0 && (
-              <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-2 py-1 text-sm font-medium">
+              <span className="text-muted text-sm">
                 {actionSpells.length} ready
               </span>
             )}
             {preparedSpellsCount > 0 && (
-              <Badge
-                variant="success"
-                size="sm"
-                className="bg-accent-green-bg text-accent-green-text"
-              >
+              <Badge variant="neutral" size="sm">
                 {preparedSpellsCount} prepared
               </Badge>
             )}
+            <Button
+              onClick={e => {
+                e.stopPropagation();
+                switchToTab('spellcasting');
+              }}
+              variant="ghost"
+              size="xs"
+            >
+              Manage
+            </Button>
           </div>
         }
-        extraContent={
-          <Button
-            onClick={e => {
-              e.stopPropagation();
-              switchToTab('spellcasting');
-            }}
-            variant="ghost"
-            size="xs"
-            className="bg-accent-purple-bg text-accent-purple-text-muted hover:bg-accent-purple-bg-strong hover:text-accent-purple-text"
-          >
-            Manage
-          </Button>
-        }
       >
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
-              <p className="text-accent-red-text-muted">
-                Unable to load quick spells
-              </p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<ActionsLoadFallback thing="Quick spells" />}>
           <QuickSpells
             showAttackRoll={showAttackRoll}
             showSavingThrow={showSavingThrow}
@@ -312,7 +231,7 @@ export default function ActionsSection({
             animateRoll={animateRoll}
           />
         </ErrorBoundary>
-      </CollapsibleSubsection>
+      </Section>
 
       {/* Concentration Tracker */}
       {character.concentration.isConcentrating && (
