@@ -128,7 +128,7 @@ describe('FocusLayout edit dialog', () => {
     ).toBeVisible();
     expect(onUpdate).not.toHaveBeenCalled();
     await user.click(
-      screen.getByRole('button', { name: 'Edit Goblin max HP' })
+      screen.getByRole('button', { name: '7, edit Goblin max HP' })
     );
     const maxInput = screen.getByDisplayValue('7');
     await user.clear(maxInput);
