@@ -15,6 +15,7 @@ import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
 import NotesManager from '@/components/ui/game/NotesManager';
+import { CharacterAppearance } from '@/components/ui/appearance/CharacterAppearance';
 import { DiceSetEditor } from '@/components/ui/game/DiceSetEditor';
 import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
@@ -684,6 +685,7 @@ const CHARACTER_SUB_TABS = [
     label: 'Dice',
     icon: <AppIcon name="dice" className="h-4 w-4" />,
   },
+  { id: 'appearance', label: 'Appearance' },
 ] as const;
 
 type CharacterSubTab = (typeof CHARACTER_SUB_TABS)[number]['id'];
@@ -786,6 +788,14 @@ function CharacterTabContent({
                 />
               </ErrorBoundary>
             </div>
+          ),
+          appearance: (
+            <CharacterAppearance
+              value={character.themePreference}
+              onChange={themePreference =>
+                params.updateCharacter({ themePreference })
+              }
+            />
           ),
           dice: (
             <DiceSetEditor

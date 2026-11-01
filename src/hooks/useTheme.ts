@@ -8,12 +8,18 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-export type Theme = 'light' | 'dark' | 'blue' | 'system';
-export type ResolvedTheme = 'light' | 'dark' | 'blue';
+import type { Theme, ResolvedTheme } from '@/types/theme';
+export type { Theme, ResolvedTheme } from '@/types/theme';
+
+export interface CharacterThemeScopeValue {
+  characterId: string;
+  theme: Theme | undefined;
+}
 
 interface ThemeContextValue {
   /** The user-chosen preference: 'light', 'dark', 'blue', or 'system'. */
   theme: Theme;
+  characterScope: CharacterThemeScopeValue | null;
   /** The actual applied theme after resolving 'system'. */
   resolvedTheme: ResolvedTheme;
   /** Change the theme preference. */
@@ -87,6 +93,37 @@ function applyTheme(resolved: ResolvedTheme) {
 let listeners: Array<() => void> = [];
 let currentTheme: Theme = 'system';
 let currentResolved: ResolvedTheme = 'light';
+let characterScope: (CharacterThemeScopeValue & { owner: object }) | null =
+  null;
+
+function applyCurrentTheme() {
+  currentResolved = resolveTheme(characterScope?.theme ?? currentTheme);
+  applyTheme(currentResolved);
+  emitChange();
+}
+
+/** Route scope is visit-local; only setTheme writes the app preference. */
+export function registerCharacterThemeScope(
+  owner: object,
+  characterId: string,
+  theme: Theme | undefined
+) {
+  characterScope = { owner, characterId, theme };
+  applyCurrentTheme();
+}
+
+export function clearCharacterThemeScope(owner: object) {
+  if (characterScope?.owner !== owner) return;
+  characterScope = null;
+  applyCurrentTheme();
+}
+
+function getSnapshotScope() {
+  return characterScope;
+}
+function getServerSnapshotScope() {
+  return null;
+}
 
 function subscribe(listener: () => void) {
   listeners = [...listeners, listener];
@@ -123,6 +160,7 @@ function getServerSnapshotResolved(): ResolvedTheme {
 
 export const ThemeContext = createContext<ThemeContextValue>({
   theme: 'system',
+  characterScope: null,
   resolvedTheme: 'light',
   setTheme: () => {},
 });
@@ -150,20 +188,14 @@ export function useThemeInit(): ThemeContextValue {
   // Hydrate the store on first client render
   useEffect(() => {
     const stored = getStoredTheme();
-    const resolved = resolveTheme(stored);
     currentTheme = stored;
-    currentResolved = resolved;
-    applyTheme(resolved);
-    emitChange();
+    applyCurrentTheme();
 
     // Listen for system preference changes
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      if (currentTheme === 'system') {
-        currentResolved = getSystemPreference();
-        applyTheme(currentResolved);
-        emitChange();
-      }
+      if ((characterScope?.theme ?? currentTheme) === 'system')
+        applyCurrentTheme();
     };
     mql.addEventListener('change', handleChange);
     return () => mql.removeEventListener('change', handleChange);
@@ -187,10 +219,13 @@ export function useThemeInit(): ThemeContextValue {
       // Storage is full or blocked: the choice still applies for this visit.
     }
     currentTheme = next;
-    currentResolved = resolveTheme(next);
-    applyTheme(currentResolved);
-    emitChange();
+    applyCurrentTheme();
   }, []);
 
-  return { theme, resolvedTheme, setTheme };
+  const scope = useSyncExternalStore(
+    subscribe,
+    getSnapshotScope,
+    getServerSnapshotScope
+  );
+  return { theme, resolvedTheme, setTheme, characterScope: scope };
 }

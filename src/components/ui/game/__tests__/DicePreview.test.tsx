@@ -55,7 +55,8 @@ function makeTray(): DiceTray {
   const tray: DiceTray = {
     supported: true,
     playRoll: vi.fn(
-      event => new Promise(resolve => pending.push({ event, resolve }))
+      (event: RollEvent) =>
+        new Promise<RollSummary>(resolve => pending.push({ event, resolve }))
     ),
     setSkin: vi.fn(),
     setDieScale: vi.fn(),

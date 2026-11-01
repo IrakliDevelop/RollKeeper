@@ -99,6 +99,15 @@ Rules:
 `npm run design:contrast` checks every role and neutral pairing against WCAG
 AA (4.5:1 text, 3:1 marks) in all three palettes.
 
+## Appearance settings
+
+The header's palette control opens appearance settings for the active character,
+or app appearance elsewhere. App appearance sets the device default. A character
+can select its own theme under Character → Appearance; Use app theme clears the
+override. Character choices travel with exported and synced character JSON and
+apply across its sheet and settings routes. Leaving those routes restores the
+app default. System uses OS light/dark in either scope.
+
 ## Character sheet presentation
 
 The character sheet deliberately uses clear rectangular outlines around its
