@@ -28,10 +28,12 @@ const meta: Meta<typeof MonsterSearch> = {
     hasMore: true,
     loading: false,
     loadingMore: false,
+    loadMoreError: false,
     error: false,
     onRetry: fn(),
     onSelect: fn(),
     onLoadMore: fn(),
+    onRetryLoadMore: fn(),
   },
 };
 

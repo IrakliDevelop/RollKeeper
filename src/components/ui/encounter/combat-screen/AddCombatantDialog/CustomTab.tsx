@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useId } from 'react';
 import { FilePen } from 'lucide-react';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Input } from '@/components/ui/forms/input';
@@ -54,6 +54,7 @@ export function CustomTab({
   onEditStatBlock,
   hasStatBlockEdits,
 }: CustomTabProps) {
+  const typeLabelId = useId();
   return (
     <div className="space-y-3 pb-4">
       <div className="space-y-2">
@@ -80,14 +81,17 @@ export function CustomTab({
           placeholder="e.g. Cursed Statue"
           label="Name"
         />
-        <div role="group" aria-label="Combatant type" className="space-y-2">
-          <p className="text-body text-sm font-medium">Type</p>
+        <div role="group" aria-labelledby={typeLabelId} className="space-y-2">
+          <p id={typeLabelId} className="text-body text-sm font-medium">
+            Type
+          </p>
           <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               selected={type === 'npc'}
+              aria-pressed={type === 'npc'}
               onClick={() => onTypeChange('npc')}
             >
               NPC
@@ -97,6 +101,7 @@ export function CustomTab({
               variant="outline"
               size="sm"
               selected={type === 'monster'}
+              aria-pressed={type === 'monster'}
               onClick={() => onTypeChange('monster')}
             >
               Monster

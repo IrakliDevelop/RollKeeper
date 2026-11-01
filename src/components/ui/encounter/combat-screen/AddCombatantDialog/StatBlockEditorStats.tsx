@@ -117,11 +117,11 @@ export function StatBlockEditorStats({
         </div>
         <div>
           <label htmlFor="edit-pp" className={LABEL_CLASSES}>
-            Passive perception
+            Passive Perception
           </label>
           <NumberField
             id="edit-pp"
-            aria-label="Passive perception"
+            aria-label="Passive Perception"
             value={draft.statBlock.passivePerception}
             onChange={v => patchBlock({ passivePerception: v ?? 0 })}
             className={FIELD_CLASSES}

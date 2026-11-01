@@ -188,7 +188,9 @@ describe('AddCombatantDialog', () => {
     render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
 
     // Monster tab is default — type in search
-    const searchInput = screen.getByPlaceholderText(/search the bestiary/i);
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search the bestiary',
+    });
     fireEvent.change(searchInput, { target: { value: 'goblin' } });
 
     // waitFor retries until Goblin appears (after 300ms debounce + fetch resolves)
@@ -218,6 +220,49 @@ describe('AddCombatantDialog', () => {
     expect(calls[0].color).toBe(calls[1].color);
     expect(calls[1].color).toBe(calls[2].color);
   }, 10000);
+
+  it('clamps an unblurred monster count in both footer and added entities', async () => {
+    const onAddEntity = vi.fn();
+    render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Search the bestiary' }),
+      { target: { value: 'goblin' } }
+    );
+    await screen.findByText('Goblin');
+    fireEvent.click(screen.getByText('Goblin'));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Count' }), {
+      target: { value: '50' },
+    });
+    expect(
+      screen.getByRole('button', { name: 'Add Goblin ×20' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Goblin ×20' }));
+    expect(onAddEntity).toHaveBeenCalledTimes(20);
+  });
+
+  it('exposes selected Custom type and disposition with visible group names', () => {
+    render(<AddCombatantDialog {...defaultProps} />);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Custom' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(screen.getByRole('group', { name: 'Type' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'NPC' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Monster' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(
+      screen.getByRole('group', { name: 'Player sees as' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enemy' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
 
   it('custom add carries isHidden, playerAlias, and playerDisposition', () => {
     const onAddEntity = vi.fn();
@@ -381,7 +426,9 @@ describe('AddCombatantDialog', () => {
 
     render(<AddCombatantDialog {...defaultProps} />);
 
-    const searchInput = screen.getByPlaceholderText(/search the bestiary/i);
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search the bestiary',
+    });
     fireEvent.change(searchInput, { target: { value: 'goblin' } });
 
     await waitFor(

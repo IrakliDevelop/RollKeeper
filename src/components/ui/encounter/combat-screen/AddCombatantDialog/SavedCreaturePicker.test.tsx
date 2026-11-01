@@ -54,6 +54,19 @@ describe('SavedCreaturePicker', () => {
     expect(preview.textContent).not.toMatch(/<|\*\*/);
   });
 
+  it('decodes entities in a plain description preview', () => {
+    render(
+      <SavedCreaturePicker
+        creatures={[
+          { ...creatures[0], description: 'Smith &amp; Wesson&nbsp;Guard' },
+        ]}
+        emptyMessage="No creatures"
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Smith & Wesson Guard')).toBeInTheDocument();
+  });
+
   it('advertises name, group, and tag search', () => {
     render(
       <SavedCreaturePicker

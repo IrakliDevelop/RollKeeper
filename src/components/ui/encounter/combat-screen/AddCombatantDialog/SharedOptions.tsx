@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -24,6 +26,7 @@ export function SharedOptions({
   disposition,
   onDispositionChange,
 }: SharedOptionsProps) {
+  const dispositionLabelId = useId();
   return (
     <div className="border-divider space-y-4 border-t pt-4">
       <Checkbox
@@ -40,8 +43,14 @@ export function SharedOptions({
           label="Player alias"
         />
       )}
-      <div role="group" aria-label="Player disposition" className="space-y-2">
-        <p className="text-body text-sm font-medium">Player sees as</p>
+      <div
+        role="group"
+        aria-labelledby={dispositionLabelId}
+        className="space-y-2"
+      >
+        <p id={dispositionLabelId} className="text-body text-sm font-medium">
+          Player sees as
+        </p>
         <div className="flex flex-wrap gap-2">
           {DISPOSITIONS.map(value => (
             <Button
@@ -50,6 +59,7 @@ export function SharedOptions({
               variant="outline"
               size="sm"
               selected={disposition === value}
+              aria-pressed={disposition === value}
               onClick={() => onDispositionChange(value)}
             >
               {value[0].toUpperCase() + value.slice(1)}

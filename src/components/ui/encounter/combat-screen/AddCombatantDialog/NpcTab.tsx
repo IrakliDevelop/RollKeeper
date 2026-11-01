@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -24,6 +24,7 @@ interface NpcTabProps {
 
 export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
   const [creatingNpc, setCreatingNpc] = useState(false);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
   const [npcName, setNpcName] = useState('');
   const [npcHp, setNpcHp] = useState('10');
   const [npcAc, setNpcAc] = useState('10');
@@ -147,6 +148,7 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
         </div>
       ) : (
         <Button
+          ref={createButtonRef}
           variant="secondary"
           fullWidth
           onClick={() => setCreatingNpc(true)}
@@ -174,6 +176,7 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
           emptyMessage="No NPCs yet. Create one to reuse across encounters."
           onSelect={handleAddNpc}
           onDelete={handleDelete}
+          onDeleteFallbackFocus={() => createButtonRef.current?.focus()}
         />
       )}
     </div>

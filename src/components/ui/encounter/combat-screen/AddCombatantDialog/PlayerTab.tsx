@@ -32,7 +32,7 @@ export function PlayerTab({
       <Input
         value={query}
         onChange={event => setQuery(event.target.value)}
-        placeholder="Search party members…"
+        placeholder="Search party members"
         aria-label="Search party members"
         leftIcon={<Search size={16} />}
         size="sm"

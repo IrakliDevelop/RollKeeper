@@ -163,11 +163,13 @@ export function AddCombatantDialog({
     handleOpenChange(false);
   };
 
+  const safeMonsterCount = Math.min(20, Math.max(1, mCount));
+
   const handleMonsterAdd = () => {
     if (!selMonster) return;
     handleAddMultiple(
       buildMonsterEntities(selMonster, {
-        count: mCount,
+        count: safeMonsterCount,
         hpOverride: parseInt(mHp) || selMonster.hpAverage,
         acOverride: parseInt(mAc) || selMonster.acValue,
         isHidden: mHideName,
@@ -365,7 +367,7 @@ export function AddCombatantDialog({
                 leftIcon={<Plus size={16} />}
               >
                 Add {selMonster.name}
-                {mCount > 1 ? ` ×${mCount}` : ''}
+                {safeMonsterCount > 1 ? ` ×${safeMonsterCount}` : ''}
               </Button>
             )}
             {tab === 'custom' && (

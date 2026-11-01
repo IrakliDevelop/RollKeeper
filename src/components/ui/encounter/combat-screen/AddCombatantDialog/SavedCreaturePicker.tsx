@@ -7,6 +7,7 @@ import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
 import { stripTags } from '@/utils/parseEntriesToHtml';
+import { statBlockHtmlToPlainText } from '@/utils/statBlockText';
 import type { CampaignNPC } from '@/types/encounter';
 
 interface SavedCreaturePickerProps {
@@ -14,6 +15,7 @@ interface SavedCreaturePickerProps {
   emptyMessage: string;
   onSelect: (creature: CampaignNPC) => void;
   onDelete?: (creature: CampaignNPC) => Promise<boolean>;
+  onDeleteFallbackFocus?: () => void;
 }
 
 const ALL_GROUPS = '__all__';
@@ -24,6 +26,7 @@ export function SavedCreaturePicker({
   emptyMessage,
   onSelect,
   onDelete,
+  onDeleteFallbackFocus,
 }: SavedCreaturePickerProps) {
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -127,9 +130,11 @@ export function SavedCreaturePicker({
                     )}
                     {creature.description && (
                       <span className="text-muted line-clamp-1 text-xs">
-                        {stripTags(creature.description)
-                          .replace(/<[^>]*>/g, '')
-                          .replace(/\*\*/g, '')}
+                        {statBlockHtmlToPlainText(
+                          stripTags(creature.description)
+                            .replace(/\*\*/g, '')
+                            .replace(/&nbsp;/gi, ' ')
+                        )}
                       </span>
                     )}
                   </div>
@@ -144,7 +149,11 @@ export function SavedCreaturePicker({
                   variant="danger"
                   size="sm"
                   onClick={async () => {
-                    if (await onDelete(creature)) searchRef.current?.focus();
+                    if (await onDelete(creature)) {
+                      if (searchRef.current?.isConnected)
+                        searchRef.current.focus();
+                      else onDeleteFallbackFocus?.();
+                    }
                   }}
                   aria-label={`Delete ${creature.name}`}
                 >

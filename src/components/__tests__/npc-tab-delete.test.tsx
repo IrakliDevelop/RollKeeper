@@ -92,6 +92,17 @@ describe('NpcTab — deleting a saved NPC', () => {
     ).toHaveFocus();
   });
 
+  it('focuses Create NPC after deleting the last saved NPC', async () => {
+    useNPCStore.setState({
+      npcsByCampaign: { CAMP1: [npc('npc1', 'Town Guard')] },
+    });
+    renderConfirmDialogHost();
+    render(<NpcTabInEncounter />);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Town Guard' }));
+    await clickConfirmDialogButton('Delete NPC');
+    expect(screen.getByRole('button', { name: 'Create NPC' })).toHaveFocus();
+  });
+
   it('shows an NPC created elsewhere while the tab is open', () => {
     render(<NpcTab npcs={[]} campaignCode="CAMP1" onAdd={vi.fn()} />);
 

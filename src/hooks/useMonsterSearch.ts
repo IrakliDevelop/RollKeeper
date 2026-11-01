@@ -23,6 +23,8 @@ export interface UseMonsterSearchResult {
   loading: boolean;
   /** Load-more request in flight. */
   loadingMore: boolean;
+  loadMoreError: boolean;
+  retryLoadMore: () => void;
   /** A request failed; an empty result is only a true no-match when false. */
   error: boolean;
   retry: () => void;
@@ -41,6 +43,7 @@ export function useMonsterSearch(): UseMonsterSearchResult {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
   const [error, setError] = useState(false);
   // Incremented per new search so stale responses are ignored.
   const searchIdRef = useRef(0);
@@ -48,6 +51,7 @@ export function useMonsterSearch(): UseMonsterSearchResult {
   const search = useCallback(async (q: string) => {
     const searchId = ++searchIdRef.current;
     setError(false);
+    setLoadMoreError(false);
     setResults([]);
     setTotal(0);
     setHasMore(false);
@@ -84,6 +88,7 @@ export function useMonsterSearch(): UseMonsterSearchResult {
     if (loading || loadingMore || !hasMore) return;
     const searchId = searchIdRef.current;
     setLoadingMore(true);
+    setLoadMoreError(false);
     try {
       const res = await fetch(
         `/api/bestiary/search?q=${encodeURIComponent(query.trim())}&limit=${PAGE_SIZE}&offset=${results.length}`
@@ -97,9 +102,11 @@ export function useMonsterSearch(): UseMonsterSearchResult {
           setTotal(data.total ?? 0);
           setHasMore(data.hasMore ?? false);
         }
+      } else if (searchId === searchIdRef.current) {
+        setLoadMoreError(true);
       }
     } catch {
-      // silently fail
+      if (searchId === searchIdRef.current) setLoadMoreError(true);
     } finally {
       // Unconditional: if a new query superseded this request, the
       // searchId guard above already ignored its data, but the flag
@@ -125,6 +132,8 @@ export function useMonsterSearch(): UseMonsterSearchResult {
     hasMore,
     loading,
     loadingMore,
+    loadMoreError,
+    retryLoadMore: loadMore,
     error,
     retry,
     loadMore,

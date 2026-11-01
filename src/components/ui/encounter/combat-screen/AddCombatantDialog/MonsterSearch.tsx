@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
+import { stripTags } from '@/utils/parseEntriesToHtml';
 import type { ProcessedMonster } from '@/types/bestiary';
 
 interface MonsterSearchProps {
@@ -15,10 +16,12 @@ interface MonsterSearchProps {
   hasMore: boolean;
   loading: boolean;
   loadingMore: boolean;
+  loadMoreError: boolean;
   error: boolean;
   onRetry: () => void;
   onSelect: (m: ProcessedMonster) => void;
   onLoadMore: () => void;
+  onRetryLoadMore: () => void;
 }
 
 export function MonsterSearch({
@@ -29,43 +32,56 @@ export function MonsterSearch({
   hasMore,
   loading,
   loadingMore,
+  loadMoreError,
   error,
   onRetry,
   onSelect,
   onLoadMore,
+  onRetryLoadMore,
 }: MonsterSearchProps) {
+  const searchRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="space-y-3 pb-4">
       <Input
+        ref={searchRef}
         value={query}
         onChange={event => onQueryChange(event.target.value)}
-        placeholder="Search the bestiary…"
+        placeholder="Goblin"
         aria-label="Search the bestiary"
         leftIcon={<Search size={16} />}
         size="sm"
       />
 
       {loading && (
-        <p className="text-muted py-8 text-center text-sm">Searching…</p>
+        <p role="status" className="text-muted py-8 text-center text-sm">
+          Searching…
+        </p>
       )}
       {!loading && error && (
-        <div className="py-6 text-center">
+        <div role="alert" className="py-6 text-center">
           <p className="text-body text-sm">Bestiary didn&apos;t load.</p>
           <Button
             variant="secondary"
             size="sm"
-            onClick={onRetry}
+            onClick={() => {
+              onRetry();
+              searchRef.current?.focus();
+            }}
             className="mt-2"
           >
             Retry search
           </Button>
         </div>
       )}
-      {!loading && !error && results.length === 0 && query.length >= 2 && (
-        <p className="text-muted py-8 text-center text-sm">
-          No creatures match &ldquo;{query}&rdquo;.
-        </p>
-      )}
+      {!loading &&
+        !error &&
+        results.length === 0 &&
+        query.trim().length >= 2 && (
+          <p role="status" className="text-muted py-8 text-center text-sm">
+            No creatures match &ldquo;{query}&rdquo;.
+          </p>
+        )}
 
       <div className="border-divider border-t">
         {results.map(m => {
@@ -78,14 +94,14 @@ export function MonsterSearch({
             >
               <div className="flex items-center justify-between">
                 <span className="text-heading text-[14.5px] font-bold">
-                  {m.name}
+                  {stripTags(m.name)}
                 </span>
                 <Badge variant="neutral" size="sm">
-                  CR {m.cr}
+                  CR {stripTags(m.cr)}
                 </Badge>
               </div>
               <div className="text-muted mt-0.5 text-xs font-medium">
-                {m.hp} HP · AC {m.ac} · {mType}
+                {stripTags(m.hp)} HP · AC {stripTags(m.ac)} · {stripTags(mType)}
               </div>
             </button>
           );
@@ -97,13 +113,22 @@ export function MonsterSearch({
           <p className="text-muted text-xs font-medium">
             Showing {results.length} of {total}
           </p>
+          {loadMoreError && (
+            <p role="alert" className="text-body text-sm">
+              More creatures didn&apos;t load.
+            </p>
+          )}
           <Button
             variant="ghost"
             size="sm"
-            onClick={onLoadMore}
+            onClick={loadMoreError ? onRetryLoadMore : onLoadMore}
             disabled={loadingMore}
           >
-            {loadingMore ? 'Loading…' : 'Load more'}
+            {loadingMore
+              ? 'Loading…'
+              : loadMoreError
+                ? 'Retry load more'
+                : 'Load more'}
           </Button>
         </div>
       )}
