@@ -19,7 +19,10 @@ export default function SubclassSelectionStep({
 }: SubclassSelectionStepProps) {
   return (
     <div className="space-y-4">
-      <h3 className="type-subheading text-heading">
+      <h3
+        id="level-up-subclass-heading"
+        className="type-subheading text-heading"
+      >
         Choose your {className} subclass
       </h3>
       <RadioGroup
@@ -28,7 +31,7 @@ export default function SubclassSelectionStep({
           const subclass = subclasses.find(item => item.id === value);
           if (subclass) onSelect(subclass);
         }}
-        aria-label="Subclass"
+        aria-labelledby="level-up-subclass-heading"
         className="border-divider gap-0 border-t"
       >
         {subclasses.map(sc => (

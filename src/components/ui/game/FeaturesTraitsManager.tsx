@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RichTextContent } from '@/types/character';
 import { RichTextEditor } from '@/components/ui/forms';
 import { Input } from '@/components/ui/forms/input';
@@ -35,17 +35,42 @@ export default function FeaturesTraitsManager({
   const [isAdding, setIsAdding] = useState(false);
   const [draft, setDraft] = useState({ title: '', content: '' });
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  // Where focus returns once the inline form closes; the target only exists
+  // (or is enabled) after the next render.
+  const [returnFocusTo, setReturnFocusTo] = useState<string | null>(null);
   const title = category === 'feature' ? 'Features' : 'Traits';
   const addLabel = category === 'feature' ? 'Add feature' : 'Add trait';
   const deleteLabel =
     category === 'feature' ? 'Delete feature' : 'Delete trait';
 
+  useEffect(() => {
+    if (!returnFocusTo) return;
+    const target =
+      returnFocusTo === 'add'
+        ? addButtonRef.current
+        : listRef.current?.querySelector<HTMLButtonElement>(
+            `[data-edit-id="${CSS.escape(returnFocusTo)}"]`
+          );
+    target?.focus();
+    setReturnFocusTo(null);
+  }, [returnFocusTo]);
+
+  const closeAddForm = () => {
+    setDraft({ title: '', content: '' });
+    setIsAdding(false);
+    setReturnFocusTo('add');
+  };
+
+  const closeEditForm = (id: string) => {
+    setEditingId(null);
+    setReturnFocusTo(id);
+  };
+
   const handleSaveNew = () => {
     if (!draft.title.trim()) return;
     onAdd({ title: draft.title.trim(), content: draft.content, category });
-    setDraft({ title: '', content: '' });
-    setIsAdding(false);
-    addButtonRef.current?.focus();
+    closeAddForm();
   };
 
   const handleDelete = (item: RichTextContent) => {
@@ -58,7 +83,7 @@ export default function FeaturesTraitsManager({
       if (!confirmed) return;
       onDelete(item.id);
       setEditingId(null);
-      addButtonRef.current?.focus();
+      setReturnFocusTo('add');
     });
   };
 
@@ -88,7 +113,9 @@ export default function FeaturesTraitsManager({
             onChange={event =>
               setDraft(current => ({ ...current, title: event.target.value }))
             }
-            placeholder={category === 'feature' ? 'Darkvision' : 'Brave'}
+            placeholder={
+              category === 'feature' ? 'Fighting Style' : 'Darkvision'
+            }
             autoFocus
           />
           <div>
@@ -99,6 +126,7 @@ export default function FeaturesTraitsManager({
                 setDraft(current => ({ ...current, content }))
               }
               minHeight="100px"
+              placeholder=""
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -110,14 +138,7 @@ export default function FeaturesTraitsManager({
             >
               Save
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setIsAdding(false);
-                setDraft({ title: '', content: '' });
-              }}
-            >
+            <Button type="button" variant="ghost" onClick={closeAddForm}>
               Cancel
             </Button>
           </div>
@@ -128,7 +149,7 @@ export default function FeaturesTraitsManager({
           Add your first {category}.
         </p>
       ) : (
-        <ul className="divide-divider divide-y">
+        <ul ref={listRef} className="divide-divider divide-y">
           {safeItems.map(item => (
             <li key={item.id} className="py-3 pointer-coarse:min-h-11">
               {editingId === item.id ? (
@@ -136,9 +157,9 @@ export default function FeaturesTraitsManager({
                   item={item}
                   onSave={updates => {
                     onUpdate(item.id, updates);
-                    setEditingId(null);
+                    closeEditForm(item.id);
                   }}
-                  onCancel={() => setEditingId(null)}
+                  onCancel={() => closeEditForm(item.id)}
                 />
               ) : (
                 <div className="flex min-w-0 items-start justify-between gap-3">
@@ -162,6 +183,7 @@ export default function FeaturesTraitsManager({
                       type="button"
                       variant="ghost"
                       size="sm"
+                      data-edit-id={item.id}
                       onClick={() => setEditingId(item.id)}
                       aria-label={`Edit ${item.title}`}
                     >
@@ -212,6 +234,7 @@ function EditItemForm({
           content={content}
           onChange={setContent}
           minHeight="100px"
+          placeholder=""
         />
       </div>
       <div className="flex flex-wrap gap-2">

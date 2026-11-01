@@ -167,11 +167,11 @@ export const ASIValidation: Story = {
     const next = page.getByRole('button', { name: 'Next' });
     expect(next).toBeDisabled();
     await userEvent.click(
-      page.getByRole('button', { name: 'Raise constitution' })
+      page.getByRole('button', { name: 'Raise Constitution' })
     );
     expect(next).toBeDisabled();
     await userEvent.click(
-      page.getByRole('button', { name: 'Raise constitution' })
+      page.getByRole('button', { name: 'Raise Constitution' })
     );
     expect(next).toBeEnabled();
     await userEvent.click(page.getByRole('button', { name: 'Take a feat' }));
@@ -185,10 +185,10 @@ export const HPReview: Story = {
     await userEvent.click(page.getByRole('radio', { name: /2024 rules/i }));
     await userEvent.click(page.getByRole('button', { name: 'Next' }));
     await userEvent.click(
-      page.getByRole('button', { name: 'Raise constitution' })
+      page.getByRole('button', { name: 'Raise Constitution' })
     );
     await userEvent.click(
-      page.getByRole('button', { name: 'Raise constitution' })
+      page.getByRole('button', { name: 'Raise Constitution' })
     );
     await userEvent.click(page.getByRole('button', { name: 'Next' }));
     await userEvent.type(

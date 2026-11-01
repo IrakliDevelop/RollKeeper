@@ -24,7 +24,7 @@ const BACKGROUND_TABS: {
   {
     id: 'backstory',
     label: 'Backstory',
-    placeholder: "Tell your character's story...",
+    placeholder: "Tell your character's story",
     description:
       "Your character's history, origins, and important life events.",
     tips: [
@@ -36,7 +36,7 @@ const BACKGROUND_TABS: {
   {
     id: 'personality',
     label: 'Personality',
-    placeholder: "Describe your character's personality...",
+    placeholder: "Describe your character's personality",
     description: 'Personality traits, mannerisms, and behavioral quirks.',
     tips: [
       'Describe how they interact with others',
@@ -47,7 +47,7 @@ const BACKGROUND_TABS: {
   {
     id: 'ideals',
     label: 'Ideals',
-    placeholder: 'What drives your character...',
+    placeholder: 'What drives your character',
     description:
       'Principles, values, and beliefs that motivate your character.',
     tips: [
@@ -59,7 +59,7 @@ const BACKGROUND_TABS: {
   {
     id: 'bonds',
     label: 'Bonds',
-    placeholder: 'Who or what matters to your character...',
+    placeholder: 'Who or what matters to your character',
     description:
       'Important people, places, or things your character cares about.',
     tips: [
@@ -71,7 +71,7 @@ const BACKGROUND_TABS: {
   {
     id: 'flaws',
     label: 'Flaws',
-    placeholder: "Your character's weaknesses...",
+    placeholder: "Your character's weaknesses",
     description:
       'Weaknesses, fears, or negative traits that create interesting roleplay.',
     tips: [

@@ -30,14 +30,21 @@ function FeatureRow({
 }) {
   const [expanded, setExpanded] = useState(!!feature.choice);
   const hasDetails = !!feature.choice || !!feature.entries?.length;
+  if (!hasDetails)
+    return (
+      <li className="border-divider flex min-h-11 items-center border-b py-2">
+        <span className="type-ui text-heading min-w-0 font-semibold break-words">
+          {feature.name}
+        </span>
+      </li>
+    );
   return (
     <li className="border-divider border-b py-2">
       <Button
         type="button"
         variant="ghost"
         onClick={() => setExpanded(value => !value)}
-        disabled={!hasDetails}
-        aria-expanded={hasDetails ? expanded : undefined}
+        aria-expanded={expanded}
         className="h-auto min-h-11 w-full flex-wrap justify-between gap-3 px-0 text-left whitespace-normal"
       >
         <span className="type-ui text-heading min-w-0 font-semibold break-words">
@@ -48,12 +55,11 @@ function FeatureRow({
             {selectedOption || 'Choose one'}
           </span>
         )}
-        {hasDetails &&
-          (expanded ? (
-            <ChevronUp aria-hidden className="size-4 shrink-0" />
-          ) : (
-            <ChevronDown aria-hidden className="size-4 shrink-0" />
-          ))}
+        {expanded ? (
+          <ChevronUp aria-hidden className="size-4 shrink-0" />
+        ) : (
+          <ChevronDown aria-hidden className="size-4 shrink-0" />
+        )}
       </Button>
       {expanded && (
         <div className="space-y-3 pb-2">

@@ -10,15 +10,9 @@ interface EditionPickerStepProps {
   onSelect: (source: string) => void;
 }
 
-const EDITION_INFO: Record<string, { label: string; description: string }> = {
-  PHB: {
-    label: '2014 rules (PHB)',
-    description: "Original Player's Handbook — classic 5th Edition rules",
-  },
-  PHB2024: {
-    label: '2024 rules (PHB 2024)',
-    description: "Revised Player's Handbook — updated 5.5e rules",
-  },
+const EDITION_LABELS: Record<string, string> = {
+  PHB: '2014 rules (PHB)',
+  PHB2024: '2024 rules (PHB 2024)',
 };
 
 function getEditionKey(source: string): string {
@@ -41,7 +35,10 @@ export default function EditionPickerStep({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="type-subheading text-heading">
+        <h3
+          id="level-up-edition-heading"
+          className="type-subheading text-heading"
+        >
           Choose your rules edition
         </h3>
         <p className="type-body text-muted mt-1">
@@ -51,21 +48,18 @@ export default function EditionPickerStep({
       <RadioGroup
         value={selectedEdition}
         onValueChange={onSelect}
-        aria-label="Edition"
+        aria-labelledby="level-up-edition-heading"
         className="border-divider gap-0 border-t"
       >
         {editionOptions.map(option => {
-          const info = EDITION_INFO[getEditionKey(option.source)] || {
-            label: option.source,
-            description: '',
-          };
+          const label =
+            EDITION_LABELS[getEditionKey(option.source)] ?? option.source;
           const sourceValue = getSourceValue(option.source);
           return (
             <WizardChoiceRow
               key={option.id}
               value={sourceValue}
-              title={info.label}
-              description={info.description}
+              title={label}
             />
           );
         })}

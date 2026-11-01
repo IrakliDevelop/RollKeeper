@@ -22,13 +22,17 @@ interface ASIFeatStepProps {
   newTotalLevel: number;
 }
 
-const ABILITY_NAMES: { key: keyof CharacterAbilities; label: string }[] = [
-  { key: 'strength', label: 'STR' },
-  { key: 'dexterity', label: 'DEX' },
-  { key: 'constitution', label: 'CON' },
-  { key: 'intelligence', label: 'INT' },
-  { key: 'wisdom', label: 'WIS' },
-  { key: 'charisma', label: 'CHA' },
+const ABILITY_NAMES: {
+  key: keyof CharacterAbilities;
+  label: string;
+  name: string;
+}[] = [
+  { key: 'strength', label: 'STR', name: 'Strength' },
+  { key: 'dexterity', label: 'DEX', name: 'Dexterity' },
+  { key: 'constitution', label: 'CON', name: 'Constitution' },
+  { key: 'intelligence', label: 'INT', name: 'Intelligence' },
+  { key: 'wisdom', label: 'WIS', name: 'Wisdom' },
+  { key: 'charisma', label: 'CHA', name: 'Charisma' },
 ];
 
 function ASIPanel({
@@ -64,7 +68,7 @@ function ASIPanel({
         {remaining} point{remaining !== 1 ? 's' : ''} remaining
       </p>
       <ul className="divide-divider border-divider grid grid-cols-1 gap-x-6 border-t sm:grid-cols-2">
-        {ABILITY_NAMES.map(({ key, label }) => {
+        {ABILITY_NAMES.map(({ key, label, name }) => {
           const base = abilities[key];
           const amount = increases.find(i => i.ability === key)?.amount || 0;
           return (
@@ -86,7 +90,7 @@ function ASIPanel({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  aria-label={`Lower ${key}`}
+                  aria-label={`Lower ${name}`}
                   disabled={amount === 0}
                   onClick={() => change(key, -1)}
                   className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
@@ -97,7 +101,7 @@ function ASIPanel({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  aria-label={`Raise ${key}`}
+                  aria-label={`Raise ${name}`}
                   disabled={
                     remaining <= 0 || base + amount >= 20 || amount >= 2
                   }

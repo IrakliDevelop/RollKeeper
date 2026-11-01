@@ -34,7 +34,10 @@ export default function SubclassMigrationStep({
     <div className="space-y-5">
       <div>
         <p className="type-caption text-ember-text mb-2">Subclass not set</p>
-        <h3 className="type-subheading text-heading">
+        <h3
+          id="level-up-subclass-heading"
+          className="type-subheading text-heading"
+        >
           Choose your {className} subclass
         </h3>
         <p className="type-body text-muted mt-1">
@@ -48,7 +51,7 @@ export default function SubclassMigrationStep({
           const subclass = subclasses.find(item => item.id === value);
           if (subclass) onSelectSubclass(subclass);
         }}
-        aria-label="Subclass"
+        aria-labelledby="level-up-subclass-heading"
         className="border-divider gap-0 border-t"
       >
         {subclasses.map(sc => (

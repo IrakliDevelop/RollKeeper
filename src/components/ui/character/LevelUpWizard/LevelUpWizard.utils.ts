@@ -162,7 +162,7 @@ export function computeWizardSteps(params: {
 
   if (params.isCustomClass) {
     if (params.needsHPInput) {
-      steps.push({ id: 'hp', label: 'Hit Points' });
+      steps.push({ id: 'hp', label: 'Hit points' });
     }
     steps.push({ id: 'confirm', label: 'Confirm' });
     return steps;
@@ -184,10 +184,10 @@ export function computeWizardSteps(params: {
     steps.push({ id: 'features', label: 'Features' });
   }
   if (params.requiresASI) {
-    steps.push({ id: 'asi', label: 'Ability Score' });
+    steps.push({ id: 'asi', label: 'Ability scores' });
   }
   if (params.needsHPInput) {
-    steps.push({ id: 'hp', label: 'Hit Points' });
+    steps.push({ id: 'hp', label: 'Hit points' });
   }
   steps.push({ id: 'confirm', label: 'Confirm' });
 

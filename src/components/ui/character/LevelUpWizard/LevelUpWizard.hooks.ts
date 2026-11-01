@@ -210,6 +210,18 @@ export function useLevelUpWizard(character: CharacterState) {
     [targetClassIndex]
   );
 
+  const selectEdition = useCallback(
+    (edition: string | undefined) => {
+      if (edition === selectedEdition) return;
+      setSelectedEdition(edition);
+      setSelectedSubclass(undefined);
+      setFeatureChoices({});
+      setMigrationSubclass(undefined);
+      setMigrationAdoptedFeatures(new Set());
+    },
+    [selectedEdition]
+  );
+
   const targetClass: MulticlassInfo | null =
     targetClassIndex >= 0 ? classes[targetClassIndex] : null;
 
@@ -677,7 +689,7 @@ export function useLevelUpWizard(character: CharacterState) {
     canGoNext: canGoNext(),
     goNext,
     goBack,
-    setSelectedEdition,
+    setSelectedEdition: selectEdition,
     setTargetClassIndex: selectTargetClass,
     setSelectedSubclass,
     setASIChoice,

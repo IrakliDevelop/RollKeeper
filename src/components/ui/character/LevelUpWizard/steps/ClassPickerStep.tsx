@@ -18,7 +18,10 @@ export default function ClassPickerStep({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="type-subheading text-heading">
+        <h3
+          id="level-up-class-heading"
+          className="type-subheading text-heading"
+        >
           Choose the class that gains a level
         </h3>
         <p className="type-body text-muted mt-1">
@@ -28,7 +31,7 @@ export default function ClassPickerStep({
       <RadioGroup
         value={selectedIndex >= 0 ? String(selectedIndex) : undefined}
         onValueChange={value => onSelect(Number(value))}
-        aria-label="Class"
+        aria-labelledby="level-up-class-heading"
         className="border-divider gap-0 border-t"
       >
         {classes.map((cls, index) => (
