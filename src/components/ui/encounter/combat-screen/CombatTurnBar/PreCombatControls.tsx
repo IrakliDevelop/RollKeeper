@@ -52,14 +52,14 @@ export function PreCombatControls({
           onClick={onRequestPlayerRolls}
           disabled={isEmpty || !hasPlayers}
           leftIcon={<Swords size={16} />}
-          title={
-            requestActive
-              ? 'Re-request (players who already answered are asked again)'
-              : 'Ask players to roll initiative'
-          }
         >
           {requestActive ? 'Re-request player rolls' : 'Request player rolls'}
         </Button>
+      )}
+      {canRequestRolls && requestActive && (
+        <span className="text-muted text-xs">
+          Request again to ask players who already answered.
+        </span>
       )}
       {canRequestRolls && requestActive && waitingNames.length > 0 && (
         <span className="text-muted text-xs">

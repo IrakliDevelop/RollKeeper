@@ -278,4 +278,26 @@ describe('CombatAppBar — rename behavior', () => {
       screen.getByRole('button', { name: 'Add combatant' })
     ).toHaveAttribute('data-variant', 'secondary');
   });
+
+  it('saves a renamed encounter and restores focus to Rename', () => {
+    const onRename = vi.fn();
+    render(
+      <CombatAppBar
+        name="Old Name"
+        backHref="/"
+        onRename={onRename}
+        onOpenAdd={vi.fn()}
+        onOpenConfig={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Old Name' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Encounter name' }), {
+      target: { value: 'New Name' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }));
+    expect(onRename).toHaveBeenCalledWith('New Name');
+    expect(
+      screen.getByRole('button', { name: 'Rename Old Name' })
+    ).toHaveFocus();
+  });
 });
