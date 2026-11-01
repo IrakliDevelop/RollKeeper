@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 import {
   ABILITY_KEYS,
   abilitySaveValue,
@@ -86,16 +87,15 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
                 {signedModifier(score)}
               </span>
               {!isPlayer && (
-                <label className="text-muted flex items-center gap-0.5 text-xs font-semibold">
-                  <input
-                    type="checkbox"
+                <div className="text-muted flex items-center gap-0.5 text-xs font-semibold">
+                  <Checkbox
+                    size="sm"
                     checked={proficient}
-                    onChange={event => setProficient(key, event.target.checked)}
+                    onCheckedChange={checked => setProficient(key, checked)}
                     aria-label={`${ABILITY_LABELS[i]} saving throw proficiency`}
-                    className="text-brass-text h-4 w-4 accent-current pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   />
                   Prof
-                </label>
+                </div>
               )}
               {proficient ? (
                 <span className="text-brass-text text-xs font-bold">

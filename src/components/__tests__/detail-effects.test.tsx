@@ -86,6 +86,26 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
     expect(conditionsTab).toHaveFocus();
   });
 
+  it('gives concurrent detail panes distinct tab and panel ids', () => {
+    render(
+      <>
+        <DetailEffects entity={entity} actions={makeActions()} />
+        <DetailEffects
+          entity={{ ...entity, id: 'npc-2' }}
+          actions={makeActions()}
+        />
+      </>
+    );
+    const tabs = screen.getAllByRole('tab', { name: 'Conditions' });
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0].id).not.toBe(tabs[1].id);
+    for (const tab of tabs) {
+      expect(
+        document.getElementById(tab.getAttribute('aria-controls')!)
+      ).toBeInTheDocument();
+    }
+  });
+
   it('renders without an update loop when persisted combatConfig lacks customConditions (legacy data)', () => {
     // Pre-custom-statuses localStorage hydrates a combatConfig without the
     // field; the selector fallback must stay referentially stable or React's

@@ -42,7 +42,7 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
               placeholder="None"
               aria-label="Concentration spell"
               size="sm"
-              className="min-w-0 flex-1"
+              wrapperClassName="min-w-0 flex-1"
             />
             {entity.concentrationSpell && (
               <Button

@@ -44,7 +44,7 @@ function InfoRow({
             defaultValue={value ?? ''}
             onBlur={e => onChange?.(e.target.value)}
             size="sm"
-            className="min-w-0 flex-1"
+            wrapperClassName="min-w-0 flex-1"
             aria-label={label}
           />
         )

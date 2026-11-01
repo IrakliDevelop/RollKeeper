@@ -146,11 +146,9 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
                 title="Temporary AC bonus"
               />
               {(entity.tempAc ?? 0) > 0 && (
-                <span
-                  className="text-heading text-xs font-semibold"
-                  aria-label="Effective AC"
-                >
-                  = {effectiveAc(entity.armorClass, entity.tempAc)}
+                <span className="text-heading text-xs font-semibold">
+                  <span className="sr-only">Effective AC </span>={' '}
+                  {effectiveAc(entity.armorClass, entity.tempAc)}
                 </span>
               )}
             </div>

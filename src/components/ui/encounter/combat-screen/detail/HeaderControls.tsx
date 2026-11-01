@@ -118,7 +118,7 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
           placeholder="Alias…"
           size="sm"
           aria-label={`Player alias for ${entity.name}`}
-          className="w-36"
+          wrapperClassName="w-36"
           autoFocus
         />
       ) : (

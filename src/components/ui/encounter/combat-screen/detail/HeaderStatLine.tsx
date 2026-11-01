@@ -56,7 +56,7 @@ export function HeaderStatLine({ entity, actions }: HeaderStatLineProps) {
               defaultValue={sb.speed ?? ''}
               onBlur={e => updateSpeed(e.target.value)}
               size="sm"
-              className="max-w-64 min-w-0 flex-1"
+              wrapperClassName="max-w-64 min-w-0 flex-1"
               aria-label="Speed"
             />
           )}

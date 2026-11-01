@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -21,12 +21,8 @@ import { usePaletteSpellEffects } from '@/hooks/usePaletteSpellEffects';
 import type { DetailSectionProps } from './DetailHeader';
 import type { EffectPaletteEntry } from '../effectPalettes';
 
-const PALETTE_TAB_IDS = {
-  conditions: 'combat-effects-conditions',
-  buffs: 'combat-effects-buffs',
-} as const;
-
 export function DetailEffects({ entity, actions }: DetailSectionProps) {
+  const tabId = useId();
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
   const library = useConditionLibrary();
@@ -122,7 +118,7 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
           placeholder="Custom effect…"
           aria-label="Custom effect name"
           size="sm"
-          className="min-w-0 flex-1"
+          wrapperClassName="min-w-0 flex-1"
         />
         <Button
           type="button"
@@ -140,13 +136,13 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const tabs: SubTabDefinition[] = [
     {
       value: 'conditions',
-      id: PALETTE_TAB_IDS.conditions,
+      id: `${tabId}-combat-effects-conditions`,
       label: 'Conditions',
       content: tab === 'conditions' ? paletteContent : null,
     },
     {
       value: 'buffs',
-      id: PALETTE_TAB_IDS.buffs,
+      id: `${tabId}-combat-effects-buffs`,
       label: 'Buffs',
       content: tab === 'buffs' ? paletteContent : null,
     },
