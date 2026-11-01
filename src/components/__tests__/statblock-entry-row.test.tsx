@@ -84,7 +84,10 @@ describe('StatBlockEntryRow', () => {
     );
     const availablePip = screen.getByLabelText('Smite use 2 (available)');
     expect((availablePip as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText('Not enough Wild Shape uses')).toBeVisible();
+    expect(screen.getByText('Needs 2 Wild Shape, 1 left')).toBeVisible();
+    expect(availablePip.getAttribute('title')).toBe(
+      'Needs 2 Wild Shape, 1 left'
+    );
     availablePip.click();
     expect(onUse).not.toHaveBeenCalled();
     const usedPip = screen.getByLabelText('Smite use 1 (used)');
@@ -129,6 +132,23 @@ describe('StatBlockEntryRow', () => {
     expect(
       view.getByText(/Wild Shape/).closest('[data-variant]')
     ).toHaveAttribute('data-variant', 'neutral');
+  });
+
+  it('says how many items an inventory cost needs and how many are left', () => {
+    const entry: StatBlockEntry = {
+      id: 'entry-arrows',
+      name: 'Volley',
+      text: '',
+      inventoryCost: { inventoryItemId: 'arrows', quantity: 3 },
+    };
+    const view = render(
+      <StatBlockEntryRow
+        entry={entry}
+        inventory={[{ id: 'arrows', name: 'Arrows', quantity: 1 } as never]}
+        onSpendCost={vi.fn()}
+      />
+    );
+    expect(view.getByText('Needs 3 Arrows, 1 left')).toBeVisible();
   });
 
   it('names a missing inventory item instead of a generic shortage', () => {

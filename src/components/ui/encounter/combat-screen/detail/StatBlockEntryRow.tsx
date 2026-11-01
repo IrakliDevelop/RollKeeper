@@ -84,11 +84,11 @@ export function StatBlockEntryRow({
   const canSpend = trackable ? !!onUseAbility : !!onSpendCost;
   const blockedReason = costInsufficient
     ? resource
-      ? `Not enough ${resource.name} uses`
+      ? `Needs ${cost.amount} ${resource.name}, ${remaining} left`
       : 'Resource removed'
     : inventoryInsufficient
       ? inventoryItem
-        ? `Not enough ${inventoryItem.name}`
+        ? `Needs ${inventoryCost.quantity} ${inventoryItem.name}, ${inventoryItem.quantity} left`
         : 'Inventory item removed'
       : null;
 
@@ -148,9 +148,7 @@ export function StatBlockEntryRow({
                         ? `Restore use (does not refund ${resource.name})`
                         : 'Restore use'
                       : useBlocked
-                        ? resource
-                          ? `Not enough ${resource.name} uses`
-                          : 'Resource removed'
+                        ? (blockedReason ?? undefined)
                         : cost && resource
                           ? `Use — spends ${cost.amount} ${resource.name}`
                           : 'Use'
