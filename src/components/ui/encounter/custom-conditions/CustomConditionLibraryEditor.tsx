@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { createCustomCondition } from '@/utils/customConditions';
@@ -18,13 +19,28 @@ export function CustomConditionLibraryEditor({
   conditions,
   onChange,
 }: CustomConditionLibraryEditorProps) {
+  const addRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+
+  useEffect(() => {
+    if (returnFocus.current) {
+      addRef.current?.focus();
+      returnFocus.current = false;
+    }
+  }, [conditions]);
+
   const patch = (id: string, changes: Partial<CustomConditionDraft>) =>
     onChange(conditions.map(c => (c.id === id ? { ...c, ...changes } : c)));
+
+  const handleRemove = (id: string) => {
+    returnFocus.current = true;
+    onChange(conditions.filter(c => c.id !== id));
+  };
 
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-heading text-sm font-medium">Custom conditions</h3>
+        <h3 className="type-subheading text-heading">Custom conditions</h3>
         <p className="text-muted mt-1 text-xs">
           Reusable conditions for every combat. Names, icons and descriptions
           are shown to players when the condition is on their character, or on a
@@ -33,10 +49,7 @@ export function CustomConditionLibraryEditor({
       </div>
 
       {conditions.length === 0 ? (
-        <p className="text-faint text-xs">
-          No custom conditions yet — add one, then attach it to the creatures
-          that inflict it.
-        </p>
+        <p className="text-muted text-sm">Add a condition to use in combat.</p>
       ) : (
         <div className="space-y-2">
           {conditions.map(condition => (
@@ -44,7 +57,7 @@ export function CustomConditionLibraryEditor({
               key={condition.id}
               role="group"
               aria-label={condition.name || 'New condition'}
-              className="border-divider bg-surface-raised flex items-start gap-2 rounded-lg border p-2"
+              className="border-divider flex flex-wrap items-start gap-2 border-b py-3"
             >
               <div className="min-w-0 flex-1">
                 <CustomConditionFields
@@ -56,9 +69,7 @@ export function CustomConditionLibraryEditor({
                 variant="ghost"
                 size="sm"
                 type="button"
-                onClick={() =>
-                  onChange(conditions.filter(c => c.id !== condition.id))
-                }
+                onClick={() => handleRemove(condition.id)}
                 aria-label={`Remove ${condition.name || 'unnamed condition'}`}
               >
                 <Trash2 size={14} className="text-muted" />
@@ -69,6 +80,7 @@ export function CustomConditionLibraryEditor({
       )}
 
       <Button
+        ref={addRef}
         variant="outline"
         size="sm"
         type="button"

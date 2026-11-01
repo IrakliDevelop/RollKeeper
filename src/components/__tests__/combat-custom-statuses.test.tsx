@@ -73,6 +73,21 @@ describe('custom combat statuses', () => {
     ]);
   });
 
+  it('names each editable HP band and removes the chosen row without losing focus', async () => {
+    const user = userEvent.setup();
+    render(<CombatConfigDialog open onOpenChange={vi.fn()} />);
+    await user.click(screen.getByRole('radio', { name: /State label/i }));
+    expect(
+      screen.getByRole('textbox', { name: /Healthy threshold/i })
+    ).toBeVisible();
+    const remove = screen.getByRole('button', { name: 'Remove Healthy band' });
+    await user.click(remove);
+    expect(
+      screen.queryByRole('textbox', { name: /Healthy threshold/i })
+    ).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add band' })).toHaveFocus();
+  });
+
   it('offers saved conditions in the combatant palette and applies icon + description', async () => {
     const user = userEvent.setup();
     useEncounterStore.getState().setCombatConfig({

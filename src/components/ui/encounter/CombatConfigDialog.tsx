@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import {
   Dialog,
@@ -79,6 +79,15 @@ interface CombatConfigDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type DraftBand = HpStateBand & { draftId: string };
+
+function toDraftBands(bands: HpStateBand[], prefix: string): DraftBand[] {
+  return bands.map((band, index) => ({
+    ...band,
+    draftId: `${prefix}-${index}`,
+  }));
+}
+
 export function CombatConfigDialog({
   open,
   onOpenChange,
@@ -93,7 +102,12 @@ export function CombatConfigDialog({
     useState<EnemyConditionsDisplay>(
       combatConfig.enemyConditionsDisplay ?? 'off'
     );
-  const [bands, setBands] = useState<HpStateBand[]>(combatConfig.hpStateBands);
+  const [bands, setBands] = useState<DraftBand[]>(() =>
+    toDraftBands(combatConfig.hpStateBands, 'initial')
+  );
+  const bandSequence = useRef(0);
+  const addBandRef = useRef<HTMLButtonElement>(null);
+  const returnBandFocus = useRef(false);
   const [customConditions, setCustomConditions] = useState<CustomCondition[]>(
     combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
   );
@@ -104,7 +118,12 @@ export function CombatConfigDialog({
     if (open) {
       setHpDisplay(combatConfig.enemyHpDisplay);
       setConditionsDisplay(combatConfig.enemyConditionsDisplay ?? 'off');
-      setBands(combatConfig.hpStateBands);
+      setBands(
+        toDraftBands(
+          combatConfig.hpStateBands,
+          `open-${++bandSequence.current}`
+        )
+      );
       setCustomConditions(
         combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
       );
@@ -112,12 +131,23 @@ export function CombatConfigDialog({
     }
   }, [open, combatConfig]);
 
+  useEffect(() => {
+    if (returnBandFocus.current) {
+      addBandRef.current?.focus();
+      returnBandFocus.current = false;
+    }
+  }, [bands]);
+
   const handleAddBand = () => {
-    setBands(prev => [...prev, { minPercent: 0, label: '' }]);
+    setBands(prev => [
+      ...prev,
+      { draftId: `added-${++bandSequence.current}`, minPercent: 0, label: '' },
+    ]);
   };
 
   const handleRemoveBand = (index: number) => {
     setBands(prev => prev.filter((_, i) => i !== index));
+    returnBandFocus.current = true;
   };
 
   const handleBandChange = (
@@ -141,12 +171,15 @@ export function CombatConfigDialog({
   };
 
   const handleResetBands = () => {
-    setBands([...DEFAULT_HP_STATE_BANDS]);
+    setBands(
+      toDraftBands(DEFAULT_HP_STATE_BANDS, `reset-${++bandSequence.current}`)
+    );
   };
 
   const handleSave = () => {
     const cleaned = bands
       .filter(b => b.label.trim() !== '')
+      .map(({ minPercent, label }) => ({ minPercent, label }))
       .sort((a, b) => b.minPercent - a.minPercent);
 
     setCombatConfig({
@@ -166,7 +199,7 @@ export function CombatConfigDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Combat Configuration</DialogTitle>
+          <DialogTitle>Combat configuration</DialogTitle>
           <DialogDescription>
             Controls what players see for enemy HP and conditions during combat.
           </DialogDescription>
@@ -208,7 +241,6 @@ export function CombatConfigDialog({
                       value={opt.value}
                       label={opt.label}
                       description={opt.description}
-                      variant="card"
                       size="sm"
                     />
                   ))}
@@ -239,8 +271,12 @@ export function CombatConfigDialog({
 
                   <div className="space-y-2">
                     {bands.map((band, index) => (
-                      <div key={index} className="flex items-center gap-2">
+                      <div
+                        key={band.draftId}
+                        className="border-divider flex flex-wrap items-end gap-2 border-b pb-2"
+                      >
                         <NumberInput
+                          label={`${band.label || `Band ${index + 1}`} threshold`}
                           value={band.minPercent}
                           onChange={v =>
                             setBands(prev =>
@@ -251,26 +287,24 @@ export function CombatConfigDialog({
                           }
                           min={0}
                           max={100}
-                          wrapperClassName="w-24 shrink-0"
-                          aria-label="Minimum percent"
+                          wrapperClassName="w-32 shrink-0"
                         />
-                        <span className="text-muted shrink-0 text-sm">%</span>
                         <Input
                           type="text"
+                          label={`Band ${index + 1} label`}
                           value={band.label}
                           onChange={e =>
                             handleBandChange(index, 'label', e.target.value)
                           }
-                          placeholder="Label..."
-                          wrapperClassName="flex-1"
-                          aria-label="Band label"
+                          placeholder="Healthy"
+                          wrapperClassName="min-w-32 flex-1"
                         />
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveBand(index)}
                           type="button"
-                          aria-label="Remove band"
+                          aria-label={`Remove ${band.label || `band ${index + 1}`} band`}
                         >
                           <Trash2 size={14} className="text-muted" />
                         </Button>
@@ -279,12 +313,13 @@ export function CombatConfigDialog({
                   </div>
 
                   <Button
+                    ref={addBandRef}
                     variant="outline"
                     size="sm"
                     onClick={handleAddBand}
                     type="button"
                   >
-                    + Add band
+                    Add band
                   </Button>
                 </div>
               )}
