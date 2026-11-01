@@ -156,7 +156,6 @@ export function ChargePoolDisplay({
                     }
                     disabled={!canUse}
                     className="border-divider text-body disabled:text-faint shrink-0 rounded border px-2 py-1.5 text-sm pointer-coarse:min-h-11"
-                    aria-label={`Use (${ability.cost} ${ability.cost === 1 ? 'charge' : 'charges'})`}
                     aria-describedby={`${namePrefix}-${ability.id}`}
                   >
                     Use ({ability.cost}{' '}

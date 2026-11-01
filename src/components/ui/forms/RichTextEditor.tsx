@@ -74,6 +74,8 @@ export default function RichTextEditor({
     editorProps: {
       attributes: {
         'aria-label': ariaLabel,
+        role: 'textbox',
+        'aria-multiline': 'true',
         class: 'focus:outline-none',
         style: `min-height: ${minHeight}; padding: 16px;`,
       },

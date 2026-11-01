@@ -173,14 +173,18 @@ describe('InventoryManager', () => {
       </>
     );
     fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete item', description: 'Rope' })
+    );
     expect(
       screen.getByRole('alertdialog', { name: 'Delete Rope?' })
     ).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onDeleteItem).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete item', description: 'Rope' })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
     await waitFor(() => expect(onDeleteItem).toHaveBeenCalledWith('i1'));
   });

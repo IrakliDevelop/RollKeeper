@@ -23,7 +23,6 @@ import {
   Zap,
   Infinity,
 } from 'lucide-react';
-import { AppIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
@@ -201,6 +200,8 @@ const SpellCard: React.FC<{
             variant="secondary"
             size="xs"
             title="Cast spell"
+            aria-label="Cast spell"
+            aria-describedby={nameId}
           >
             <Wand2 size={12} />
           </Button>
@@ -223,6 +224,8 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="View details"
+            aria-label="View details"
+            aria-describedby={nameId}
           >
             <Eye size={14} />
           </Button>
@@ -386,6 +389,8 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="View details"
+              aria-label="View details"
+              aria-describedby={nameId}
             >
               <Eye size={16} />
             </Button>
@@ -603,7 +608,6 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(
     new Set([0, 1, 2])
   );
-  const [justAutoFilled, setJustAutoFilled] = useState(false);
 
   // Load spells from spellbook for autocomplete
   const { spells: spellbookSpells, loading: spellbookLoading } =
@@ -730,12 +734,6 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
   const handleSpellSelect = (spell: ProcessedSpell) => {
     const converted = convertProcessedSpellToFormData(spell);
     setFormData(converted);
-    setJustAutoFilled(true);
-
-    // Clear the animation flag after 2 seconds
-    setTimeout(() => {
-      setJustAutoFilled(false);
-    }, 2000);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1332,13 +1330,6 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
                     placeholder="Search spells from spellbook database..."
                   />
                 </div>
-              )}
-
-              {/* Auto-fill success message */}
-              {justAutoFilled && (
-                <p className="text-muted text-sm">
-                  Spell details filled in. Review before saving.
-                </p>
               )}
 
               <SpellFormFields

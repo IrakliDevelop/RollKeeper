@@ -114,7 +114,6 @@ export function ItemCard({
             variant="outline"
             size="sm"
             onClick={onUse}
-            aria-label="Use item"
             aria-describedby={nameId}
           >
             Use item
@@ -163,7 +162,6 @@ export function ItemCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onView(item)}
-                aria-label="View details"
                 aria-describedby={nameId}
               >
                 View details
@@ -175,7 +173,6 @@ export function ItemCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onEdit(item)}
-                aria-label="Edit"
                 aria-describedby={nameId}
               >
                 Edit
@@ -187,7 +184,6 @@ export function ItemCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onSend(item)}
-                aria-label="Send to a player"
                 aria-describedby={nameId}
               >
                 Send to a player
@@ -199,7 +195,6 @@ export function ItemCard({
                 variant="danger"
                 size="sm"
                 onClick={onDelete}
-                aria-label="Delete item"
                 aria-describedby={nameId}
               >
                 Delete item
