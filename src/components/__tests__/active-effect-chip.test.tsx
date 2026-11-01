@@ -18,7 +18,7 @@ function renderChip(cond: EncounterCondition) {
 }
 
 describe('ActiveEffectChip', () => {
-  it('shows the custom icon and uses the description as hover text', () => {
+  it('shows the custom icon and description in text', () => {
     const { container } = renderChip({
       id: 'c1',
       name: 'Cursed Blood',
@@ -27,7 +27,7 @@ describe('ActiveEffectChip', () => {
       kind: 'debuff',
     });
     expect(container.querySelector('.lucide-droplet')).not.toBeNull();
-    expect(container.firstElementChild?.getAttribute('title')).toBe(
+    expect(container).toHaveTextContent(
       'Lose 1d4 HP at the start of each turn.'
     );
   });
@@ -40,22 +40,19 @@ describe('ActiveEffectChip', () => {
       sourceSpell: 'Bless',
     });
     expect(container.querySelector('svg.lucide-droplet')).toBeNull();
-    expect(container.querySelector('span.rounded-full.h-2')).not.toBeNull();
-    expect(container.firstElementChild?.getAttribute('title')).toBe(
-      'From: Bless'
-    );
+    expect(container.querySelector('span.rounded-full')).not.toBeNull();
+    expect(container).toHaveTextContent('From Bless');
   });
 
-  it('joins description and spell source, and has no title when neither exists', () => {
+  it('shows description and spell source, and omits a title tooltip', () => {
     const both = renderChip({
       id: 'c3',
       name: 'Hexed',
       description: 'Disadvantage on Wisdom checks.',
       sourceSpell: 'Hex',
     });
-    expect(both.container.firstElementChild?.getAttribute('title')).toBe(
-      'Disadvantage on Wisdom checks. — From: Hex'
-    );
+    expect(both.container).toHaveTextContent('Disadvantage on Wisdom checks.');
+    expect(both.container).toHaveTextContent('From Hex');
     cleanup();
     const none = renderChip({ id: 'c4', name: 'Prone' });
     expect(none.container.firstElementChild?.hasAttribute('title')).toBe(false);

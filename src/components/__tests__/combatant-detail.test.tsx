@@ -298,7 +298,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     const user = userEvent.setup();
     render(<CombatantDetail entity={monsterEntity} actions={actions} />);
 
-    await user.click(screen.getByRole('button', { name: 'Buffs' }));
+    await user.click(screen.getByRole('tab', { name: 'Buffs' }));
     await user.click(screen.getByRole('button', { name: 'Bless' }));
 
     expect(actions.onAddCondition).toHaveBeenCalledWith('monster-1', {

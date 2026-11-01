@@ -20,10 +20,8 @@ export function CreatureConditionsRow({
   if (items.length === 0) return null;
   return (
     <div className="space-y-1">
-      <h4 className="text-muted text-[11px] font-semibold tracking-wider uppercase">
-        From creatures
-      </h4>
-      <div className="flex flex-wrap gap-1">
+      <h4 className="type-label-heading text-heading">From creatures</h4>
+      <div className="grid gap-2">
         {items.map(item => {
           const { condition, sourceName } = item;
           const Icon = getConditionIcon(
@@ -32,19 +30,28 @@ export function CreatureConditionsRow({
             condition.icon
           );
           return (
-            <Button
+            <div
               key={condition.id}
-              variant="outline"
-              size="xs"
-              type="button"
-              disabled={activeNames.has(condition.name)}
-              aria-label={`${condition.name} (from ${sourceName})`}
-              title={condition.description || `From ${sourceName}`}
-              onClick={() => onApply(item)}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1"
             >
-              <Icon size={11} aria-hidden />
-              {condition.name}
-            </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                type="button"
+                disabled={activeNames.has(condition.name)}
+                aria-label={`${condition.name} (from ${sourceName})`}
+                onClick={() => onApply(item)}
+              >
+                <Icon size={12} aria-hidden="true" />
+                {condition.name}
+              </Button>
+              <span className="text-muted text-xs">From {sourceName}</span>
+              {condition.description && (
+                <span className="text-muted text-xs">
+                  {condition.description}
+                </span>
+              )}
+            </div>
           );
         })}
       </div>

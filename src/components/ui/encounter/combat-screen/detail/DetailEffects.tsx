@@ -2,6 +2,10 @@
 
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { Input } from '@/components/ui/forms/input';
+import { Badge } from '@/components/ui/layout/badge';
+import { SubTabs, type SubTabDefinition } from '@/components/ui/layout/SubTabs';
 import { ActiveEffectChip } from './ActiveEffectChip';
 import { CreatureConditionsRow } from './CreatureConditionsRow';
 import {
@@ -17,18 +21,10 @@ import { usePaletteSpellEffects } from '@/hooks/usePaletteSpellEffects';
 import type { DetailSectionProps } from './DetailHeader';
 import type { EffectPaletteEntry } from '../effectPalettes';
 
-const PALETTE_TABS: PaletteTab[] = ['conditions', 'buffs'];
-
-function paletteChipClass(tab: PaletteTab, isActive: boolean): string {
-  if (tab === 'conditions') {
-    return isActive
-      ? 'bg-accent-red-bg text-accent-red-text cursor-not-allowed opacity-60'
-      : 'bg-surface-raised text-muted hover:bg-accent-red-bg hover:text-accent-red-text shadow-sm';
-  }
-  return isActive
-    ? 'bg-accent-emerald-bg text-accent-emerald-text cursor-not-allowed opacity-60'
-    : 'bg-surface-raised text-muted hover:bg-accent-emerald-bg hover:text-accent-emerald-text shadow-sm';
-}
+const PALETTE_TAB_IDS = {
+  conditions: 'combat-effects-conditions',
+  buffs: 'combat-effects-buffs',
+} as const;
 
 export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const [tab, setTab] = useState<PaletteTab>('conditions');
@@ -40,7 +36,8 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
     usePaletteSpellEffects();
   const creatureConditions = useCreatureConditions(entity.id, library);
 
-  const activeNames = new Set(entity.conditions.map(c => c.name));
+  const activeConditions = entity.conditions ?? [];
+  const activeNames = new Set(activeConditions.map(c => c.name));
   const palette = buildEffectPalette(
     tab,
     library,
@@ -71,15 +68,97 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
     );
   };
 
+  const paletteContent = (
+    <div className="space-y-3">
+      <div className="grid gap-2">
+        {palette.map(entry => {
+          const isActive = activeNames.has(entry.name);
+          const isWaitingForRules =
+            (entry.origin === 'official' && officialConditionsLoading) ||
+            (entry.origin === 'spell' && spellEffectsLoading);
+          const Icon = entry.condition
+            ? getConditionIcon(entry.name, entry.kind, entry.condition.icon)
+            : null;
+          const description = entry.condition?.description || entry.description;
+          return (
+            <div
+              key={entry.condition?.id ?? entry.name}
+              className="border-divider flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-2 last:border-b-0"
+            >
+              {isActive ? (
+                <Badge
+                  variant={tab === 'buffs' ? 'success' : 'warning'}
+                  size="sm"
+                >
+                  {entry.name} · Active
+                </Badge>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  disabled={isWaitingForRules}
+                  onClick={() => handleApplyPalette(entry)}
+                >
+                  {Icon && <Icon size={12} aria-hidden="true" />}
+                  {entry.name}
+                </Button>
+              )}
+              {description && (
+                <span className="text-muted text-xs">{description}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={customInput}
+          onChange={e => setCustomInput(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') handleAddCustom();
+          }}
+          placeholder="Custom effect…"
+          aria-label="Custom effect name"
+          size="sm"
+          className="min-w-0 flex-1"
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={handleAddCustom}
+          disabled={!customInput.trim()}
+        >
+          <Plus size={12} aria-hidden="true" />
+          Add effect
+        </Button>
+      </div>
+    </div>
+  );
+  const tabs: SubTabDefinition[] = [
+    {
+      value: 'conditions',
+      id: PALETTE_TAB_IDS.conditions,
+      label: 'Conditions',
+      content: tab === 'conditions' ? paletteContent : null,
+    },
+    {
+      value: 'buffs',
+      id: PALETTE_TAB_IDS.buffs,
+      label: 'Buffs',
+      content: tab === 'buffs' ? paletteContent : null,
+    },
+  ];
+
   return (
     <div className="border-divider space-y-3 border-t p-4">
-      <h3 className="text-heading text-xs font-semibold tracking-wider uppercase">
-        Active Effects
-      </h3>
+      <h3 className="type-label-heading text-heading">Active effects</h3>
 
-      {entity.conditions.length > 0 && (
+      {activeConditions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {entity.conditions.map(cond => (
+          {activeConditions.map(cond => (
             <ActiveEffectChip
               key={cond.id}
               cond={cond}
@@ -101,69 +180,14 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
         }
       />
 
-      {/* Segmented palette tab */}
-      <div className="bg-surface-secondary flex items-center rounded-lg p-0.5">
-        {PALETTE_TABS.map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 rounded-md px-3 py-1 text-xs font-semibold capitalize transition-colors ${
-              tab === t
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            {t === 'conditions' ? 'Conditions' : 'Buffs'}
-          </button>
-        ))}
-      </div>
-
-      {/* Palette chips */}
-      <div className="flex flex-wrap gap-1">
-        {palette.map(entry => {
-          const isActive = activeNames.has(entry.name);
-          const isWaitingForRules =
-            (entry.origin === 'official' && officialConditionsLoading) ||
-            (entry.origin === 'spell' && spellEffectsLoading);
-          const Icon = entry.condition
-            ? getConditionIcon(entry.name, entry.kind, entry.condition.icon)
-            : null;
-          return (
-            <button
-              key={entry.condition?.id ?? entry.name}
-              disabled={isActive || isWaitingForRules}
-              title={entry.condition?.description || entry.description}
-              onClick={() => handleApplyPalette(entry)}
-              className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${paletteChipClass(tab, isActive)}`}
-            >
-              {Icon && <Icon size={11} aria-hidden />}
-              {entry.name}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Custom add */}
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={customInput}
-          onChange={e => setCustomInput(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleAddCustom();
-          }}
-          placeholder="Custom effect…"
-          className="bg-surface-raised text-body placeholder:text-faint flex-1 rounded px-2 py-1 text-xs"
-        />
-        <button
-          onClick={handleAddCustom}
-          disabled={!customInput.trim()}
-          className="bg-surface-inset text-muted hover:bg-surface-hover disabled:text-faint flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed"
-        >
-          <Plus size={11} />
-          Add
-        </button>
-      </div>
+      <SubTabs
+        tabs={tabs}
+        label="Effect palette"
+        value={tab}
+        onValueChange={value => {
+          if (value === 'conditions' || value === 'buffs') setTab(value);
+        }}
+      />
     </div>
   );
 }

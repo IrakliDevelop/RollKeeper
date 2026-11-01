@@ -66,6 +66,26 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
     });
   });
 
+  it('uses keyboard tabs, visible descriptions, and survives missing legacy conditions', async () => {
+    const user = userEvent.setup();
+    render(
+      <DetailEffects
+        entity={{ ...entity, conditions: undefined as never }}
+        actions={makeActions()}
+      />
+    );
+    const conditionsTab = screen.getByRole('tab', { name: 'Conditions' });
+    conditionsTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Buffs' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Buffs' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await user.keyboard('{ArrowLeft}');
+    expect(conditionsTab).toHaveFocus();
+  });
+
   it('renders without an update loop when persisted combatConfig lacks customConditions (legacy data)', () => {
     // Pre-custom-statuses localStorage hydrates a combatConfig without the
     // field; the selector fallback must stay referentially stable or React's
@@ -165,10 +185,10 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
 
     const chip = screen.getByRole('button', { name: 'Webbed' });
     expect(chip.querySelector('.lucide-link')).not.toBeNull();
-    expect(chip.getAttribute('title')).toBe('Restrained by sticky webbing.');
+    expect(screen.getByText('Restrained by sticky webbing.')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Warded' })).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Buffs' }));
+    await user.click(screen.getByRole('tab', { name: 'Buffs' }));
     expect(
       screen
         .getByRole('button', { name: 'Warded' })
