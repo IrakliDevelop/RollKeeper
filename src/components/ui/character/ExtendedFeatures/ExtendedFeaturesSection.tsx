@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -65,6 +65,39 @@ export default function ExtendedFeaturesSection({
   const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingMoveFocus = useRef<{
+    id: string;
+    direction: 'up' | 'down';
+  } | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const pending = pendingMoveFocus.current;
+    if (!pending) return;
+    pendingMoveFocus.current = null;
+    const row = Array.from(
+      listRef.current?.querySelectorAll<HTMLElement>('[data-feature-row]') ?? []
+    ).find(element => element.dataset.featureRow === pending.id);
+    if (!row) return;
+    const preferred = row.querySelector<HTMLButtonElement>(
+      `button[aria-label="Move ${pending.direction}"]`
+    );
+    const fallback = row.querySelector<HTMLButtonElement>(
+      `button[aria-label="Move ${pending.direction === 'up' ? 'down' : 'up'}"]`
+    );
+    (preferred && !preferred.disabled ? preferred : fallback)?.focus();
+  }, [features]);
+  const handleMove = (
+    id: string,
+    direction: 'up' | 'down',
+    targetId: string
+  ) => {
+    const pending = { id, direction };
+    pendingMoveFocus.current = pending;
+    onReorderFeatures(id, targetId);
+    window.setTimeout(() => {
+      if (pendingMoveFocus.current === pending) pendingMoveFocus.current = null;
+    }, 0);
+  };
   const orderedFeatures = features;
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const visibleFeatures = normalizedQuery
@@ -106,7 +139,7 @@ export default function ExtendedFeaturesSection({
 
   return (
     <Section
-      heading="Character Features"
+      heading="Character features"
       className={className}
       trailing={
         !readonly && (
@@ -145,170 +178,181 @@ export default function ExtendedFeaturesSection({
             </p>
           )}
           {visibleFeatures.length > 0 && (
-            <DragDropList
-              items={visibleFeatures}
-              keyExtractor={feature => feature.id}
-              onReorder={(sourceIndex, targetIndex) => {
-                const source = visibleFeatures[sourceIndex];
-                const target = visibleFeatures[targetIndex];
-                if (source && target) onReorderFeatures(source.id, target.id);
-              }}
-              disabled={readonly || Boolean(query)}
-              showDragHandle={!readonly && !query}
-              dragHandlePosition="right"
-              className="divide-divider border-divider divide-y border-y"
-              renderItem={(feature, index) => {
-                const maxUses = calculateTraitMaxUses(feature, character.level);
-                const usedUses = Math.min(
-                  Math.max(feature.usedUses, 0),
-                  maxUses
-                );
-                return (
-                  <div
-                    data-feature-row={feature.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-7 sm:flex-nowrap"
-                  >
-                    <div className="min-w-0 flex-1 basis-full sm:basis-0">
-                      <p
-                        id={`feature-name-${feature.id}`}
-                        className="text-heading font-medium break-words"
-                      >
-                        {feature.name}
-                      </p>
-                      <p className="text-muted text-sm break-words">
-                        {feature.sourceDetail ||
-                          feature.source ||
-                          FEATURE_SOURCE_LABELS[feature.sourceType]}
-                      </p>
-                    </div>
-                    {feature.isPassive ? (
-                      <span className="text-muted text-sm">Passive</span>
-                    ) : maxUses === 0 ? (
-                      <span className="text-muted text-sm">Unlimited</span>
-                    ) : (
-                      <span className="text-muted text-sm">
-                        {maxUses - usedUses}/{maxUses}
-                      </span>
-                    )}
-                    {!feature.isPassive && maxUses > 0 && (
-                      <div className="flex min-w-0 flex-wrap items-center gap-1">
-                        {Array.from({ length: maxUses }, (_, pipIndex) => {
-                          const spent = pipIndex >= maxUses - usedUses;
-                          return (
-                            <button
-                              key={pipIndex}
-                              type="button"
-                              aria-label={`${spent ? 'Restore' : 'Spend'} a use of ${feature.name}`}
-                              disabled={readonly}
-                              onClick={() =>
-                                onUpdateFeature(feature.id, {
-                                  usedUses: spent ? usedUses - 1 : usedUses + 1,
-                                })
-                              }
-                              className={`focus-visible:outline-ring flex size-8 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:size-11 ${spent ? 'text-muted' : 'text-brass-text'}`}
-                            >
-                              <span
-                                aria-hidden="true"
-                                className={`size-3 rounded-full border border-current ${spent ? '' : 'bg-current'}`}
-                              />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {!feature.isPassive && maxUses > 0 && (
-                      <span className="text-muted text-sm capitalize">
-                        {feature.restType}
-                      </span>
-                    )}
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Open ${feature.name}`}
-                        onClick={() => openFeature(feature, 'view')}
-                      >
-                        <Eye className="size-4" aria-hidden="true" />
-                      </Button>
-                      {onToggleFavoriteFeature && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label="Add to quick actions"
-                          aria-describedby={`feature-name-${feature.id}`}
-                          aria-pressed={favoriteFeatureIds.includes(feature.id)}
-                          onClick={() => onToggleFavoriteFeature(feature.id)}
+            <div ref={listRef}>
+              <DragDropList
+                items={visibleFeatures}
+                keyExtractor={feature => feature.id}
+                onReorder={(sourceIndex, targetIndex) => {
+                  const source = visibleFeatures[sourceIndex];
+                  const target = visibleFeatures[targetIndex];
+                  if (source && target) onReorderFeatures(source.id, target.id);
+                }}
+                disabled={readonly || Boolean(query)}
+                showDragHandle={!readonly && !query}
+                dragHandlePosition="right"
+                className="divide-divider border-divider divide-y border-y"
+                renderItem={(feature, index) => {
+                  const maxUses = calculateTraitMaxUses(
+                    feature,
+                    character.level
+                  );
+                  const usedUses = Math.min(
+                    Math.max(feature.usedUses, 0),
+                    maxUses
+                  );
+                  return (
+                    <div
+                      data-feature-row={feature.id}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-7 sm:flex-nowrap"
+                    >
+                      <div className="min-w-0 flex-1 basis-full sm:basis-0">
+                        <p
+                          id={`feature-name-${feature.id}`}
+                          className="text-heading font-medium break-words"
                         >
-                          <Star className="size-4" aria-hidden="true" />
-                        </Button>
+                          {feature.name}
+                        </p>
+                        <p className="text-muted text-sm break-words">
+                          {feature.sourceDetail ||
+                            feature.source ||
+                            FEATURE_SOURCE_LABELS[feature.sourceType]}
+                        </p>
+                      </div>
+                      {feature.isPassive ? (
+                        <span className="text-muted text-sm">Passive</span>
+                      ) : maxUses === 0 ? (
+                        <span className="text-muted text-sm">Unlimited</span>
+                      ) : (
+                        <span className="text-muted text-sm">
+                          {maxUses - usedUses}/{maxUses}
+                        </span>
                       )}
-                      {!readonly && (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Edit feature"
-                            aria-describedby={`feature-name-${feature.id}`}
-                            onClick={() => openFeature(feature, 'edit')}
-                          >
-                            <Edit3 className="size-4" aria-hidden="true" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Delete feature"
-                            aria-describedby={`feature-name-${feature.id}`}
-                            onClick={() => deleteFeature(feature)}
-                          >
-                            <Trash2 className="size-4" aria-hidden="true" />
-                          </Button>
-                        </>
+                      {!feature.isPassive && maxUses > 0 && (
+                        <div className="flex min-w-0 flex-wrap items-center gap-1">
+                          {Array.from({ length: maxUses }, (_, pipIndex) => {
+                            const spent = pipIndex >= maxUses - usedUses;
+                            return (
+                              <button
+                                key={pipIndex}
+                                type="button"
+                                aria-label={`${spent ? 'Restore' : 'Spend'} a use of ${feature.name}`}
+                                disabled={readonly}
+                                onClick={() =>
+                                  onUpdateFeature(feature.id, {
+                                    usedUses: spent
+                                      ? usedUses - 1
+                                      : usedUses + 1,
+                                  })
+                                }
+                                className={`focus-visible:outline-ring flex size-8 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:size-11 ${spent ? 'text-muted' : 'text-brass-text'}`}
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={`size-3 rounded-full border border-current ${spent ? '' : 'bg-current'}`}
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
-                    </div>
-                    {editing && !readonly && (
+                      {!feature.isPassive && maxUses > 0 && (
+                        <span className="text-muted text-sm capitalize">
+                          {feature.restType}
+                        </span>
+                      )}
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          aria-label="Move up"
-                          aria-describedby={`feature-name-${feature.id}`}
-                          disabled={index === 0}
-                          onClick={() =>
-                            onReorderFeatures(
-                              feature.id,
-                              visibleFeatures[index - 1].id
-                            )
-                          }
+                          aria-label={`Open ${feature.name}`}
+                          onClick={() => openFeature(feature, 'view')}
                         >
-                          <ArrowUp className="size-4" aria-hidden="true" />
+                          <Eye className="size-4" aria-hidden="true" />
                         </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label="Move down"
-                          aria-describedby={`feature-name-${feature.id}`}
-                          disabled={index === visibleFeatures.length - 1}
-                          onClick={() =>
-                            onReorderFeatures(
-                              feature.id,
-                              visibleFeatures[index + 1].id
-                            )
-                          }
-                        >
-                          <ArrowDown className="size-4" aria-hidden="true" />
-                        </Button>
+                        {onToggleFavoriteFeature && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Add to quick actions"
+                            aria-describedby={`feature-name-${feature.id}`}
+                            aria-pressed={favoriteFeatureIds.includes(
+                              feature.id
+                            )}
+                            onClick={() => onToggleFavoriteFeature(feature.id)}
+                          >
+                            <Star className="size-4" aria-hidden="true" />
+                          </Button>
+                        )}
+                        {!readonly && (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              aria-label="Edit feature"
+                              aria-describedby={`feature-name-${feature.id}`}
+                              onClick={() => openFeature(feature, 'edit')}
+                            >
+                              <Edit3 className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              aria-label="Delete feature"
+                              aria-describedby={`feature-name-${feature.id}`}
+                              onClick={() => deleteFeature(feature)}
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </Button>
+                          </>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              }}
-            />
+                      {editing && !readonly && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Move up"
+                            aria-describedby={`feature-name-${feature.id}`}
+                            disabled={index === 0}
+                            onClick={() =>
+                              handleMove(
+                                feature.id,
+                                'up',
+                                visibleFeatures[index - 1].id
+                              )
+                            }
+                          >
+                            <ArrowUp className="size-4" aria-hidden="true" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Move down"
+                            aria-describedby={`feature-name-${feature.id}`}
+                            disabled={index === visibleFeatures.length - 1}
+                            onClick={() =>
+                              handleMove(
+                                feature.id,
+                                'down',
+                                visibleFeatures[index + 1].id
+                              )
+                            }
+                          >
+                            <ArrowDown className="size-4" aria-hidden="true" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+            </div>
           )}
           {!readonly && features.some(feature => feature.usedUses > 0) && (
             <div className="flex flex-wrap gap-2">

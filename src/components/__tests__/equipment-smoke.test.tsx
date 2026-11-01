@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WeaponRow } from '@/components/ui/character/equipment/WeaponRow';
 import { MagicItemRow } from '@/components/ui/character/equipment/MagicItemRow';
@@ -201,7 +201,10 @@ describe('ChargePoolDisplay', () => {
       screen.getByRole('button', { name: 'Use one item charge' })
     ).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: 'Use Lightning Bolt (3 charges)' })
+      screen.getByRole('button', {
+        name: 'Use (3 charges)',
+        description: 'Lightning Bolt',
+      })
     ).toBeDisabled();
   });
 });

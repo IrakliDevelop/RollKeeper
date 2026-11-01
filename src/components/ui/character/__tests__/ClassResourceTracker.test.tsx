@@ -106,7 +106,7 @@ describe('ClassResourceTracker', () => {
         onResetClassResource={vi.fn()}
       />
     );
-    const disclosure = screen.getByRole('button', { name: 'Class Resources' });
+    const disclosure = screen.getByRole('button', { name: 'Class resources' });
     fireEvent.click(disclosure);
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
     expect(
@@ -145,9 +145,9 @@ describe('ClassResourceTracker', () => {
     );
 
     for (const [label, key] of [
-      ['Ready Weapons', 'actions-ready-weapons'],
-      ['Quick Features', 'actions-quick-features'],
-      ['Quick Spells', 'actions-quick-spells'],
+      ['Ready weapons', 'actions-ready-weapons'],
+      ['Quick features', 'actions-quick-features'],
+      ['Quick spells', 'actions-quick-spells'],
     ]) {
       const disclosure = screen.getByRole('button', { name: label });
       fireEvent.click(disclosure);
@@ -162,11 +162,11 @@ describe('ClassResourceTracker', () => {
     const headings = Array.from(container.querySelectorAll('h3')).map(
       heading => heading.textContent
     );
-    expect(headings.indexOf('Class Resources')).toBeGreaterThan(
-      headings.indexOf('Ready Weapons')
+    expect(headings.indexOf('Class resources')).toBeGreaterThan(
+      headings.indexOf('Ready weapons')
     );
-    expect(headings.indexOf('Class Resources')).toBeLessThan(
-      headings.indexOf('Quick Features')
+    expect(headings.indexOf('Class resources')).toBeLessThan(
+      headings.indexOf('Quick features')
     );
   });
 });

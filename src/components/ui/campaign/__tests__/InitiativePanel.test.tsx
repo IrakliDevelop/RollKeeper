@@ -27,7 +27,29 @@ const base: SharedInitiativeState = {
 const noop = () => {};
 
 describe('InitiativePanel', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    localStorage.removeItem('rollkeeper-initiative-panel-y');
+    vi.unstubAllGlobals();
+  });
+
+  it('clamps a saved low position above the sheet floating stack', () => {
+    localStorage.setItem('rollkeeper-initiative-panel-y', '700');
+    vi.stubGlobal('innerHeight', 800);
+    render(
+      <InitiativePanel
+        state={base}
+        characterId="char-a"
+        onEndTurn={noop}
+        bottomReservedHeight={400}
+      />
+    );
+    const panel = screen
+      .getByRole('button', { name: /initiative/i })
+      .closest('.fixed');
+    expect(panel).toHaveStyle({ top: '280px' });
+    expect(localStorage.getItem('rollkeeper-initiative-panel-y')).toBe('700');
+  });
 
   it('renders nothing when there is no active initiative', () => {
     const { container } = render(

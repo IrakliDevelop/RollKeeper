@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -15,6 +15,7 @@ import { cn } from '@/utils/cn';
 import { calculateModifier } from '@/utils/calculations';
 import { useCharacterStore } from '@/store/characterStore';
 import { useLevelUpWizard } from './LevelUpWizard.hooks';
+import { grantsThatWillBeAdded } from './LevelUpWizard.utils';
 import EditionPickerStep from './steps/EditionPickerStep';
 import ClassPickerStep from './steps/ClassPickerStep';
 import SubclassSelectionStep from './steps/SubclassSelectionStep';
@@ -30,7 +31,12 @@ interface LevelUpWizardProps {
 }
 
 export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
-  const character = useCharacterStore(s => s.character);
+  const liveCharacter = useCharacterStore(s => s.character);
+  // While the dialog fades out after Level up, keep showing the character it
+  // opened with instead of re-deriving every step from the levelled-up one.
+  const characterRef = useRef(liveCharacter);
+  if (isOpen) characterRef.current = liveCharacter;
+  const character = characterRef.current;
   const wizard = useLevelUpWizard(character);
 
   const handleApply = useCallback(() => {
@@ -194,6 +200,9 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               constitutionScore={wizard.prospectiveConstitution}
               hpRollResult={state.hpRollResult}
               hpGained={wizard.hpPreview?.gained}
+              newLevelHp={wizard.hpPreview?.newLevelGain}
+              retroactiveHp={wizard.hpPreview?.retroactiveGain}
+              minimumAdjustment={wizard.hpPreview?.minimumAdjustment}
               onRollResultChange={wizard.setHPRollResult}
             />
           )}
@@ -212,12 +221,23 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               features={state.features}
               subclassFeatures={state.subclassFeatures}
               subclassSpellGrants={state.subclassSpellGrants}
+              migrationFeatures={state.subclassMigration.missedFeatures
+                .filter(item => item.adopted)
+                .map(item => item.feature)}
+              migrationSpellGrants={grantsThatWillBeAdded(
+                state.subclassMigration.missedSpellGrants,
+                wizard.allSpells,
+                wizard.character.spells || []
+              )}
               asiChoice={state.asiChoice}
               abilities={character.abilities}
               hpRollResult={state.hpRollResult}
               hitDie={state.targetClass.hitDie}
               conModifier={calculateModifier(wizard.prospectiveConstitution)}
               hpGained={wizard.hpPreview?.gained}
+              newLevelHp={wizard.hpPreview?.newLevelGain}
+              retroactiveHp={wizard.hpPreview?.retroactiveGain}
+              minimumAdjustment={wizard.hpPreview?.minimumAdjustment}
               isCustomClass={state.isCustomClass}
               spellsKnownDelta={wizard.spellsKnownDelta}
               cantripsKnownDelta={wizard.cantripsKnownDelta}

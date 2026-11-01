@@ -173,14 +173,18 @@ describe('InventoryManager', () => {
       </>
     );
     fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Rope' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete item', description: 'Rope' })
+    );
     expect(
       screen.getByRole('alertdialog', { name: 'Delete Rope?' })
     ).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onDeleteItem).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Rope' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete item', description: 'Rope' })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
     await waitFor(() => expect(onDeleteItem).toHaveBeenCalledWith('i1'));
   });
@@ -205,7 +209,7 @@ describe('InventoryManager', () => {
       </>
     );
     fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
-    const deleteButton = screen.getByRole('button', { name: 'Delete Rope' });
+    const deleteButton = screen.getByRole('button', { name: 'Delete item' });
     deleteButton.focus();
     fireEvent.click(deleteButton);
     fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
@@ -241,7 +245,7 @@ describe('InventoryManager', () => {
     );
     expect(screen.queryByText('Add item')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
-    expect(screen.queryByRole('button', { name: 'Delete Rope' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete item' })).toBeNull();
   });
 
   it('uses overrideTotalWeight and overrideTotalValue', () => {

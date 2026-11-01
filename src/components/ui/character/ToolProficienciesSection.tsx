@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
 import { Section } from '@/components/ui/layout/section';
@@ -46,6 +46,18 @@ export default function ToolProficienciesSection({
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [addingCustom, setAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingDeleteFocus = useRef(false);
+  useEffect(() => {
+    if (pendingDeleteFocus.current) {
+      pendingDeleteFocus.current = false;
+      addButtonRef.current?.focus();
+    }
+  }, [toolProficiencies]);
+  const removeTool = (id: string) => {
+    pendingDeleteFocus.current = true;
+    onDeleteToolProficiency(id);
+  };
   const byName = useMemo(
     () =>
       new Map(
@@ -104,7 +116,7 @@ export default function ToolProficienciesSection({
           : 'none';
     return (
       <div
-        key={tool?.id ?? name}
+        key={name}
         className="border-divider flex min-h-11 flex-wrap items-center gap-3 border-b py-2 last:border-b-0"
       >
         <ProficiencyDotButton
@@ -151,7 +163,7 @@ export default function ToolProficienciesSection({
                 size="sm"
                 aria-label={removeLabel}
                 aria-describedby={nameId}
-                onClick={() => onDeleteToolProficiency(tool.id)}
+                onClick={() => removeTool(tool.id)}
               >
                 <Trash2 className="size-4" aria-hidden="true" />
               </Button>
@@ -168,6 +180,7 @@ export default function ToolProficienciesSection({
       trailing={
         editing && (
           <Button
+            ref={addButtonRef}
             type="button"
             variant="ghost"
             size="sm"
@@ -181,6 +194,9 @@ export default function ToolProficienciesSection({
     >
       {!editing ? (
         <div className="divide-divider divide-y">
+          {activeTools.length === 0 && (
+            <p className="text-muted text-sm">No tool proficiencies.</p>
+          )}
           {activeTools.map(tool => (
             <div
               key={tool.id}
@@ -198,6 +214,11 @@ export default function ToolProficienciesSection({
               </span>
             </div>
           ))}
+          {activeTools.some(tool => tool.isTemporary) && (
+            <p className="text-muted py-2 text-sm">
+              You can swap temporary tools on a long rest.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -206,10 +227,15 @@ export default function ToolProficienciesSection({
               editRow(tool.name, tool, 'Remove proficiency')
             )}
           </div>
+          {activeTools.some(tool => tool.isTemporary) && (
+            <p className="text-muted text-sm">
+              You can swap temporary tools on a long rest.
+            </p>
+          )}
           {addingCustom && (
             <div className="flex flex-wrap items-end gap-2">
               <Input
-                label="Custom"
+                label="Tool name"
                 value={customName}
                 onChange={event => setCustomName(event.target.value)}
                 onKeyDown={event => {
@@ -225,7 +251,7 @@ export default function ToolProficienciesSection({
               />
               <Button
                 type="button"
-                variant="primary"
+                variant="secondary"
                 size="sm"
                 onClick={saveCustom}
               >

@@ -231,6 +231,7 @@ export function MagicItemForm({
             Properties
           </label>
           <RichTextEditor
+            ariaLabel="Properties"
             content={formData.description}
             onChange={(content: string) =>
               setFormData({
@@ -304,6 +305,7 @@ export function MagicItemForm({
                     Description (optional)
                   </label>
                   <RichTextEditor
+                    ariaLabel="Description (optional)"
                     content={charge.description || ''}
                     onChange={(content: string) =>
                       updateCharge(index, { description: content })

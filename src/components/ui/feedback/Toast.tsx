@@ -234,18 +234,26 @@ const ToastAnnouncement: React.FC<{ toast: ToastData }> = ({ toast }) => {
 interface ToastContainerProps {
   toasts: ToastData[];
   onDismiss: (id: string) => void;
+  embedded?: boolean;
 }
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({
   toasts,
   onDismiss,
+  embedded = false,
 }) => {
   // The status region stays mounted, so screen readers announce each toast
   // as it is added (politely, and only the new one). It holds a text-only
   // copy, so they hear the title, message and details without the dismiss
   // button, which stays in the visible toast.
   const content = (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-[100]">
+    <div
+      className={
+        embedded
+          ? 'pointer-events-none'
+          : 'pointer-events-none fixed right-4 bottom-4 z-[100]'
+      }
+    >
       <div className="pointer-events-auto space-y-2">
         {toasts.map(toast => (
           <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
@@ -264,7 +272,7 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
     </div>
   );
 
-  if (typeof document === 'undefined') return content;
+  if (embedded || typeof document === 'undefined') return content;
   return createPortal(content, document.body);
 };
 

@@ -121,6 +121,7 @@ export default function FeaturesTraitsManager({
           <div>
             <p className="type-ui text-body mb-2">Description</p>
             <RichTextEditor
+              ariaLabel="Description"
               content={draft.content}
               onChange={content =>
                 setDraft(current => ({ ...current, content }))
@@ -231,6 +232,7 @@ function EditItemForm({
       <div>
         <p className="type-ui text-body mb-2">Description</p>
         <RichTextEditor
+          ariaLabel="Description"
           content={content}
           onChange={setContent}
           minHeight="100px"

@@ -369,7 +369,7 @@ export default function UnifiedFeatureModal({
                     <div className="flex flex-wrap gap-2">
                       {hasUses && !isExhausted && onUse && (
                         <Button onClick={onUse} variant="primary" size="sm">
-                          Use Feature
+                          Use feature
                         </Button>
                       )}
                       <Button
@@ -398,7 +398,7 @@ export default function UnifiedFeatureModal({
               {isEditMode && mode === 'view' && existingFeature && (
                 <div className="space-y-6">
                   {/* Usage Info */}
-                  <Section heading="Usage Information" level={3}>
+                  <Section heading="Usage information" level={3}>
                     <div className="flex items-center justify-between">
                       <div>
                         {existingFeature.isPassive ? (
@@ -566,11 +566,11 @@ export default function UnifiedFeatureModal({
 
                   {/* Form Fields */}
                   <div className="space-y-6">
-                    {/* Basic Information */}
-                    <Section heading="Basic Information" level={3}>
+                    {/* Basic information */}
+                    <Section heading="Basic information" level={3}>
                       <div className="space-y-4">
                         <Input
-                          label="Feature Name"
+                          label="Feature name"
                           value={formData.name}
                           onChange={e =>
                             setFormData({ ...formData, name: e.target.value })
@@ -630,6 +630,7 @@ export default function UnifiedFeatureModal({
                             Description
                           </label>
                           <RichTextEditor
+                            ariaLabel="Description"
                             content={formData.description}
                             onChange={content =>
                               setFormData({ ...formData, description: content })
@@ -738,7 +739,7 @@ export default function UnifiedFeatureModal({
                       disabled={!formData.name.trim()}
                       variant="primary"
                     >
-                      {isEditMode ? 'Save Changes' : 'Add feature'}
+                      {isEditMode ? 'Save changes' : 'Add feature'}
                     </Button>
                   </DialogFooter>
                 </div>

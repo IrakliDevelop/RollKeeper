@@ -41,7 +41,7 @@ export function ItemTransferNotification({
   };
 
   return (
-    <div className="pointer-events-none fixed top-4 right-4 z-50 flex max-h-[80vh] w-80 flex-col gap-2 overflow-y-auto sm:w-96">
+    <div className="contents">
       {visibleTransfers.map(transfer => {
         const isDismissing = dismissingIds.has(transfer.id);
         const fromLabel =
@@ -54,36 +54,29 @@ export function ItemTransferNotification({
         return (
           <div
             key={transfer.id}
-            className={`pointer-events-auto rounded-lg border-2 border-amber-400 bg-amber-900 p-4 text-amber-50 shadow-2xl shadow-amber-900/50 transition-all duration-300 ${
-              isDismissing
-                ? 'translate-x-full opacity-0'
-                : 'animate-in slide-in-from-right-full translate-x-0 opacity-100'
-            }`}
+            className={`border-divider bg-surface-elevated text-body pointer-events-auto rounded-md border p-4 transition-opacity duration-300 ${isDismissing ? 'opacity-0' : 'opacity-100'}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-2.5">
-                <div className="mt-0.5 rounded-full bg-amber-700 p-1.5 text-amber-200">
-                  <Package size={16} />
-                </div>
+                <Package size={16} className="text-muted mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-amber-300">
-                    Item Received
+                  <p className="text-muted text-sm font-semibold">
+                    Item received
                   </p>
-                  <p className="mt-1 text-base font-bold text-white">
+                  <p className="text-heading mt-1 text-base font-bold">
                     {transfer.item.name}
                     {'quantity' in transfer.item &&
                       transfer.item.quantity > 1 &&
                       ` (x${transfer.item.quantity})`}
                   </p>
-                  <p className="mt-1 text-sm text-amber-200">
-                    From {fromLabel}
-                  </p>
+                  <p className="text-muted mt-1 text-sm">From {fromLabel}</p>
                 </div>
               </div>
               <button
                 onClick={() => handleDismiss(transfer.id)}
-                className="shrink-0 rounded p-1 text-amber-400 transition-colors hover:bg-amber-800 hover:text-amber-100"
+                className="text-muted hover:text-heading shrink-0 rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 title="Dismiss"
+                aria-label={`Dismiss ${transfer.item.name} transfer`}
               >
                 <X size={18} />
               </button>
@@ -96,7 +89,7 @@ export function ItemTransferNotification({
                 leftIcon={<Package size={14} />}
                 onClick={() => handleClick(transfer.id)}
               >
-                View in Inventory
+                View in inventory
               </Button>
             </div>
           </div>

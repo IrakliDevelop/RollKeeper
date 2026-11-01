@@ -64,24 +64,41 @@ import {
   InventoryItem,
 } from '@/types/character';
 
-function LevelUpButton({
+export function LevelUpButton({
   pendingLevelUp = false,
 }: {
   pendingLevelUp?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  // Each open gets a fresh wizard, even when the previous one is still
+  // fading out, so no earlier choices carry over.
+  const [wizardSession, setWizardSession] = useState(0);
+  useEffect(() => {
+    if (isOpen || !showWizard) return;
+    const timer = window.setTimeout(() => setShowWizard(false), 200);
+    return () => window.clearTimeout(timer);
+  }, [isOpen, showWizard]);
   return (
     <>
       <Button
         variant={pendingLevelUp ? 'primary' : 'secondary'}
         size="sm"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setWizardSession(session => session + 1);
+          setShowWizard(true);
+          setIsOpen(true);
+        }}
       >
         <AppIcon name="levelUp" size={14} />
         Level up
       </Button>
-      {isOpen && (
-        <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      {showWizard && (
+        <LevelUpWizard
+          key={wizardSession}
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+        />
       )}
     </>
   );
@@ -987,7 +1004,7 @@ function CombatTabContent({
                       <div className="py-4 text-center">
                         <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
                         <p className="text-body mt-2">
-                          Loading conditions and diseases...
+                          Loading conditions and diseases…
                         </p>
                       </div>
                     </div>

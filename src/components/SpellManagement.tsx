@@ -23,7 +23,6 @@ import {
   Zap,
   Infinity,
 } from 'lucide-react';
-import { AppIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
@@ -201,6 +200,8 @@ const SpellCard: React.FC<{
             variant="secondary"
             size="xs"
             title="Cast spell"
+            aria-label="Cast spell"
+            aria-describedby={nameId}
           >
             <Wand2 size={12} />
           </Button>
@@ -223,10 +224,19 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="View details"
+            aria-label="View details"
+            aria-describedby={nameId}
           >
             <Eye size={14} />
           </Button>
-          <Button onClick={onEdit} variant="ghost" size="xs" title="Edit spell">
+          <Button
+            onClick={onEdit}
+            variant="ghost"
+            size="xs"
+            title="Edit spell"
+            aria-label="Edit spell"
+            aria-describedby={nameId}
+          >
             <Edit2 size={14} />
           </Button>
           <Button
@@ -234,6 +244,8 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Delete spell"
+            aria-label="Delete spell"
+            aria-describedby={nameId}
             className="text-blood-text"
           >
             <Trash2 size={14} />
@@ -377,6 +389,8 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="View details"
+              aria-label="View details"
+              aria-describedby={nameId}
             >
               <Eye size={16} />
             </Button>
@@ -385,6 +399,8 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Edit spell"
+              aria-label="Edit spell"
+              aria-describedby={nameId}
             >
               <Edit2 size={16} />
             </Button>
@@ -393,6 +409,8 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Delete spell"
+              aria-label="Delete spell"
+              aria-describedby={nameId}
               className="text-blood-text"
             >
               <Trash2 size={16} />
@@ -590,7 +608,6 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(
     new Set([0, 1, 2])
   );
-  const [justAutoFilled, setJustAutoFilled] = useState(false);
 
   // Load spells from spellbook for autocomplete
   const { spells: spellbookSpells, loading: spellbookLoading } =
@@ -717,12 +734,6 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
   const handleSpellSelect = (spell: ProcessedSpell) => {
     const converted = convertProcessedSpellToFormData(spell);
     setFormData(converted);
-    setJustAutoFilled(true);
-
-    // Clear the animation flag after 2 seconds
-    setTimeout(() => {
-      setJustAutoFilled(false);
-    }, 2000);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1318,19 +1329,6 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
                     loading={spellbookLoading}
                     placeholder="Search spells from spellbook database..."
                   />
-                </div>
-              )}
-
-              {/* Auto-fill success message */}
-              {justAutoFilled && (
-                <div className="animate-in fade-in slide-in-from-top-2 border-accent-green-border-strong bg-accent-green-bg rounded-lg border-2 p-3 duration-300">
-                  <div className="text-accent-green-text flex items-center gap-2">
-                    <Wand2 className="h-5 w-5" />
-                    <p className="text-sm font-medium">
-                      <AppIcon name="confirm" className="inline h-4 w-4" />{' '}
-                      Spell details loaded! Review and adjust as needed.
-                    </p>
-                  </div>
                 </div>
               )}
 

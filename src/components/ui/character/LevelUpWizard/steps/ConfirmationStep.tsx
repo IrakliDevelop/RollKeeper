@@ -15,12 +15,17 @@ interface ConfirmationStepProps {
   features: ClassFeature[];
   subclassFeatures: ClassFeature[];
   subclassSpellGrants: SubclassSpellGrant[];
+  migrationFeatures?: ClassFeature[];
+  migrationSpellGrants?: SubclassSpellGrant[];
   asiChoice?: ASIChoice;
   abilities: CharacterAbilities;
   hpRollResult?: number;
   hitDie: number;
   conModifier: number;
   hpGained?: number;
+  retroactiveHp?: number;
+  newLevelHp?: number;
+  minimumAdjustment?: number;
   isCustomClass: boolean;
   spellsKnownDelta: number;
   cantripsKnownDelta: number;
@@ -37,30 +42,37 @@ export default function ConfirmationStep({
   features,
   subclassFeatures,
   subclassSpellGrants,
+  migrationFeatures = [],
+  migrationSpellGrants = [],
   asiChoice,
   abilities,
   hpRollResult,
   hitDie,
   conModifier,
   hpGained,
+  retroactiveHp = 0,
+  newLevelHp,
+  minimumAdjustment = 0,
   isCustomClass,
   spellsKnownDelta,
   cantripsKnownDelta,
   cantripUpgrades,
 }: ConfirmationStepProps) {
-  const displayFeatures = [...features, ...subclassFeatures].filter(
+  const displayFeatures = [
+    ...features,
+    ...subclassFeatures,
+    ...migrationFeatures,
+  ].filter(
     f => f.name !== 'Ability Score Improvement' && f.name !== 'Epic Boon'
   );
-  const autoGrantedSpells = subclassSpellGrants.filter(
-    g => g.grantType !== 'expanded'
-  );
+  const autoGrantedSpells = [
+    ...subclassSpellGrants,
+    ...migrationSpellGrants,
+  ].filter(g => g.grantType !== 'expanded');
   return (
     <div className="space-y-5">
       <div>
         <h3 className="type-subheading text-heading">Review level-up</h3>
-        <p className="type-body text-muted mt-1">
-          Review your changes before applying.
-        </p>
       </div>
       <dl className="divide-divider border-divider divide-y border-t">
         <div className="flex flex-wrap justify-between gap-2 py-3">
@@ -153,11 +165,26 @@ export default function ConfirmationStep({
         {hpRollResult !== undefined && (
           <div className="flex flex-wrap justify-between gap-2 py-3">
             <dt className="type-ui text-heading font-semibold">HP</dt>
-            <dd className="type-ui text-body">
-              {hpGained !== undefined && hpGained >= 0 ? '+' : ''}
-              {hpGained} (d{hitDie}: {hpRollResult} + CON:{' '}
-              {conModifier >= 0 ? '+' : ''}
-              {conModifier})
+            <dd className="type-ui text-body text-right">
+              <p>
+                d{hitDie}: {hpRollResult} + CON {conModifier >= 0 ? '+' : ''}
+                {conModifier}
+              </p>
+              {newLevelHp !== undefined && <p>This level: +{newLevelHp} HP</p>}
+              {retroactiveHp !== 0 && (
+                <p>
+                  Earlier levels (CON): {retroactiveHp > 0 ? '+' : ''}
+                  {retroactiveHp} HP
+                </p>
+              )}
+              {minimumAdjustment !== 0 && (
+                <p>Max HP can&apos;t go below 1: +{minimumAdjustment} HP</p>
+              )}
+              <p>
+                Total HP gained:{' '}
+                {hpGained !== undefined && hpGained >= 0 ? '+' : ''}
+                {hpGained}
+              </p>
             </dd>
           </div>
         )}

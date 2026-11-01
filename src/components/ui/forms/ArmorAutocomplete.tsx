@@ -209,7 +209,7 @@ export function ArmorAutocomplete({
                                 Attunement
                               </span>
                             )}
-                            <span className="text-faint text-xs">
+                            <span className="text-muted text-xs">
                               {item.source}
                             </span>
                           </div>

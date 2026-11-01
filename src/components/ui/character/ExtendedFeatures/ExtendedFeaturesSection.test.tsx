@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanup,
@@ -173,6 +174,83 @@ describe('03h1 Abilities list', () => {
     expect(callbacks.onUpdateFeature).toHaveBeenCalledWith('one', {
       usedUses: 0,
     });
+  });
+
+  it('keeps focus on a moved feature at the list end', () => {
+    function Features() {
+      const [features, setFeatures] = useState([
+        feature('one', 'Second Wind'),
+        feature('two', 'Action Surge'),
+      ]);
+      return (
+        <ExtendedFeaturesSection
+          features={features}
+          character={makeCharacter({ extendedFeatures: features })}
+          editing
+          onAddFeature={vi.fn()}
+          onUpdateFeature={vi.fn()}
+          onDeleteFeature={vi.fn()}
+          onUseFeature={vi.fn()}
+          onResetFeatures={vi.fn()}
+          onReorderFeatures={(source, target) =>
+            setFeatures(current => {
+              const next = [...current];
+              const from = next.findIndex(item => item.id === source);
+              const to = next.findIndex(item => item.id === target);
+              next.splice(to, 0, next.splice(from, 1)[0]);
+              return next;
+            })
+          }
+        />
+      );
+    }
+    render(<Features />);
+    const row = document.querySelector(
+      '[data-feature-row="one"]'
+    ) as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Move down' }));
+    expect(within(row).getByRole('button', { name: 'Move up' })).toHaveFocus();
+  });
+
+  it('forgets a rejected move before an unrelated feature update', async () => {
+    const features = [
+      feature('one', 'Second Wind'),
+      feature('two', 'Action Surge'),
+    ];
+    const callbacks = {
+      onAddFeature: vi.fn(),
+      onUpdateFeature: vi.fn(),
+      onDeleteFeature: vi.fn(),
+      onUseFeature: vi.fn(),
+      onResetFeatures: vi.fn(),
+      onReorderFeatures: vi.fn(),
+    };
+    const { rerender } = render(
+      <ExtendedFeaturesSection
+        features={features}
+        character={makeCharacter({ extendedFeatures: features })}
+        editing
+        {...callbacks}
+      />
+    );
+    fireEvent.click(
+      within(
+        document.querySelector('[data-feature-row="one"]') as HTMLElement
+      ).getByRole('button', { name: 'Move down' })
+    );
+    const search = screen.getByRole('searchbox', { name: 'Search features' });
+    search.focus();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const updated = [{ ...features[0], usedUses: 2 }, features[1]];
+    rerender(
+      <ExtendedFeaturesSection
+        features={updated}
+        character={makeCharacter({ extendedFeatures: updated })}
+        editing
+        {...callbacks}
+      />
+    );
+    expect(search).toHaveFocus();
   });
 
   it('fills available pips first and wraps long use pools', () => {

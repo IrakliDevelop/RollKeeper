@@ -103,6 +103,7 @@ export default function CharacterBackgroundEditor({
             <div className="space-y-4">
               <p className="type-body text-muted">{tab.description}</p>
               <RichTextEditor
+                ariaLabel={tab.label}
                 key={tab.id}
                 content={background[tab.id]}
                 onChange={content => onChange({ [tab.id]: content })}

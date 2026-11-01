@@ -46,6 +46,17 @@ interface ActionsSectionProps {
   spellSlotsPanel?: React.ReactNode;
 }
 
+function ActionsLoadFallback({ thing }: { thing: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 py-3">
+      <p className="text-ember-text text-sm">{thing} didn&apos;t load.</p>
+      <Button variant="link" size="sm" onClick={() => window.location.reload()}>
+        Reload page
+      </Button>
+    </div>
+  );
+}
+
 export default function ActionsSection({
   editing = false,
   character,
@@ -92,7 +103,7 @@ export default function ActionsSection({
   return (
     <div className="space-y-6">
       <Section
-        heading="Ready Weapons"
+        heading="Ready weapons"
         level={3}
         collapsible="actions-ready-weapons"
         trailing={
@@ -103,15 +114,7 @@ export default function ActionsSection({
           )
         }
       >
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
-              <p className="text-accent-red-text-muted">
-                Unable to load equipped weapons
-              </p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<ActionsLoadFallback thing="Ready weapons" />}>
           <EquippedWeapons
             editing={editing}
             showAttackRoll={showAttackRoll}
@@ -139,7 +142,7 @@ export default function ActionsSection({
             onRestoreClassResource &&
             onResetClassResource && (
               <Section
-                heading="Class Resources"
+                heading="Class resources"
                 level={3}
                 collapsible="class-resources"
               >
@@ -162,7 +165,7 @@ export default function ActionsSection({
 
       {(character.favoriteFeatureIds || []).length > 0 && (
         <Section
-          heading="Quick Features"
+          heading="Quick features"
           level={3}
           collapsible="actions-quick-features"
           trailing={
@@ -184,13 +187,7 @@ export default function ActionsSection({
           }
         >
           <ErrorBoundary
-            fallback={
-              <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
-                <p className="text-accent-red-text-muted">
-                  Unable to load quick features
-                </p>
-              </div>
-            }
+            fallback={<ActionsLoadFallback thing="Quick features" />}
           >
             <QuickFeatures />
           </ErrorBoundary>
@@ -198,7 +195,7 @@ export default function ActionsSection({
       )}
 
       <Section
-        heading="Quick Spells"
+        heading="Quick spells"
         level={3}
         collapsible="actions-quick-spells"
         trailing={
@@ -226,15 +223,7 @@ export default function ActionsSection({
           </div>
         }
       >
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
-              <p className="text-accent-red-text-muted">
-                Unable to load quick spells
-              </p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<ActionsLoadFallback thing="Quick spells" />}>
           <QuickSpells
             showAttackRoll={showAttackRoll}
             showSavingThrow={showSavingThrow}

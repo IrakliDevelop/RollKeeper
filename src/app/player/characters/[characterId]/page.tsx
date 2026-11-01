@@ -76,6 +76,7 @@ import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
 import { InitiativePanel } from '@/components/ui/campaign/InitiativePanel';
 import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPrompt';
+import { SheetFloatingStack } from '@/components/ui/campaign/SheetFloatingStack';
 import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -137,6 +138,7 @@ export default function CharacterSheet() {
     showShortRest,
     addToast,
   } = useToast();
+  const [floatingStackHeight, setFloatingStackHeight] = useState(0);
 
   const rollD20ForSheet = useSheetRoll({
     diceReady: diceBoxInitialized,
@@ -877,6 +879,12 @@ export default function CharacterSheet() {
     }
   };
 
+  const hasCampaignNotifications =
+    pendingEffectToasts.some(effect => effect.action === 'add') ||
+    Boolean(counterToast) ||
+    (sharedState?.messages?.length ?? 0) > 0 ||
+    pendingTransfers.length > 0;
+
   return (
     <ErrorBoundary>
       <NavigationContext.Provider value={{ switchToTab }}>
@@ -894,6 +902,7 @@ export default function CharacterSheet() {
               state={liveInitiative}
               characterId={characterId}
               onEndTurn={handleEndTurn}
+              bottomReservedHeight={floatingStackHeight + 24}
               battleMapHref={
                 playerSync.campaignCode && activeBattleMapId
                   ? `/player/campaign/${playerSync.campaignCode}/battlemap/${activeBattleMapId}?character=${encodeURIComponent(characterId)}`
@@ -906,39 +915,6 @@ export default function CharacterSheet() {
               isVisible={showCombatBanner}
               onDone={() => setShowCombatBanner(false)}
             />
-
-            {/* DM → player "roll for initiative" request */}
-            {initiativePrompt.showPrompt && initiativePrompt.request && (
-              <InitiativeRollPrompt
-                request={initiativePrompt.request}
-                modifier={getInitiativeModifier()}
-                onSubmit={initiativePrompt.handleSubmit}
-                onDismiss={initiativePrompt.dismiss}
-              />
-            )}
-
-            {/* Live battle map banner: full "Join map" until the player joins
-              this map; afterwards the initiative panel carries the link, with
-              a compact corner pill as fallback while combat is inactive. */}
-            {playerSync.campaignCode &&
-              activeBattleMapId &&
-              (!joinedBattleMap ? (
-                <BattleMapLiveBanner
-                  campaignCode={playerSync.campaignCode}
-                  battleMapId={activeBattleMapId}
-                  mapName={sharedState?.battleMap?.name}
-                  characterId={characterId}
-                  onJoin={markBattleMapJoinedNow}
-                />
-              ) : !initiativeActive ? (
-                <BattleMapLiveBanner
-                  campaignCode={playerSync.campaignCode}
-                  battleMapId={activeBattleMapId}
-                  mapName={sharedState?.battleMap?.name}
-                  characterId={characterId}
-                  compact
-                />
-              ) : null)}
 
             {/* Header */}
             <CharacterSheetHeader
@@ -1060,50 +1036,91 @@ export default function CharacterSheet() {
                 onUpdateCharacter={updateCharacter}
               />
 
-              {/* DM Effects (applied by DM in encounter) */}
-              {pendingEffectToasts.length > 0 && (
-                <DmEffectsNotification
-                  effects={pendingEffectToasts}
-                  onDismiss={() => setPendingEffectToasts([])}
-                />
-              )}
-
-              {/* DM Custom Counter change notification */}
-              {counterToast && (
-                <DmCounterNotification
-                  label={counterToast.label}
-                  value={counterToast.value}
-                  delta={counterToast.delta}
-                  onDismiss={() => setCounterToast(null)}
-                />
-              )}
-
-              {/* DM Message Notifications */}
-              {(sharedState?.messages?.length ?? 0) > 0 && (
-                <DmMessageNotification
-                  messages={sharedState!.messages}
-                  onAccept={msg => {
-                    acknowledgeMessage(msg.id);
-                    switchToTab('character');
-                    setCharacterSubTab('notes');
-                  }}
-                  onDismiss={messageId => {
-                    acknowledgeMessage(messageId);
-                  }}
-                />
-              )}
-
-              {/* Item Transfer Notifications */}
-              {pendingTransfers.length > 0 && (
-                <ItemTransferNotification
-                  transfers={pendingTransfers}
-                  onDismiss={clearPendingTransfer}
-                  onNavigateToInventory={() => {
-                    switchToTab('inventory');
-                    setInventorySubTab('items');
-                  }}
-                />
-              )}
+              <SheetFloatingStack
+                onHeightChange={setFloatingStackHeight}
+                prompt={
+                  initiativePrompt.showPrompt && initiativePrompt.request ? (
+                    <InitiativeRollPrompt
+                      embedded
+                      request={initiativePrompt.request}
+                      modifier={getInitiativeModifier()}
+                      onSubmit={initiativePrompt.handleSubmit}
+                      onDismiss={initiativePrompt.dismiss}
+                    />
+                  ) : null
+                }
+                notifications={
+                  hasCampaignNotifications ? (
+                    <>
+                      {pendingEffectToasts.length > 0 && (
+                        <DmEffectsNotification
+                          effects={pendingEffectToasts}
+                          onDismiss={() => setPendingEffectToasts([])}
+                        />
+                      )}
+                      {counterToast && (
+                        <DmCounterNotification
+                          label={counterToast.label}
+                          value={counterToast.value}
+                          delta={counterToast.delta}
+                          onDismiss={() => setCounterToast(null)}
+                        />
+                      )}
+                      {(sharedState?.messages?.length ?? 0) > 0 && (
+                        <DmMessageNotification
+                          messages={sharedState!.messages}
+                          onAccept={msg => {
+                            acknowledgeMessage(msg.id);
+                            switchToTab('character');
+                            setCharacterSubTab('notes');
+                          }}
+                          onDismiss={messageId => acknowledgeMessage(messageId)}
+                        />
+                      )}
+                      {pendingTransfers.length > 0 && (
+                        <ItemTransferNotification
+                          transfers={pendingTransfers}
+                          onDismiss={clearPendingTransfer}
+                          onNavigateToInventory={() => {
+                            switchToTab('inventory');
+                            setInventorySubTab('items');
+                          }}
+                        />
+                      )}
+                    </>
+                  ) : null
+                }
+                mapAccess={
+                  playerSync.campaignCode && activeBattleMapId ? (
+                    !joinedBattleMap ? (
+                      <BattleMapLiveBanner
+                        embedded
+                        campaignCode={playerSync.campaignCode}
+                        battleMapId={activeBattleMapId}
+                        mapName={sharedState?.battleMap?.name}
+                        characterId={characterId}
+                        onJoin={markBattleMapJoinedNow}
+                      />
+                    ) : !initiativeActive ? (
+                      <BattleMapLiveBanner
+                        embedded
+                        compact
+                        campaignCode={playerSync.campaignCode}
+                        battleMapId={activeBattleMapId}
+                        mapName={sharedState?.battleMap?.name}
+                        characterId={characterId}
+                      />
+                    ) : null
+                  ) : null
+                }
+                toasts={
+                  <ToastContainer
+                    embedded
+                    toasts={toasts}
+                    onDismiss={dismissToast}
+                  />
+                }
+              />
 
               {/* Send Item Dialog */}
               <SendItemDialog
@@ -1258,8 +1275,6 @@ export default function CharacterSheet() {
                   onSendItem={onSendItem}
                 />
               </main>
-
-              <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
               <YouDiedOverlay
                 isVisible={showDeathAnimation}

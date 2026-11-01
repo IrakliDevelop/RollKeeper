@@ -4,6 +4,7 @@ import {
   isValidASIChoice,
   shouldShowEditionStep,
   computeWizardSteps,
+  grantsThatWillBeAdded,
 } from './LevelUpWizard.utils';
 import type { CharacterAbilities } from '@/types/character';
 
@@ -78,7 +79,14 @@ describe('level-up HP', () => {
         newConstitution: 14,
         roll: 5,
       })
-    ).toEqual({ max: 34, current: 29, gained: 10 });
+    ).toEqual({
+      max: 34,
+      current: 29,
+      gained: 10,
+      newLevelGain: 7,
+      retroactiveGain: 3,
+      minimumAdjustment: 0,
+    });
   });
 
   it('does not add historic levels to a manually set maximum', () => {
@@ -91,7 +99,14 @@ describe('level-up HP', () => {
         newConstitution: 8,
         roll: 1,
       })
-    ).toEqual({ max: 6, current: 1, gained: 1 });
+    ).toEqual({
+      max: 6,
+      current: 1,
+      gained: 1,
+      newLevelGain: 1,
+      retroactiveGain: 0,
+      minimumAdjustment: 0,
+    });
   });
 
   it('clamps extreme negative retroactive HP and current HP', () => {
@@ -104,6 +119,32 @@ describe('level-up HP', () => {
         newConstitution: 3,
         roll: 1,
       })
-    ).toEqual({ max: 1, current: 0, gained: -2 });
+    ).toEqual({
+      max: 1,
+      current: 0,
+      gained: -2,
+      newLevelGain: 1,
+      retroactiveGain: -16,
+      minimumAdjustment: 13,
+    });
+  });
+});
+
+describe('level-up spell grants', () => {
+  it('lists only grants that apply will add', () => {
+    const grant = (spellName: string, grantType = 'prepared') =>
+      ({ spellName, grantType }) as never;
+    expect(
+      grantsThatWillBeAdded(
+        [
+          grant('Shield'),
+          grant('Bless'),
+          grant('Unknown Spell'),
+          grant('Guidance', 'expanded'),
+        ],
+        [{ name: 'Shield' }, { name: 'Bless' }, { name: 'Guidance' }] as never,
+        [{ name: 'shield' }] as never
+      ).map(g => g.spellName)
+    ).toEqual(['Bless']);
   });
 });

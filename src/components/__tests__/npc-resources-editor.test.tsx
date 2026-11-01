@@ -51,7 +51,7 @@ function Harness({
 describe('NpcResourcesEditor', () => {
   it('renders with an empty resource list', () => {
     render(<Harness initial={[]} />);
-    expect(screen.getByText('Class Resources')).toBeInTheDocument();
+    expect(screen.getByText('Class resources')).toBeInTheDocument();
     expect(screen.getByText(/No class resources/)).toBeInTheDocument();
   });
 

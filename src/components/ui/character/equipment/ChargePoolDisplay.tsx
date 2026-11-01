@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import type { ChargePool } from '@/types/character';
 import { Zap, Minus, Plus } from 'lucide-react';
 import { AppIcon } from '@/components/ui/icons';
@@ -32,6 +32,7 @@ export function ChargePoolDisplay({
   itemName = 'item',
 }: ChargePoolDisplayProps) {
   const [localUsed, setLocalUsed] = useState<number | null>(null);
+  const namePrefix = useId();
   const used = localUsed ?? pool.usedCharges;
   const remaining = pool.maxCharges - used;
 
@@ -135,7 +136,10 @@ export function ChargePoolDisplay({
                       className="text-muted size-3 shrink-0"
                     />
                   )}
-                  <span className="text-heading font-medium break-words">
+                  <span
+                    id={`${namePrefix}-${ability.id}`}
+                    className="text-heading font-medium break-words"
+                  >
                     {ability.name}
                   </span>
                   {ability.description && (
@@ -152,7 +156,7 @@ export function ChargePoolDisplay({
                     }
                     disabled={!canUse}
                     className="border-divider text-body disabled:text-faint shrink-0 rounded border px-2 py-1.5 text-sm pointer-coarse:min-h-11"
-                    aria-label={`Use ${ability.name} (${ability.cost} ${ability.cost === 1 ? 'charge' : 'charges'})`}
+                    aria-describedby={`${namePrefix}-${ability.id}`}
                   >
                     Use ({ability.cost}{' '}
                     {ability.cost === 1 ? 'charge' : 'charges'})

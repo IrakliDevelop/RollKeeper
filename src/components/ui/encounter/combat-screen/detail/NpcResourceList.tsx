@@ -25,7 +25,7 @@ export function NpcResourceList({
   if (resources.length === 0) return null;
 
   return (
-    <Section heading="Class Resources" level={4}>
+    <Section heading="Class resources" level={4}>
       <div className="divide-divider divide-y">
         {resources.map(res => {
           const remaining = Math.max(0, res.maxUses - res.usesExpended);

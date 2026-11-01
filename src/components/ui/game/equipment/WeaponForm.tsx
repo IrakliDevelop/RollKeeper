@@ -454,6 +454,7 @@ export function WeaponForm({
             Special properties
           </label>
           <RichTextEditor
+            ariaLabel="Special properties"
             content={formData.description || ''}
             onChange={content =>
               setFormData(prev => ({ ...prev, description: content }))
@@ -523,6 +524,7 @@ export function WeaponForm({
                     Description (optional)
                   </label>
                   <RichTextEditor
+                    ariaLabel="Description (optional)"
                     content={charge.description || ''}
                     onChange={(content: string) =>
                       updateCharge(index, { description: content })

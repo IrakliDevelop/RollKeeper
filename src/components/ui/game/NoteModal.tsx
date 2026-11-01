@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button, RichTextEditor } from '@/components/ui/forms';
 import { ToastData } from '@/components/ui/feedback/Toast';
-import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import { confirmNoteDeletion } from './confirmNoteDeletion';
 
 interface NoteModalProps {
   note: RichTextContent | null;
@@ -94,14 +94,7 @@ export default function NoteModal({
 
   const handleDelete = async () => {
     if (!note || !onDelete) return;
-    const confirmed = await confirmDialog({
-      title: note.title.trim()
-        ? `Delete ${note.title.trim()}?`
-        : 'Delete this note?',
-      message: "This can't be undone.",
-      confirmLabel: 'Delete note',
-      tone: 'danger',
-    });
+    const confirmed = await confirmNoteDeletion(note.title);
     if (!confirmed) return;
     onDelete(note.id);
     onClose();
@@ -132,6 +125,7 @@ export default function NoteModal({
 
           {/* Content */}
           <RichTextEditor
+            ariaLabel="Note content"
             content={editContent}
             onChange={setEditContent}
             placeholder="Write your note here..."

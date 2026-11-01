@@ -131,7 +131,7 @@ function TagSelector({
             variant="ghost"
             size="sm"
             leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
-            aria-label={`${isAdding ? 'Done' : 'Add'} ${label}`}
+            aria-label={`${isAdding ? 'Done adding' : 'Add'} ${label.charAt(0).toLowerCase()}${label.slice(1)}`}
             onClick={() => {
               setIsAdding(!isAdding);
               setSearch('');
@@ -297,7 +297,7 @@ function SensesSection({ editing }: { editing: boolean }) {
             variant="ghost"
             size="sm"
             leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
-            aria-label={isAdding ? 'Done Senses' : 'Add Senses'}
+            aria-label={isAdding ? 'Done adding senses' : 'Add senses'}
             onClick={() => setIsAdding(!isAdding)}
           >
             {isAdding ? 'Done' : 'Add'}
@@ -369,15 +369,15 @@ function SensesSection({ editing }: { editing: boolean }) {
             <div>
               {loading ? (
                 <Input
-                  label="Sense Type"
-                  placeholder="Loading..."
+                  label="Sense type"
+                  placeholder="Loading…"
                   disabled
                   size="sm"
                 />
               ) : selectedSense === '__custom' ? (
                 <div>
                   <Input
-                    label="Custom Sense Name"
+                    label="Custom sense name"
                     value={customSenseName}
                     onChange={e => setCustomSenseName(e.target.value)}
                     placeholder="e.g., See Invisibility"
@@ -397,14 +397,14 @@ function SensesSection({ editing }: { editing: boolean }) {
               ) : (
                 <div>
                   <label className="text-heading mb-1.5 block text-sm font-medium">
-                    Sense Type
+                    Sense type
                   </label>
                   <Select
                     value={selectedSense || undefined}
                     onValueChange={setSelectedSense}
                   >
-                    <SelectTrigger size="sm">
-                      <SelectValue placeholder="Select a sense..." />
+                    <SelectTrigger size="sm" aria-label="Sense type">
+                      <SelectValue placeholder="Select a sense…" />
                     </SelectTrigger>
                     <SelectContent>
                       {uniqueSenseNames.map(name => (
@@ -412,7 +412,7 @@ function SensesSection({ editing }: { editing: boolean }) {
                           {name}
                         </SelectItem>
                       ))}
-                      <SelectItem value="__custom">Custom...</SelectItem>
+                      <SelectItem value="__custom">Custom…</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

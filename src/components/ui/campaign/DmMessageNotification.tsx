@@ -57,7 +57,7 @@ export function DmMessageNotification({
   };
 
   return (
-    <div className="pointer-events-none fixed top-4 right-4 z-50 flex max-h-[80vh] w-80 flex-col gap-2 overflow-y-auto sm:w-96">
+    <div className="contents">
       {visibleMessages.map(msg => {
         const isExpanded = expandedId === msg.id;
         const isDismissing = dismissingIds.has(msg.id);
@@ -65,31 +65,29 @@ export function DmMessageNotification({
         return (
           <div
             key={msg.id}
-            className={`pointer-events-auto rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-950 shadow-xl shadow-emerald-200/40 transition-all duration-300 ${
-              isDismissing
-                ? 'translate-x-full opacity-0'
-                : 'animate-in slide-in-from-right-full translate-x-0 opacity-100'
-            }`}
+            className={`border-divider bg-surface-elevated text-body pointer-events-auto rounded-md border p-4 transition-opacity duration-300 ${isDismissing ? 'opacity-0' : 'opacity-100'}`}
           >
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-2.5">
-                <div className="mt-0.5 rounded-full bg-emerald-200 p-1.5 text-emerald-700">
-                  <MessageSquare size={14} />
-                </div>
+                <MessageSquare
+                  size={14}
+                  className="text-muted mt-0.5 shrink-0"
+                />
                 <div>
-                  <p className="text-xs font-medium text-emerald-600">
+                  <p className="text-muted text-xs font-medium">
                     Message from DM
                   </p>
-                  <p className="mt-0.5 text-sm font-bold text-emerald-900">
+                  <p className="text-heading mt-0.5 text-sm font-bold">
                     {msg.title}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => handleDismiss(msg.id)}
-                className="shrink-0 rounded p-0.5 text-emerald-400 transition-colors hover:bg-emerald-200 hover:text-emerald-700"
+                className="text-muted hover:text-heading shrink-0 rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 title="Dismiss"
+                aria-label={`Dismiss ${msg.title} message`}
               >
                 <X size={16} />
               </button>
@@ -98,19 +96,24 @@ export function DmMessageNotification({
             {/* Expandable content */}
             {msg.content && msg.content.length > 0 && (
               <>
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   onClick={() => setExpandedId(isExpanded ? null : msg.id)}
-                  className="mt-2 flex items-center gap-1 text-xs text-emerald-600 transition-colors hover:text-emerald-800"
+                  aria-expanded={isExpanded}
+                  className="text-body hover:text-heading mt-2 h-auto px-0"
+                  leftIcon={
+                    isExpanded ? (
+                      <ChevronUp size={12} />
+                    ) : (
+                      <ChevronDown size={12} />
+                    )
+                  }
                 >
-                  {isExpanded ? (
-                    <ChevronUp size={12} />
-                  ) : (
-                    <ChevronDown size={12} />
-                  )}
                   {isExpanded ? 'Hide message' : 'Read message'}
-                </button>
+                </Button>
                 {isExpanded && (
-                  <div className="mt-2 rounded-md bg-emerald-100 p-3 text-sm text-emerald-900">
+                  <div className="bg-surface-secondary text-body mt-2 rounded-md p-3 text-sm">
                     <RichTextRenderer content={msg.content} />
                   </div>
                 )}
@@ -125,7 +128,7 @@ export function DmMessageNotification({
                 leftIcon={<BookOpen size={12} />}
                 onClick={() => handleAccept(msg)}
               >
-                View in Notes
+                View in notes
               </Button>
             </div>
           </div>
