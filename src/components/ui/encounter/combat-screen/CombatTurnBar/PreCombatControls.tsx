@@ -28,13 +28,13 @@ export function PreCombatControls({
   return (
     <>
       <Button
-        variant="primary"
+        variant={isEmpty ? 'secondary' : 'primary'}
         size="sm"
         onClick={onStartCombat}
         disabled={isEmpty}
         leftIcon={<Play size={16} />}
       >
-        Start Combat
+        Start combat
       </Button>
       <Button
         variant="secondary"
@@ -43,7 +43,7 @@ export function PreCombatControls({
         disabled={isEmpty}
         leftIcon={<Dices size={16} />}
       >
-        Roll Initiatives (NPCs/Monsters)
+        Roll NPC and monster initiative
       </Button>
       {canRequestRolls && (
         <Button

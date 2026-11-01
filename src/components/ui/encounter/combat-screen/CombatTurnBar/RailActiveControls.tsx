@@ -34,7 +34,7 @@ export function RailActiveControls({
           onClick={onPrevTurn}
           leftIcon={<SkipBack size={16} />}
         >
-          Prev
+          Previous turn
         </Button>
         <Button
           variant="primary"
@@ -42,30 +42,24 @@ export function RailActiveControls({
           onClick={onNextTurn}
           leftIcon={<SkipForward size={16} />}
         >
-          Next Turn
+          Next turn
         </Button>
       </div>
 
-      <div className="ml-3 flex flex-col">
-        <span className="text-muted text-xs font-bold tracking-widest uppercase">
-          Round {encounter.round}
-        </span>
+      <div className="flex flex-col">
+        <span className="text-muted type-caption">Round {encounter.round}</span>
         {activeEntity && (
-          <div className="font-display text-heading text-sm font-bold">
+          <div className="type-ui text-heading">
             <span>{activeEntity.name}</span>
-            <span className="text-accent-amber-text-muted font-normal">
-              &apos;s turn
-            </span>
+            <span className="text-muted font-normal">&apos;s turn</span>
           </div>
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex flex-wrap items-center gap-2">
         {onDeckEntity && (
-          <div className="mr-2 flex flex-col items-end">
-            <span className="text-muted text-xs font-bold tracking-widest uppercase">
-              Up Next
-            </span>
+          <div className="flex flex-col items-end">
+            <span className="text-muted type-caption">Up next</span>
             <span className="text-body text-sm font-medium">
               {onDeckEntity.name}
             </span>
@@ -74,20 +68,20 @@ export function RailActiveControls({
         <Button
           variant="ghost"
           selected={hidePlayerHp}
+          aria-pressed={hidePlayerHp}
           size="sm"
           onClick={onToggleHidePlayerHp}
           leftIcon={hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />}
         >
-          Player HP
+          {hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
         </Button>
         <Button
-          variant="ghost"
+          variant="secondary"
           size="sm"
           onClick={onEndCombat}
-          className="bg-accent-red-bg text-accent-red-text hover:bg-accent-red-bg-strong"
           leftIcon={<Square size={14} />}
         >
-          End Combat
+          End combat
         </Button>
       </div>
     </>

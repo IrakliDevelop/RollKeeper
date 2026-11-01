@@ -87,6 +87,7 @@ export function CombatScreen({
       onRename={onRename}
       onOpenAdd={onOpenAdd}
       onOpenConfig={onOpenConfig}
+      addPrimary={entities.length === 0}
       mapAction={mapAction}
     />
   );
