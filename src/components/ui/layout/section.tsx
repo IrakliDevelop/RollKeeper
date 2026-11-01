@@ -22,6 +22,8 @@ export interface SectionProps
    * The section heading.
    */
   heading: React.ReactNode;
+  /** Focus target for actions that move between sections. */
+  headingRef?: React.Ref<HTMLHeadingElement>;
   /**
    * Heading element: h2 (default), h3 or h4. Each level has its own step of
    * the type scale.
@@ -57,6 +59,7 @@ const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
   (
     {
       heading,
+      headingRef,
       toggle,
       level = 2,
       trailing,
@@ -81,6 +84,8 @@ const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
       >
         <div className="border-divider flex items-center justify-between gap-3 border-b pb-2">
           <Heading
+            ref={headingRef}
+            tabIndex={headingRef ? -1 : undefined}
             id={headingId}
             className={cn('text-heading min-w-0', HEADING_CLASS[level])}
           >

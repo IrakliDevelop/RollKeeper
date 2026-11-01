@@ -167,20 +167,18 @@ export function CharacterAutomaticSyncControls(
                   <Button
                     variant="secondary"
                     size="sm"
-                    aria-describedby={`auto-sync-${character.id}-name`}
                     onClick={() => actions.enable(character)}
                     disabled={!actions.indexedDbPrimary}
                   >
-                    Enable
+                    Enable <span className="sr-only">{character.name}</span>
                   </Button>
                 ) : (
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-describedby={`auto-sync-${character.id}-name`}
                     onClick={() => actions.disable(character.id)}
                   >
-                    Turn off
+                    Turn off <span className="sr-only">{character.name}</span>
                   </Button>
                 )}
                 {['offline', 'auth-required', 'failed'].includes(status) && (
@@ -189,7 +187,7 @@ export function CharacterAutomaticSyncControls(
                     size="sm"
                     onClick={() => actions.retry(character.id)}
                   >
-                    Retry
+                    Retry <span className="sr-only">{character.name}</span>
                   </Button>
                 )}
                 {status === 'conflict' && (
@@ -197,32 +195,32 @@ export function CharacterAutomaticSyncControls(
                     <Button
                       variant="secondary"
                       size="sm"
-                      aria-describedby={`auto-sync-${character.id}-name`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'keep-mine')
                       }
                     >
-                      Keep mine
+                      Keep mine{' '}
+                      <span className="sr-only">{character.name}</span>
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
-                      aria-describedby={`auto-sync-${character.id}-name`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'use-cloud')
                       }
                     >
-                      Use cloud
+                      Use cloud{' '}
+                      <span className="sr-only">{character.name}</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      aria-describedby={`auto-sync-${character.id}-name`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'keep-both')
                       }
                     >
-                      Keep both
+                      Keep both{' '}
+                      <span className="sr-only">{character.name}</span>
                     </Button>
                   </>
                 )}
@@ -230,10 +228,10 @@ export function CharacterAutomaticSyncControls(
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-describedby={`auto-sync-${character.id}-name`}
                     onClick={() => actions.downloadQuarantine(character.id)}
                   >
-                    Download quarantined data
+                    Download quarantined data{' '}
+                    <span className="sr-only">{character.name}</span>
                   </Button>
                 )}
               </div>

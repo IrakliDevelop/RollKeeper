@@ -30,14 +30,16 @@ export function PlayerBackupSummaryCard({
           </h2>
           <p className="type-body text-body mt-1">{view.description}</p>
           {view.counts && view.counts.length > 0 ? (
-            <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
               {view.counts.map(count => (
-                <div key={count.label} className="type-small flex gap-1">
-                  <dt className="text-body">{count.label}</dt>
-                  <dd className="text-heading font-semibold">{count.value}</dd>
-                </div>
+                <li key={count.label} className="type-small flex gap-1">
+                  <span className="text-heading font-semibold">
+                    {count.value}
+                  </span>{' '}
+                  <span className="text-body">{count.label}</span>
+                </li>
               ))}
-            </dl>
+            </ul>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">

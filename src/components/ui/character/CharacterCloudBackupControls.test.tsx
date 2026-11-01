@@ -146,7 +146,7 @@ describe('CharacterCloudBackupControls', () => {
     );
     expect(cloud.service.list).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now Aria' }));
 
     const dialog = await findConfirmDialog();
     expect(dialog).toHaveAccessibleName('Back up Aria?');
@@ -182,17 +182,17 @@ describe('CharacterCloudBackupControls', () => {
 
     await waitFor(() => expect(cloud.service.list).toHaveBeenCalledTimes(1));
     expect(
-      screen.getByRole('button', { name: 'Verify cloud copy' })
+      screen.getByRole('button', { name: 'Verify cloud copy Aria' })
     ).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Restore' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Restore Aria' })).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Restore as copy' })
-    ).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Archive cloud copy' })
+      screen.getByRole('button', { name: 'Restore as copy Aria' })
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Download recovery' })
+      screen.getByRole('button', { name: 'Archive cloud copy Aria' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Download recovery Aria' })
     ).toBeVisible();
   });
 });

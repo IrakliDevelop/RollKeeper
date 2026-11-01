@@ -67,11 +67,8 @@ describe('PlayerBackupSummaryCard', () => {
   );
 
   it('groups manage and restore actions after ongoing completion', () => {
-    render(
-      <PlayerBackupSummaryCard
-        view={createPlayerBackupDashboardFixture('ongoing-complete')}
-      />
-    );
+    const view = createPlayerBackupDashboardFixture('ongoing-complete');
+    render(<PlayerBackupSummaryCard view={view} />);
     expect(
       screen.getByRole('link', { name: COPY.dashboard.manage })
     ).toHaveAttribute('href', '/player/backup?intent=manage');
@@ -82,5 +79,10 @@ describe('PlayerBackupSummaryCard', () => {
       screen.getByText(COPY.dashboard.counts.protected)
     ).toBeInTheDocument();
     expect(screen.getByText(COPY.dashboard.counts.paused)).toBeInTheDocument();
+    for (const count of view.counts ?? []) {
+      expect(document.body.textContent).toContain(
+        `${count.value} ${count.label}`
+      );
+    }
   });
 });

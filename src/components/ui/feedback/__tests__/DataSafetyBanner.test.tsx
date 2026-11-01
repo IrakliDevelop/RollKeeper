@@ -35,7 +35,7 @@ describe('DataSafetyBanner', () => {
     render(<DataSafetyBanner onExport={onExport} />);
 
     await screen.findByText(/saved only in this browser/i);
-    fireEvent.click(screen.getByText('Export All'));
+    fireEvent.click(screen.getByRole('button', { name: 'Export all' }));
     expect(onExport).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));

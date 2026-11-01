@@ -39,7 +39,7 @@ test('deployment flag alone leaves the control profile local-only and makes zero
   await expect(page.getByText('Cloud: local only')).toBeVisible();
   await expect(
     page.getByRole('button', {
-      name: /enable automatic sync for slice 9 control/i,
+      name: 'Enable Slice 9 Control',
     })
   ).toBeDisabled();
 

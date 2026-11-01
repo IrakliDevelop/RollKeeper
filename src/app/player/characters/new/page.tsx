@@ -200,7 +200,7 @@ export default function NewCharacterPage() {
               <AvatarUpload
                 avatar={avatar}
                 characterId={tempCharacterId}
-                characterName={characterName || 'New character'}
+                characterName={characterName || 'your character'}
                 onAvatarChange={setAvatar}
                 size="xl"
                 editable={true}
@@ -230,6 +230,7 @@ export default function NewCharacterPage() {
               <div>
                 <label
                   htmlFor="race"
+                  id="race-label"
                   className="text-heading mb-2 block text-sm font-medium"
                 >
                   Race
@@ -240,9 +241,7 @@ export default function NewCharacterPage() {
                     options={raceOptions}
                     value={selectedRace}
                     onChange={setSelectedRace}
-                    placeholder={
-                      isLoadingRaces ? 'Loading races…' : 'Search races'
-                    }
+                    placeholder={isLoadingRaces ? 'Loading races…' : 'Elf'}
                     disabled={isLoadingRaces}
                     className="min-w-40 flex-1"
                   />
@@ -251,6 +250,7 @@ export default function NewCharacterPage() {
                       <DialogTrigger asChild>
                         <Button
                           type="button"
+                          aria-describedby="race-label"
                           variant="outline"
                           size="md"
                           leftIcon={<Info size={16} />}
@@ -527,6 +527,7 @@ export default function NewCharacterPage() {
               <div>
                 <label
                   htmlFor="class"
+                  id="class-label"
                   className="text-heading mb-2 block text-sm font-medium"
                 >
                   Class
@@ -554,7 +555,7 @@ export default function NewCharacterPage() {
                                       : classData.spellcaster === 'third'
                                         ? '1/3'
                                         : 'Pact'
-                                } Caster`
+                                } caster`
                               : 'Non-spellcaster'
                           }
                         >
@@ -568,6 +569,7 @@ export default function NewCharacterPage() {
                       <DialogTrigger asChild>
                         <Button
                           type="button"
+                          aria-describedby="class-label"
                           variant="outline"
                           size="md"
                           leftIcon={<Info size={16} />}
@@ -895,14 +897,14 @@ export default function NewCharacterPage() {
 
             {/* Character preview */}
             <div className="border-divider border-t pt-6">
-              <h3 className="text-heading mb-4 text-lg font-medium">
+              <h2 className="text-heading mb-4 text-lg font-medium">
                 Character preview
-              </h3>
+              </h2>
               <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                 <div>
                   <span className="text-muted">Name:</span>
                   <p className="text-heading font-medium">
-                    {characterName || 'Character name'}
+                    {characterName || 'Unnamed'}
                   </p>
                 </div>
                 <div>

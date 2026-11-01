@@ -91,8 +91,7 @@ describe('CharacterAutomaticSyncControls', () => {
       screen.getByRole('heading', { name: 'Automatic character sync' })
     ).toBeVisible();
     expect(screen.getByText('Cloud: local only')).toBeVisible();
-    const enable = screen.getByRole('button', { name: 'Enable' });
-    expect(enable).toHaveAccessibleDescription('Aster');
+    const enable = screen.getByRole('button', { name: 'Enable Aster' });
     fireEvent.click(enable);
     await waitFor(() =>
       expect(actions.enable).toHaveBeenCalledWith(characters[0])
@@ -142,6 +141,9 @@ describe('CharacterAutomaticSyncControls', () => {
       />
     );
     expect(screen.getByText(label)).toBeVisible();
+    if (['offline', 'auth-required', 'failed'].includes(status)) {
+      expect(screen.getByRole('button', { name: 'Retry Aster' })).toBeVisible();
+    }
   });
 
   it('offers all explicit conflict actions and quarantine export', () => {
@@ -154,9 +156,9 @@ describe('CharacterAutomaticSyncControls', () => {
       />
     );
     expect(screen.getByText('Cloud: conflict')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Keep mine' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Use cloud' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Keep both' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep mine Aster' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use cloud Aster' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep both Aster' }));
     expect(conflict.resolveConflict).toHaveBeenCalledTimes(3);
 
     const quarantined = controller('quarantined');
@@ -169,7 +171,7 @@ describe('CharacterAutomaticSyncControls', () => {
     expect(screen.getByText('Cloud: quarantined')).toBeVisible();
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Download quarantined data',
+        name: 'Download quarantined data Aster',
       })
     );
     expect(quarantined.downloadQuarantine).toHaveBeenCalledWith('character-a');

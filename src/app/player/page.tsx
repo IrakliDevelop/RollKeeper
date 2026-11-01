@@ -272,7 +272,7 @@ export default function PlayerDashboardPage() {
         <AvatarUpload
           avatar={character.avatar}
           characterId={character.id}
-          characterName={character.name || 'Character'}
+          characterName={character.name || 'unnamed character'}
           onAvatarChange={() => {}}
           size="sm"
           editable={false}
@@ -357,7 +357,7 @@ export default function PlayerDashboardPage() {
               aria-describedby={`character-${character.id}-name`}
               onClick={() => {
                 restoreCharacter(character.id);
-                setFocusSection('archived');
+                setFocusSection('active');
               }}
             >
               Restore character
@@ -426,9 +426,8 @@ export default function PlayerDashboardPage() {
             ref={fileInputRef}
             type="file"
             accept=".json"
-            aria-label="Character import file"
             onChange={handleImportCharacter}
-            className="sr-only"
+            className="hidden"
           />
         </div>
 
@@ -442,29 +441,27 @@ export default function PlayerDashboardPage() {
             <h2 className="type-subheading text-heading">
               Create your first character
             </h2>
-            <Button
-              asChild
-              variant="primary"
-              className="mt-4"
-              leftIcon={<Plus size={18} aria-hidden />}
-            >
-              <Link href="/player/characters/new">Create character</Link>
-            </Button>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Button
+                asChild
+                variant="primary"
+                leftIcon={<Plus size={18} aria-hidden />}
+              >
+                <Link href="/player/characters/new">Create character</Link>
+              </Button>
+              <Button variant="secondary" onClick={handleTryMigration}>
+                Migrate old data
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-8">
-            <p className="type-small text-muted">
-              {activeCharacters.length} active · {archivedCharacters.length}{' '}
-              archived
-            </p>
             {activeCharacters.length > 0 && (
               <Section
                 heading={`Active characters (${activeCharacters.length})`}
+                headingRef={activeHeadingRef}
                 level={2}
               >
-                <h2 ref={activeHeadingRef} tabIndex={-1} className="sr-only">
-                  Active characters
-                </h2>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {activeCharacters.map(character =>
                     renderCharacter(character)
@@ -475,11 +472,9 @@ export default function PlayerDashboardPage() {
             {archivedCharacters.length > 0 && (
               <Section
                 heading={`Archived characters (${archivedCharacters.length})`}
+                headingRef={archivedHeadingRef}
                 level={2}
               >
-                <h2 ref={archivedHeadingRef} tabIndex={-1} className="sr-only">
-                  Archived characters
-                </h2>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {archivedCharacters.map(character =>
                     renderCharacter(character, true)
@@ -510,7 +505,7 @@ export default function PlayerDashboardPage() {
           </>
         )}
 
-        <Section heading="Settings" level={2}>
+        <Section heading="Animations" level={2}>
           <Button
             variant="ghost"
             aria-expanded={showSettings}
@@ -532,7 +527,7 @@ export default function PlayerDashboardPage() {
               />
               <Switch
                 label="Level up animation"
-                description="Show the level up animation."
+                description="Play an animation when your character levels up."
                 checked={settings?.enableLevelUpAnimation ?? false}
                 onCheckedChange={checked =>
                   updateSettings({ enableLevelUpAnimation: checked })

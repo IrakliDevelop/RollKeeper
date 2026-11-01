@@ -133,13 +133,18 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
           <Button
             asChild
             variant="ghost"
+            size="sm"
             leftIcon={<ArrowLeft size={20} aria-hidden />}
           >
             <Link href="/player">{COPY.chrome.back}</Link>
           </Button>
         }
         title={<h1 className="type-heading text-heading">{view.pageTitle}</h1>}
-        actions={<p className="type-small text-muted">{view.headerNote}</p>}
+        actions={
+          <p className="type-small text-muted hidden min-w-0 break-all sm:block">
+            {view.headerNote}
+          </p>
+        }
         wrapControls
       />
 

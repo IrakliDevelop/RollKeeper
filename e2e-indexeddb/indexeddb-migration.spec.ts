@@ -35,7 +35,7 @@ test('untouched profile keeps byte-compatible localStorage behavior and makes ze
   const page = await context.newPage();
   await page.goto('/player');
   await expect(
-    page.getByRole('heading', { name: /your characters/i })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
   expect(
     await page.evaluate(() => localStorage.getItem('rollkeeper-player-data'))
@@ -51,7 +51,7 @@ test('untouched profile keeps byte-compatible localStorage behavior and makes ze
   });
   await page.reload();
   await expect(
-    page.getByRole('heading', { name: /your characters/i })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
   expect(await databaseNames(page)).not.toContain('rollkeeper-local');
   expect(
@@ -89,7 +89,7 @@ test.describe('explicitly selected profile', () => {
     expect(download.suggestedFilename()).toMatch(/^rollkeeper-browser-backup_/);
 
     await expect(
-      page.getByRole('heading', { name: /your characters/i }).first()
+      page.getByRole('heading', { name: 'Characters', exact: true }).first()
     ).toBeVisible();
     await expect(
       page.getByRole('button', { name: /confirm indexeddb cutover/i })
@@ -106,7 +106,7 @@ test.describe('explicitly selected profile', () => {
       .click();
     await activationReload;
     await expect(
-      page.getByRole('heading', { name: /your characters/i }).first()
+      page.getByRole('heading', { name: 'Characters', exact: true }).first()
     ).toBeVisible();
 
     const createdId = await page.evaluate(() =>
@@ -152,7 +152,7 @@ test.describe('explicitly selected profile', () => {
     }, createdId);
     await page.reload();
     await expect(
-      page.getByRole('heading', { name: /your characters/i }).first()
+      page.getByRole('heading', { name: 'Characters', exact: true }).first()
     ).toBeVisible();
     const hydrationEvidence = await page.evaluate(async () => ({
       names: window

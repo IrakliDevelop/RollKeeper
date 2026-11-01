@@ -50,9 +50,10 @@ describe('/player/backup', () => {
         name: 'Back up my characters online',
       }).length
     ).toBeGreaterThan(0);
-    expect(
-      screen.getByRole('link', { name: /back to my characters/i })
-    ).toHaveAttribute('href', '/player');
+    expect(screen.getByRole('link', { name: 'Characters' })).toHaveAttribute(
+      'href',
+      '/player'
+    );
     expectPlayerBackupVocabulary(baseElement);
   });
 

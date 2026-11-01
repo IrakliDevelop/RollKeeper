@@ -67,20 +67,19 @@ function EnabledCharacterCloudBackupControls(
               <Button
                 variant="secondary"
                 size="sm"
-                aria-describedby={`local-backup-${character.id}-name`}
                 onClick={() => actions.backup(character)}
                 disabled={actions.busy !== null}
               >
-                Back up now
+                Back up now <span className="sr-only">{character.name}</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                aria-describedby={`local-backup-${character.id}-name`}
                 onClick={() => actions.verify(character)}
                 disabled={actions.busy !== null}
               >
-                Verify cloud copy
+                Verify cloud copy{' '}
+                <span className="sr-only">{character.name}</span>
               </Button>
             </div>
           </div>
@@ -109,42 +108,39 @@ function EnabledCharacterCloudBackupControls(
                 <Button
                   variant="secondary"
                   size="sm"
-                  aria-describedby={`cloud-backup-${row.id}-name`}
                   onClick={() => actions.restore(row, false)}
                   disabled={actions.busy !== null}
                 >
-                  Restore
+                  Restore <span className="sr-only">{row.name}</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-describedby={`cloud-backup-${row.id}-name`}
                   onClick={() => actions.restore(row, true)}
                   disabled={actions.busy !== null}
                 >
-                  Restore as copy
+                  Restore as copy <span className="sr-only">{row.name}</span>
                 </Button>
                 {!row.deleted_at && (
                   <Button
-                    variant="danger"
+                    variant="secondary"
                     size="sm"
                     leftIcon={<Archive size={14} />}
-                    aria-describedby={`cloud-backup-${row.id}-name`}
                     onClick={() => actions.archive(row)}
                     disabled={actions.busy !== null}
                   >
-                    Archive cloud copy
+                    Archive cloud copy{' '}
+                    <span className="sr-only">{row.name}</span>
                   </Button>
                 )}
                 <Button
                   variant="outline"
                   size="sm"
                   leftIcon={<Download size={14} />}
-                  aria-describedby={`cloud-backup-${row.id}-name`}
                   onClick={() => actions.download(row)}
                   disabled={actions.busy !== null}
                 >
-                  Download recovery
+                  Download recovery <span className="sr-only">{row.name}</span>
                 </Button>
               </div>
             </div>
