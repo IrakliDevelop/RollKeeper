@@ -313,7 +313,7 @@ test.describe('player map sheet drawer', () => {
     await dialog
       .getByRole('textbox', { name: 'HP amount' })
       .fill(String(DAMAGE));
-    await dialog.getByRole('button', { name: 'Damage' }).click();
+    await dialog.getByRole('button', { name: 'Damage', exact: true }).click();
     await expect(dialog.getByText(expectedHp, { exact: true })).toBeVisible({
       timeout: 5_000,
     });
