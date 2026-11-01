@@ -94,11 +94,9 @@ describe('CombatantRow', () => {
         onSelect={vi.fn()}
       />
     );
-    // The counter div has title="Rage"; its last button is the + (increment)
-    const counterContainer = screen.getByTitle('Rage');
-    const counterButtons = counterContainer.querySelectorAll('button');
-    const plusButton = counterButtons[counterButtons.length - 1];
-    fireEvent.click(plusButton);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Increase Rage for Thorin' })
+    );
     // Must be called with playerCharacterId='pc-9', NOT entity.id='entity-42'
     expect(onAdjustCounter).toHaveBeenCalledWith('pc-9', 1);
     expect(onAdjustCounter).not.toHaveBeenCalledWith('entity-42', 1);
@@ -115,9 +113,9 @@ describe('CombatantRow', () => {
       />
     );
     expect(screen.getByText('Goblin')).toBeInTheDocument();
-    expect(screen.getByTitle('Click to set initiative')).toHaveTextContent(
-      '15'
-    );
+    expect(
+      screen.getByRole('textbox', { name: 'Goblin initiative' })
+    ).toHaveValue('15');
     expect(screen.getByText('7/7')).toBeInTheDocument();
     expect(screen.getByTestId('ac-section')).toBeInTheDocument();
   });
@@ -125,7 +123,7 @@ describe('CombatantRow', () => {
   it('calls onSelect when row clicked', () => {
     const actions = makeMockActions();
     const onSelect = vi.fn();
-    const { container } = render(
+    render(
       <CombatantRow
         {...defaultProps}
         entity={mockEntity}
@@ -133,7 +131,7 @@ describe('CombatantRow', () => {
         onSelect={onSelect}
       />
     );
-    fireEvent.click(container.firstChild as Element);
+    fireEvent.click(screen.getByRole('button', { name: 'Goblin details' }));
     expect(onSelect).toHaveBeenCalled();
   });
 
@@ -148,7 +146,7 @@ describe('CombatantRow', () => {
         isOnDeck={true}
       />
     );
-    expect(screen.getByText('ON DECK')).toBeInTheDocument();
+    expect(screen.getByText('On deck')).toBeInTheDocument();
   });
 
   it('editing initiative calls onSetInitiative', async () => {
@@ -162,12 +160,81 @@ describe('CombatantRow', () => {
         onSelect={vi.fn()}
       />
     );
-    await user.click(screen.getByTitle('Click to set initiative'));
-    const input = screen.getByRole('spinbutton');
+    const input = screen.getByRole('textbox', { name: 'Goblin initiative' });
     await user.clear(input);
-    await user.type(input, '20');
+    await user.type(input, '20.5');
     await user.keyboard('{Enter}');
-    expect(actions.onSetInitiative).toHaveBeenCalledWith('e1', 20);
+    expect(actions.onSetInitiative).toHaveBeenCalledWith('e1', 20.5);
+    expect(input).toHaveFocus();
+  });
+
+  it('restores initiative on Escape without saving', async () => {
+    const actions = makeMockActions();
+    const user = userEvent.setup();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={mockEntity}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    const input = screen.getByRole('textbox', { name: 'Goblin initiative' });
+    await user.clear(input);
+    await user.type(input, '19');
+    await user.keyboard('{Escape}');
+    expect(input).toHaveValue('15');
+    expect(input).toHaveFocus();
+    expect(actions.onSetInitiative).not.toHaveBeenCalled();
+  });
+
+  it('restores initiative when an empty edit is committed or blurred', async () => {
+    const actions = makeMockActions();
+    const user = userEvent.setup();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={mockEntity}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    const input = screen.getByRole('textbox', { name: 'Goblin initiative' });
+    await user.clear(input);
+    await user.tab();
+    expect(input).toHaveValue('15');
+    await user.click(input);
+    await user.clear(input);
+    await user.keyboard('{Enter}');
+    expect(input).toHaveValue('15');
+    expect(actions.onSetInitiative).not.toHaveBeenCalled();
+  });
+
+  it('names non-player allegiance and dead state without color', () => {
+    const actions = makeMockActions();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={{ ...mockEntity, playerDisposition: 'ally', currentHp: 0 }}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Ally')).toBeVisible();
+    expect(screen.getByText('Dead')).toBeVisible();
+  });
+
+  it('shows a synced player summon as an ally when no disposition was stored', () => {
+    const actions = makeMockActions();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={{ ...mockEntity, summonOwnerId: 'pc-9' }}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Ally')).toBeVisible();
   });
 
   it('remove condition chip calls onRemoveCondition', async () => {
@@ -252,8 +319,10 @@ describe('CombatantRow', () => {
     );
     fireEvent.click(screen.getByText('Goblin'));
     expect(onSelect).toHaveBeenCalled();
-    // No inline rename affordance left on the row
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    // The only textbox is the always-on initiative value.
+    expect(
+      screen.getByRole('textbox', { name: 'Goblin initiative' })
+    ).toBeVisible();
     expect(actions.onUpdate).not.toHaveBeenCalled();
   });
 

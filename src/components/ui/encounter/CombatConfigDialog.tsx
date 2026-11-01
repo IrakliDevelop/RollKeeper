@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
+import { SubTabs, type SubTabDefinition } from '@/components/ui/layout/SubTabs';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Switch } from '@/components/ui/forms/switch';
@@ -68,11 +69,6 @@ const HP_DISPLAY_OPTIONS: HpDisplayOption[] = [
 ];
 
 type ConfigSection = 'visibility' | 'conditions';
-
-const CONFIG_SECTIONS: Array<{ key: ConfigSection; label: string }> = [
-  { key: 'visibility', label: 'Player visibility' },
-  { key: 'conditions', label: 'Custom conditions' },
-];
 
 interface CombatConfigDialogProps {
   open: boolean;
@@ -195,6 +191,141 @@ export function CombatConfigDialog({
     onOpenChange(false);
   };
 
+  const tabs: SubTabDefinition[] = [
+    {
+      value: 'visibility',
+      id: 'combat-config-visibility',
+      label: 'Player visibility',
+      content: (
+        <div className="space-y-6">
+          {/* Enemy HP display picker */}
+          <RadioGroupField
+            label="Enemy HP display"
+            value={hpDisplay}
+            onValueChange={v => setHpDisplay(v as EnemyHpDisplay)}
+          >
+            <div className="space-y-2">
+              {HP_DISPLAY_OPTIONS.map(opt => (
+                <RadioGroupItem
+                  key={opt.value}
+                  value={opt.value}
+                  label={opt.label}
+                  description={opt.description}
+                  size="sm"
+                />
+              ))}
+            </div>
+          </RadioGroupField>
+
+          {/* HP state bands editor — only shown when display === 'label' */}
+          {hpDisplay === 'label' && (
+            <div className="space-y-3">
+              <div className="border-divider flex items-center justify-between border-b pb-2">
+                <span className="text-heading text-sm font-medium">
+                  HP state labels
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetBands}
+                  type="button"
+                >
+                  Reset to defaults
+                </Button>
+              </div>
+
+              <p className="text-muted text-xs">
+                Each band covers HP from its threshold up to the next band. Rows
+                with empty labels are dropped on save.
+              </p>
+
+              <div className="space-y-2">
+                {bands.map((band, index) => (
+                  <div
+                    key={band.draftId}
+                    className="border-divider flex flex-wrap items-end gap-2 border-b pb-2"
+                  >
+                    <NumberInput
+                      label={`Band ${index + 1} threshold (%)`}
+                      value={band.minPercent}
+                      onChange={v =>
+                        setBands(prev =>
+                          prev.map((b, i) =>
+                            i === index ? { ...b, minPercent: v ?? 0 } : b
+                          )
+                        )
+                      }
+                      min={0}
+                      max={100}
+                      wrapperClassName="w-32 shrink-0"
+                    />
+                    <Input
+                      type="text"
+                      label={`Band ${index + 1} label`}
+                      value={band.label}
+                      onChange={e =>
+                        handleBandChange(index, 'label', e.target.value)
+                      }
+                      placeholder="Wounded"
+                      wrapperClassName="min-w-32 flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveBand(index)}
+                      type="button"
+                      aria-label={
+                        band.label
+                          ? `Remove ${band.label} band`
+                          : `Remove band ${index + 1}`
+                      }
+                    >
+                      <Trash2 size={14} className="text-muted" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                ref={addBandRef}
+                variant="outline"
+                size="sm"
+                onClick={handleAddBand}
+                type="button"
+              >
+                Add band
+              </Button>
+            </div>
+          )}
+
+          {/* Enemy conditions sharing */}
+          <div className="border-divider border-t pt-4">
+            <Switch
+              checked={conditionsDisplay === 'on'}
+              onCheckedChange={checked =>
+                setConditionsDisplay(checked ? 'on' : 'off')
+              }
+              label="Share enemy conditions with players"
+              description="Players see condition icons and concentration on enemy tokens. Your own party's conditions are always visible to them."
+              wrapperClassName="gap-4"
+            />
+          </div>
+        </div>
+      ),
+    },
+    {
+      value: 'conditions',
+      id: 'combat-config-conditions',
+      label: 'Custom conditions',
+      content: (
+        <CustomConditionLibraryEditor
+          conditions={customConditions}
+          onChange={setCustomConditions}
+        />
+      ),
+    },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
@@ -206,149 +337,12 @@ export function CombatConfigDialog({
         </DialogHeader>
 
         <DialogBody className="space-y-6">
-          <div
-            role="group"
-            aria-label="Configuration section"
-            className="flex gap-1"
-          >
-            {CONFIG_SECTIONS.map(item => (
-              <Button
-                key={item.key}
-                variant="ghost"
-                selected={section === item.key}
-                size="sm"
-                type="button"
-                aria-pressed={section === item.key}
-                onClick={() => setSection(item.key)}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </div>
-
-          {section === 'visibility' && (
-            <>
-              {/* Enemy HP display picker */}
-              <RadioGroupField
-                label="Enemy HP display"
-                value={hpDisplay}
-                onValueChange={v => setHpDisplay(v as EnemyHpDisplay)}
-              >
-                <div className="space-y-2">
-                  {HP_DISPLAY_OPTIONS.map(opt => (
-                    <RadioGroupItem
-                      key={opt.value}
-                      value={opt.value}
-                      label={opt.label}
-                      description={opt.description}
-                      size="sm"
-                    />
-                  ))}
-                </div>
-              </RadioGroupField>
-
-              {/* HP state bands editor — only shown when display === 'label' */}
-              {hpDisplay === 'label' && (
-                <div className="space-y-3">
-                  <div className="border-divider flex items-center justify-between border-b pb-2">
-                    <span className="text-heading text-sm font-medium">
-                      HP state labels
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleResetBands}
-                      type="button"
-                    >
-                      Reset to defaults
-                    </Button>
-                  </div>
-
-                  <p className="text-muted text-xs">
-                    Each band covers HP from its threshold up to the next band.
-                    Rows with empty labels are dropped on save.
-                  </p>
-
-                  <div className="space-y-2">
-                    {bands.map((band, index) => (
-                      <div
-                        key={band.draftId}
-                        className="border-divider flex flex-wrap items-end gap-2 border-b pb-2"
-                      >
-                        <NumberInput
-                          label={`Band ${index + 1} threshold (%)`}
-                          value={band.minPercent}
-                          onChange={v =>
-                            setBands(prev =>
-                              prev.map((b, i) =>
-                                i === index ? { ...b, minPercent: v ?? 0 } : b
-                              )
-                            )
-                          }
-                          min={0}
-                          max={100}
-                          wrapperClassName="w-32 shrink-0"
-                        />
-                        <Input
-                          type="text"
-                          label={`Band ${index + 1} label`}
-                          value={band.label}
-                          onChange={e =>
-                            handleBandChange(index, 'label', e.target.value)
-                          }
-                          placeholder="Wounded"
-                          wrapperClassName="min-w-32 flex-1"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveBand(index)}
-                          type="button"
-                          aria-label={
-                            band.label
-                              ? `Remove ${band.label} band`
-                              : `Remove band ${index + 1}`
-                          }
-                        >
-                          <Trash2 size={14} className="text-muted" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button
-                    ref={addBandRef}
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddBand}
-                    type="button"
-                  >
-                    Add band
-                  </Button>
-                </div>
-              )}
-
-              {/* Enemy conditions sharing */}
-              <div className="border-divider border-t pt-4">
-                <Switch
-                  checked={conditionsDisplay === 'on'}
-                  onCheckedChange={checked =>
-                    setConditionsDisplay(checked ? 'on' : 'off')
-                  }
-                  label="Share enemy conditions with players"
-                  description="Players see condition icons and concentration on enemy tokens. Your own party's conditions are always visible to them."
-                  wrapperClassName="gap-4"
-                />
-              </div>
-            </>
-          )}
-
-          {section === 'conditions' && (
-            <CustomConditionLibraryEditor
-              conditions={customConditions}
-              onChange={setCustomConditions}
-            />
-          )}
+          <SubTabs
+            tabs={tabs}
+            label="Combat configuration sections"
+            value={section}
+            onValueChange={value => setSection(value as ConfigSection)}
+          />
         </DialogBody>
 
         <DialogFooter>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ChessBishop,
   ChessKing,
@@ -10,6 +10,7 @@ import {
   ChessRook,
   Milk,
 } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import type { ChessPiece, EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from './types';
 
@@ -35,6 +36,7 @@ export const CHESS_PIECES: {
   { piece: 'pawn', Icon: ChessPawn },
 ];
 
+// Persisted token colour data, not the interface palette.
 export const PIECE_COLORS = [
   { name: 'White', value: '#e2e8f0' },
   { name: 'Black', value: '#1e293b' },
@@ -47,133 +49,183 @@ export const PIECE_COLORS = [
   { name: 'Brown', value: '#92400e' },
 ];
 
-function getChessPieceIcon(piece: ChessPiece) {
-  return CHESS_PIECES.find(p => p.piece === piece)?.Icon;
-}
-
 export function TokenChip({ entity, size, actions }: TokenChipProps) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const firstOptionRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   const isPlayer = entity.type === 'player';
-  const dimClass = size === 'sm' ? 'h-8 w-8' : 'h-[34px] w-[34px]';
-  const Icon = entity.chessPiece ? getChessPieceIcon(entity.chessPiece) : null;
+  const Icon = CHESS_PIECES.find(p => p.piece === entity.chessPiece)?.Icon;
   const color = entity.color;
 
-  function handlePieceChange(piece: ChessPiece | undefined) {
-    actions.onUpdate(entity.id, { chessPiece: piece });
-  }
-
-  function handleColorChange(c: string | undefined) {
-    actions.onUpdate(entity.id, { color: c });
-    const pcId = entity.playerCharacterId;
-    if (pcId !== undefined) {
-      actions.onChangePlayerColor?.(pcId, c);
+  useEffect(() => {
+    if (open) firstOptionRef.current?.focus();
+    else if (returnFocus.current) {
+      const timer = setTimeout(() => triggerRef.current?.focus(), 0);
+      returnFocus.current = false;
+      return () => clearTimeout(timer);
     }
-  }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !panelRef.current?.contains(event.target)
+      ) {
+        returnFocus.current = true;
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        returnFocus.current = true;
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const handleClose = () => {
+    returnFocus.current = true;
+    setOpen(false);
+  };
+
+  const handlePieceChange = (piece: ChessPiece | undefined) => {
+    actions.onUpdate(entity.id, { chessPiece: piece });
+  };
+
+  const handleColorChange = (nextColor: string | undefined) => {
+    actions.onUpdate(entity.id, { color: nextColor });
+    const pcId = entity.playerCharacterId;
+    if (pcId !== undefined) actions.onChangePlayerColor?.(pcId, nextColor);
+  };
 
   if (!open) {
-    const closedTitle = isPlayer
-      ? color
-        ? 'Figurine color — click to change'
-        : 'Assign figurine color'
-      : entity.chessPiece
-        ? `${entity.chessPiece} — click to change`
-        : 'Assign chess piece';
     return (
-      <button
-        onClick={e => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
-        className={`${dimClass} border-divider bg-surface-raised hover:border-divider-strong flex shrink-0 items-center justify-center rounded-md border shadow-sm transition-colors`}
-        title={closedTitle}
+      <Button
+        ref={triggerRef}
+        variant="ghost"
+        size="xs"
+        onClick={() => setOpen(true)}
+        aria-label={`Edit ${entity.name} token`}
+        className={size === 'sm' ? 'shrink-0 px-1' : 'shrink-0 px-2'}
       >
         {isPlayer ? (
           <Milk
             size={18}
             style={color ? { color } : undefined}
-            className={color ? '' : 'opacity-40'}
+            className={color ? '' : 'text-muted'}
+            aria-hidden="true"
           />
         ) : Icon ? (
           <Icon
             size={18}
             style={color ? { color } : undefined}
             className={color ? '' : 'text-heading'}
+            aria-hidden="true"
           />
         ) : (
-          <ChessPawn size={14} className="opacity-40" />
+          <ChessPawn size={18} className="text-muted" aria-hidden="true" />
         )}
-      </button>
+      </Button>
     );
   }
 
   return (
     <div
-      onClick={e => e.stopPropagation()}
-      className="border-divider bg-surface-raised z-10 flex flex-col gap-1.5 rounded-lg border p-1.5 shadow-lg"
+      ref={panelRef}
+      className="border-divider bg-surface-elevated z-10 flex max-w-full flex-col gap-2 rounded-md border p-2"
+      role="group"
+      aria-label={`${entity.name} token appearance`}
     >
       {!isPlayer && (
-        <div className="flex items-center gap-0.5">
-          {CHESS_PIECES.map(({ piece: p, Icon: I }) => (
-            <button
-              key={p}
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label="Chess piece"
+        >
+          {CHESS_PIECES.map(({ piece, Icon: PieceIcon }, index) => (
+            <Button
+              key={piece}
+              ref={index === 0 ? firstOptionRef : undefined}
+              variant="ghost"
+              selected={piece === entity.chessPiece}
+              aria-pressed={piece === entity.chessPiece}
+              size="xs"
               onClick={() =>
-                handlePieceChange(p === entity.chessPiece ? undefined : p)
+                handlePieceChange(
+                  piece === entity.chessPiece ? undefined : piece
+                )
               }
-              className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
-                p === entity.chessPiece
-                  ? 'bg-accent-amber-bg-strong text-heading'
-                  : 'text-muted hover:bg-surface-secondary hover:text-heading'
-              }`}
-              title={p.charAt(0).toUpperCase() + p.slice(1)}
+              aria-label={`${piece.charAt(0).toUpperCase()}${piece.slice(1)} for ${entity.name}`}
+              className="px-2"
             >
-              <I
+              <PieceIcon
                 size={16}
-                style={color && p === entity.chessPiece ? { color } : undefined}
+                style={
+                  color && piece === entity.chessPiece ? { color } : undefined
+                }
+                aria-hidden="true"
               />
-            </button>
+            </Button>
           ))}
         </div>
       )}
-      <div className="flex items-center gap-0.5">
-        {PIECE_COLORS.map(c => (
-          <button
-            key={c.value}
+      <div
+        className="flex flex-wrap gap-1"
+        role="group"
+        aria-label="Token color"
+      >
+        {PIECE_COLORS.map((choice, index) => (
+          <Button
+            key={choice.value}
+            ref={isPlayer && index === 0 ? firstOptionRef : undefined}
+            variant="ghost"
+            selected={choice.value === color}
+            aria-pressed={choice.value === color}
+            size="xs"
             onClick={() =>
-              handleColorChange(c.value === color ? undefined : c.value)
+              handleColorChange(
+                choice.value === color ? undefined : choice.value
+              )
             }
-            className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
-              c.value === color
-                ? 'ring-heading ring-2'
-                : 'hover:bg-surface-secondary'
-            }`}
-            title={c.name}
+            aria-label={`${choice.name} for ${entity.name}`}
+            className="px-2"
           >
             <span
-              className="border-divider h-4 w-4 rounded-full border"
-              style={{ backgroundColor: c.value }}
+              className="border-divider size-4 rounded-full border"
+              style={{ backgroundColor: choice.value }}
+              aria-hidden="true"
             />
-          </button>
+          </Button>
         ))}
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap justify-end gap-2">
         {(entity.chessPiece ?? color) && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               handlePieceChange(undefined);
               handleColorChange(undefined);
-              setOpen(false);
+              handleClose();
             }}
-            className="text-faint hover:text-accent-red-text px-1 text-[10px] font-medium transition-colors"
           >
-            Clear
-          </button>
+            Clear token
+          </Button>
         )}
-        <button
-          onClick={() => setOpen(false)}
-          className="text-faint hover:text-heading ml-auto px-1 text-[10px] font-medium transition-colors"
-        >
+        <Button size="sm" onClick={handleClose}>
           Done
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -27,6 +27,8 @@ export interface NumberInputProps
   integer?: boolean;
   /** Commit on Enter/blur instead of each keystroke when false. */
   live?: boolean;
+  /** In draft mode, an empty Enter or blur restores the previous value. */
+  cancelEmpty?: boolean;
 }
 
 const toNumber = (v: string | number | undefined): number | undefined =>
@@ -42,6 +44,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       allowEmpty = false,
       integer = true,
       live = true,
+      cancelEmpty = false,
       inputMode,
       onBlur,
       onKeyDown,
@@ -76,7 +79,8 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           if (!live && !e.nativeEvent.isComposing) {
             if (e.key === 'Enter') {
               e.preventDefault();
-              field.commit();
+              if (cancelEmpty && field.value === '') field.cancel();
+              else field.commit();
             } else if (e.key === 'Escape') {
               e.preventDefault();
               e.stopPropagation();
@@ -86,7 +90,8 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           onKeyDown?.(e);
         }}
         onBlur={e => {
-          field.onBlur();
+          if (cancelEmpty && field.value === '') field.cancel();
+          else field.onBlur();
           onBlur?.(e);
         }}
       />

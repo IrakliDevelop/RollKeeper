@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Eye, Link2, Pencil, X } from 'lucide-react';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../types';
@@ -43,9 +43,14 @@ export function DetailHeader({
   entity,
   actions,
   onOpenSheet,
-}: DetailSectionProps & { onOpenSheet?: () => void }) {
+  hideNameHeading = false,
+}: DetailSectionProps & {
+  onOpenSheet?: () => void;
+  hideNameHeading?: boolean;
+}) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const cancelName = useRef(false);
 
   const isPlayer = entity.type === 'player';
   const isSummon = !!entity.summonId;
@@ -97,10 +102,19 @@ export function DetailHeader({
               type="text"
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
-              onBlur={commitName}
+              data-in-place-dirty=""
+              onBlur={() => {
+                if (!cancelName.current) commitName();
+                cancelName.current = false;
+              }}
               onKeyDown={e => {
                 if (e.key === 'Enter') commitName();
-                if (e.key === 'Escape') setIsEditingName(false);
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  cancelName.current = true;
+                  setIsEditingName(false);
+                }
               }}
               className="font-display text-heading bg-surface-raised border-divider w-full rounded border px-2 py-0.5 text-2xl leading-tight font-bold"
               aria-label="Combatant name"
@@ -108,9 +122,15 @@ export function DetailHeader({
             />
           ) : (
             <div className="flex items-center gap-1">
-              <h2 className="font-display text-heading min-w-0 truncate text-2xl leading-tight font-bold">
-                {entity.name}
-              </h2>
+              {hideNameHeading ? (
+                <span className="font-display text-heading min-w-0 truncate text-2xl leading-tight font-bold">
+                  {entity.name}
+                </span>
+              ) : (
+                <h2 className="font-display text-heading min-w-0 truncate text-2xl leading-tight font-bold">
+                  {entity.name}
+                </h2>
+              )}
               {!isPlayer && (
                 <button
                   onClick={() => {

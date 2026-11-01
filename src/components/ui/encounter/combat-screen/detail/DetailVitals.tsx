@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Shield, Plus, X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { effectiveAc } from '@/utils/calculations';
@@ -15,6 +15,7 @@ import { canSpendHitDie, showDeathSaves, spendHitDie } from './hitDie';
 export function DetailVitals({ entity, actions }: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);
   const [maxInput, setMaxInput] = useState('');
+  const cancelMax = useRef(false);
 
   if (entity.type === 'lair') return null;
 
@@ -49,10 +50,19 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
               type="number"
               value={maxInput}
               onChange={e => setMaxInput(e.target.value)}
-              onBlur={() => commitMaxHp(maxInput)}
+              data-in-place-dirty=""
+              onBlur={() => {
+                if (!cancelMax.current) commitMaxHp(maxInput);
+                cancelMax.current = false;
+              }}
               onKeyDown={e => {
                 if (e.key === 'Enter') commitMaxHp(maxInput);
-                if (e.key === 'Escape') setEditingMax(false);
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  cancelMax.current = true;
+                  setEditingMax(false);
+                }
               }}
               className="bg-surface-raised text-heading w-14 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
               autoFocus
