@@ -551,13 +551,16 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
       <div className="mt-4">
         <p className="text-muted text-center text-sm">
-          Manage your full weapon inventory in the{' '}
-          <button
-            onClick={() => switchToTab('equipment')}
-            className="text-body hover:text-heading font-semibold underline transition-colors hover:no-underline"
+          Manage weapons on the{' '}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            onClick={() => switchToTab('inventory')}
+            className="text-body hover:text-heading h-auto p-0 font-semibold"
           >
-            Equipment tab
-          </button>
+            Inventory tab
+          </Button>
           .
         </p>
       </div>
@@ -718,7 +721,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       return maxCharges > 1 ? (
                         <div className="bg-surface-inset mt-3 h-2 w-full rounded-full">
                           <div
-                            className="bg-divider-strong h-2 rounded-full transition-all duration-300"
+                            className="bg-muted h-2 rounded-full transition-all duration-300"
                             style={{
                               width: `${(chargesRemaining / maxCharges) * 100}%`,
                             }}

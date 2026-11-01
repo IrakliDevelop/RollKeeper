@@ -34,6 +34,21 @@ const weapon: Weapon = {
 };
 
 describe('EquippedWeapons actions', () => {
+  it('opens the Inventory tab from the weapon help link', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const switchToTab = vi.fn();
+    useCharacterStore.setState({
+      character: makeCharacter({ weapons: [weapon] }),
+    });
+    render(
+      <NavigationContext.Provider value={{ switchToTab }}>
+        <EquippedWeapons showAttackRoll={vi.fn()} showDamageRoll={vi.fn()} />
+      </NavigationContext.Provider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Inventory tab' }));
+    expect(switchToTab).toHaveBeenCalledWith('inventory');
+  });
+
   it('moves equipped weapons through edit-mode buttons using the existing reorder action', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }));
     const reorderWeapons = vi.fn();
