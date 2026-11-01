@@ -44,7 +44,7 @@ export function CharacterSelectionStep({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase">
+          <p className="text-muted mb-0.5 text-[11px] font-bold">
             <span className="lg:hidden">{view.compactStepLabel}</span>
             <span className="hidden lg:inline">{COPY.selection.eyebrow}</span>
           </p>
@@ -72,15 +72,15 @@ export function CharacterSelectionStep({
         <div
           role="alert"
           tabIndex={-1}
-          className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-3.5"
+          className="border-ember-border bg-ember-bg rounded-md border p-3.5"
         >
-          <p className="text-accent-amber-text text-[13px] font-semibold">
+          <p className="text-ember-text text-[13px] font-semibold">
             {selection.alert}
           </p>
         </div>
       ) : null}
 
-      <div className="border-divider overflow-hidden rounded-lg border">
+      <div className="border-divider divide-divider divide-y border-y">
         {view.characters.map(character => (
           <div
             key={character.id}
@@ -105,7 +105,7 @@ export function CharacterSelectionStep({
         ))}
       </div>
 
-      <div className="border-divider bg-surface rounded-lg border p-4">
+      <div className="border-divider border-b py-4">
         <Switch
           checked={selection.ongoingChecked}
           disabled={!selection.ongoingAvailable}
@@ -124,16 +124,16 @@ export function CharacterSelectionStep({
         />
       </div>
 
-      <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border-2 p-4">
-        <p className="text-accent-amber-text text-sm font-semibold">
+      <div className="border-ember-border bg-ember-bg rounded-md border-2 p-4">
+        <p className="text-ember-text text-sm font-semibold">
           {COPY.selection.confirmHeading}
         </p>
-        <p className="text-accent-amber-text mt-1.5 text-[13px]">
+        <p className="text-ember-text mt-1.5 text-[13px]">
           {selection.confirmBody}
         </p>
         <div className="mt-3.5 flex flex-wrap items-center gap-3">
           <Button
-            variant="primary"
+            variant="secondary"
             leftIcon={<Shield size={16} />}
             onClick={onConfirm}
             disabled={!selection.confirmEnabled || view.busy}
@@ -141,9 +141,7 @@ export function CharacterSelectionStep({
           >
             {selection.confirmLabel}
           </Button>
-          <p className="text-accent-amber-text text-xs">
-            {selection.confirmHint}
-          </p>
+          <p className="text-ember-text text-xs">{selection.confirmHint}</p>
         </div>
       </div>
     </section>

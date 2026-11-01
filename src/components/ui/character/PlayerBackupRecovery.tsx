@@ -54,7 +54,7 @@ export function PlayerBackupRecovery({
 
   return (
     <div className="flex flex-col gap-4 overflow-x-hidden">
-      <div className="border-divider bg-surface rounded-lg border p-4">
+      <div className="border-divider border-b py-4">
         <h3 id={headingId} className="text-heading text-base font-semibold">
           {COPY.recovery.sectionTitle}
         </h3>
@@ -85,7 +85,7 @@ export function PlayerBackupRecovery({
               type="file"
               accept="application/json,.json"
               disabled={recovery.busy}
-              className="text-muted border-divider bg-surface-secondary block w-full rounded-lg border-2 border-dashed px-3 py-2 text-sm"
+              className="text-muted border-divider bg-surface-secondary block w-full rounded-md border-2 border-dashed px-3 py-2 text-sm"
               onChange={event => {
                 const file = event.target.files?.[0];
                 if (file) void recovery.handleChooseFile(file);
@@ -103,7 +103,7 @@ export function PlayerBackupRecovery({
       </div>
 
       {recovery.optionsOpen ? (
-        <div className="border-divider bg-surface-secondary flex flex-col gap-2 rounded-lg border p-4">
+        <div className="border-divider flex flex-col gap-2 border-b py-4">
           <Button
             variant="outline"
             onClick={() => void recovery.handleSaveCurrent()}
@@ -158,7 +158,7 @@ export function PlayerBackupRecovery({
           ref={alertRef}
           role="alert"
           tabIndex={-1}
-          className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4"
+          className="border-ember-border bg-ember-bg rounded-md border p-4"
         >
           <p className="text-heading text-sm font-semibold">{resultCopy}</p>
         </div>

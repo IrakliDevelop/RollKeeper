@@ -62,6 +62,7 @@ describe('PlayerBackupSummaryCard', () => {
         screen.getByRole('link', { name: expected.action })
       ).toHaveAttribute('href', expected.href);
       expectPlayerBackupVocabulary(container);
+      expect(container.querySelector('.shadow-md')).toBeNull();
     }
   );
 

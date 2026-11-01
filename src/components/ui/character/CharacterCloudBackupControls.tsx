@@ -30,7 +30,7 @@ function EnabledCharacterCloudBackupControls(
   });
 
   return (
-    <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
+    <section className="border-divider mb-6 border-b pb-6">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-heading flex items-center gap-2 text-sm font-semibold">
@@ -55,7 +55,7 @@ function EnabledCharacterCloudBackupControls(
         {props.characters.map(character => (
           <div
             key={character.id}
-            className="border-divider bg-surface-raised flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+            className="border-divider flex flex-wrap items-center justify-between gap-2 border-b py-3"
           >
             <span className="text-heading text-sm font-medium">
               {character.name}
@@ -87,10 +87,7 @@ function EnabledCharacterCloudBackupControls(
       {actions.rows.length > 0 && (
         <div className="border-divider mt-4 space-y-2 border-t pt-4">
           {actions.rows.map(row => (
-            <div
-              key={row.id}
-              className="border-divider bg-surface-raised rounded-md border p-3"
-            >
+            <div key={row.id} className="border-divider border-b py-3">
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-heading font-medium">{row.name}</span>
                 <Badge
@@ -149,14 +146,14 @@ function EnabledCharacterCloudBackupControls(
 
       {actions.status && (
         <p
-          className="text-accent-emerald-text mt-3 flex items-center gap-2 text-sm"
+          className="text-verdigris-text mt-3 flex items-center gap-2 text-sm"
           role="status"
         >
           <ShieldCheck size={16} /> {actions.status}
         </p>
       )}
       {actions.error && (
-        <p className="text-accent-red-text mt-3 text-sm" role="alert">
+        <p className="text-blood-text mt-3 text-sm" role="alert">
           {actions.error}
         </p>
       )}

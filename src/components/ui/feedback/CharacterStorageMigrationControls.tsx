@@ -291,7 +291,7 @@ export function CharacterStorageMigrationControls() {
   };
 
   return (
-    <section className="border-divider bg-surface-secondary mt-4 rounded-lg border p-4">
+    <section className="border-divider bg-surface-secondary mt-4 rounded-md border p-4">
       <h2 className="text-heading text-sm font-semibold">
         Character IndexedDB migration
       </h2>
@@ -356,7 +356,7 @@ export function CharacterStorageMigrationControls() {
         />
       )}
       {status && <p className="text-muted mt-2 text-sm">{status}</p>}
-      {error && <p className="text-accent-red-text mt-2 text-sm">{error}</p>}
+      {error && <p className="text-blood-text mt-2 text-sm">{error}</p>}
     </section>
   );
 }
