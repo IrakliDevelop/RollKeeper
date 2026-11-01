@@ -91,7 +91,11 @@ describe('DmGuestInvitationControls', () => {
       maxUses: 1,
     });
     expect(
-      (screen.getByLabelText('One-time guest link') as HTMLInputElement).value
+      (
+        (await screen.findByLabelText(
+          'One-time guest link'
+        )) as HTMLInputElement
+      ).value
     ).toContain(`/guest#invite=${'a'.repeat(64)}`);
   });
 

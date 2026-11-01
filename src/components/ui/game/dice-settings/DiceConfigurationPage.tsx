@@ -1,18 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { AppHeader } from '@/components/ui/layout/AppHeader';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
 import { DiceSetEditor } from '../DiceSetEditor';
-import { useCharacterStore } from '@/store/characterStore';
-import { usePlayerStore } from '@/store/playerStore';
-import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
-import { useHydration } from '@/hooks/useHydration';
-import { useAutoSave } from '@/hooks/useAutoSave';
-import { usePlayerSync } from '@/hooks/usePlayerSync';
+import { useCharacterSettings } from '@/hooks/useCharacterSettings';
 import { DEFAULT_DICE_SET, parseDiceSet } from '@/utils/diceSet';
 
 export function DiceConfigurationPage({
@@ -20,57 +14,22 @@ export function DiceConfigurationPage({
 }: {
   characterId: string;
 }) {
-  const hydrated = useHydration();
-  const playerCharacter = usePlayerStore(state =>
-    state.characters.find(character => character.id === characterId)
-  );
-  useEffect(() => {
-    if (
-      hydrated &&
-      playerCharacter?.id === characterId &&
-      usePlayerStore.getState().activeCharacterId !== characterId
-    ) {
-      usePlayerStore.getState().setActiveCharacter(characterId);
-    }
-  }, [hydrated, playerCharacter?.id, characterId]);
-  const updateCharacterData = usePlayerStore(
-    state => state.updateCharacterData
-  );
   const {
     character,
     updateCharacter,
-    loadCharacterState,
     saveStatus,
     lastSaved,
     hasUnsavedChanges,
-  } = useCharacterStore();
-  const { isInitialLoad } = useCharacterRosterSync({
-    playerCharacter,
-    hasHydrated: hydrated,
-    characterId,
-    character,
-    loadCharacterState,
-    updateCharacterData,
-  });
-  const { syncEnabled, autoSync, syncNow } = usePlayerSync({ characterId });
-  const afterSave = useCallback(() => {
-    if (character.id === characterId && syncEnabled && autoSync)
-      void syncNow(character);
-  }, [character, characterId, syncEnabled, autoSync, syncNow]);
-  useAutoSave({
-    enabled: hydrated && !isInitialLoad && character.id === characterId,
-    onAfterSave: afterSave,
-  });
-  if (
-    !hydrated ||
-    (playerCharacter && (isInitialLoad || character.id !== characterId))
-  )
+    loading,
+    missing,
+  } = useCharacterSettings(characterId);
+  if (loading)
     return (
       <p role="status" className="type-body text-muted p-6">
         Loading dice settings…
       </p>
     );
-  if (!playerCharacter)
+  if (missing)
     return (
       <main className="mx-auto max-w-5xl space-y-4 p-6">
         <h1 className="type-heading text-heading">

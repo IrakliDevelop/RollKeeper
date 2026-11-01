@@ -206,7 +206,8 @@ it('pairs the Player panel sections in rows and moves weapon proficiencies to Fe
     headings.find(h => h.textContent?.trim() === name)!;
   const grid = heading('Hit points').closest('.lg\\:grid-cols-2')!;
   expect(grid.className).toContain('grid-cols-1');
-  expect(grid.className).toContain('items-start');
+  // Default grid stretch aligns paired frames; stacked rows stay intrinsic.
+  expect(grid.className).not.toContain('items-start');
   expect(grid.className).toContain('gap-x-10');
   expect(grid.className).toContain('gap-y-8');
   const itemOf = (name: string) => {

@@ -12,12 +12,12 @@ import './fonts.css';
 import { MotionProvider } from '../src/app/MotionProvider';
 import { ConfirmDialogHost } from '../src/components/ui/feedback/confirm-dialog';
 
-type StoryTheme = 'light' | 'dark';
+type StoryTheme = 'light' | 'dark' | 'blue';
 
 // Paper unless the toolbar asks for felt. Story links saved with a retired
 // or unknown theme value render as paper.
 function toStoryTheme(value: unknown): StoryTheme {
-  return value === 'dark' ? 'dark' : 'light';
+  return value === 'dark' || value === 'blue' ? value : 'light';
 }
 
 // Colours come from the theme tokens, which resolve per data-theme scope.
@@ -116,6 +116,7 @@ const preview: Preview = {
         items: [
           { value: 'light', title: 'Light', icon: 'sun' },
           { value: 'dark', title: 'Dark', icon: 'moon' },
+          { value: 'blue', title: 'Blue dark', icon: 'paintbrush' },
         ],
         dynamicTitle: true,
       },

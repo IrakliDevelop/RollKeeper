@@ -26,7 +26,7 @@ and where things deviate from the documented pattern.
 | `calendar/` | Campaign calendar UI |
 | `icons/` | Icon components |
 | `utils/` | UI-layer utility functions |
-| `ThemeToggle.tsx` | The theme switch (`useTheme`) |
+| `ThemeToggle.tsx` | Appearance settings link; targets the active character or app settings |
 | `index.ts` | Barrel that re-exports `character`, `feedback`, `forms`, `game`, `layout` and `utils` |
 
 There is no separate top-level `stats/`, `conditions/`, `combat/`, or
@@ -37,8 +37,8 @@ sibling of `forms/`/`layout/`/etc.
 
 ## Dark mode
 
-Theme is `data-theme="dark"` on `<html>`, set pre-hydration from `localStorage`
-key `rollkeeper-theme`, toggled via `useTheme`. **Always use semantic tokens**
+Dark palettes use `data-theme="dark"` or `data-theme="blue"` on `<html>`, set pre-hydration from `localStorage`
+key `rollkeeper-theme`, selected at `/player/appearance` via `useTheme`. **Always use semantic tokens**
 (`bg-surface`, `text-heading`, `border-divider`, and the role
 tokens `text-brass-text`, `bg-blood-fill`, …) — never raw Tailwind color classes. Full token list is in `AGENTS.md` (which `CLAUDE.md` imports).
 
@@ -48,7 +48,39 @@ proficiency), blood (harm, destructive), verdigris (healing, success), lapis
 hue-named `accent-*` tokens and `--gradient-*` variables are deprecated
 aliases that point at the nearest role until the Phase 3 sweeps remove them.
 `npm run design:contrast` checks every role and neutral pairing against WCAG
-AA in both themes.
+AA in all three palettes. The blue palette maps the primary/on-state
+`brass` role to blue and the magic `lapis` role to violet. Light, dark and
+blue are explicit persisted choices; system resolves to light or dark.
+
+## App and character appearance
+
+`/player/appearance` selects the app default. A character can override it at
+`/player/characters/[characterId]/appearance` or Character → Appearance on the
+sheet. `CharacterState.themePreference` is optional: missing means Use app
+theme; light, dark, blue and system are explicit choices. The normal character
+update, autosave, export/import and sync paths carry this JSON field. Unknown
+values safely follow the app without writing a migration.
+
+The character route layout owns `CharacterThemeScope`. It accepts an override
+only when the hydrated live character matches the route id. Owner tokens prevent
+a departing route's cleanup from clearing a newer scope. Leaving character
+routes restores the latest app preference; choosing a character theme never
+writes `rollkeeper-theme`. `theme` in `useTheme` remains the app choice, while
+`resolvedTheme` describes the displayed palette. Explicit system on a character
+follows OS light/dark independently of the app default.
+
+## Character sheet presentation preferences
+
+`TabbedCharacterSheet` opts into `SectionFramesProvider` from `layout/section`.
+Only outer sections receive neutral rectangular frames; each Section resets
+the context for descendants. This intentional sheet exception does not change
+the unframed Section default elsewhere. `CharacterBasicInfo` gives its
+read-only `dd` values clear borders while retaining description-list semantics.
+
+`AbilitiesSection` reads `abilityLayout: 'classic' | '2024'` from `useUiPrefs`
+(default classic), independently of `abilityDisplay`. The 2024 presentation
+reuses `AbilityBlock`, `Medallion`, `SkillRow`, proficiency controls and all
+existing character calculations and handlers. It does not select a rules edition.
 
 ## Type scale
 

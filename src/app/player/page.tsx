@@ -108,19 +108,10 @@ export default function PlayerDashboardPage() {
     }, [addToast])
   );
 
-  // Check for migration on component mount
+  // Keep server and initial client rendering consistent.
   useEffect(() => {
     setHasMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (characters.length === 0) {
-      const migrated = migrateFromOldStorage();
-      if (migrated) {
-        console.log('Successfully migrated character from old storage');
-      }
-    }
-  }, [characters.length, migrateFromOldStorage]);
 
   const handlePlayCharacter = (character: PlayerCharacter) => {
     setActiveCharacter(character.id);
@@ -267,7 +258,11 @@ export default function PlayerDashboardPage() {
   };
 
   const renderCharacter = (character: PlayerCharacter, isArchived = false) => (
-    <Card key={character.id} padding="none" className="min-w-0 p-4 sm:p-5">
+    <Card
+      key={character.id}
+      padding="none"
+      className="flex h-full min-w-0 flex-col p-4 sm:p-5"
+    >
       <div className="flex min-w-0 items-start gap-3">
         <AvatarUpload
           avatar={character.avatar}
@@ -320,7 +315,7 @@ export default function PlayerDashboardPage() {
           )}
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
         {!isArchived ? (
           <>
             <Button asChild variant="secondary" size="sm">

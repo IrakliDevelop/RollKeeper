@@ -28,6 +28,16 @@ describe('themeScript (pre-hydration)', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
 
+  it.each([true, false])(
+    'applies blue before hydration with OS dark %s',
+    osPrefersDark => {
+      localStorage.setItem(STORAGE_KEY, 'blue');
+      runThemeScript({ osPrefersDark });
+      expect(document.documentElement.getAttribute('data-theme')).toBe('blue');
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('blue');
+    }
+  );
+
   it('follows a dark OS when nothing is stored', () => {
     runThemeScript({ osPrefersDark: true });
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');

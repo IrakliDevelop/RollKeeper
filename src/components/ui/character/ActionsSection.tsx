@@ -133,7 +133,7 @@ export default function ActionsSection({
           className={cn(
             spellSlotsPanel &&
               classResources.length > 0 &&
-              'grid items-start gap-6 lg:grid-cols-2'
+              'grid gap-6 lg:grid-cols-2'
           )}
         >
           {spellSlotsPanel}

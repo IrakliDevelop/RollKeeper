@@ -15,6 +15,7 @@ import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
 import NotesManager from '@/components/ui/game/NotesManager';
+import { CharacterAppearance } from '@/components/ui/appearance/CharacterAppearance';
 import { DiceSetEditor } from '@/components/ui/game/DiceSetEditor';
 import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
@@ -684,6 +685,7 @@ const CHARACTER_SUB_TABS = [
     label: 'Dice',
     icon: <AppIcon name="dice" className="h-4 w-4" />,
   },
+  { id: 'appearance', label: 'Appearance' },
 ] as const;
 
 type CharacterSubTab = (typeof CHARACTER_SUB_TABS)[number]['id'];
@@ -786,6 +788,14 @@ function CharacterTabContent({
                 />
               </ErrorBoundary>
             </div>
+          ),
+          appearance: (
+            <CharacterAppearance
+              value={character.themePreference}
+              onChange={themePreference =>
+                params.updateCharacter({ themePreference })
+              }
+            />
           ),
           dice: (
             <DiceSetEditor
@@ -927,7 +937,7 @@ function CombatTabContent({
         content: {
           player: (
             <div className="space-y-8">
-              <div className="grid grid-cols-1 items-start gap-x-10 gap-y-8 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-2">
                 <ErrorBoundary fallback={<SheetLoadError thing="Hit points" />}>
                   <HitPointManager
                     editing={params.editing}
@@ -1007,7 +1017,7 @@ function CombatTabContent({
             </div>
           ),
           defenses: (
-            <div className="grid items-start gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
               <ErrorBoundary fallback={<SheetLoadError thing="Buffs" />}>
                 <TemporaryBuffsManager />
               </ErrorBoundary>

@@ -1,10 +1,13 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
 } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { makeCharacter } from '@/utils/__tests__/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
@@ -21,10 +24,14 @@ import {
 
 import PlayerDashboardPage from '../page';
 
+const originalStorage = usePlayerStore.persist.getOptions().storage;
+
 const originalWizard = process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
 
 afterEach(() => {
   cleanup();
+  usePlayerStore.persist.setOptions({ storage: originalStorage });
+  window.localStorage.clear();
   document.body.replaceChildren();
   usePlayerStore.setState({ characters: [], activeCharacterId: null });
   if (originalWizard === undefined) {
@@ -35,6 +42,77 @@ afterEach(() => {
 });
 
 describe('PlayerDashboardPage', () => {
+  it('waits for the persisted roster before importing legacy data under StrictMode', async () => {
+    const id = usePlayerStore.getState().createCharacter('Existing Hero');
+    const persisted = JSON.parse(
+      window.localStorage.getItem('rollkeeper-player-data')!
+    );
+    usePlayerStore.setState({ characters: [], activeCharacterId: null });
+    const legacyRaw = JSON.stringify({
+      state: { character: makeCharacter({ name: 'Legacy Hero' }) },
+      version: 0,
+    });
+    window.localStorage.setItem('rollkeeper-character', legacyRaw);
+    let resolveRoster!: (value: typeof persisted) => void;
+    const setItem = vi.fn();
+    usePlayerStore.persist.setOptions({
+      storage: {
+        getItem: () =>
+          new Promise(resolve => {
+            resolveRoster = resolve;
+          }),
+        setItem,
+        removeItem: vi.fn(),
+      },
+    });
+    const hydration = usePlayerStore.persist.rehydrate();
+    render(
+      <StrictMode>
+        <PlayerDashboardPage />
+      </StrictMode>
+    );
+
+    expect(usePlayerStore.persist.hasHydrated()).toBe(false);
+    expect(usePlayerStore.getState().characters).toHaveLength(0);
+    expect(setItem).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveRoster(persisted);
+      await hydration;
+    });
+    expect(
+      usePlayerStore.getState().characters.map(character => character.id)
+    ).toEqual([id]);
+    expect(usePlayerStore.getState().activeCharacterId).toBe(id);
+    expect(window.localStorage.getItem('rollkeeper-character')).toBe(legacyRaw);
+  });
+
+  it('does not retry legacy migration after failed roster hydration', async () => {
+    window.localStorage.setItem(
+      'rollkeeper-character',
+      JSON.stringify({
+        state: { character: makeCharacter({ name: 'Legacy Hero' }) },
+        version: 0,
+      })
+    );
+    const setItem = vi.fn();
+    usePlayerStore.persist.setOptions({
+      storage: {
+        getItem: () => Promise.reject(new Error('Roster unavailable')),
+        setItem,
+        removeItem: vi.fn(),
+      },
+    });
+    await usePlayerStore.persist.rehydrate();
+    render(
+      <StrictMode>
+        <PlayerDashboardPage />
+      </StrictMode>
+    );
+    expect(usePlayerStore.persist.hasHydrated()).toBe(false);
+    expect(usePlayerStore.getState().characters).toHaveLength(0);
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
   it('uses the shared shell and a single create action', async () => {
     render(<PlayerDashboardPage />);
     expect(

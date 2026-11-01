@@ -3,6 +3,7 @@
 import { Switch } from '@/components/ui/forms/switch';
 import { Section } from '@/components/ui/layout/section';
 import { useUiPrefs } from '@/hooks/useUiPrefs';
+import { cn } from '@/utils/cn';
 import { AbilityBlock } from './AbilityBlock';
 import { SkillRow } from './SkillRow';
 import {
@@ -54,18 +55,35 @@ export function AbilitiesSection({
     <Section
       heading="Abilities"
       level={2}
+      wrapHeading
       trailing={
-        <Switch
-          label="Scores large"
-          size="sm"
-          checked={prefs.abilityDisplay === 'score'}
-          onCheckedChange={on =>
-            setPref('abilityDisplay', on ? 'score' : 'modifier')
-          }
-        />
+        <div className="flex flex-wrap gap-x-5 gap-y-3">
+          <Switch
+            label="2024 sheet layout"
+            size="sm"
+            checked={prefs.abilityLayout === '2024'}
+            onCheckedChange={on =>
+              setPref('abilityLayout', on ? '2024' : 'classic')
+            }
+          />
+          <Switch
+            label="Scores large"
+            size="sm"
+            checked={prefs.abilityDisplay === 'score'}
+            onCheckedChange={on =>
+              setPref('abilityDisplay', on ? 'score' : 'modifier')
+            }
+          />
+        </div>
       }
     >
-      <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        data-ability-layout={prefs.abilityLayout}
+        className={cn(
+          'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+          prefs.abilityLayout === '2024' ? 'gap-4' : 'gap-x-6 gap-y-8'
+        )}
+      >
         {ABILITY_ORDER.map(ability => {
           const abilitySkills = SKILLS_BY_ABILITY[ability];
           return (
@@ -76,6 +94,7 @@ export function AbilitiesSection({
               save={getSavingThrowModifier(ability)}
               saveProficient={savingThrows[ability]?.proficient ?? false}
               abilityDisplay={prefs.abilityDisplay}
+              layout={prefs.abilityLayout}
               animateSwap={localChange}
               editing={editing}
               onScoreChange={onUpdateAbilityScore}
@@ -84,7 +103,13 @@ export function AbilitiesSection({
               onRollSave={onRollSavingThrow}
             >
               {abilitySkills.length > 0 ? (
-                <ul className="mt-4">
+                <ul
+                  className={cn(
+                    prefs.abilityLayout === '2024'
+                      ? 'divide-divider divide-y px-3 py-1'
+                      : 'mt-4'
+                  )}
+                >
                   {abilitySkills.map(skill => (
                     <SkillRow
                       key={skill}
@@ -94,6 +119,7 @@ export function AbilitiesSection({
                       bonus={getSkillModifier(skill)}
                       bonusAbilities={skills[skill]?.bonusAbilities ?? NONE}
                       editing={editing}
+                      layout={prefs.abilityLayout}
                       onRoll={onRollSkillCheck}
                       onDotTap={handleDotTap}
                       onToggleBonusAbility={onToggleSkillBonusAbility}
@@ -101,7 +127,9 @@ export function AbilitiesSection({
                   ))}
                 </ul>
               ) : (
-                <p className="type-small text-muted mt-4">No skills</p>
+                prefs.abilityLayout === 'classic' && (
+                  <p className="type-small text-muted mt-4">No skills</p>
+                )
               )}
             </AbilityBlock>
           );

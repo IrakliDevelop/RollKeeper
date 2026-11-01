@@ -14,6 +14,8 @@ export const UI_PREFS_KEY = 'rollkeeper-ui-prefs';
 export interface UiPrefs {
   /** Which number an ability shows large: the modifier or the score. */
   abilityDisplay: 'modifier' | 'score';
+  /** Ability, saving throw and skill arrangement; presentation only. */
+  abilityLayout: 'classic' | '2024';
   collapsed: Record<string, boolean>;
   /** Spell-slot tracker disclosure, shared by the Actions and Spells tabs. */
   spellSlotsExpanded: boolean;
@@ -21,6 +23,7 @@ export interface UiPrefs {
 
 export const DEFAULT_UI_PREFS: UiPrefs = {
   abilityDisplay: 'modifier',
+  abilityLayout: 'classic',
   collapsed: {},
   spellSlotsExpanded: false,
 };
@@ -29,6 +32,7 @@ type Validators = { [K in keyof UiPrefs]: (value: unknown) => boolean };
 
 const VALIDATORS: Validators = {
   abilityDisplay: value => value === 'modifier' || value === 'score',
+  abilityLayout: value => value === 'classic' || value === '2024',
   collapsed: value =>
     typeof value === 'object' &&
     value !== null &&

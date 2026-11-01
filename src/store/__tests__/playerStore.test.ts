@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { vi } from 'vitest';
 import { mockFetchResponse } from '@/test/mocks/fetch';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
@@ -25,6 +25,113 @@ describe('playerStore', () => {
   });
 
   describe('migrateFromOldStorage', () => {
+    const originalStorage = usePlayerStore.persist.getOptions().storage;
+
+    afterEach(() => {
+      usePlayerStore.persist.setOptions({ storage: originalStorage });
+    });
+
+    const seedLegacy = () => {
+      const raw = JSON.stringify({
+        state: {
+          character: makeCharacter({ id: 'legacy-char', name: 'Legacy Hero' }),
+        },
+        version: 0,
+      });
+      window.localStorage.setItem('rollkeeper-character', raw);
+      return raw;
+    };
+
+    it('imports only once when repeated callers use the same empty-roster snapshot', () => {
+      const raw = seedLegacy();
+      const { characters, migrateFromOldStorage } = usePlayerStore.getState();
+      const mountEffect = () =>
+        characters.length === 0 && migrateFromOldStorage();
+
+      expect(mountEffect()).toBe(true);
+      const imported = usePlayerStore.getState().characters[0];
+      expect(mountEffect()).toBe(false);
+      expect(usePlayerStore.getState().characters).toEqual([imported]);
+      expect(usePlayerStore.getState().activeCharacterId).toBe(imported.id);
+      expect(window.localStorage.getItem('rollkeeper-character')).toBe(raw);
+    });
+
+    it.each([false, true])(
+      'preserves an existing roster and selection (archived: %s)',
+      isArchived => {
+        const raw = seedLegacy();
+        const { characters, migrateFromOldStorage } = usePlayerStore.getState();
+        const id = usePlayerStore.getState().createCharacter('Existing Hero');
+        if (isArchived) usePlayerStore.getState().archiveCharacter(id);
+        const before = usePlayerStore.getState();
+
+        // The mount closure still sees the pre-hydration empty array.
+        expect(characters).toHaveLength(0);
+        expect(migrateFromOldStorage()).toBe(false);
+        expect(usePlayerStore.getState()).toBe(before);
+        expect(window.localStorage.getItem('rollkeeper-character')).toBe(raw);
+      }
+    );
+
+    it('does not resurrect a character when only deletion tombstones remain', () => {
+      const raw = seedLegacy();
+      const id = usePlayerStore.getState().createCharacter('Deleted Hero');
+      usePlayerStore.getState().deleteCharacter(id);
+      const before = usePlayerStore.getState();
+
+      expect(usePlayerStore.getState().migrateFromOldStorage()).toBe(false);
+      expect(usePlayerStore.getState()).toBe(before);
+      expect(window.localStorage.getItem('rollkeeper-character')).toBe(raw);
+    });
+
+    it('automatically imports a genuinely empty roster after hydration only once', async () => {
+      const raw = seedLegacy();
+      await usePlayerStore.persist.rehydrate();
+      const imported = usePlayerStore.getState().characters[0];
+      expect(imported).toEqual(
+        expect.objectContaining({ name: 'Legacy Hero', tags: ['migrated'] })
+      );
+      await usePlayerStore.persist.rehydrate();
+      expect(usePlayerStore.getState().characters).toHaveLength(1);
+      expect(usePlayerStore.getState().characters[0].id).toBe(imported.id);
+      expect(window.localStorage.getItem('rollkeeper-character')).toBe(raw);
+    });
+
+    it('keeps one character across fresh module loads with the legacy bytes intact', async () => {
+      const raw = seedLegacy();
+      let importedId: string | undefined;
+      for (let load = 0; load < 3; load++) {
+        vi.resetModules();
+        const { usePlayerStore: reloadedStore } = await import(
+          '@/store/playerStore'
+        );
+        await reloadedStore.persist.rehydrate();
+        const { characters, activeCharacterId } = reloadedStore.getState();
+        expect(characters).toHaveLength(1);
+        importedId ??= characters[0].id;
+        expect(characters[0].id).toBe(importedId);
+        expect(activeCharacterId).toBe(importedId);
+        expect(window.localStorage.getItem('rollkeeper-character')).toBe(raw);
+      }
+    });
+
+    it('does not import or persist legacy data when roster hydration fails', async () => {
+      const raw = seedLegacy();
+      const setItem = vi.fn();
+      usePlayerStore.persist.setOptions({
+        storage: {
+          getItem: () => Promise.reject(new Error('Roster unavailable')),
+          setItem,
+          removeItem: vi.fn(),
+        },
+      });
+      await usePlayerStore.persist.rehydrate();
+      expect(usePlayerStore.persist.hasHydrated()).toBe(false);
+      expect(usePlayerStore.getState().characters).toHaveLength(0);
+      expect(setItem).not.toHaveBeenCalled();
+      expect(window.localStorage.getItem('rollkeeper-character')).toBe(raw);
+    });
+
     it('reads a Zustand legacy character from state.character', () => {
       const legacy = makeCharacter({
         id: 'legacy-char',

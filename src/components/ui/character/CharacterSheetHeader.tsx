@@ -141,7 +141,7 @@ export default function CharacterSheetHeader({
 
       <section
         aria-labelledby="character-identity-name"
-        className="border-divider relative z-30 mx-auto mb-8 max-w-7xl border-b pb-6"
+        className="border-divider relative z-30 mx-auto mb-8 max-w-7xl border-b pt-6 pb-6"
       >
         <div className="flex flex-col items-start gap-4 sm:flex-row">
           <AvatarUpload

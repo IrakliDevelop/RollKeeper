@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import {
   FELT_SELECTOR,
+  BLUE_SELECTOR,
   PAPER_SELECTOR,
   SHARED_SELECTOR,
   readBlock,
@@ -17,6 +18,7 @@ test('dark: variant follows the data-theme attribute', async () => {
   const output = await buildCss(['dark:bg-surface']);
   const rule = ruleFor(output, '.dark\\:bg-surface');
   assert.match(rule, /data-theme=dark/);
+  assert.match(rule, /data-theme=blue/);
 });
 
 test('dark: variant never follows the OS colour scheme', async () => {
@@ -113,7 +115,8 @@ test('native controls follow the theme through color-scheme', async () => {
   assert.equal(scheme(PAPER_SELECTOR), 'light');
   assert.equal(scheme(FELT_SELECTOR), 'dark');
   const declarations = stripComments(css).match(/(?<![\w-])color-scheme:/g);
-  assert.equal(declarations.length, 2, 'only paper and felt set color-scheme');
+  assert.equal(scheme(BLUE_SELECTOR), 'dark');
+  assert.equal(declarations.length, 3, 'every palette sets color-scheme');
 });
 
 test('role utilities are generated from the role tokens', async () => {
@@ -179,7 +182,7 @@ test('every deprecated accent token points at its role', async () => {
 
 test('paper and felt each declare the softer bridge border literals', async () => {
   const css = await readGlobalsCss();
-  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR]) {
+  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR, BLUE_SELECTOR]) {
     const block = readBlock(css, selector);
     for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
       assert.match(
@@ -193,7 +196,7 @@ test('paper and felt each declare the softer bridge border literals', async () =
 
 test('felt and paper declare no hue-named accent or gradient literals', async () => {
   const css = await readGlobalsCss();
-  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR]) {
+  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR, BLUE_SELECTOR]) {
     const names = Object.keys(readBlock(css, selector));
     assert.deepEqual(
       names.filter(name => /^--(accent|gradient)-/.test(name)),
@@ -211,14 +214,14 @@ test('gradient endpoints are flattened to surfaces', async () => {
   assert.equal(shared['--gradient-purple-from'], 'var(--lapis-bg)');
 });
 
-test('parchment is retired: paper and felt are the only theme blocks', async () => {
+test('parchment is retired: paper, felt and blue dark are the only theme blocks', async () => {
   const css = stripComments(await readGlobalsCss());
   const themed = new Set(
     [...css.matchAll(/\[data-theme=['"]?([\w-]+)['"]?\]/g)].map(
       match => match[1]
     )
   );
-  assert.deepEqual([...themed].sort(), ['dark', 'light']);
+  assert.deepEqual([...themed].sort(), ['blue', 'dark', 'light']);
   assert.doesNotMatch(css, /parchment/i);
 });
 
@@ -235,7 +238,7 @@ test('no theme block redeclares a shared token', async () => {
       `${name} must be declared on :root, [data-theme]`
     );
   }
-  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR]) {
+  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR, BLUE_SELECTOR]) {
     const block = readBlock(css, selector);
     assert.deepEqual(
       shared.filter(name => name in block),
@@ -290,12 +293,14 @@ test('a light wrapper inside a felt page re-declares every paper literal', async
     /:root,\s*\[data-theme='light'\]\s*\{\s*color-scheme:\s*light/
   );
   const paper = Object.keys(readBlock(css, PAPER_SELECTOR));
-  const felt = Object.keys(readBlock(css, FELT_SELECTOR));
-  assert.deepEqual(
-    felt.filter(name => !paper.includes(name)),
-    [],
-    'felt declares literals the paper block lacks'
-  );
+  for (const selector of [FELT_SELECTOR, BLUE_SELECTOR]) {
+    const tokens = Object.keys(readBlock(css, selector));
+    assert.deepEqual(
+      tokens.filter(name => !paper.includes(name)),
+      [],
+      `${selector} declares literals the paper block lacks`
+    );
+  }
 });
 
 test('number fields hide their spin buttons', async () => {

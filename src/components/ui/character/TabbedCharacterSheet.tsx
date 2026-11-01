@@ -2,6 +2,7 @@
 
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import BookmarkTabs from '@/components/ui/layout/BookmarkTabs';
+import { SectionFramesProvider } from '@/components/ui/layout/section';
 import type { BookmarkTabsRef } from '@/components/ui/layout/BookmarkTabs';
 import {
   createTabbedSheetConfig,
@@ -45,14 +46,16 @@ const TabbedCharacterSheet = forwardRef<
   );
 
   return (
-    <BookmarkTabs
-      ref={tabsRef}
-      tabs={tabs}
-      defaultTab="actions"
-      persistKey="tabbed-layout-active-tab"
-      // Tab jumps scroll the tabs to the top; keep them below the sticky bar.
-      className="scroll-mt-[calc(var(--app-header-height,4rem)+1rem)]"
-    />
+    <SectionFramesProvider value={true}>
+      <BookmarkTabs
+        ref={tabsRef}
+        tabs={tabs}
+        defaultTab="actions"
+        persistKey="tabbed-layout-active-tab"
+        // Tab jumps scroll the tabs to the top; keep them below the sticky bar.
+        className="scroll-mt-[calc(var(--app-header-height,4rem)+1rem)]"
+      />
+    </SectionFramesProvider>
   );
 });
 

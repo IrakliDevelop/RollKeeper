@@ -1,61 +1,32 @@
 'use client';
 
-import { Sun, Moon, Monitor } from 'lucide-react';
+import Link from 'next/link';
+import { Palette } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { useTheme, type Theme } from '@/hooks/useTheme';
+import { useTheme } from '@/hooks/useTheme';
 
 export interface ThemeToggleProps {
-  /** Show the 3-way toggle (light / system / dark) instead of simple toggle. */
+  /** @deprecated Appearance now offers every theme on a dedicated page. */
   showSystemOption?: boolean;
   className?: string;
 }
 
-const SIMPLE_CYCLE: Theme[] = ['light', 'dark'];
-const SYSTEM_CYCLE: Theme[] = ['light', 'system', 'dark'];
-
-/** Names what a tap does: the theme it switches to. */
-const NEXT_THEME_LABEL: Record<Theme, string> = {
-  light: 'Switch to light mode',
-  dark: 'Switch to dark mode',
-  system: 'Use system theme',
-};
-
-/**
- * A compact theme toggle button. By default cycles light → system → dark → light.
- * When `showSystemOption` is true, cycles light → system → dark → light.
- */
-export function ThemeToggle({
-  showSystemOption = true,
-  className = '',
-}: ThemeToggleProps) {
-  const { theme, resolvedTheme, setTheme } = useTheme();
-
-  const cycle = showSystemOption ? SYSTEM_CYCLE : SIMPLE_CYCLE;
-  const current =
-    showSystemOption || theme !== 'system' ? theme : resolvedTheme;
-  const next = cycle[(cycle.indexOf(current) + 1) % cycle.length];
-  const label = NEXT_THEME_LABEL[next];
-
-  const icon =
-    theme === 'system' ? (
-      <Monitor size={18} />
-    ) : resolvedTheme === 'dark' ? (
-      <Moon size={18} />
-    ) : (
-      <Sun size={18} />
-    );
-
+/** Open settings for the currently displayed app or character theme. */
+export function ThemeToggle({ className = '' }: ThemeToggleProps) {
+  const { characterScope } = useTheme();
+  const href = characterScope
+    ? `/player/characters/${encodeURIComponent(characterScope.characterId)}/appearance`
+    : '/player/appearance';
   return (
     <Button
-      type="button"
+      asChild
       variant="ghost"
       size="sm"
-      onClick={() => setTheme(next)}
       className={`size-9 shrink-0 px-0 ${className}`}
-      aria-label={label}
-      title={label}
     >
-      {icon}
+      <Link href={href} aria-label="Appearance" title="Appearance">
+        <Palette size={18} aria-hidden />
+      </Link>
     </Button>
   );
 }

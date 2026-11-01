@@ -20,6 +20,18 @@ function otherTabWrites(value: string | null, key: string | null = KEY) {
 }
 
 describe('parseUiPrefs', () => {
+  it('validates the independent layout preference and keeps old preferences compatible', async () => {
+    const { parseUiPrefs } = await load();
+    expect(parseUiPrefs('{"abilityDisplay":"score"}').abilityLayout).toBe(
+      'classic'
+    );
+    expect(parseUiPrefs('{"abilityLayout":"2024"}').abilityLayout).toBe('2024');
+    for (const abilityLayout of [true, 2024, 'unknown', null]) {
+      expect(
+        parseUiPrefs(JSON.stringify({ abilityLayout })).abilityLayout
+      ).toBe('classic');
+    }
+  });
   it('accepts only a boolean spell-slot disclosure preference', async () => {
     const { parseUiPrefs } = await load();
     expect(parseUiPrefs('{"spellSlotsExpanded":true}').spellSlotsExpanded).toBe(
@@ -33,6 +45,7 @@ describe('parseUiPrefs', () => {
     const { parseUiPrefs } = await load();
     expect(parseUiPrefs(null)).toEqual({
       abilityDisplay: 'modifier',
+      abilityLayout: 'classic',
       collapsed: {},
       spellSlotsExpanded: false,
     });
@@ -42,6 +55,7 @@ describe('parseUiPrefs', () => {
     const { parseUiPrefs } = await load();
     expect(parseUiPrefs('{"abilityDisplay":"score"}')).toEqual({
       abilityDisplay: 'score',
+      abilityLayout: 'classic',
       collapsed: {},
       spellSlotsExpanded: false,
     });
@@ -53,6 +67,7 @@ describe('parseUiPrefs', () => {
       const { parseUiPrefs } = await load();
       expect(parseUiPrefs(raw)).toEqual({
         abilityDisplay: 'modifier',
+        abilityLayout: 'classic',
         collapsed: {},
         spellSlotsExpanded: false,
       });
@@ -65,6 +80,7 @@ describe('parseUiPrefs', () => {
       const { parseUiPrefs } = await load();
       expect(parseUiPrefs(raw)).toEqual({
         abilityDisplay: 'modifier',
+        abilityLayout: 'classic',
         collapsed: {},
         spellSlotsExpanded: false,
       });
@@ -75,6 +91,7 @@ describe('parseUiPrefs', () => {
     const { parseUiPrefs } = await load();
     expect(parseUiPrefs('{"abilityDisplay":"score","future":1}')).toEqual({
       abilityDisplay: 'score',
+      abilityLayout: 'classic',
       collapsed: {},
       spellSlotsExpanded: false,
     });
@@ -112,11 +129,35 @@ describe('useUiPrefs', () => {
     vi.restoreAllMocks();
   });
 
+  it('changes layout independently, preserves unknown keys, restores it and follows another tab', async () => {
+    localStorage.setItem(KEY, '{"abilityDisplay":"score","future":1}');
+    const { useUiPrefs } = await load();
+    const first = renderHook(() => useUiPrefs());
+    act(() => first.result.current.setPref('abilityLayout', '2024'));
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({
+      abilityDisplay: 'score',
+      abilityLayout: '2024',
+      future: 1,
+    });
+    first.unmount();
+    const restored = renderHook(() => useUiPrefs());
+    expect(restored.result.current.prefs.abilityLayout).toBe('2024');
+    act(() =>
+      otherTabWrites(
+        '{"abilityDisplay":"score","abilityLayout":"classic","future":1}'
+      )
+    );
+    expect(restored.result.current.prefs.abilityLayout).toBe('classic');
+    expect(restored.result.current.prefs.abilityDisplay).toBe('score');
+    expect(restored.result.current.localChange).toBe(false);
+  });
+
   it('starts from the defaults with nothing stored', async () => {
     const { useUiPrefs } = await load();
     const { result } = renderHook(() => useUiPrefs());
     expect(result.current.prefs).toEqual({
       abilityDisplay: 'modifier',
+      abilityLayout: 'classic',
       collapsed: {},
       spellSlotsExpanded: false,
     });
@@ -275,6 +316,7 @@ it('retains visit-local choices across preference keys when writes are refused',
   act(() => result.current.setPref('abilityDisplay', 'score'));
   expect(result.current.prefs).toEqual({
     abilityDisplay: 'score',
+    abilityLayout: 'classic',
     collapsed: { spells: true },
     spellSlotsExpanded: false,
   });
@@ -297,6 +339,7 @@ it('retains visit-local choices across preference keys when writes are refused',
   );
   expect(result.current.prefs).toEqual({
     abilityDisplay: 'modifier',
+    abilityLayout: 'classic',
     collapsed: { other: true },
     spellSlotsExpanded: false,
   });

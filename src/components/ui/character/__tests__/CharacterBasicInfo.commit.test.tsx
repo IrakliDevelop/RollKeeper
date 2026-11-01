@@ -38,18 +38,21 @@ it('shows information without build controls in play mode', () => {
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Manage classes' })).toBeNull();
 });
-it('lays play-mode information out in two columns without a spacer', () => {
+it('frames read-only values without adding editable controls', () => {
   const { container } = render(
     <CharacterBasicInfo {...props()} editing={false} />
   );
   const list = container.querySelector('dl');
-  expect(list).toHaveClass('grid-cols-2');
-  expect(list?.className).not.toMatch(/grid-cols-1|sm:grid-cols/);
+  expect(list).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
   expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
   expect(container.querySelector('dt')).toHaveClass('type-caption');
-  expect(screen.getByText('Fighter 5').closest('dd')).not.toHaveClass(
-    'min-h-10'
+  expect(screen.getByText('Fighter 5').closest('dd')).toHaveClass(
+    'min-h-10',
+    'border',
+    'border-input-border'
   );
+  expect(screen.queryByRole('textbox')).toBeNull();
+  expect(list?.querySelector('[tabindex]')).toBeNull();
 });
 it('commits level once and opens Manage classes as a dialog', () => {
   const p = props();

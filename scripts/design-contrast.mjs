@@ -43,6 +43,8 @@ function pairs() {
   // The keyboard highlight of a menu item: a brass outline on the row hover.
   add('ring', 'surface-hover', NON_TEXT);
   for (const role of ROLES) add(`${role}-text`, `${role}-bg`, TEXT);
+  // Prepared spell rows keep their neutral labels on the selected-state wash.
+  for (const text of ['heading', 'body', 'muted']) add(text, 'brass-bg', TEXT);
   // Ghost Buttons inside a warning banner (StorageBlockedBanner).
   add('heading', 'ember-bg', TEXT);
   // Deprecated accent bridge: bg-accent-*-bg-strong behind role text.
@@ -70,10 +72,12 @@ export const PAIRS = pairs();
 export const PAPER_SELECTOR = ":root,\n[data-theme='light']";
 export const SHARED_SELECTOR = ':root,\n[data-theme]';
 export const FELT_SELECTOR = "[data-theme='dark']";
+export const BLUE_SELECTOR = "[data-theme='blue']";
 
 export const THEMES = {
   paper: [PAPER_SELECTOR, SHARED_SELECTOR],
   felt: [PAPER_SELECTOR, SHARED_SELECTOR, FELT_SELECTOR],
+  blue: [PAPER_SELECTOR, SHARED_SELECTOR, BLUE_SELECTOR],
 };
 
 export function stripComments(css) {
