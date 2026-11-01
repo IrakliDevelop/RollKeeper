@@ -63,6 +63,8 @@ export function useSharedCampaignState(
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
   const [pendingTransfers, setPendingTransfers] = useState<ItemTransfer[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const initiativeExpiryRef = useRef<NodeJS.Timeout | null>(null);
+  const pollSequenceRef = useRef(0);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPausedRef = useRef(false);
   const currentIntervalRef = useRef(POLL_INTERVAL_MS);
@@ -78,6 +80,7 @@ export function useSharedCampaignState(
 
   const fetchSharedState = useCallback(async () => {
     if (!campaignCode) return;
+    const sequence = ++pollSequenceRef.current;
     try {
       const params = new URLSearchParams({ role: 'player' });
       if (playerId) params.set('playerId', playerId);
@@ -86,6 +89,23 @@ export function useSharedCampaignState(
         throw new Error('Failed to fetch shared state');
       }
       const data: SharedCampaignState = await res.json();
+      if (sequence !== pollSequenceRef.current) return;
+      if (initiativeExpiryRef.current)
+        clearTimeout(initiativeExpiryRef.current);
+      const expiresAt = data.initiative?.expiresAt;
+      if (expiresAt) {
+        if (expiresAt <= Date.now()) {
+          data.initiative = null;
+        } else {
+          initiativeExpiryRef.current = setTimeout(() => {
+            setSharedState(previous =>
+              previous && previous.initiative?.expiresAt === expiresAt
+                ? { ...previous, initiative: null }
+                : previous
+            );
+          }, expiresAt - Date.now());
+        }
+      }
       setSharedState(data);
       setError(null);
       setLastFetched(new Date());
@@ -107,11 +127,12 @@ export function useSharedCampaignState(
         });
       }
     } catch (err) {
+      if (sequence !== pollSequenceRef.current) return;
       setError(
         err instanceof Error ? err.message : 'Failed to fetch shared state'
       );
     } finally {
-      setLoading(false);
+      if (sequence === pollSequenceRef.current) setLoading(false);
     }
   }, [campaignCode, playerId]);
 
@@ -210,7 +231,10 @@ export function useSharedCampaignState(
     startPolling();
 
     return () => {
+      pollSequenceRef.current += 1;
       stopPolling();
+      if (initiativeExpiryRef.current)
+        clearTimeout(initiativeExpiryRef.current);
     };
   }, [campaignCode, fetchSharedState, startPolling, stopPolling]);
 

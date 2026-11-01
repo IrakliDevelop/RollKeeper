@@ -22,7 +22,11 @@ import { usePaletteSpellEffects } from '@/hooks/usePaletteSpellEffects';
 import type { DetailSectionProps } from './DetailHeader';
 import type { EffectPaletteEntry } from '../effectPalettes';
 
-export function DetailEffects({ entity, actions }: DetailSectionProps) {
+export function DetailEffects({
+  entity,
+  actions,
+  capabilities,
+}: DetailSectionProps) {
   const tabId = useId();
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
@@ -33,7 +37,12 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
     useOfficialConditions();
   const { effects: spellEffects, loading: spellEffectsLoading } =
     usePaletteSpellEffects();
-  const creatureConditions = useCreatureConditions(entity.id, library);
+  const creatureConditions = useCreatureConditions(
+    entity.id,
+    library,
+    capabilities?.creatureConditions
+  );
+  const readOnly = capabilities !== undefined && !capabilities.conditions;
 
   const activeConditions = entity.conditions ?? [];
   const activeNames = new Set(activeConditions.map(c => c.name));
@@ -185,30 +194,37 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
               cond={cond}
               entityId={entity.id}
               actions={actions}
+              readOnly={readOnly}
             />
           ))}
         </div>
       )}
 
-      <CreatureConditionsRow
-        items={creatureConditions}
-        activeNames={activeNames}
-        onApply={item =>
-          actions.onAddCondition(
-            entity.id,
-            toAppliedCondition(item.condition, item.sourceName)
-          )
-        }
-      />
+      {readOnly ? (
+        <p className="text-muted text-xs">Conditions are read-only here.</p>
+      ) : (
+        <>
+          <CreatureConditionsRow
+            items={creatureConditions}
+            activeNames={activeNames}
+            onApply={item =>
+              actions.onAddCondition(
+                entity.id,
+                toAppliedCondition(item.condition, item.sourceName)
+              )
+            }
+          />
 
-      <SubTabs
-        tabs={tabs}
-        label="Effects to add"
-        value={tab}
-        onValueChange={value => {
-          if (value === 'conditions' || value === 'buffs') setTab(value);
-        }}
-      />
+          <SubTabs
+            tabs={tabs}
+            label="Effects to add"
+            value={tab}
+            onValueChange={value => {
+              if (value === 'conditions' || value === 'buffs') setTab(value);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

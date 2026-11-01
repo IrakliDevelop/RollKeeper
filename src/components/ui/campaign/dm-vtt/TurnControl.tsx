@@ -2,7 +2,7 @@ import { Rewind, Play } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 
-interface TurnControlProps {
+export interface TurnControlProps {
   round: number;
   activeName: string;
   onNext: () => void;

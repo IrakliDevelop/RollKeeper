@@ -81,6 +81,7 @@ describe('managed connection onPoke', () => {
         role: 'player',
         battleMapId: 'map-42',
         playerId: 'char-1',
+        kind: 'location',
       },
       transportFactory: () => fakeTransport(),
       onPoke,

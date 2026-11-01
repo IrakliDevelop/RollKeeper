@@ -26,44 +26,18 @@ describe('shared route — initiativeRequest feature', () => {
     );
   });
 
-  it('stores the request and returns it in the GET envelope', async () => {
-    const request = {
-      requestId: 'req-1',
-      encounterId: 'enc-1',
-      encounterName: 'Goblin Ambush',
-      requestedAt: 1234,
-    };
-    const post = await postFeature(request);
-    expect(post.status).toBe(200);
-
-    const get = await GET(
-      createGetRequest(
-        '/api/campaign/ABC123/shared?role=player&playerId=char-1'
-      ),
-      createRouteParams({ code: 'ABC123' })
-    );
-    const state = await get.json();
-    expect(state.initiativeRequest).toEqual(request);
-  });
-
-  it('accepts data: null to clear the request', async () => {
-    await postFeature({
-      requestId: 'req-1',
-      encounterId: 'enc-1',
-      encounterName: 'X',
-      requestedAt: 1,
-    });
-    const post = await postFeature(null);
-    expect(post.status).toBe(200);
-
-    const get = await GET(
-      createGetRequest(
-        '/api/campaign/ABC123/shared?role=player&playerId=char-1'
-      ),
-      createRouteParams({ code: 'ABC123' })
-    );
-    const state = await get.json();
-    expect(state.initiativeRequest).toBeNull();
+  it('rejects the legacy initiativeRequest writer, including a null clear (426)', async () => {
+    for (const data of [
+      {
+        requestId: 'req-1',
+        encounterId: 'enc-1',
+        encounterName: 'Goblin Ambush',
+        requestedAt: 1234,
+      },
+      null,
+    ]) {
+      expect((await postFeature(data)).status).toBe(426);
+    }
   });
 
   it('envelope has initiativeRequest: null when never set', async () => {

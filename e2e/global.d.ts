@@ -31,6 +31,8 @@ declare global {
         store: {
           getById(id: string): RkE2ECanvasElement | null;
           getAll(): RkE2ECanvasElement[];
+          /** A local edit (the same store path a drag takes). */
+          update(id: string, partial: Partial<RkE2ECanvasElement>): void;
         };
       };
     };

@@ -17,10 +17,6 @@ import { useInitiativeSubmissionSync } from '@/hooks/useInitiativeSubmissionSync
 import { useActiveBattleMapId } from '@/hooks/useActiveBattleMapId';
 import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
 import { useDebouncedRefetch } from '@/hooks/useDebouncedRefetch';
-import { useBattleMapStore } from '@/store/battleMapStore';
-import { useDmBattleMapSync } from '@/hooks/useDmBattleMapSync';
-import { findLinkedBattleMap } from '@/utils/battleMapLinks';
-import type { BattleMap } from '@/types/battlemap';
 import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
@@ -29,6 +25,7 @@ import type { EntityActions } from './combat-screen/types';
 import { buildEntityActions } from './combat-screen/buildEntityActions';
 import { AddCombatantDialog } from './combat-screen/AddCombatantDialog';
 import { CombatConfigDialog } from './CombatConfigDialog';
+import { TablePublicationControls } from './TablePublicationControls';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { NPCDetailDialog } from '@/components/ui/campaign/NPCDetailDialog';
 import type { CampaignPlayerData } from '@/types/campaign';
@@ -54,27 +51,8 @@ export function handleEncounterPoke(
 }
 
 /**
- * Start-combat side effect, extracted for unit testability (same pattern
- * as `handleEncounterPoke`). Starting combat makes the encounter's linked
- * battle map the campaign's live map, so players who tap the banner land
- * on the map the DM is actually fighting on — previously the only writer
- * of activeBattleMapId was the editor's manual share toggle, and a map
- * shared in an earlier session stayed live forever (with two same-named
- * maps, players joined the wrong one). No linked map → no push: never
- * clear a share the DM set up manually.
- */
-export function pushLinkedMapLive(
-  battleMaps: BattleMap[],
-  encounterId: string,
-  pushActive: (battleMapId: string | null, name?: string) => Promise<void>
-): void {
-  const linked = findLinkedBattleMap(battleMaps, encounterId);
-  if (linked) void pushActive(linked.id, linked.name);
-}
-
-/**
  * Start-combat combat-log wiring, extracted for unit testability (same
- * pattern as `handleEncounterPoke`/`pushLinkedMapLive`). `startArchive`
+ * pattern as `handleEncounterPoke`). `startArchive`
  * admits and activates a new archive for this encounter; a null return
  * (admission rejected — e.g. the campaign already sits at the archive-count
  * cap) is an expected, silent outcome that must not interrupt combat start.
@@ -177,13 +155,11 @@ export function EncounterView({
 
   const combatConfig = useEncounterStore(state => state.combatConfig);
 
-  const { pushInitiative, pushInitiativeRequest } = useDmInitiativeSync({
-    campaignCode,
-    dmId,
-  });
-
-  const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
-  const getBattleMaps = useBattleMapStore(state => state.getBattleMaps);
+  const { pushInitiative, pushInitiativeRequest, control } =
+    useDmInitiativeSync({
+      campaignCode,
+      dmId,
+    });
 
   const {
     startArchive,
@@ -206,7 +182,11 @@ export function EncounterView({
   // Only fires for campaign-linked encounters; safe when encounter is undefined.
   useEffect(() => {
     if (!encounter || !encounter.campaignCode) return;
-    pushInitiative(buildSharedInitiative(encounter, combatConfig));
+    if (control.status !== 'controlling' && control.status !== 'broadcasting')
+      return;
+    void pushInitiative(buildSharedInitiative(encounter, combatConfig)).catch(
+      () => {}
+    );
   }, [
     encounter,
     encounter?.isActive,
@@ -215,6 +195,7 @@ export function EncounterView({
     encounter?.entities,
     combatConfig,
     pushInitiative,
+    control.status,
   ]);
 
   const { players: campaignPlayers, refresh: refreshPlayers } = useCampaignSync(
@@ -375,20 +356,19 @@ export function EncounterView({
       requestId: req.requestId,
       requestedAt: req.requestedAt,
     });
-    void pushInitiativeRequest(req);
+    void pushInitiativeRequest(req).catch(() => {});
   }, [encounter, pushInitiativeRequest, setPendingInitiativeRequest]);
 
   const handleStartCombat = useCallback(() => {
     if (encounter?.pendingInitiativeRequest) {
       setPendingInitiativeRequest(encounterId, null);
-      void pushInitiativeRequest(null);
+      void pushInitiativeRequest(null).catch(() => {});
       void fetch(`/api/campaign/${campaignCode}/initiative-submission`, {
         method: 'DELETE',
       }).catch(() => {});
     }
     startCombat(encounterId);
     startCombatLogArchiveForCombat(encounterId, campaignCode, startArchive);
-    pushLinkedMapLive(getBattleMaps(campaignCode), encounterId, pushActive);
   }, [
     encounter?.pendingInitiativeRequest,
     encounterId,
@@ -397,8 +377,6 @@ export function EncounterView({
     setPendingInitiativeRequest,
     startCombat,
     startArchive,
-    getBattleMaps,
-    pushActive,
   ]);
 
   const handleEndCombat = useCallback(() => {
@@ -434,6 +412,10 @@ export function EncounterView({
 
   return (
     <div className="flex h-full flex-col">
+      <TablePublicationControls
+        control={control}
+        combatActive={encounter.isActive}
+      />
       <CombatScreen
         encounter={encounter}
         playerSyncMap={playerSyncMap}

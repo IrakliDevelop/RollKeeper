@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+import { withLocalRedis } from './e2eRedis';
+
 export default defineConfig({
   testDir: '../../e2e/auth-wizard',
   outputDir: '../../test-results/auth-wizard',
@@ -20,7 +22,10 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'node scripts/start-auth-wizard-e2e-server.mjs',
+    command: withLocalRedis(
+      'node scripts/start-auth-wizard-e2e-server.mjs',
+      'none'
+    ),
     cwd: '../..',
     url: 'http://localhost:3111/account',
     reuseExistingServer: false,

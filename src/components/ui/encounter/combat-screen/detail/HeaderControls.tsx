@@ -17,12 +17,52 @@ const DISPOSITIONS: Array<{
   { value: 'neutral', label: 'Neutral' },
 ];
 
-export function HeaderControls({ entity, actions }: DetailSectionProps) {
+export function HeaderControls({
+  entity,
+  actions,
+  capabilities,
+}: DetailSectionProps) {
   const [isEditingAlias, setIsEditingAlias] = useState(false);
   const [aliasInput, setAliasInput] = useState('');
   const cancelAlias = useRef(false);
 
   if (entity.type === 'player') return null;
+  if (capabilities) {
+    // Scene runs: only the hidden-from-players toggle is supported.
+    if (!capabilities.hidden) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          selected={entity.isHidden}
+          onClick={() =>
+            actions.onUpdate(entity.id, { isHidden: !entity.isHidden })
+          }
+          aria-pressed={entity.isHidden === true}
+          aria-label={
+            entity.isHidden
+              ? 'Reveal name to players'
+              : 'Hide name from players'
+          }
+          className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        >
+          {entity.isHidden ? (
+            <EyeOff size={14} aria-hidden />
+          ) : (
+            <Eye size={14} aria-hidden />
+          )}
+        </Button>
+        {entity.isHidden && (
+          <span className="text-muted text-xs">
+            Players see:{' '}
+            <span className="font-medium">{playersSeeLabel(entity)}</span>
+          </span>
+        )}
+      </div>
+    );
+  }
 
   const hpVisible = entity.hpVisibleToPlayers === true;
   const hpToggleLabel = hpVisible

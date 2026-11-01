@@ -65,8 +65,6 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     lastSyncedAt,
     syncStatus,
     syncError,
-    sharedWithPlayers,
-    handleToggleShareWithPlayers,
     imageUploading,
     handleReady,
     handlePickImage,
@@ -198,11 +196,19 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             liveSyncConfigured={liveSyncConfigured}
             onOpenTvDisplay={handleOpenTvDisplay}
             syncStatus={syncStatus}
-            sharedWithPlayers={sharedWithPlayers}
-            onToggleShareWithPlayers={handleToggleShareWithPlayers}
             arrangeMapsActive={arrangeMapsActive}
             onToggleArrangeMaps={handleToggleArrangeMaps}
             fogControls={fogControls}
+            fogPresetControls={fogPresetControls}
+            markerControls={markerControls}
+            measureSharing={{
+              enabled: measureSharing,
+              onChange: handleSetMeasureSharing,
+            }}
+            movementControls={{
+              sharing: { enabled: pathSharing, onChange: handleSetPathSharing },
+              dash: { enabled: movementDash, onChange: handleSetMovementDash },
+            }}
             exportControl={
               <BattleMapExportControl
                 getViewport={getViewport}
@@ -272,7 +278,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           </div>
         )}
 
-        {viewport && (
+        {viewport && mode !== 'battlemap' && (
           <DmLocationToolOptions
             mode={mode}
             liveSyncConfigured={liveSyncConfigured}

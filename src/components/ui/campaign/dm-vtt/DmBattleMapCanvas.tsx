@@ -1,5 +1,6 @@
 'use client';
 import { BattleMapMovement } from '../location-map/BattleMapMovement';
+import { TableBattleMapMovement } from '../table/TableBattleMapMovement';
 
 import { useCallback, useEffect, useState } from 'react';
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
@@ -38,7 +39,17 @@ export type { DmBattleMapCanvasProps };
  * provider/toolbar composition. See `DmBattleMapCanvas.hooks.ts` for the
  * init/persistence/connection wiring.
  */
+/**
+ * PR08 repair 07 CC4 / repair 08 DD4: tools that only work through a live
+ * room. The original editor is private (no room under Table v1), so it
+ * hides ping (its input and overlay are attached only with a room). The
+ * laser stays: it draws its own trail locally, useful when screen sharing.
+ */
+const PRIVATE_EDITOR_HIDDEN_TOOLS: readonly string[] = ['ping'];
+
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
+  // Only a Table scene has a live room: sharing and presence need one.
+  const liveRoom = Boolean(props.tableSceneAdapter);
   const {
     children,
     sessionControls,
@@ -76,6 +87,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     markerControls,
     selectedElementIsMarker,
     markerAudienceNotice,
+    markerShareNotice,
+    liveSyncNotice,
     markerPanelOpen,
     markerPanelState,
     markerPanelIsDmOnly,
@@ -87,12 +100,23 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     fogControls,
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
-  const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
+  const updateLegacyBattleMap = useBattleMapStore(s => s.updateBattleMap);
+  const updateBattleMap = useCallback(
+    (updates: Parameters<typeof updateLegacyBattleMap>[2]) => {
+      if (props.tableSceneAdapter) {
+        props.tableSceneAdapter.updateBattleMap(updates);
+      } else {
+        updateLegacyBattleMap(campaignCode, battleMapId, updates);
+      }
+    },
+    [props.tableSceneAdapter, updateLegacyBattleMap, campaignCode, battleMapId]
+  );
   const { appearance: fogAppearance, fingerprint: fogFingerprint } =
     useAppliedFogAppearance(battleMap?.fogAppearance);
   const [fogPlugin] = useState(() =>
     createRollKeeperFogPlugin(resolveFogRendererOptions(fogAppearance))
   );
+  // PR04 P7: Table scenes project fog appearance for their scene id too.
   useFogAppearanceProjection({
     enabled:
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) &&
@@ -111,6 +135,28 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     },
   });
 
+  // FF5: a live-map sync outcome (offline edits not sent, an edit the room
+  // refused or could not keep) is shown, never console-only.
+  useEffect(() => {
+    if (!liveSyncNotice) return;
+    addToast({
+      type: 'error',
+      title: 'Live map',
+      message: liveSyncNotice.message,
+    });
+  }, [liveSyncNotice, addToast]);
+
+  // C4-2: a refused Table marker publication is surfaced, never silent.
+  useEffect(() => {
+    if (!markerShareNotice) return;
+    addToast({
+      type: 'error',
+      title: markerShareNotice,
+      message:
+        'Marker details and loot stay saved in this scene. They are retried after your next marker change.',
+    });
+  }, [markerShareNotice, addToast]);
+
   useEffect(() => {
     if (viewport) {
       setViewportFogStyle(viewport, resolveFogRendererOptions(fogAppearance));
@@ -124,30 +170,35 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
       if (viewport) {
         setViewportFogStyle(viewport, resolveFogRendererOptions(appearance));
       }
-      updateBattleMap(campaignCode, battleMapId, { fogAppearance: appearance });
+      updateBattleMap({ fogAppearance: appearance });
     },
-    [viewport, updateBattleMap, campaignCode, battleMapId]
+    [viewport, updateBattleMap]
   );
   const fogPresetControls = useFogPresetControls({
     campaignCode,
     viewport,
     applied: fogAppearance,
     onApply: handleFogAppearanceChange,
+    libraryWritable: !props.tableSceneAdapter,
   });
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
   // anyone else's camera.
   const [cameraSharing, setCameraSharing] = useState(false);
 
+  const Movement = props.tableSceneAdapter
+    ? TableBattleMapMovement
+    : BattleMapMovement;
   return (
     <ViewportContext.Provider value={viewport}>
       <div className="bg-surface fixed inset-0">
         {viewport && (
           <div className="absolute bottom-16 left-3 z-20">
-            <BattleMapMovement
+            <Movement
               viewport={viewport}
               campaignCode={campaignCode}
               battleMapId={battleMapId}
+              sceneAdapter={props.tableSceneAdapter}
               dash={movementDash}
               onDashChange={handleSetMovementDash}
             />
@@ -179,15 +230,21 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             selectedElementIsMarker={selectedElementIsMarker}
             markerAudienceNotice={markerAudienceNotice}
             markerControls={markerControls}
-            measureSharing={{
-              enabled: measureSharing,
-              onChange: handleSetMeasureSharing,
-            }}
+            hiddenTools={liveRoom ? undefined : PRIVATE_EDITOR_HIDDEN_TOOLS}
+            measureSharing={
+              liveRoom
+                ? { enabled: measureSharing, onChange: handleSetMeasureSharing }
+                : undefined
+            }
             movementControls={{
-              sharing: {
-                enabled: pathSharing,
-                onChange: handleSetPathSharing,
-              },
+              ...(liveRoom
+                ? {
+                    sharing: {
+                      enabled: pathSharing,
+                      onChange: handleSetPathSharing,
+                    },
+                  }
+                : {}),
               dash: {
                 enabled: movementDash,
                 onChange: handleSetMovementDash,
@@ -201,6 +258,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                 name={battleMap?.name ?? 'battle-map'}
                 mapImageSize={battleMap?.mapImageSize}
                 getDmOnlyElements={() =>
+                  props.tableSceneAdapter?.getBattleMap()?.dmOnlyElements ??
                   useBattleMapStore
                     .getState()
                     .getBattleMap(campaignCode, battleMapId)?.dmOnlyElements ??
@@ -215,6 +273,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               <BattleMapViewsControl
                 getViewport={() => viewport}
                 views={battleMap?.cameraViews ?? []}
+                canShare={liveRoom}
                 sharingEnabled={cameraSharing}
                 onSharingChange={setCameraSharing}
                 onSaveView={(view, name) => {
@@ -222,11 +281,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                     ...(battleMap?.cameraViews ?? []),
                     { id: crypto.randomUUID(), name, view },
                   ];
-                  useBattleMapStore
-                    .getState()
-                    .updateBattleMap(campaignCode, battleMapId, {
-                      cameraViews: next,
-                    });
+                  updateBattleMap({ cameraViews: next });
                 }}
                 onGoToView={handleGoToCameraView}
                 onSend={handleSendCameraView}
@@ -234,33 +289,29 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                   const next = (battleMap?.cameraViews ?? []).map(v =>
                     v.id === id ? { ...v, name } : v
                   );
-                  useBattleMapStore
-                    .getState()
-                    .updateBattleMap(campaignCode, battleMapId, {
-                      cameraViews: next,
-                    });
+                  updateBattleMap({ cameraViews: next });
                 }}
                 onDeleteView={id => {
                   const next = (battleMap?.cameraViews ?? []).filter(
                     v => v.id !== id
                   );
-                  useBattleMapStore
-                    .getState()
-                    .updateBattleMap(campaignCode, battleMapId, {
-                      cameraViews: next,
-                    });
+                  updateBattleMap({ cameraViews: next });
                 }}
               />
             }
+            editMapControl={props.editMapControl}
+            sideBySide={props.editMapControl !== undefined ? 'never' : '2xl'}
             presenceControl={
-              <PresenceControl
-                campaignCode={campaignCode}
-                roster={awarenessRoster}
-                cursorSharing={cursorSharing}
-                onCursorSharingChange={handleSetCursorSharing}
-                showPlayerCursors={showPlayerCursors}
-                onShowPlayerCursorsChange={handleSetShowPlayerCursors}
-              />
+              liveRoom ? (
+                <PresenceControl
+                  campaignCode={campaignCode}
+                  roster={awarenessRoster}
+                  cursorSharing={cursorSharing}
+                  onCursorSharingChange={handleSetCursorSharing}
+                  showPlayerCursors={showPlayerCursors}
+                  onShowPlayerCursorsChange={handleSetShowPlayerCursors}
+                />
+              ) : undefined
             }
           />
         )}

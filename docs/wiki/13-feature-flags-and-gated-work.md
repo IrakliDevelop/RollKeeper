@@ -17,6 +17,10 @@ own reasoning about what a change will do), check the relevant flag.
 - Fog-of-war preset **campaign persistence** was merged explicitly "(gate
   off)" per its commit message — confirm current state before assuming it's
   live. See [07](07-battlemap-fog-fieldnotes.md).
+- **Scenes and Table has no switch.** Table protocol v1 is always on; its
+  former server and client deployment switches were removed. Live play needs
+  the relay (`NEXT_PUBLIC_BATTLEMAP_RELAY_URL`,
+  `BATTLEMAP_RELAY_INTERNAL_URL`). See [15](15-scenes-and-table.md).
 - `src/components/ui/layout/ExperimentalFeaturesSection.tsx` — a user-facing
   toggle surface for experimental features; if a feature has a flag, this may
   be where a user can opt in/out.

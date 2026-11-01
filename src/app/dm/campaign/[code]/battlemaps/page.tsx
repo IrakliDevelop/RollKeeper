@@ -21,6 +21,18 @@ import { useBattleMapStore, generateBattleMapId } from '@/store/battleMapStore';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 import { uploadAsset } from '@/utils/uploadAsset';
+import { TableScenePanel } from '@/components/ui/campaign/table/TableScenePanel';
+import { battleMapDeleteRequest } from '@/components/ui/campaign/table/sideChannelRequests';
+
+/** PR04 P9: a battle map delete refusal in words (never a bare status). */
+function tableDeleteRefusal(status: number): string {
+  if (status === 404) return 'Not deleted: a Table scene uses this map.';
+  if (status === 403)
+    return 'Not deleted: only the campaign DM can delete battle maps.';
+  if (status === 503)
+    return 'Not deleted: live storage is unavailable. Try again shortly.';
+  return 'The battle map was not deleted. Try again.';
+}
 
 export default function CampaignBattleMapsPage() {
   const params = useParams();
@@ -36,6 +48,7 @@ export default function CampaignBattleMapsPage() {
   const [mapFile, setMapFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const battleMaps = hasHydrated ? getBattleMaps(code) : [];
@@ -108,30 +121,42 @@ export default function CampaignBattleMapsPage() {
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
+            {/* C3: fits 360 px; the title truncates, actions never shrink. */}
+            <div className="flex min-w-0 items-center">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                leftIcon={<ArrowLeft size={20} />}
+                className="shrink-0"
+              >
+                <Link
+                  href={`/dm/campaign/${code}`}
+                  aria-label={`Back to ${campaign?.name ?? 'Campaign'}`}
+                  title={campaign?.name}
                 >
-                  {campaign?.name ?? 'Campaign'}
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">Battle Maps</h1>
+                  <span className="hidden max-w-48 truncate sm:inline lg:max-w-none">
+                    {campaign?.name ?? 'Campaign'}
+                  </span>
+                </Link>
+              </Button>
+              <div className="ml-2 flex min-w-0 items-center sm:ml-6">
+                <Map className="text-accent-orange-text mr-2 h-6 w-6 shrink-0 sm:mr-3" />
+                <h1 className="text-heading truncate text-xl font-bold">
+                  Battle Maps
+                </h1>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
                 <DialogTrigger asChild>
                   <Button
                     variant="primary"
                     size="sm"
                     leftIcon={<Plus size={16} />}
+                    aria-label="New Battle Map"
                   >
-                    New Battle Map
+                    <span className="hidden sm:inline">New Battle Map</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent size="sm">
@@ -231,6 +256,12 @@ export default function CampaignBattleMapsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <TableScenePanel campaignCode={code} battleMaps={battleMaps} />
+        {deleteError && (
+          <p className="text-blood-text mb-4" role="alert">
+            {deleteError}
+          </p>
+        )}
         {battleMaps.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Map className="text-muted mb-4 h-12 w-12" />
@@ -246,13 +277,21 @@ export default function CampaignBattleMapsPage() {
                 key={bm.id}
                 battleMap={bm}
                 campaignCode={code}
-                onDelete={id => {
-                  removeBattleMap(code, id);
-                  fetch(`/api/campaign/${code}/battlemaps/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dmId }),
-                  }).catch(() => {});
+                onDelete={async id => {
+                  setDeleteError('');
+                  const request = battleMapDeleteRequest(code, id, dmId);
+                  let status = 0;
+                  try {
+                    const response = await fetch(request.url, request.init);
+                    status = response.ok ? 200 : response.status;
+                  } catch {
+                    // Network failure: status 0 maps to the generic refusal.
+                  }
+                  if (status === 200) {
+                    removeBattleMap(code, id);
+                    return;
+                  }
+                  setDeleteError(tableDeleteRefusal(status));
                 }}
               />
             ))}

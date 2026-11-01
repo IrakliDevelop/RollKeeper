@@ -5,7 +5,7 @@ import { Eye, Link2, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import type { EncounterEntity } from '@/types/encounter';
-import type { EntityActions } from '../types';
+import type { CombatantDetailCapabilities, EntityActions } from '../types';
 import { HeaderControls } from './HeaderControls';
 import { HeaderStatLine } from './HeaderStatLine';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
@@ -13,12 +13,15 @@ import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 export interface DetailSectionProps {
   entity: EncounterEntity;
   actions: EntityActions;
+  /** Table scene runs (see CombatantDetailCapabilities); legacy when omitted. */
+  capabilities?: CombatantDetailCapabilities;
 }
 
 export function DetailHeader({
   entity,
   actions,
   onOpenSheet,
+  capabilities,
   hideNameHeading = false,
 }: DetailSectionProps & {
   onOpenSheet?: () => void;
@@ -104,7 +107,7 @@ export function DetailHeader({
                   {entity.name}
                 </h2>
               )}
-              {!isPlayer && (
+              {!isPlayer && !capabilities && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -130,7 +133,7 @@ export function DetailHeader({
                 CR {cr}
               </Badge>
             )}
-            {!isPlayer && npcSourceId && (
+            {!isPlayer && npcSourceId && !capabilities && (
               <span className="text-muted inline-flex items-center gap-1 text-xs">
                 <Link2 size={12} aria-hidden="true" />
                 Stat edits sync to the NPC library record
@@ -138,46 +141,54 @@ export function DetailHeader({
             )}
           </div>
           {meta && <p className="text-muted mt-0.5 text-xs">{meta}</p>}
-          <HeaderStatLine entity={entity} actions={actions} />
+          {!capabilities && (
+            <HeaderStatLine entity={entity} actions={actions} />
+          )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          {isPlayer && onOpenSheet && (
+        {!capabilities && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {isPlayer && onOpenSheet && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="xs"
+                onClick={onOpenSheet}
+              >
+                Full character sheet
+              </Button>
+            )}
+            {npcSourceId && onViewNPC && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => onViewNPC(npcSourceId, entity.id)}
+                aria-label={`View ${entity.name} in NPC library`}
+                className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              >
+                <Eye size={15} aria-hidden="true" />
+              </Button>
+            )}
             <Button
               type="button"
-              variant="secondary"
+              variant="danger"
               size="xs"
-              onClick={onOpenSheet}
-            >
-              Full character sheet
-            </Button>
-          )}
-          {npcSourceId && onViewNPC && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() => onViewNPC(npcSourceId, entity.id)}
-              aria-label={`View ${entity.name} in NPC library`}
+              onClick={handleRemove}
+              aria-label={`Remove ${entity.name} from combat`}
               className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
-              <Eye size={15} aria-hidden="true" />
+              <X size={15} aria-hidden="true" />
             </Button>
-          )}
-          <Button
-            type="button"
-            variant="danger"
-            size="xs"
-            onClick={handleRemove}
-            aria-label={`Remove ${entity.name} from combat`}
-            className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-          >
-            <X size={15} aria-hidden="true" />
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
-      <HeaderControls entity={entity} actions={actions} />
+      <HeaderControls
+        entity={entity}
+        actions={actions}
+        capabilities={capabilities}
+      />
     </div>
   );
 }

@@ -389,3 +389,123 @@ describe('DmBattleMapCanvas wiring', () => {
     );
   });
 });
+
+describe('DmBattleMapCanvas: Table scene side channels (PR04 P7)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(mockHookState, defaultMarkerHookFields(), {
+      battleMap: baseBattleMap,
+      markerShareNotice: null,
+    });
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.test');
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  const adapter = {
+    sceneId: 'scene-1',
+    sourceMapId: 'map-original',
+    getBattleMap: () => ({ ...baseBattleMap, id: 'scene-1' }),
+    updateBattleMap: vi.fn(),
+    subscribe: () => () => {},
+  } as never;
+
+  it('projects fog appearance for the Table scene id (no longer suppressed)', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () =>
+      Response.json({ fogAppearance: 'solid', updatedAt: null })
+    );
+    vi.stubGlobal('fetch', fetchFn);
+    render(
+      <DmBattleMapCanvas
+        campaignCode={CAMPAIGN_CODE}
+        battleMapId="scene-1"
+        dmId="dm-1"
+        tableSceneAdapter={adapter}
+        tokenConfigRef={{ current: null }}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        onExportError={vi.fn()}
+      />
+    );
+    await vi.waitFor(() =>
+      expect(
+        fetchFn.mock.calls.some(
+          ([url, init]) =>
+            String(url) ===
+              '/api/campaign/TEST01/battlemaps/scene-1/fog-appearance' &&
+            (init as RequestInit | undefined)?.method === 'PUT'
+        )
+      ).toBe(true)
+    );
+  });
+
+  it('shows a visible notice when marker sharing was refused', async () => {
+    (mockHookState as Record<string, unknown>).markerShareNotice =
+      'Markers not shared with players';
+    renderCanvas();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Markers not shared with players',
+      })
+    ).toBeVisible();
+  });
+});
+
+describe('DmBattleMapCanvas: sharing controls follow the live room (PR08 repair 07 CC4)', () => {
+  const adapter = {
+    sceneId: 'scene-1',
+    sourceMapId: 'map-original',
+    getBattleMap: () => ({ ...baseBattleMap, id: 'scene-1' }),
+    updateBattleMap: vi.fn(),
+    subscribe: () => () => {},
+  } as never;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(mockHookState, defaultMarkerHookFields(), {
+      battleMap: baseBattleMap,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ fogAppearance: 'solid' }))
+    );
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+  const toolbarProps = () => vi.mocked(DmVttToolbar).mock.calls.at(-1)![0];
+
+  it('the private original editor shows no sharing, presence or ping controls, and keeps the local laser', () => {
+    renderCanvas();
+    const props = toolbarProps();
+    expect(props.measureSharing).toBeUndefined();
+    expect(props.movementControls?.sharing).toBeUndefined();
+    expect(props.movementControls?.dash).toBeDefined();
+    expect(props.presenceControl).toBeUndefined();
+    // DD4: the laser draws its own trail locally, so it stays.
+    expect(props.hiddenTools).toEqual(['ping']);
+    expect(getViewsControlProps().canShare).toBe(false);
+  });
+
+  it('the Table stage keeps every sharing control', () => {
+    render(
+      <DmBattleMapCanvas
+        campaignCode={CAMPAIGN_CODE}
+        battleMapId="scene-1"
+        dmId="dm-1"
+        tableSceneAdapter={adapter}
+        tokenConfigRef={{ current: null }}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        onExportError={vi.fn()}
+      />
+    );
+    const props = toolbarProps();
+    expect(props.measureSharing).toBeDefined();
+    expect(props.movementControls?.sharing).toBeDefined();
+    expect(props.presenceControl).toBeTruthy();
+    expect(props.hiddenTools ?? []).toEqual([]);
+    expect(getViewsControlProps().canShare).not.toBe(false);
+  });
+});

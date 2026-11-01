@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import type { EditorMode } from './DmLocationEditor.types';
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
+import type {
+  MarkerToolControls,
+  MeasureSharingControl,
+  MovementControls,
+} from './DmLocationToolOptions';
+import type { FogPresetControls } from './fog';
 import type { DmFogControls } from './fog';
 
 export interface DmLocationToolbarProps {
@@ -38,12 +44,12 @@ export interface DmLocationToolbarProps {
   /** ISO timestamp of last successful sync, or null if never synced */
   lastSyncedAt: string | null;
   mode?: EditorMode;
-  onOpenTvDisplay?: () => void;
+  /** May resolve to the PR05 launcher result (failure message shown). */
+  onOpenTvDisplay?: () => void | Promise<
+    import('@/lib/openTableDisplay').OpenTableDisplayResult | void
+  >;
   /** Live sync connection status (battlemap mode only); 'disabled' when the relay isn't configured. */
   syncStatus: BattleMapConnectionStatus | 'disabled';
-  /** Whether the battle map is currently shared with players (battlemap mode only) */
-  sharedWithPlayers?: boolean;
-  onToggleShareWithPlayers?: () => void;
   /** Add a map image onto the locked map layer (battlemap mode only). */
   onPickMapImage?: () => void;
   /** Whether arrange-maps mode is active (battlemap mode only). */
@@ -58,6 +64,10 @@ export interface DmLocationToolbarProps {
   presenceControl?: ReactNode;
   /** Fog authoring controls for battle maps and campaign locations. */
   fogControls?: DmFogControls;
+  fogPresetControls?: FogPresetControls;
+  markerControls?: MarkerToolControls;
+  measureSharing?: MeasureSharingControl;
+  movementControls?: MovementControls;
   /** The relay is configured, so location mode gets the live controls
    *  (presence tools now; presence control, sync chip and hidden placement are
    *  wired by the editor). Ignored in battlemap mode. */

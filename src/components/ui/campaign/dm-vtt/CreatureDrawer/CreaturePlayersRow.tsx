@@ -54,8 +54,8 @@ export function CreaturePlayersRow({
     : 'Show exact HP to players';
 
   const hiddenLabel = entity.isHidden
-    ? 'Name hidden from players — click to reveal'
-    : 'Name visible to players — click to hide';
+    ? 'Name hidden from players. Click to reveal.'
+    : 'Name visible to players. Click to hide.';
   const [alias, setAlias] = useDraftValue(entity.playerAlias ?? '');
 
   const commitAlias = () => {

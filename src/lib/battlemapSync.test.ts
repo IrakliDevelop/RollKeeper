@@ -168,7 +168,12 @@ describe('createManagedBattleMapConnection', () => {
       battleMapId: 'map-1',
       store,
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       seedLocal,
       onStatus: s => statuses.push(s),
       onPoke,
@@ -220,6 +225,182 @@ describe('createManagedBattleMapConnection', () => {
     conn.stop();
   });
 
+  it('keeps location rooms on the legacy client when the global Table v1 flag is on', async () => {
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'location-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'location-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+      authorityTransportFactory: () => {
+        throw new Error('location must not construct an authority transport');
+      },
+    });
+    await flush();
+
+    expect(transportUrls).toEqual([
+      'wss://relay.example?room=CODE_location-1&token=test-token',
+    ]);
+    const posted = JSON.parse(
+      (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string
+    ) as Record<string, unknown>;
+    expect(posted).toMatchObject({ kind: 'location' });
+    expect(posted).not.toHaveProperty('sceneId');
+    conn.stop();
+  });
+
+  it('re-verifies a genuine location on credential refresh without manufacturing sceneId', async () => {
+    vi.useFakeTimers();
+    try {
+      const conn = createManagedBattleMapConnection({
+        relayUrl: 'wss://relay.example',
+        campaignCode: 'CODE',
+        battleMapId: 'location-1',
+        store: new ElementStore(),
+        clientId: 'dm-1',
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'location-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
+        transportFactory: () => fakeTransport,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      fakeTransport.emitClose(4401);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      for (const call of fetchMock.mock.calls) {
+        const posted = JSON.parse(
+          (call[1] as RequestInit).body as string
+        ) as Record<string, unknown>;
+        expect(posted).toMatchObject({ kind: 'location' });
+        expect(posted).not.toHaveProperty('sceneId');
+      }
+      conn.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails a legacy location adapter visibly when the server returns authority:1', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        token: 'authority-token',
+        authority: 1,
+        room: '123e4567-e89b-42d3-a456-426614174000',
+        roomGeneration: '223e4567-e89b-42d3-a456-426614174000',
+      }),
+    });
+    const diagnostic = vi.fn();
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'location-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'location-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      onStatus: status => statuses.push(status),
+      onDiagnostic: diagnostic,
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+    });
+    await flush();
+
+    expect(transportUrls).toEqual([]);
+    expect(statuses).toContain('denied');
+    expect(diagnostic).toHaveBeenCalledWith(
+      expect.stringMatching(/location can.t open live/i)
+    );
+    conn.stop();
+  });
+
+  it('opens no location socket and reports a diagnostic when token minting is rejected', async () => {
+    fetchMock.mockResolvedValue({ ok: false });
+    const diagnostic = vi.fn();
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'location-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'location-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      onStatus: status => statuses.push(status),
+      onDiagnostic: diagnostic,
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+    });
+    await flush();
+
+    expect(transportUrls).toEqual([]);
+    expect(statuses).toContain('denied');
+    expect(diagnostic).toHaveBeenCalledWith(expect.stringMatching(/denied/i));
+    conn.stop();
+  });
+
+  it('uses an explicitly supplied sceneId for v1 even with a location hint', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        token: 'authority-token',
+        authority: 1,
+        room: '123e4567-e89b-42d3-a456-426614174000',
+        roomGeneration: '223e4567-e89b-42d3-a456-426614174000',
+      }),
+    });
+    const authorityTransportFactory = vi.fn(() => fakeTransport as never);
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        sceneId: 'scene-real',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      authorityTransportFactory,
+    });
+    await flush();
+
+    const posted = JSON.parse(
+      (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string
+    ) as Record<string, unknown>;
+    expect(posted.sceneId).toBe('scene-real');
+    expect(posted.kind).toBe('location');
+    expect(authorityTransportFactory).toHaveBeenCalled();
+    conn.stop();
+  });
+
   it('normalizes additive token metadata before exposing it to viewers', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
@@ -236,7 +417,12 @@ describe('createManagedBattleMapConnection', () => {
       battleMapId: 'map-1',
       store: new ElementStore(),
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       onTokenMetadata,
       transportFactory: url => {
         transportUrls.push(url);
@@ -250,6 +436,35 @@ describe('createManagedBattleMapConnection', () => {
       fogAppearanceUpdatedAt: '2026-09-05T00:00:00.000Z',
     });
     conn.stop();
+  });
+
+  it('exposes only a string resolved sceneId from the mint response', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        token: 't',
+        authority: 1,
+        room: 'room-x',
+        sceneId: 'scene-x',
+      }),
+    });
+    await expect(
+      mintBattleMapToken('CODE', {
+        role: 'player',
+        battleMapId: 'map-m',
+        playerId: 'legacy-a',
+      })
+    ).resolves.toMatchObject({ room: 'room-x', sceneId: 'scene-x' });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ token: 't', authority: 1, sceneId: 7 }),
+    });
+    const malformed = await mintBattleMapToken('CODE', {
+      role: 'player',
+      battleMapId: 'map-m',
+      playerId: 'legacy-a',
+    });
+    expect(malformed?.sceneId).toBeUndefined();
   });
 
   it('keeps a projected custom appearance and strips any source preset id', async () => {
@@ -293,7 +508,12 @@ describe('createManagedBattleMapConnection', () => {
       battleMapId: 'map-1',
       store: new ElementStore(),
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       onTokenMetadata,
       transportFactory: url => {
         transportUrls.push(url);
@@ -363,7 +583,12 @@ describe('createManagedBattleMapConnection', () => {
         battleMapId: 'map-1',
         store,
         clientId: 'dm-1',
-        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'map-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
         seedLocal: true,
         onStatus: s => statuses.push(s),
         transportFactory: url => {
@@ -475,7 +700,12 @@ describe('createManagedBattleMapConnection', () => {
         battleMapId: 'map-1',
         store,
         clientId: 'dm-1',
-        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'map-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
         onStatus: s => statuses.push(s),
         transportFactory: url => {
           transportUrls.push(url);
@@ -583,7 +813,12 @@ describe('createManagedBattleMapConnection layer sync (call-site wiring)', () =>
       battleMapId: 'map-1',
       store: vp.store as ElementStore,
       clientId,
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: clientId },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: clientId,
+        kind: 'location',
+      },
       seedLocal: roleWiring === 'dm',
       layers: {
         applyLayer: makeApplyRemoteLayer(vp, roleWiring, { ownLayerId }),
@@ -670,7 +905,12 @@ describe('createManagedBattleMapConnection layer sync (call-site wiring)', () =>
         battleMapId: 'map-1',
         store: vp.store as ElementStore,
         clientId: 'dm-1',
-        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'map-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
         seedLocal: true,
         layers: {
           applyLayer: update => {
@@ -844,7 +1084,12 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       battleMapId: 'map-1',
       store: new ElementStore(),
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       onStatus: s => statuses.push(s),
       onPoke,
       transportFactory: () => fakeTransport,
@@ -967,6 +1212,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
@@ -1187,6 +1433,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
@@ -1500,6 +1747,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
@@ -1838,6 +2086,7 @@ describe('createManagedBattleMapConnection — player marker filtering (task B11
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       transportFactory: () => fakeTransport,
     });
@@ -2000,8 +2249,13 @@ describe('managed connection fog lifecycle with the published SDK', () => {
       clientId,
       tokenRequest:
         role === 'dm'
-          ? { role, battleMapId: 'map-1', dmId: clientId }
-          : { role, battleMapId: 'map-1', playerId: clientId },
+          ? { role, battleMapId: 'map-1', dmId: clientId, kind: 'location' }
+          : {
+              role,
+              battleMapId: 'map-1',
+              playerId: clientId,
+              kind: 'location',
+            },
       fog: {
         manager: fog,
         preserveLocalWhenRemoteMissing: role === 'dm',

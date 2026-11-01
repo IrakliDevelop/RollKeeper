@@ -52,6 +52,13 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
+import {
+  CONNECTION_DROPPED_MESSAGE,
+  ROOM_RESTORED_PLAYER_MESSAGE,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_PLAYER_MESSAGE,
+} from '@/lib/battlemapAuthority';
 import { configureFogView, resolvePlayerFogStyle } from './fog';
 import {
   applyFogAppearanceMetadata,
@@ -59,6 +66,11 @@ import {
   getAppliedFogAppearance,
   startFogAppearancePoll,
 } from './fog/fogAppearancePoll';
+import {
+  fogAppearanceReadUrl,
+  lootClaimRequest,
+  markerDetailsUrl,
+} from '@/components/ui/campaign/table/sideChannelRequests';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import {
@@ -71,7 +83,12 @@ import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
 import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
 import MarkerDetailPanel from './MarkerDetailPanel';
 import type { PublicMarkerDetail } from '@/types/battlemap';
-import { ensurePlayerLayer, playerLayerId } from './playerLayer';
+import {
+  canonicalPlayerBand,
+  ensurePlayerLayer,
+  playerLayerId,
+} from './playerLayer';
+import { isControlBearingElement } from './tokenIdentity';
 import {
   ensureCanonicalLayers,
   subscribePinCanonicalLayers,
@@ -165,6 +182,7 @@ interface PlayerBattleMapCanvasProps {
 }
 
 const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
+const NEVER_ACTIVATABLE = () => false;
 const EMPTY_APPLIED_TRANSFER_IDS: string[] = [];
 
 const PLAYER_TOOLS: {
@@ -196,10 +214,10 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
 
 /**
  * This receive site's role for `attachFocusReceiver`. Pulled out to a named,
- * directly-assertable constant — swapping this literal with the display
- * page's `DISPLAY_FOCUS_OPTIONS` would otherwise pass type-check, lint, and
- * every test while making a DM's "send to the TV" move every player's
- * camera instead. See PlayerBattleMapCanvas.focusOptions.test.ts.
+ * directly-assertable constant; swapping this literal for the display role
+ * would otherwise pass type-check, lint, and every test while making a DM's
+ * "send to the TV" move every player's camera instead. See
+ * PlayerBattleMapCanvas.focusOptions.test.ts.
  */
 export const PLAYER_FOCUS_OPTIONS = {
   role: 'player',
@@ -290,7 +308,7 @@ export function PlayerToolbar({
             ? 'bg-accent-emerald-bg text-accent-emerald-text'
             : status === 'denied'
               ? 'bg-accent-red-bg text-accent-red-text'
-              : 'bg-accent-amber-bg text-accent-amber-text'
+              : 'bg-ember-bg text-ember-text'
         }`}
       >
         {status === 'live'
@@ -323,6 +341,55 @@ export function PlayerBattleMapCanvas({
   onOpenPartySheet,
 }: PlayerBattleMapCanvasProps) {
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
+  // R4 (Table v1): this route opens the source map URL; the server resolves
+  // the presented scene. PR04 P7: side channels (marker details, loot, shop,
+  // fog appearance) are addressed by the RESOLVED scene id, never the
+  // source map id, and stay neutral until the token resolves one.
+  const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
+  const sideChannelId = resolvedSceneId;
+  const sideChannelsEnabled = sideChannelId !== null;
+  const sideChannelIdRef = useRef(sideChannelId);
+  sideChannelIdRef.current = sideChannelId;
+  // P10: the token 403 body decides the cover: "Scene is unavailable" is
+  // neutral; any other credential denial is "Access denied".
+  const [tokenDenial, setTokenDenial] = useState<
+    'scene-unavailable' | 'credential' | null
+  >(null);
+  const tokenDenialRef = useRef(tokenDenial);
+  tokenDenialRef.current = tokenDenial;
+  // A2: the relay closes an audience socket with 4403 on any presentation
+  // change and the SDK settles on terminal `denied` (no re-mint). Under
+  // Table v1 the surface rebuilds its connection with bounded backoff so the
+  // fresh mint rebinds, goes live or shows the neutral cover.
+  const [withdrawn, setWithdrawn] = useState(false);
+  const reconnectRef = useRef<{
+    delay: number;
+    timer: ReturnType<typeof setTimeout> | null;
+    identityInvalid: boolean;
+    lastResolved: string | null;
+  }>({ delay: 1_000, timer: null, identityInvalid: false, lastResolved: null });
+  // A resolved-scene change rebuilds the whole canvas (store, layers, fog)
+  // under a new key; the notice tells the player unsent edits were dropped.
+  const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const [sceneNotice, setSceneNotice] = useState<string | null>(null);
+  // Table v1 relay rule 12: players delete only their own self-placed token
+  // among control-bearing elements (never a bound or DM-placed one).
+  const playerMayDelete = useCallback(
+    (element: CanvasElement): boolean => {
+      if (!isControlBearingElement(element)) return true;
+      const rec = element as unknown as Record<string, unknown>;
+      const absent = (key: string) =>
+        rec[key] === undefined || rec[key] === null;
+      return (
+        rec.tokenKind === PLAYER_TOKEN_KIND &&
+        rec.characterId === characterId &&
+        rec.layerId === playerLayerId(characterId) &&
+        absent('sceneMemberId') &&
+        absent('entityId')
+      );
+    },
+    [characterId]
+  );
   const [publishedMarkers, setPublishedMarkers] =
     useState<PublicMarkerDetail[]>(suppliedMarkers);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -333,6 +400,8 @@ export function PlayerBattleMapCanvas({
   >(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
+  // PR05 E11: the one pending first-live fit of the current canvas.
+  const fitFrameRef = useRef<number | null>(null);
   // `viewport` is state, so a plain closure over it would be null inside a
   // tool built on the first render (mirrors DmBattleMapCanvas.hooks.ts).
   const viewportRef = useRef<Viewport | null>(null);
@@ -397,23 +466,75 @@ export function PlayerBattleMapCanvas({
   const onOpenPartySheetRef = useRef(onOpenPartySheet);
   onOpenPartySheetRef.current = onOpenPartySheet;
 
+  // F3: one marker request at a time; a newer refresh, a scene change or
+  // unmount aborts the previous one.
+  const markersAbortRef = useRef<AbortController | null>(null);
   const refreshMarkers = useCallback(async () => {
+    markersAbortRef.current?.abort();
+    markersAbortRef.current = null;
+    if (sideChannelId === null) {
+      setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
+      return;
+    }
+    const abort = new AbortController();
+    markersAbortRef.current = abort;
     try {
       const response = await fetch(
-        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
+        markerDetailsUrl(campaignCode, sideChannelId, {
+          role: 'player',
+          playerId: characterId,
+        }),
+        { signal: abort.signal }
       );
-      if (!response.ok) return;
+      if (abort.signal.aborted) return;
+      // A late answer for a previous scene never lands on the new one.
+      if (sideChannelIdRef.current !== sideChannelId) return;
+      if (!response.ok) {
+        // Table v1: 404 (not presented/blanked/deleted) is a neutral empty
+        // state, never the previous scene's details.
+        setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
+        return;
+      }
       const data = (await response.json()) as {
         markers?: PublicMarkerDetail[];
       };
+      if (sideChannelIdRef.current !== sideChannelId) return;
       setPublishedMarkers(data.markers ?? []);
     } catch (error) {
+      if (abort.signal.aborted) return;
       // Marker details are a best-effort companion to the live canvas relay.
       // Keep the last projection when the endpoint is unavailable; activation
       // can retry, and a marker poke will refresh connected clients later.
       console.warn('Failed to refresh marker details:', error);
     }
-  }, [battleMapId, campaignCode]);
+  }, [campaignCode, characterId, sideChannelId]);
+  const refreshMarkersRef = useRef(refreshMarkers);
+  refreshMarkersRef.current = refreshMarkers;
+
+  // PR04 Q2(b): scene-keyed markers get no relay poke (the markers route
+  // pokes the legacy room), so refresh every 10 s while a Table scene is
+  // resolved: one request in flight, paused while hidden, refreshed on
+  // visibility, disposed on unmount or scene change.
+  useEffect(() => {
+    if (sideChannelId === null) return;
+    let disposed = false;
+    const tick = () => {
+      if (disposed || document.hidden) return;
+      // A newer refresh aborts a still-pending one (single in flight).
+      void refreshMarkersRef.current();
+    };
+    const timer = window.setInterval(tick, 10_000);
+    const onVisibility = () => {
+      if (!document.hidden) tick();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      markersAbortRef.current?.abort();
+    };
+  }, [sideChannelId]);
 
   useEffect(() => {
     setPublishedMarkers(suppliedMarkers);
@@ -539,7 +660,9 @@ export function PlayerBattleMapCanvas({
     gesture: 'single',
     markerDetails: publishedMarkers,
     onActivateMarker: handleMarkerActivate,
-    isExtraActivatable: isCombatantToken,
+    isExtraActivatable: sideChannelsEnabled
+      ? isCombatantToken
+      : NEVER_ACTIVATABLE,
     onActivateExtra: handleShopTokenActivate,
     sheetTokens,
   });
@@ -580,25 +703,19 @@ export function PlayerBattleMapCanvas({
 
   const handleClaimLoot = useCallback(
     async (entryId: string, quantity: number): Promise<number> => {
+      const target = sideChannelIdRef.current;
+      if (target === null)
+        throw new Error('Loot is not available in this scene.');
       if (markerPanelState.kind !== 'ready')
         throw new Error('This loot container is no longer available.');
-      const response = await fetch(
-        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-rollkeeper-csrf': '1',
-          },
-          body: JSON.stringify({
-            playerId: characterId,
-            markerId: markerPanelState.detail.id,
-            entryId,
-            quantity,
-            requestId: crypto.randomUUID(),
-          }),
-        }
-      );
+      const request = lootClaimRequest(campaignCode, target, {
+        playerId: characterId,
+        markerId: markerPanelState.detail.id,
+        entryId,
+        quantity,
+        requestId: crypto.randomUUID(),
+      });
+      const response = await fetch(request.url, request.init);
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         markers?: PublicMarkerDetail[];
@@ -616,7 +733,7 @@ export function PlayerBattleMapCanvas({
       setPublishedMarkers(data.markers ?? []);
       return data.claim?.grantedQuantity ?? quantity;
     },
-    [battleMapId, campaignCode, characterId, markerPanelState]
+    [campaignCode, characterId, markerPanelState]
   );
 
   // `activeMarkerElement` above is a bare render-time `getById` with no store
@@ -653,16 +770,19 @@ export function PlayerBattleMapCanvas({
 
     // Selection state for the touch-friendly delete button.
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
+    const deletableSelection = (): boolean =>
+      (selectTool?.selectedIds ?? []).some(id => {
+        const element = vp.store.getById(id);
+        return element !== undefined && playerMayDelete(element);
+      });
     if (selectTool) {
       selectTool.onSelectionChange(() => {
-        setHasSelection(selectTool.selectedIds.length > 0);
+        setHasSelection(deletableSelection());
       });
     }
     vp.toolManager.onChange(() => {
       const active = vp.toolManager.activeTool?.name === 'select';
-      setHasSelection(
-        active ? (selectTool?.selectedIds.length ?? 0) > 0 : false
-      );
+      setHasSelection(active ? deletableSelection() : false);
     });
 
     // Movement commit: connection-independent — moving a token needs no
@@ -695,7 +815,13 @@ export function PlayerBattleMapCanvas({
     laserCleanupRef.current = null;
     connectionRef.current?.stop();
     connectionRef.current = null;
+    if (fitFrameRef.current !== null) cancelAnimationFrame(fitFrameRef.current);
+    fitFrameRef.current = null;
+    // PR05 E11: fit on the first `live` of this canvas only, never again
+    // on later authority notifications (every DM edit) or reconnects.
+    let fitted = false;
     const ownLayerId = playerLayerId(characterId);
+    // Set right after creation; status callbacks may run before that.
     const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode,
@@ -714,30 +840,123 @@ export function PlayerBattleMapCanvas({
           onApplied: () => vp.requestRender(),
         }),
       },
+      onDiagnostic: message => {
+        if (message.startsWith('Live map identity is invalid'))
+          reconnectRef.current.identityInvalid = true;
+        // EE2: an edit that could not be kept, or held edits dropped after
+        // the live map changed, is never silent.
+        if (
+          message === HELD_OVERFLOW_MESSAGE ||
+          message === HELD_STALE_MESSAGE ||
+          message === OFFLINE_DISCARDED_PLAYER_MESSAGE ||
+          message === CONNECTION_DROPPED_MESSAGE ||
+          message === ROOM_RESTORED_PLAYER_MESSAGE
+        )
+          setSceneNotice(message);
+      },
       onStatus: s => {
         setStatus(s);
         onStatusProp?.(s);
+        const reconnect = reconnectRef.current;
         if (s === 'live') {
-          requestAnimationFrame(() => vp.fitToContent(60));
+          reconnect.delay = 1_000;
+          setWithdrawn(false);
+        }
+        if (
+          s === 'denied' &&
+          tokenDenialRef.current !== 'credential' &&
+          !reconnect.identityInvalid &&
+          reconnect.timer === null
+        ) {
+          setWithdrawn(true);
+          const delay = reconnect.delay;
+          reconnect.delay = Math.min(delay * 2, 15_000);
+          reconnect.timer = setTimeout(() => {
+            reconnect.timer = null;
+            setResolvedSceneId(null);
+            laserCleanupRef.current?.();
+            laserCleanupRef.current = null;
+            connectionRef.current?.stop();
+            connectionRef.current = null;
+            setViewport(null);
+            viewportRef.current = null;
+            setCanvasEpoch(epoch => epoch + 1);
+          }, delay);
+        }
+        if (s === 'live') {
+          if (!fitted) {
+            fitted = true;
+            fitFrameRef.current = requestAnimationFrame(() => {
+              fitFrameRef.current = null;
+              vp.fitToContent(60);
+            });
+          }
           // Managed sendPresence drops while not live, so the attach-time
           // frame may be lost; announce on every live transition (first
           // connect AND reconnect) — the heartbeat self-heals otherwise.
           awarenessRef.current?.announce();
         }
       },
+      onTokenDenied: denial =>
+        setTokenDenial(
+          denial.status === 403 && denial.error === 'Scene is unavailable'
+            ? 'scene-unavailable'
+            : denial.status === 403 || denial.status === 400
+              ? 'credential'
+              : null
+        ),
       onTokenMetadata: meta => {
+        setTokenDenial(null);
         applyFogAppearanceMetadata(
           vp,
           meta.fogAppearance,
           meta.fogAppearanceUpdatedAt
         );
       },
+      onSceneResolved: sceneId => {
+        // A rebuild after a withdrawal resolves afresh: name a scene change.
+        const reconnect = reconnectRef.current;
+        if (
+          reconnect.lastResolved !== null &&
+          reconnect.lastResolved !== sceneId
+        )
+          setSceneNotice(
+            notice =>
+              notice ?? 'The DM changed the scene. The map was reloaded.'
+          );
+        reconnect.lastResolved = sceneId;
+        setResolvedSceneId(sceneId);
+      },
+      onSceneChange: change => {
+        const count =
+          change.discardedOperationIds.length +
+          (change.discardedHeldEdits ?? 0);
+        setSceneNotice(
+          `The DM changed the scene.${
+            count > 0
+              ? ` ${count} unsent edit${count === 1 ? ' was' : 's were'} discarded.`
+              : ''
+          } The map was reloaded.`
+        );
+        setResolvedSceneId(null);
+        laserCleanupRef.current?.();
+        laserCleanupRef.current = null;
+        connectionRef.current?.stop();
+        connectionRef.current = null;
+        setViewport(null);
+        viewportRef.current = null;
+        setCanvasEpoch(epoch => epoch + 1);
+      },
       onPoke: feature => {
-        if (feature === 'markers') void refreshMarkers();
-        if (feature === 'fog-appearance') {
+        if (feature === 'markers') void refreshMarkersRef.current();
+        const target = sideChannelIdRef.current;
+        if (feature === 'fog-appearance' && target !== null) {
           fetchAndApplyFogAppearance(
             vp,
-            `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`
+            fogAppearanceReadUrl('battlemap', campaignCode, target, {
+              role: 'player',
+              playerId: characterId,
+            })
           );
         }
         onPokeRef.current?.(feature);
@@ -749,7 +968,7 @@ export function PlayerBattleMapCanvas({
     publishOwnedLayers(
       vp,
       'player',
-      def => connection.publishLayerUpsert(def),
+      def => connection.publishLayerUpsert(canonicalPlayerBand(def)),
       ownLayerId
     );
     // Render remote laser trails + map pings (DM pointer). Players do not
@@ -807,13 +1026,6 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current = null;
           awareness.dispose();
         });
-
-        scope.push(
-          startFogAppearancePoll({
-            viewport: vp,
-            url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
-          })
-        );
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and
@@ -824,22 +1036,47 @@ export function PlayerBattleMapCanvas({
     }
   };
 
+  // Fog appearance companion, keyed by the side-channel id (the resolved
+  // scene under Table v1; this map outside it).
+  useEffect(() => {
+    if (
+      !viewport ||
+      sideChannelId === null ||
+      !process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL
+    )
+      return;
+    return startFogAppearancePoll({
+      viewport,
+      url: fogAppearanceReadUrl('battlemap', campaignCode, sideChannelId, {
+        role: 'player',
+        playerId: characterId,
+      }),
+    });
+  }, [viewport, sideChannelId, campaignCode, characterId]);
+
   const handleDeleteSelected = useCallback(() => {
     const vp = viewport;
     if (!vp) return;
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
     if (!selectTool) return;
-    const ids = selectTool.selectedIds.filter(id => vp.store.getById(id));
+    const ids = selectTool.selectedIds.filter(id => {
+      const element = vp.store.getById(id);
+      return element !== undefined && playerMayDelete(element);
+    });
     if (ids.length === 0) return;
     vp.removeElements(ids);
     selectTool.setSelection([]);
-  }, [viewport]);
+  }, [viewport, playerMayDelete]);
 
   useEffect(
     () => () => {
       laserCleanupRef.current?.();
       movementCommitUnsubRef.current?.();
       connectionRef.current?.stop();
+      markersAbortRef.current?.abort();
+      if (fitFrameRef.current !== null)
+        cancelAnimationFrame(fitFrameRef.current);
+      if (reconnectRef.current.timer) clearTimeout(reconnectRef.current.timer);
     },
     []
   );
@@ -848,6 +1085,7 @@ export function PlayerBattleMapCanvas({
     <ViewportContext.Provider value={viewport}>
       <div className="bg-surface fixed inset-0">
         <FieldNotesCanvas
+          key={canvasEpoch}
           tools={tools}
           defaultTool="hand"
           onReady={handleReady}
@@ -858,7 +1096,30 @@ export function PlayerBattleMapCanvas({
           }}
           snapToGrid
         />
-        <BattleMapBootstrapPrivacyCover status={status} />
+        <BattleMapBootstrapPrivacyCover
+          status={status}
+          message={
+            tokenDenial === 'credential'
+              ? 'Access denied'
+              : tokenDenial === 'scene-unavailable' || withdrawn
+                ? "The DM isn't showing this map right now"
+                : undefined
+          }
+        />
+        {sceneNotice && (
+          <div className="border-ember-border bg-ember-bg pointer-events-auto absolute top-16 left-1/2 z-[110] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 shadow-md">
+            <p role="status" className="text-ember-text text-sm">
+              {sceneNotice}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSceneNotice(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
         {viewport && (
           <PlayerMapToolControls>
             <BattleMapMovement

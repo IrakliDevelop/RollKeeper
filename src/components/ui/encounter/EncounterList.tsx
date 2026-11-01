@@ -20,6 +20,9 @@ import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import { Card } from '@/components/ui/layout/card';
 import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
+import { OpenSceneRunLink } from '@/components/ui/campaign/table/combat/OpenSceneRunLink';
+import { PrepareOnMapLink } from '@/components/ui/campaign/table/TableEntryLinks';
+import { SceneRunLinksProvider } from '@/components/ui/campaign/table/combat/useSceneRunLinks';
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
 import type { BattleMap } from '@/types/battlemap';
@@ -129,25 +132,27 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sorted.map(encounter => (
-            <EncounterCard
-              key={encounter.id}
-              encounter={encounter}
-              campaignCode={campaignCode}
-              linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
-              onDelete={async () => {
-                const confirmed = await confirmDialog({
-                  title: `Delete ${encounter.name}?`,
-                  message: "This can't be undone.",
-                  confirmLabel: 'Delete encounter',
-                  tone: 'danger',
-                });
-                if (confirmed) deleteEncounter(encounter.id);
-              }}
-            />
-          ))}
-        </div>
+        <SceneRunLinksProvider campaignCode={campaignCode}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {sorted.map(encounter => (
+              <EncounterCard
+                key={encounter.id}
+                encounter={encounter}
+                campaignCode={campaignCode}
+                linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
+                onDelete={async () => {
+                  const confirmed = await confirmDialog({
+                    title: `Delete ${encounter.name}?`,
+                    message: "This can't be undone.",
+                    confirmLabel: 'Delete encounter',
+                    tone: 'danger',
+                  });
+                  if (confirmed) deleteEncounter(encounter.id);
+                }}
+              />
+            ))}
+          </div>
+        </SceneRunLinksProvider>
       )}
     </div>
   );
@@ -249,6 +254,16 @@ function EncounterCard({
             <Trash2 size={14} />
             Delete <span className="sr-only">{encounter.name}</span>
           </Button>
+        </div>
+        <div className="mt-2 flex flex-col gap-2 empty:hidden">
+          <OpenSceneRunLink
+            campaignCode={campaignCode}
+            encounterId={encounter.id}
+          />
+          <PrepareOnMapLink
+            campaignCode={campaignCode}
+            encounterId={encounter.id}
+          />
         </div>
       </div>
     </Card>

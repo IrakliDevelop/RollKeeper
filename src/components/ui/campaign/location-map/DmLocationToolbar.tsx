@@ -1,5 +1,7 @@
 'use client';
 
+import { DmBattleMapSetupToolbar } from '@/components/ui/campaign/dm-vtt/DmBattleMapSetupToolbar';
+
 import {
   Hand,
   MousePointer2,
@@ -35,6 +37,7 @@ import DmLocationGridPopover from './DmLocationGridPopover';
 import DmOnlyToggle from './DmOnlyToggle';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
+import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDisplayLauncher';
 
 const BASE_TOOL_DEFS = [
   { name: 'hand', icon: Hand, label: 'Pan' },
@@ -46,6 +49,10 @@ const BASE_TOOL_DEFS = [
   { name: 'arrow', icon: ArrowRight, label: 'Arrow' },
   { name: MARKER_TOOL_NAME, icon: Flag, label: 'Marker' },
 ] as const;
+
+/** PR04 P9: why the retired join-banner toggle is disabled. */
+export const TABLE_V1_SHARE_DISABLED_REASON =
+  'Players now see maps through Table scenes.';
 
 /** Battle maps only: grid-distance, movement and cleanup tools. */
 const BATTLEMAP_ONLY_TOOL_DEFS = [
@@ -92,7 +99,15 @@ function formatSyncTime(iso: string): string {
   return date.toLocaleDateString();
 }
 
-export default function DmLocationToolbar({
+export default function DmLocationToolbar(props: DmLocationToolbarProps) {
+  return props.mode === 'battlemap' ? (
+    <DmBattleMapSetupToolbar {...props} />
+  ) : (
+    <LegacyDmLocationToolbar {...props} />
+  );
+}
+
+function LegacyDmLocationToolbar({
   onPickImage,
   onPickMapImage,
   onClear,
@@ -120,8 +135,6 @@ export default function DmLocationToolbar({
   mode,
   onOpenTvDisplay,
   syncStatus,
-  sharedWithPlayers,
-  onToggleShareWithPlayers,
   arrangeMapsActive,
   onToggleArrangeMaps,
   exportControl,
@@ -130,6 +143,7 @@ export default function DmLocationToolbar({
   fogControls,
   liveSyncConfigured = false,
 }: DmLocationToolbarProps) {
+  const displayLauncher = useDisplayLauncher();
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
   const toolDefs =
@@ -312,7 +326,7 @@ export default function DmLocationToolbar({
         {markerAudienceNotice != null && (
           <span
             role="status"
-            className="text-accent-amber-text bg-accent-amber-bg border-accent-amber-border max-w-xs rounded border px-2 py-1 text-xs"
+            className="text-ember-text bg-ember-bg border-ember-border max-w-xs rounded border px-2 py-1 text-xs"
           >
             {markerAudienceNotice}
           </span>
@@ -335,7 +349,7 @@ export default function DmLocationToolbar({
               <div
                 className={`flex items-center gap-1 text-xs ${
                   hasUnsyncedChanges
-                    ? 'text-accent-amber-text'
+                    ? 'text-ember-text'
                     : 'text-accent-emerald-text'
                 }`}
                 title={
@@ -364,12 +378,20 @@ export default function DmLocationToolbar({
           {mode === 'battlemap' && onOpenTvDisplay && (
             <Button
               variant="outline"
-              onClick={onOpenTvDisplay}
+              onClick={() => displayLauncher.launch(onOpenTvDisplay)}
               className="flex items-center gap-1.5 px-3 py-1 text-xs"
             >
               <ExternalLink size={13} />
               Open TV Display
             </Button>
+          )}
+          {mode === 'battlemap' && displayLauncher.message && (
+            <span
+              role="status"
+              className="text-ember-text max-w-[16rem] text-xs break-words"
+            >
+              {displayLauncher.message}
+            </span>
           )}
           {mode === 'battlemap' && exportControl}
           {mode === 'battlemap' && viewsControl}
@@ -381,7 +403,7 @@ export default function DmLocationToolbar({
                 syncStatus === 'live'
                   ? 'bg-accent-emerald-bg text-accent-emerald-text'
                   : syncStatus === 'connecting'
-                    ? 'bg-accent-amber-bg text-accent-amber-text'
+                    ? 'bg-ember-bg text-ember-text'
                     : syncStatus === 'denied' || syncStatus === 'offline'
                       ? 'bg-accent-red-bg text-accent-red-text'
                       : 'text-muted'
@@ -404,19 +426,24 @@ export default function DmLocationToolbar({
             </span>
           )}
           {mode === 'battlemap' && (
-            <Button
-              variant="outline"
-              selected={sharedWithPlayers}
-              onClick={onToggleShareWithPlayers}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs"
-              title={
-                sharedWithPlayers
-                  ? 'Players see the join banner — click to end'
-                  : 'Show a join banner on player character sheets'
-              }
-            >
-              {sharedWithPlayers ? 'Live for players' : 'Share with players'}
-            </Button>
+            // PR04 P9: Table owns the join banner (Show on a Table scene);
+            // this retired toggle never claims "Live for players".
+            <span className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                disabled
+                aria-describedby="share-with-players-table-v1"
+                className="flex items-center gap-1.5 px-3 py-1 text-xs"
+              >
+                Share with players
+              </Button>
+              <span
+                id="share-with-players-table-v1"
+                className="text-muted max-w-56 text-xs"
+              >
+                {TABLE_V1_SHARE_DISABLED_REASON}
+              </span>
+            </span>
           )}
           {mode !== 'battlemap' && (
             <Button

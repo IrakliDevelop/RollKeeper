@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { guestDeniedResponse } from '@/lib/guestRouteResponses';
-import { campaignShopKey, campaignShopsIndexKey, getRedis } from '@/lib/redis';
+import {
+  campaignShopKey,
+  campaignShopLedgerKey,
+  campaignShopsIndexKey,
+  getRedis,
+} from '@/lib/redis';
 import { sanitizePublicShop } from '@/lib/shopProjection';
+import { SHOP_INDEX_PRUNE_SCRIPT } from '@/lib/shopRedisScripts';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import type { PublicShopIndexEntry } from '@/types/shop';
 
@@ -28,10 +34,10 @@ import type { PublicShopIndexEntry } from '@/types/shop';
  * `PUT` (`sadd` on open, `srem` on close) with its own sliding TTL — never
  * part of `refreshCampaignTTL`, matching every other shop key. A member
  * whose own `campaignShopKey` no longer resolves to a valid `PublicShop`
- * (expired independently, or corrupted) is dropped from the RESPONSE and
- * lazily `srem`'d from the index itself (best-effort, never blocking the
- * response) — the same self-healing-by-omission the singular shop `GET`
- * already applies to a missing ledger.
+ * (expired independently, or corrupted) is dropped from the RESPONSE. It is
+ * removed from the index itself only when its projection AND its ledger are
+ * both gone (`SHOP_INDEX_PRUNE_SCRIPT`, best-effort, never blocking the
+ * response), so a shop whose publish is still in progress stays listed.
  *
  * Auth: same `'shared:read'` guest scope the singular shop `GET` already
  * uses — this is equally non-player-scoped public campaign state (any
@@ -91,8 +97,24 @@ export async function GET(
 
     if (staleNpcIds.length > 0) {
       // Best-effort cleanup — never awaited into the response path, and a
-      // failure here can never turn a good response into an error.
-      void redis.srem(indexKey, ...staleNpcIds).catch(() => {});
+      // failure here can never turn a good response into an error. Repair 10
+      // (shop flake): only ids whose projection AND ledger are both gone
+      // are removed. A publish seeds the ledger and adds the id BEFORE it
+      // writes the projection, so a read in that window saw "no
+      // projection" and used to delist a shop that was just going live.
+      void Promise.resolve(
+        redis.eval(
+          SHOP_INDEX_PRUNE_SCRIPT,
+          [
+            ...staleNpcIds.flatMap(npcId => [
+              campaignShopKey(code, npcId),
+              campaignShopLedgerKey(code, npcId),
+            ]),
+            indexKey,
+          ],
+          staleNpcIds
+        )
+      ).catch(() => {});
     }
 
     return NextResponse.json({ shops });
