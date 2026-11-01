@@ -77,7 +77,7 @@ export function NpcResourcesEditor({
 
   return (
     <Section
-      heading="Class Resources"
+      heading="Class resources"
       level={3}
       trailing={
         <div className="w-44">

@@ -549,15 +549,12 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         }}
       />
 
-      <div className="border-accent-blue-border bg-accent-blue-bg mt-4 rounded-lg border p-3">
-        <p className="text-accent-blue-text text-center text-sm">
-          <strong className="inline-flex items-center gap-1">
-            <AppIcon name="tip" className="h-3.5 w-3.5" /> Quick Reference:
-          </strong>{' '}
+      <div className="mt-4">
+        <p className="text-muted text-center text-sm">
           Manage your full weapon inventory in the{' '}
           <button
             onClick={() => switchToTab('equipment')}
-            className="text-accent-blue-text-muted hover:text-accent-blue-text font-semibold underline transition-colors hover:no-underline"
+            className="text-body hover:text-heading font-semibold underline transition-colors hover:no-underline"
           >
             Equipment tab
           </button>
@@ -607,7 +604,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                   )}
 
                   {/* Charges info */}
-                  <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-3">
+                  <div className="border-divider border-t pt-3">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-body text-sm font-medium">
                         Charges
@@ -656,25 +653,16 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                                   : null
                               );
                             }}
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             disabled={isFull}
                             leftIcon={<Plus size={14} />}
-                            className="border-accent-green-border text-accent-green-text hover:bg-accent-green-bg"
                           >
                             Restore
                           </Button>
 
                           <div className="text-center">
-                            <span
-                              className={`text-2xl font-bold ${
-                                isExhausted
-                                  ? 'text-accent-red-text-muted'
-                                  : chargesRemaining <= 1
-                                    ? 'text-accent-orange-text'
-                                    : 'text-accent-indigo-text'
-                              }`}
-                            >
+                            <span className="text-heading type-num-lg">
                               {chargesRemaining}
                             </span>
                             <span className="text-muted text-lg">
@@ -708,11 +696,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                                   : null
                               );
                             }}
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             disabled={isExhausted}
                             leftIcon={<Minus size={14} />}
-                            className="border-accent-red-border text-accent-red-text-muted hover:bg-accent-red-bg"
                           >
                             Use
                           </Button>
@@ -728,18 +715,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       );
                       const chargesRemaining =
                         maxCharges - (selectedCharge.charge.usedCharges || 0);
-                      const isExhausted = chargesRemaining <= 0;
-
                       return maxCharges > 1 ? (
                         <div className="bg-surface-inset mt-3 h-2 w-full rounded-full">
                           <div
-                            className={`h-2 rounded-full transition-all duration-300 ${
-                              isExhausted
-                                ? 'bg-red-500'
-                                : chargesRemaining <= 1
-                                  ? 'bg-orange-500'
-                                  : 'bg-indigo-500'
-                            }`}
+                            className="bg-divider-strong h-2 rounded-full transition-all duration-300"
                             style={{
                               width: `${(chargesRemaining / maxCharges) * 100}%`,
                             }}

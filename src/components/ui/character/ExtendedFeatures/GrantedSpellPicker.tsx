@@ -94,7 +94,7 @@ export default function GrantedSpellPicker({
     >
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>Feat Grants Spells</DialogTitle>
+          <DialogTitle>Feat grants spells</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <div className="space-y-6">

@@ -996,7 +996,7 @@ function CombatTabContent({
                       <div className="py-4 text-center">
                         <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
                         <p className="text-body mt-2">
-                          Loading conditions and diseases...
+                          Loading conditions and diseases…
                         </p>
                       </div>
                     </div>

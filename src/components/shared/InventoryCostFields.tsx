@@ -64,7 +64,7 @@ export function InventoryCostFields({
         )}
       </div>
       {value && !linked && (
-        <p className="text-accent-red-text-muted text-xs">
+        <p className="text-ember-text text-xs">
           The linked inventory item is missing. Choose another item or remove
           the cost.
         </p>

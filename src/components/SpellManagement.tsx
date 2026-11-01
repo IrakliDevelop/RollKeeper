@@ -1336,15 +1336,9 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
 
               {/* Auto-fill success message */}
               {justAutoFilled && (
-                <div className="animate-in fade-in slide-in-from-top-2 border-accent-green-border-strong bg-accent-green-bg rounded-lg border-2 p-3 duration-300">
-                  <div className="text-accent-green-text flex items-center gap-2">
-                    <Wand2 className="h-5 w-5" />
-                    <p className="text-sm font-medium">
-                      <AppIcon name="confirm" className="inline h-4 w-4" />{' '}
-                      Spell details loaded! Review and adjust as needed.
-                    </p>
-                  </div>
-                </div>
+                <p className="text-muted text-sm">
+                  Spell details filled in. Review before saving.
+                </p>
               )}
 
               <SpellFormFields

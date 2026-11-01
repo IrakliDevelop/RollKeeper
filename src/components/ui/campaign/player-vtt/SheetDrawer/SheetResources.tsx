@@ -34,7 +34,7 @@ export function SheetResources() {
 
   return (
     <div className={`${SECTION_CLASS} @container`}>
-      <h3 className={HEADING_CLASS}>Class Resources</h3>
+      <h3 className={HEADING_CLASS}>Class resources</h3>
       <div className="space-y-2.5">
         {resources.map(resource => (
           <ResourceRow

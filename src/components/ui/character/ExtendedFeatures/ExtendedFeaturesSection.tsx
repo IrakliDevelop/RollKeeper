@@ -127,7 +127,7 @@ export default function ExtendedFeaturesSection({
 
   return (
     <Section
-      heading="Character Features"
+      heading="Character features"
       className={className}
       trailing={
         !readonly && (

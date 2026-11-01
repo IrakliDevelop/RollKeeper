@@ -24,7 +24,7 @@ describe('GrantedSpellPicker', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Browse level 1/i }));
 
-    const dialog = screen.getByRole('dialog', { name: 'Feat Grants Spells' });
+    const dialog = screen.getByRole('dialog', { name: 'Feat grants spells' });
     const filter = await screen.findByRole('textbox', {
       name: 'Filter spells',
     });

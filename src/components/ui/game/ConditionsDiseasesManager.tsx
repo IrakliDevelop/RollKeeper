@@ -253,7 +253,7 @@ export default function ConditionsDiseasesManager() {
   if (isLoading)
     return (
       <p className="type-body text-muted py-8 text-center">
-        Loading conditions and diseases...
+        Loading conditions and diseases…
       </p>
     );
 

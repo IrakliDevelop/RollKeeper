@@ -75,7 +75,7 @@ describe('Defenses and senses screen-reader names', () => {
     seedDefenses();
     render(<DefensesAndSenses editing />);
     await user.click(
-      screen.getByRole('button', { name: 'Add Damage resistances' })
+      screen.getByRole('button', { name: 'Add damage resistances' })
     );
     expect(
       screen.getByRole('textbox', { name: 'Search damage resistances' })

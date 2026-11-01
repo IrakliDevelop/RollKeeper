@@ -194,6 +194,9 @@ export default function ToolProficienciesSection({
     >
       {!editing ? (
         <div className="divide-divider divide-y">
+          {activeTools.length === 0 && (
+            <p className="text-muted text-sm">No tool proficiencies.</p>
+          )}
           {activeTools.map(tool => (
             <div
               key={tool.id}
@@ -211,6 +214,9 @@ export default function ToolProficienciesSection({
               </span>
             </div>
           ))}
+          {activeTools.some(tool => tool.isTemporary) && (
+            <p className="text-muted py-2 text-sm">Swap on a long rest</p>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -219,10 +225,13 @@ export default function ToolProficienciesSection({
               editRow(tool.name, tool, 'Remove proficiency')
             )}
           </div>
+          {activeTools.some(tool => tool.isTemporary) && (
+            <p className="text-muted text-sm">Swap on a long rest</p>
+          )}
           {addingCustom && (
             <div className="flex flex-wrap items-end gap-2">
               <Input
-                label="Custom"
+                label="Tool name"
                 value={customName}
                 onChange={event => setCustomName(event.target.value)}
                 onKeyDown={event => {

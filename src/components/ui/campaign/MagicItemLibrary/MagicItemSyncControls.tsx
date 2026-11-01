@@ -1749,7 +1749,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
             {manifest.blockers.map(blocker => (
               <p
                 role="alert"
-                className="text-accent-red-text"
+                className="text-ember-text"
                 key={`${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
               >
                 {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
@@ -1814,7 +1814,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
           </p>
         )}
         {error && (
-          <p role="alert" className="text-accent-red-text text-sm">
+          <p role="alert" className="text-ember-text text-sm">
             {error}
           </p>
         )}

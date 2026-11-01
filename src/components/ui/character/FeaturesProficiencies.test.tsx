@@ -58,6 +58,29 @@ function renderPanels(editing: boolean) {
 }
 
 describe('Features proficiencies', () => {
+  it('explains empty tools and the temporary long-rest swap', () => {
+    const { rerender } = render(
+      <ToolProficienciesSection
+        toolProficiencies={[]}
+        proficiencyBonus={3}
+        onAddToolProficiency={vi.fn()}
+        onUpdateToolProficiency={vi.fn()}
+        onDeleteToolProficiency={vi.fn()}
+      />
+    );
+    expect(screen.getByText('No tool proficiencies.')).toBeInTheDocument();
+    rerender(
+      <ToolProficienciesSection
+        toolProficiencies={[tool]}
+        proficiencyBonus={3}
+        onAddToolProficiency={vi.fn()}
+        onUpdateToolProficiency={vi.fn()}
+        onDeleteToolProficiency={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Swap on a long rest')).toBeInTheDocument();
+  });
+
   it('shows tools and languages as plain display in play', () => {
     renderPanels(false);
     expect(screen.getByText("Thieves' Tools")).toBeInTheDocument();
