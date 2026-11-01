@@ -1,5 +1,12 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import NotesManager from './NotesManager';
 
 const { confirmDialog } = vi.hoisted(() => ({
@@ -57,6 +64,55 @@ describe('NotesManager', () => {
         title: 'Delete Session one?',
         confirmLabel: 'Delete note',
       })
+    );
+  });
+
+  it('uses the same untitled deletion confirmation as the note dialog', async () => {
+    const onDelete = vi.fn();
+    render(
+      <NotesManager
+        items={[{ ...note, title: '' }]}
+        onAdd={vi.fn()}
+        onUpdate={vi.fn()}
+        onDelete={onDelete}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Edit untitled note' })
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete untitled note' })
+    );
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith('one'));
+    expect(confirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Delete this note?',
+        message: "This can't be undone.",
+        confirmLabel: 'Delete note',
+      })
+    );
+  });
+
+  it('returns focus to Add note after a confirmed row deletion', async () => {
+    function Notes() {
+      const [items, setItems] = useState([note]);
+      return (
+        <NotesManager
+          items={items}
+          onAdd={vi.fn()}
+          onUpdate={vi.fn()}
+          onDelete={id =>
+            setItems(current => current.filter(item => item.id !== id))
+          }
+        />
+      );
+    }
+    render(<Notes />);
+    const remove = screen.getByRole('button', { name: 'Delete Session one' });
+    remove.focus();
+    fireEvent.click(remove);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add note' })).toHaveFocus()
     );
   });
 });

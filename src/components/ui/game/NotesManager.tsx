@@ -6,7 +6,6 @@ import { RichTextContent } from '@/types/character';
 import { RichTextRenderer } from '@/components/ui/utils';
 import { ToastData } from '@/components/ui/feedback/Toast';
 import { Button } from '@/components/ui/forms/button';
-import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { Section } from '@/components/ui/layout/section';
 import { Input } from '@/components/ui/forms/input';
 import {
@@ -17,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/forms/select';
 import NoteModal from './NoteModal';
+import { confirmNoteDeletion } from './confirmNoteDeletion';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
 type SortOption = 'newest' | 'oldest' | 'alphabetical' | 'manual';
@@ -124,14 +124,7 @@ export default function NotesManager({
   };
 
   const handleDelete = async (item: RichTextContent) => {
-    if (
-      await confirmDialog({
-        title: `Delete ${item.title}?`,
-        confirmLabel: 'Delete note',
-        cancelLabel: 'Cancel',
-        tone: 'danger',
-      })
-    ) {
+    if (await confirmNoteDeletion(item.title)) {
       pendingDeleteFocus.current = true;
       onDelete(item.id);
     }
@@ -214,13 +207,14 @@ export default function NotesManager({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <h3 className="text-heading text-sm font-semibold break-words">
-                  <button
+                  <Button
                     type="button"
-                    className="text-left pointer-coarse:min-h-11"
+                    variant="link"
+                    className="text-heading h-auto min-h-0 p-0 text-left whitespace-normal focus-visible:underline pointer-coarse:min-h-11"
                     onClick={() => handleNoteClick(item)}
                   >
-                    {item.title}
-                  </button>
+                    {item.title.trim() || 'Untitled note'}
+                  </Button>
                 </h3>
                 {item.content ? (
                   <div className="mt-1.5 line-clamp-2 text-xs">
@@ -250,7 +244,7 @@ export default function NotesManager({
                   variant="ghost"
                   size="sm"
                   onClick={() => handleNoteClick(item)}
-                  aria-label={`Edit ${item.title}`}
+                  aria-label={`Edit ${item.title.trim() || 'untitled note'}`}
                 >
                   <Edit3 size={14} />
                 </Button>
@@ -259,7 +253,7 @@ export default function NotesManager({
                   variant="danger"
                   size="sm"
                   onClick={() => void handleDelete(item)}
-                  aria-label={`Delete ${item.title}`}
+                  aria-label={`Delete ${item.title.trim() || 'untitled note'}`}
                 >
                   <Trash2 size={14} />
                 </Button>
