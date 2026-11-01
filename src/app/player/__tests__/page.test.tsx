@@ -35,11 +35,23 @@ afterEach(() => {
 });
 
 describe('PlayerDashboardPage', () => {
+  it('uses the shared shell and a single create action', async () => {
+    render(<PlayerDashboardPage />);
+    expect(
+      await screen.findByRole('heading', { name: 'Characters' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Create character' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Import character' })
+    ).toBeInTheDocument();
+  });
   it('renders without a Next app router when account sign-in is disabled', async () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_AUTH_ENABLED;
     delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
     const { container } = render(<PlayerDashboardPage />);
-    await screen.findByRole('heading', { name: /player dashboard/i });
+    await screen.findByRole('heading', { name: 'Characters' });
     expect(
       screen.queryByRole('button', { name: 'Sign in' })
     ).not.toBeInTheDocument();
@@ -55,10 +67,10 @@ describe('PlayerDashboardPage', () => {
       screen.getByRole('button', { name: /join campaign/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /^import$/i })
+      screen.getByRole('button', { name: 'Import character' })
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole('link', { name: /new character/i }).length
+      screen.getAllByRole('link', { name: 'Create character' }).length
     ).toBeGreaterThan(0);
   });
 
@@ -78,9 +90,9 @@ describe('PlayerDashboardPage', () => {
       activeCharacterId: null,
     });
     render(<PlayerDashboardPage />);
-    await screen.findByRole('heading', { name: /player dashboard/i });
+    await screen.findByRole('heading', { name: 'Characters' });
     expect(
-      screen.getByRole('heading', { name: /active characters/i })
+      screen.getByRole('heading', { name: 'Active characters (1)' })
     ).toBeInTheDocument();
   });
 
@@ -91,7 +103,7 @@ describe('PlayerDashboardPage', () => {
       screen.queryByRole('heading', { name: /full browser recovery/i })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /export all/i })
+      screen.queryByRole('button', { name: 'Export all' })
     ).not.toBeInTheDocument();
     expect(
       await screen.findByRole('heading', {
@@ -102,10 +114,10 @@ describe('PlayerDashboardPage', () => {
       screen.getByRole('button', { name: /join campaign/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /^import$/i })
+      screen.getByRole('button', { name: 'Import character' })
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole('link', { name: /new character/i }).length
+      screen.getAllByRole('link', { name: 'Create character' }).length
     ).toBeGreaterThan(0);
     expectPlayerBackupVocabulary(container);
   });
@@ -119,7 +131,7 @@ describe('PlayerDashboardPage', () => {
       delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
       renderConfirmDialogHost();
       render(<PlayerDashboardPage />);
-      await screen.findByRole('heading', { name: /player dashboard/i });
+      await screen.findByRole('heading', { name: 'Characters' });
     };
 
     const byId = (id: string) =>
@@ -130,7 +142,7 @@ describe('PlayerDashboardPage', () => {
       await renderPage();
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Archive Character' })
+        screen.getByRole('button', { name: 'Archive Thalia Vane' })
       );
       expect(await findConfirmDialog()).toHaveAccessibleName(
         'Archive Thalia Vane?'
@@ -139,7 +151,7 @@ describe('PlayerDashboardPage', () => {
       expect(byId(id)?.isArchived).toBeFalsy();
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Archive Character' })
+        screen.getByRole('button', { name: 'Archive Thalia Vane' })
       );
       await clickConfirmDialogButton('Archive character');
       expect(byId(id)?.isArchived).toBe(true);
@@ -151,7 +163,7 @@ describe('PlayerDashboardPage', () => {
       await renderPage();
 
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Delete Permanently' })
+        await screen.findByRole('button', { name: 'Delete Thalia Vane' })
       );
       const dialog = await findConfirmDialog();
       expect(dialog).toHaveAttribute('role', 'alertdialog');
@@ -166,7 +178,7 @@ describe('PlayerDashboardPage', () => {
       await renderPage();
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Duplicate Character' })
+        screen.getByRole('button', { name: 'Duplicate Thalia Vane' })
       );
       const dialog = await findConfirmDialog();
       const field = screen.getByLabelText('Name');

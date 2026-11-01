@@ -4,28 +4,20 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus,
-  User,
   Archive,
   Edit3,
   Trash2,
   Copy,
-  ExternalLink,
-  ArrowLeft,
   Upload,
   Download,
-  Settings,
-  Skull,
-  ChevronDown,
-  ChevronUp,
-  TrendingUp,
   Link2,
-  Swords,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
-import { Badge } from '@/components/ui/layout';
+import { Badge, Card, Section } from '@/components/ui/layout';
+import { AppHeader } from '@/components/ui/layout/AppHeader';
+import { Switch } from '@/components/ui/forms/switch';
 import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import {
@@ -42,7 +34,6 @@ import { PlayerBackupDashboardSurface } from '@/components/ui/character/PlayerBa
 import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
 import { isPlayerBackupWizardVisible } from '@/lib/playerBackup/playerBackupFlags';
 import { recordAutomaticCharacterDelete } from '@/lib/supabase/automaticCharacterSyncRuntime';
-import { AppIcon } from '@/components/ui/icons';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 import {
   exportAllCharactersToFile,
@@ -68,6 +59,12 @@ export default function PlayerDashboardPage() {
   } = usePlayerStore();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [focusSection, setFocusSection] = useState<
+    'active' | 'archived' | null
+  >(null);
+  const pageHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const activeHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const archivedHeadingRef = React.useRef<HTMLHeadingElement>(null);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const { toasts, addToast, dismissToast } = useToast();
@@ -76,6 +73,15 @@ export default function PlayerDashboardPage() {
   const archivedCharacters = getArchivedCharacters();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const wizardOwnsBackup = isPlayerBackupWizardVisible();
+
+  useEffect(() => {
+    if (!focusSection) return;
+    const target = (
+      focusSection === 'active' ? activeHeadingRef : archivedHeadingRef
+    ).current;
+    (target ?? pageHeadingRef.current)?.focus();
+    setFocusSection(null);
+  }, [focusSection, characters]);
 
   const handleExportAll = useCallback(() => {
     if (characters.length === 0) return;
@@ -131,7 +137,10 @@ export default function PlayerDashboardPage() {
       message: 'You can restore it from your archived characters.',
       confirmLabel: 'Archive character',
     });
-    if (confirmed) archiveCharacter(characterId);
+    if (confirmed) {
+      archiveCharacter(characterId);
+      setFocusSection('archived');
+    }
   };
 
   const handleDeleteCharacter = async (characterId: string) => {
@@ -147,6 +156,7 @@ export default function PlayerDashboardPage() {
       .getState()
       .characters.find(character => character.id === characterId);
     deleteCharacter(characterId);
+    setFocusSection('archived');
     if (beforeImage) {
       void awaitCharacterPersistenceResult().then(result => {
         if (result.saved) return recordAutomaticCharacterDelete(beforeImage);
@@ -257,554 +267,280 @@ export default function PlayerDashboardPage() {
     });
   };
 
-  const getClassBadgeVariant = (
-    className: string
-  ):
-    | 'danger'
-    | 'secondary'
-    | 'neutral'
-    | 'warning'
-    | 'success'
-    | 'primary'
-    | 'info' => {
-    const variants: Record<
-      string,
-      | 'danger'
-      | 'secondary'
-      | 'neutral'
-      | 'warning'
-      | 'success'
-      | 'primary'
-      | 'info'
-    > = {
-      Fighter: 'danger',
-      Wizard: 'secondary',
-      Rogue: 'neutral',
-      Cleric: 'warning',
-      Ranger: 'success',
-      Paladin: 'primary',
-      Barbarian: 'danger',
-      Bard: 'info',
-      Druid: 'success',
-      Monk: 'warning',
-      Sorcerer: 'secondary',
-      Warlock: 'primary',
-    };
-    return variants[className] || 'neutral';
-  };
-
-  const CharacterCard = ({
-    character,
-    isArchived = false,
-  }: {
-    character: PlayerCharacter;
-    isArchived?: boolean;
-  }) => (
-    <div
-      className={`bg-surface-raised rounded-lg border-2 shadow-md transition-all hover:shadow-xl ${
-        isArchived
-          ? 'border-divider hover:bg-surface-hover opacity-75'
-          : 'border-accent-blue-border hover:bg-surface-secondary'
-      }`}
-    >
-      <div className="p-4 sm:p-5 lg:p-6">
-        {/* Top row: Avatar + Name/Class + Actions */}
-        <div className="mb-3 flex items-start gap-3">
-          <div className="flex-shrink-0">
-            <AvatarUpload
-              avatar={character.avatar}
-              characterId={character.id}
-              characterName={character.name}
-              onAvatarChange={() => {}}
-              size="sm"
-              editable={false}
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-1">
-              <h3 className="text-heading min-w-0 flex-1 truncate text-lg leading-tight font-semibold">
-                {character.name}
-              </h3>
-              {!isArchived && (
-                <div className="flex flex-shrink-0">
-                  <Button
-                    onClick={() => void handleDuplicateCharacter(character)}
-                    variant="ghost"
-                    size="sm"
-                    title="Duplicate Character"
-                  >
-                    <Copy size={14} />
-                  </Button>
-                  <Button
-                    onClick={() => void handleArchiveCharacter(character.id)}
-                    variant="ghost"
-                    size="sm"
-                    title="Archive Character"
-                  >
-                    <Archive size={14} />
-                  </Button>
-                </div>
-              )}
-            </div>
-            <p className="text-body mt-0.5 truncate text-sm">
-              {character.race}
+  const renderCharacter = (character: PlayerCharacter, isArchived = false) => (
+    <Card key={character.id} padding="none" className="min-w-0 p-4 sm:p-5">
+      <div className="flex min-w-0 items-start gap-3">
+        <AvatarUpload
+          avatar={character.avatar}
+          characterId={character.id}
+          characterName={character.name || 'Character'}
+          onAvatarChange={() => {}}
+          size="sm"
+          editable={false}
+        />
+        <div className="min-w-0 flex-1">
+          <h3 className="type-subheading text-heading break-words">
+            {character.name || 'Unnamed character'}
+          </h3>
+          <p className="type-small text-body mt-1">
+            {[
+              character.race,
+              character.class,
+              character.level && `Level ${character.level}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+          {character.campaignCode && (
+            <p className="type-small text-muted mt-1 break-words">
+              {character.campaignName || character.campaignCode}
             </p>
-          </div>
-        </div>
-
-        {/* Class badge + Level */}
-        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge variant={getClassBadgeVariant(character.class)}>
-            {character.class}
-          </Badge>
-          <span className="text-faint">•</span>
-          <span className="text-body text-sm">Level {character.level}</span>
-        </div>
-
-        {/* Campaign + Tags */}
-        {(character.campaignCode || (character.tags ?? []).length > 0) && (
-          <div className="mb-3 flex flex-wrap gap-1">
-            {character.campaignCode && (
-              <Badge variant="info" size="sm">
-                <Link2 size={10} className="mr-1" />
-                {character.campaignName || character.campaignCode}
-              </Badge>
-            )}
-            {(character.tags ?? []).map(tag => (
-              <Badge key={tag} variant="neutral" size="sm">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        {/* Dates */}
-        <div className="text-muted mb-3 flex justify-between text-xs">
-          <span>
-            Created: {new Date(character.createdAt).toLocaleDateString()}
-          </span>
-          <span>
-            Last Played: {new Date(character.lastPlayed).toLocaleDateString()}
-          </span>
-        </div>
-
-        {/* Actions */}
-        <div className="flex space-x-2">
-          {!isArchived ? (
-            <>
-              <Link
-                href={`/player/characters/${character.id}`}
-                onClick={() => handlePlayCharacter(character)}
-                className="flex-1"
-              >
-                <Button variant="secondary" fullWidth>
-                  Play Character
-                </Button>
-              </Link>
-              <Link href={`/player/characters/${character.id}/edit`}>
-                <Button variant="ghost" size="md" title="Edit Character">
-                  <Edit3 size={16} />
-                </Button>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Button
-                onClick={() => restoreCharacter(character.id)}
-                variant="success"
-                fullWidth
-              >
-                Restore
-              </Button>
-              <Button
-                onClick={() => void handleDeleteCharacter(character.id)}
-                variant="danger"
-                size="md"
-                title="Delete Permanently"
-              >
-                <Trash2 size={16} />
-              </Button>
-            </>
+          )}
+          {(character.tags ?? []).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {(character.tags ?? []).map(tag => (
+                <Badge key={tag} variant="neutral" size="sm">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
           )}
         </div>
       </div>
-    </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {!isArchived ? (
+          <>
+            <Button asChild variant="secondary" size="sm">
+              <Link
+                href={`/player/characters/${character.id}`}
+                onClick={() => handlePlayCharacter(character)}
+              >
+                Open character
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link
+                href={`/player/characters/${character.id}/edit`}
+                aria-label={`Edit ${character.name || 'character'}`}
+              >
+                <Edit3 size={16} aria-hidden />
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Duplicate ${character.name || 'character'}`}
+              onClick={() => void handleDuplicateCharacter(character)}
+            >
+              <Copy size={16} aria-hidden />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Archive ${character.name || 'character'}`}
+              onClick={() => void handleArchiveCharacter(character.id)}
+            >
+              <Archive size={16} aria-hidden />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                restoreCharacter(character.id);
+                setFocusSection('archived');
+              }}
+            >
+              Restore character
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              aria-label={`Delete ${character.name || 'character'}`}
+              onClick={() => void handleDeleteCharacter(character.id)}
+            >
+              <Trash2 size={16} aria-hidden />
+            </Button>
+          </>
+        )}
+      </div>
+    </Card>
   );
 
   if (!hasMounted) return null;
 
   return (
     <div className="bg-surface min-h-screen">
-      {/* Header */}
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Back to Home
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <User className="mr-3 h-6 w-6 text-blue-600 dark:text-blue-400" />
-                <h1 className="text-heading text-xl font-bold">
-                  Player Dashboard
-                </h1>
-              </div>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Dashboard Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-heading mb-2 text-3xl font-bold">
-              Your Characters
-            </h1>
-            <p className="text-body">
-              Manage your D&D characters and jump into your adventures
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <AppHeader
+        title={
+          <h1
+            ref={pageHeadingRef}
+            tabIndex={-1}
+            className="type-heading text-heading"
+          >
+            Characters
+          </h1>
+        }
+      />
+      <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            asChild
+            variant="primary"
+            leftIcon={<Plus size={18} aria-hidden />}
+          >
+            <Link href="/player/characters/new">Create character</Link>
+          </Button>
+          <Button
+            onClick={() => setJoinDialogOpen(true)}
+            leftIcon={<Link2 size={18} aria-hidden />}
+          >
+            Join campaign
+          </Button>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            leftIcon={<Upload size={18} aria-hidden />}
+          >
+            Import character
+          </Button>
+          {characters.length > 0 && !wizardOwnsBackup && (
             <Button
-              variant="outline"
-              leftIcon={<Link2 size={18} />}
-              onClick={() => setJoinDialogOpen(true)}
+              onClick={handleExportAll}
+              leftIcon={<Download size={18} aria-hidden />}
             >
-              Join Campaign
+              Export all
             </Button>
-            <Button
-              variant="success"
-              leftIcon={<Upload size={18} />}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Import
-            </Button>
-            {characters.length > 0 && !wizardOwnsBackup && (
-              <Button
-                variant="outline"
-                leftIcon={<Download size={18} />}
-                onClick={handleExportAll}
-              >
-                Export All
-              </Button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleImportCharacter}
-              className="hidden"
-            />
-            <Link href="/player/characters/new">
-              <Button variant="secondary" leftIcon={<Plus size={18} />}>
-                New Character
-              </Button>
-            </Link>
-          </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            aria-label="Character import file"
+            onChange={handleImportCharacter}
+            className="sr-only"
+          />
         </div>
 
         {wizardOwnsBackup ? <PlayerBackupDashboardSurface /> : null}
-
-        {/* Local-storage safety reminder */}
         {!wizardOwnsBackup && characters.length > 0 && (
           <DataSafetyBanner onExport={handleExportAll} />
         )}
 
-        {!wizardOwnsBackup ? (
-          <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
-            <h2 className="text-heading text-sm font-semibold">
-              Full browser recovery
-            </h2>
-            <p className="text-muted mb-3 text-sm">
-              Back up all RollKeeper browser data or stage a recovery file for
-              review without replacing active values.
-            </p>
-            <DeviceRecoveryControls />
-            <CharacterStorageMigrationControls />
-          </section>
-        ) : null}
-
-        {!wizardOwnsBackup ? (
-          <CharacterCloudBackupControls
-            characters={characters}
-            onAddCharacter={character =>
-              addCloudRecoveredCharacter(character as PlayerCharacter)
-            }
-          />
-        ) : null}
-
-        {!wizardOwnsBackup ? (
-          <CharacterAutomaticSyncControls characters={characters} />
-        ) : null}
-
-        {/* Stats Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border-2 p-6 shadow-md">
-            <div className="flex items-center">
-              <User className="text-accent-blue-text-muted mr-3 h-8 w-8" />
-              <div>
-                <h3
-                  className="text-heading text-2xl font-bold"
-                  suppressHydrationWarning
-                >
-                  {activeCharacters.length}
-                </h3>
-                <p className="text-body">Active Characters</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-divider bg-surface-secondary rounded-lg border-2 p-6 shadow-md">
-            <div className="flex items-center">
-              <Archive className="text-muted mr-3 h-8 w-8" />
-              <div>
-                <h3
-                  className="text-heading text-2xl font-bold"
-                  suppressHydrationWarning
-                >
-                  {archivedCharacters.length}
-                </h3>
-                <p className="text-body">Archived</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-6 shadow-md">
-            <div className="flex items-center">
-              <ExternalLink className="text-accent-purple-text-muted mr-3 h-8 w-8" />
-              <div>
-                <h3
-                  className="text-heading text-2xl font-bold"
-                  suppressHydrationWarning
-                >
-                  {characters.length}
-                </h3>
-                <p className="text-body">Total Characters</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Characters Section */}
         {activeCharacters.length === 0 && archivedCharacters.length === 0 ? (
-          <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border-2 p-12 text-center shadow-md">
-            <User size={64} className="text-faint mx-auto mb-6" />
-            <h3 className="text-heading mb-2 text-xl font-semibold">
-              No Characters Yet
-            </h3>
-            <p className="text-body mb-6">
-              Create your first character, import an existing one, or migrate
-              from your old character sheet!
+          <div className="py-10 text-center">
+            <h2 className="type-subheading text-heading">
+              Create your first character
+            </h2>
+            <p className="type-body text-muted mt-2">
+              Create a character or import a RollKeeper character file.
             </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/player/characters/new">
-                <Button variant="secondary" leftIcon={<Plus size={20} />}>
-                  Create New Character
-                </Button>
-              </Link>
-
-              <Button
-                variant="success"
-                leftIcon={<Upload size={20} />}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Import Character
-              </Button>
-
-              <Button
-                onClick={handleTryMigration}
-                variant="warning"
-                leftIcon={<Download size={20} />}
-              >
-                Migrate Old Data
-              </Button>
-            </div>
           </div>
         ) : (
-          <>
-            {/* Active Characters */}
+          <div className="space-y-8">
+            <p className="type-small text-muted">
+              {activeCharacters.length} active · {archivedCharacters.length}{' '}
+              archived
+            </p>
             {activeCharacters.length > 0 && (
-              <div className="mb-12" suppressHydrationWarning>
-                <h2
-                  className="text-heading mb-6 flex items-center gap-2 text-2xl font-semibold"
-                  suppressHydrationWarning
-                >
-                  <User size={24} />
-                  Active Characters ({activeCharacters.length})
+              <Section
+                heading={`Active characters (${activeCharacters.length})`}
+                level={2}
+              >
+                <h2 ref={activeHeadingRef} tabIndex={-1} className="sr-only">
+                  Active characters
                 </h2>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                  {activeCharacters.map(character => (
-                    <CharacterCard key={character.id} character={character} />
-                  ))}
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {activeCharacters.map(character =>
+                    renderCharacter(character)
+                  )}
                 </div>
-              </div>
+              </Section>
             )}
-
-            {/* Archived Characters */}
             {archivedCharacters.length > 0 && (
-              <div suppressHydrationWarning>
-                <h2
-                  className="text-body mb-6 flex items-center gap-2 text-2xl font-semibold"
-                  suppressHydrationWarning
-                >
-                  <Archive size={24} />
-                  Archived Characters ({archivedCharacters.length})
+              <Section
+                heading={`Archived characters (${archivedCharacters.length})`}
+                level={2}
+              >
+                <h2 ref={archivedHeadingRef} tabIndex={-1} className="sr-only">
+                  Archived characters
                 </h2>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                  {archivedCharacters.map(character => (
-                    <CharacterCard
-                      key={character.id}
-                      character={character}
-                      isArchived
-                    />
-                  ))}
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {archivedCharacters.map(character =>
+                    renderCharacter(character, true)
+                  )}
                 </div>
-              </div>
+              </Section>
             )}
+          </div>
+        )}
+
+        {!wizardOwnsBackup && (
+          <>
+            <Section heading="Full browser recovery" level={2}>
+              <p className="type-body text-muted mb-3">
+                Back up all RollKeeper browser data or stage a recovery file for
+                review without replacing active values.
+              </p>
+              <DeviceRecoveryControls />
+              <CharacterStorageMigrationControls />
+            </Section>
+            <CharacterCloudBackupControls
+              characters={characters}
+              onAddCharacter={character =>
+                addCloudRecoveredCharacter(character as PlayerCharacter)
+              }
+            />
+            <CharacterAutomaticSyncControls characters={characters} />
           </>
         )}
 
+        <Section heading="Settings" level={2}>
+          <Button
+            variant="ghost"
+            aria-expanded={showSettings}
+            onClick={() => setShowSettings(!showSettings)}
+          >
+            {showSettings
+              ? 'Hide animation settings'
+              : 'Show animation settings'}
+          </Button>
+          {showSettings && (
+            <div className="mt-4 space-y-4">
+              <Switch
+                label="Death animation"
+                description="Show the death screen when your character dies."
+                checked={settings?.enableDeathAnimation ?? false}
+                onCheckedChange={checked =>
+                  updateSettings({ enableDeathAnimation: checked })
+                }
+              />
+              <Switch
+                label="Level up animation"
+                description="Show the level up animation."
+                checked={settings?.enableLevelUpAnimation ?? false}
+                onCheckedChange={checked =>
+                  updateSettings({ enableLevelUpAnimation: checked })
+                }
+              />
+              <Switch
+                label="Combat start banner"
+                description="Show a banner when the DM starts combat."
+                checked={settings?.enableCombatStartBanner ?? false}
+                onCheckedChange={checked =>
+                  updateSettings({ enableCombatStartBanner: checked })
+                }
+              />
+            </div>
+          )}
+        </Section>
         <JoinCampaignDialog
           open={joinDialogOpen}
           onOpenChange={setJoinDialogOpen}
           characters={characters}
           onJoin={handleJoinCampaign}
         />
-
-        {/* Settings Section */}
-        <div className="mb-8">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="border-divider bg-surface-secondary hover:border-divider-strong flex w-full items-center justify-between rounded-lg border-2 px-6 py-4 text-left shadow-sm transition-all hover:shadow-md"
-          >
-            <div className="flex items-center gap-3">
-              <Settings className="text-body h-5 w-5" />
-              <span className="text-body text-lg font-semibold">
-                Settings & Features
-              </span>
-              <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-2 py-0.5 text-xs font-medium">
-                Easter Eggs
-              </span>
-            </div>
-            {showSettings ? (
-              <ChevronUp className="text-muted h-5 w-5" />
-            ) : (
-              <ChevronDown className="text-muted h-5 w-5" />
-            )}
-          </button>
-
-          {showSettings && (
-            <div className="border-divider bg-surface-raised mt-2 rounded-lg border-2 p-6 shadow-sm">
-              <div className="space-y-4">
-                {/* Death Animation Toggle */}
-                <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-accent-red-bg flex h-10 w-10 items-center justify-center rounded-lg">
-                      <Skull className="text-accent-red-text-muted h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-heading font-medium">
-                        &quot;YOU DIED&quot; Animation
-                      </h4>
-                      <p className="text-muted text-sm">
-                        Dark Souls-style death screen when your character dies
-                      </p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input
-                      type="checkbox"
-                      checked={settings?.enableDeathAnimation}
-                      onChange={e =>
-                        updateSettings({
-                          enableDeathAnimation: e.target.checked,
-                        })
-                      }
-                      className="peer sr-only"
-                    />
-                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-red-600 peer-focus:ring-2 peer-focus:ring-red-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                  </label>
-                </div>
-
-                {/* Level Up Animation Toggle */}
-                <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-accent-amber-bg flex h-10 w-10 items-center justify-center rounded-lg">
-                      <TrendingUp className="text-accent-amber-text-muted h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-heading font-medium">
-                        Level Up Animation
-                      </h4>
-                      <p className="text-muted text-sm">
-                        Skyrim-style celebration when your character levels up
-                      </p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input
-                      type="checkbox"
-                      checked={settings?.enableLevelUpAnimation}
-                      onChange={e =>
-                        updateSettings({
-                          enableLevelUpAnimation: e.target.checked,
-                        })
-                      }
-                      className="peer sr-only"
-                    />
-                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                  </label>
-                </div>
-
-                {/* Combat Start Banner Toggle */}
-                <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-accent-red-bg flex h-10 w-10 items-center justify-center rounded-lg">
-                      <Swords className="text-accent-red-text-muted h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-heading font-medium">
-                        Combat Start Banner
-                      </h4>
-                      <p className="text-muted text-sm">
-                        A &quot;Combat Begins&quot; flourish when the DM starts
-                        a fight
-                      </p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input
-                      type="checkbox"
-                      checked={settings?.enableCombatStartBanner}
-                      onChange={e =>
-                        updateSettings({
-                          enableCombatStartBanner: e.target.checked,
-                        })
-                      }
-                      className="peer sr-only"
-                    />
-                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                  </label>
-                </div>
-
-                <p className="text-faint text-center text-sm">
-                  More features coming soon!{' '}
-                  <AppIcon name="dice" className="inline h-4 w-4" />{' '}
-                  <span className="text-amber-500">maybe</span>
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
       </main>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
