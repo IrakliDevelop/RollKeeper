@@ -27,6 +27,7 @@ const STEPS: Record<
   (typeof TYPE_SCALE_STEPS)[number],
   { className: string; sample: string }
 > = {
+  display: { className: 'type-display', sample: 'Your character sheet' },
   title: { className: 'type-title', sample: 'Thorin Oakenshield' },
   heading: { className: 'type-heading', sample: 'Combat' },
   subheading: { className: 'type-subheading', sample: 'Hit dice' },
@@ -77,6 +78,8 @@ function TypeScale() {
 
 async function checkScale(canvasElement: HTMLElement) {
   const canvas = within(canvasElement);
+  // type-display is responsive (30px below 640px, 36px above), so its size
+  // depends on the story viewport and is not pinned here.
   const sizes: Record<string, string> = {
     title: '28px',
     heading: '22px',

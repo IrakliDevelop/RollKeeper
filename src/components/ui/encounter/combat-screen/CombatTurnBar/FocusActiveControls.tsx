@@ -67,22 +67,26 @@ export function FocusActiveControls({
       </Button>
 
       <div className="flex w-full flex-wrap items-center justify-end gap-2 pt-1">
-        <Button
-          variant="ghost"
-          selected={hidePlayerHp}
-          size="sm"
-          onClick={onToggleHidePlayerHp}
-          aria-label={hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
-          leftIcon={hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />}
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onEndCombat}
-          leftIcon={<Square size={14} />}
-        >
-          End combat
-        </Button>
+        {onToggleHidePlayerHp && (
+          <Button
+            variant="ghost"
+            selected={hidePlayerHp}
+            size="sm"
+            onClick={onToggleHidePlayerHp}
+            aria-label={hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
+            leftIcon={hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />}
+          />
+        )}
+        {onEndCombat && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onEndCombat}
+            leftIcon={<Square size={14} />}
+          >
+            End combat
+          </Button>
+        )}
       </div>
     </>
   );
