@@ -6,6 +6,15 @@ const nextConfig: NextConfig = {
     // Development keeps its separate default cache.
     turbopackFileSystemCacheForBuild: false,
   },
+  // `/` is a static page built from the React launcher by
+  // scripts/build-launcher.mjs, so it ships no React or Next.js runtime.
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: '/', destination: '/launcher.html' }],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   images: {
     remotePatterns: [
       {

@@ -27,7 +27,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 const ROUTES = [
-  { path: '/', page: () => import('@/app/page') },
   {
     path: '/about',
     // `@/app/about/page` is an async server component that reads the roadmap
@@ -179,15 +178,11 @@ describe.each(FLAG_SETS)('blocked browser storage (%s)', (_label, env) => {
     expect(errors).not.toHaveBeenCalledWith(
       expect.objectContaining({ name: 'SecurityError' })
     );
-    if (route.path === '/') {
-      expect(screen.queryByText(/Site storage is blocked/)).toBeNull();
-    } else {
-      expect(
-        screen.getByText(
-          'Site storage is blocked, so nothing here will be saved.'
-        )
-      ).toBeInTheDocument();
-    }
+    expect(
+      screen.getByText(
+        'Site storage is blocked, so nothing here will be saved.'
+      )
+    ).toBeInTheDocument();
   });
 });
 

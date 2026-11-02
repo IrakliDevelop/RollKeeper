@@ -20,16 +20,35 @@ export function KeyholeMark({ className }: { className?: string }) {
   );
 }
 
+interface ContinueLinkViewProps {
+  href: string;
+  name: string;
+  className?: string;
+}
+
+/** The "Open {name}'s sheet" button, without deciding whether to show it. */
+export function ContinueLinkView({
+  href,
+  name,
+  className,
+}: ContinueLinkViewProps) {
+  return (
+    <Button variant="primary" asChild className={className}>
+      <Link href={href}>Open {name}&apos;s sheet</Link>
+    </Button>
+  );
+}
+
 /** Opens the sheet last played on this device, for someone returning. */
 export function ContinueLink({ className }: { className?: string }) {
   const last = useLastCharacter();
   if (!last) return null;
   return (
-    <Button variant="primary" asChild className={className}>
-      <Link href={`/player/characters/${last.id}`}>
-        Open {last.name}&apos;s sheet
-      </Link>
-    </Button>
+    <ContinueLinkView
+      href={`/player/characters/${last.id}`}
+      name={last.name}
+      className={className}
+    />
   );
 }
 

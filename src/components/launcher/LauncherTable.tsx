@@ -69,7 +69,17 @@ function TableGrid() {
 }
 
 /** Launcher A: the felt table with two doors and a glimpse of each. */
-export function LauncherTable() {
+interface LauncherTableProps {
+  /**
+   * What sits under the line. Defaults to the live "Open {name}'s sheet"
+   * link; the static build passes a placeholder its script fills in.
+   */
+  continueSlot?: ReactNode;
+}
+
+export function LauncherTable({
+  continueSlot = <ContinueLink />,
+}: LauncherTableProps) {
   return (
     <div className="bg-surface relative isolate flex min-h-dvh flex-col">
       <TableGrid />
@@ -78,7 +88,7 @@ export function LauncherTable() {
           <KeyholeMark className="size-14" />
           <h1 className="type-display text-heading">RollKeeper</h1>
           <p className="type-body text-body max-w-[32em]">{LAUNCHER_LINE}</p>
-          <ContinueLink />
+          {continueSlot}
         </header>
         <div className="grid gap-4 md:grid-cols-2">
           <Door
