@@ -3,6 +3,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
 
 /** The Felt and Brass type-scale steps, rendered as `type-<step>` utilities. */
 export const TYPE_SCALE_STEPS = [
+  'display',
   'title',
   'heading',
   'subheading',

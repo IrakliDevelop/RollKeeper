@@ -1,0 +1,73 @@
+import type { Encounter } from '@/types/encounter';
+
+/**
+ * The landing page's sample fight, in initiative order. Invented names and
+ * stat lines; it lives in React state only and is never saved.
+ */
+export const SAMPLE_ENCOUNTER: Encounter = {
+  id: 'landing-encounter',
+  name: 'Ambush at the ford',
+  entities: [
+    {
+      id: 'landing-wren',
+      type: 'player',
+      name: 'Wren Hollis',
+      initiative: 18,
+      initiativeModifier: 0,
+      currentHp: 26,
+      maxHp: 38,
+      tempHp: 0,
+      armorClass: 18,
+      conditions: [],
+      concentrationSpell: 'Bless',
+      playerDisposition: 'ally',
+    },
+    {
+      id: 'landing-bugbear',
+      type: 'monster',
+      name: 'Bugbear',
+      initiative: 15,
+      initiativeModifier: 2,
+      currentHp: 19,
+      maxHp: 27,
+      tempHp: 0,
+      armorClass: 16,
+      conditions: [{ id: 'landing-frightened', name: 'Frightened' }],
+      chessPiece: 'rook',
+      color: '#b45309',
+    },
+    {
+      id: 'landing-tamsin',
+      type: 'player',
+      name: 'Tamsin Reed',
+      initiative: 12,
+      initiativeModifier: 3,
+      currentHp: 31,
+      maxHp: 31,
+      tempHp: 0,
+      armorClass: 15,
+      conditions: [],
+      playerDisposition: 'ally',
+    },
+    {
+      id: 'landing-goblin',
+      type: 'monster',
+      name: 'Goblin',
+      initiative: 9,
+      initiativeModifier: 2,
+      currentHp: 7,
+      maxHp: 7,
+      tempHp: 0,
+      armorClass: 15,
+      conditions: [],
+      chessPiece: 'pawn',
+      color: '#b45309',
+    },
+  ],
+  currentTurn: 1,
+  round: 2,
+  isActive: true,
+  sortOrder: 'initiative',
+  createdAt: '2026-11-02T00:00:00.000Z',
+  updatedAt: '2026-11-02T00:00:00.000Z',
+};

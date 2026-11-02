@@ -10,9 +10,11 @@ export interface CombatTurnBarProps {
   encounter: Encounter;
   layout: 'rail' | 'focus';
   hidePlayerHp: boolean;
-  onToggleHidePlayerHp: () => void;
+  /** Omit to leave out the hide-player-HP toggle (the landing page's sample fight). */
+  onToggleHidePlayerHp?: () => void;
   onStartCombat: () => void;
-  onEndCombat: () => void;
+  /** Omit to leave out the End combat button (the landing page's sample fight). */
+  onEndCombat?: () => void;
   onNextTurn: () => void;
   onPrevTurn: () => void;
   onRollAllInitiatives: () => void;
