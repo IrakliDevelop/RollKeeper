@@ -15,20 +15,21 @@ export interface DemoSheetState {
 }
 
 /**
- * The landing page's sample character: a level 5 cleric with rules-correct
- * numbers (8 + 4 × 5 + 5 × Con +2 = 38 HP, 4/3/2 slots, Wisdom and Charisma
- * saves, AC 18 from chain mail and a shield). It lives in React state only
+ * The landing page's sample character, Eric Ravenshaw from the owner's Curse
+ * of Strahd group: a level 5 human grave cleric with rules-correct numbers
+ * (8 + 4 × 5 + 5 × Con +2 = 38 HP, 4/3/2 slots, Wisdom and Charisma saves,
+ * AC 18 from scale mail, a shield and Dex +2). It lives in React state only
  * and is never written to a store or to browser storage.
  */
 export const SAMPLE_CHARACTER: DemoSheetState = {
-  name: 'Wren Hollis',
-  className: 'Cleric',
+  name: 'Eric Ravenshaw',
+  className: 'Human grave cleric',
   level: 5,
   hp: { current: 38, max: 38, temporary: 0 },
   ac: 18,
   abilities: {
     strength: 12,
-    dexterity: 10,
+    dexterity: 14,
     constitution: 14,
     intelligence: 10,
     wisdom: 17,

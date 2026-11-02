@@ -12,7 +12,7 @@ const noop = () => {};
 
 /**
  * The redesigned initiative list with a sample fight: step through turns and
- * damage or heal a creature. Nothing is saved.
+ * select a creature. Nothing is saved.
  */
 export function DemoInitiative() {
   const [encounter, setEncounter] = useState<Encounter>(SAMPLE_ENCOUNTER);

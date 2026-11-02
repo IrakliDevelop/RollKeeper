@@ -103,7 +103,7 @@ export function LandingPage({ roadmap }: LandingPageProps) {
               in what they rolled.
             </p>
             <p className="type-small text-muted">
-              A sample fight. Step through the turns or select a creature.
+              A sample fight. Step through the turns; nothing here is saved.
             </p>
           </LandingSection>
 

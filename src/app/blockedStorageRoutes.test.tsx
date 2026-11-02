@@ -27,10 +27,11 @@ vi.mock('next/navigation', () => ({
 }));
 
 const ROUTES = [
+  { path: '/', page: () => import('@/app/page') },
   {
-    path: '/',
-    // `@/app/page` is an async server component that reads the roadmap file;
-    // render the client page it returns, with fixture roadmap items.
+    path: '/about',
+    // `@/app/about/page` is an async server component that reads the roadmap
+    // file; render the client page it returns, with fixture roadmap items.
     page: async () => {
       const { LandingPage } = await import('@/components/landing/LandingPage');
       return {
