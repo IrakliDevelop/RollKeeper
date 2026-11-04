@@ -34,7 +34,7 @@ export function CampaignHeader({
             asChild
             variant="ghost"
             size="sm"
-            className="shrink-0 px-2"
+            className="shrink-0 px-2 whitespace-nowrap sm:px-4"
             leftIcon={<ArrowLeft size={20} aria-hidden />}
           >
             <Link href={crumb.href}>
