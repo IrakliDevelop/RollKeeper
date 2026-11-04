@@ -126,15 +126,15 @@ export function useCampaignItemSends({
 
         addToast({
           type: 'success',
-          title: 'Item Sent',
-          message: `${item.name} sent to ${target.characterName}`,
+          title: 'Item sent',
+          message: `${item.name} sent to ${target.characterName}.`,
         });
       } catch (err) {
         console.error('Failed to send item:', err);
         addToast({
           type: 'error',
-          title: 'Failed',
-          message: 'Could not send item',
+          title: 'Item not sent',
+          message: `${item.name} wasn't sent to ${target.characterName}. Try again.`,
         });
       } finally {
         setIsNpcSendingItem(false);
@@ -167,15 +167,15 @@ export function useCampaignItemSends({
         if (!response.ok) throw new Error('Failed to give magic item');
         addToast({
           type: 'success',
-          title: 'Magic Item Given',
+          title: 'Magic item sent',
           message: `${item.name} sent to ${target.characterName}. The library copy was kept.`,
         });
       } catch (error) {
         console.error('Failed to give magic item:', error);
         addToast({
           type: 'error',
-          title: 'Magic Item Not Sent',
-          message: `Could not send ${item.name} to ${target.characterName}.`,
+          title: 'Magic item not sent',
+          message: `${item.name} wasn't sent to ${target.characterName}. Try again.`,
         });
       }
     },
