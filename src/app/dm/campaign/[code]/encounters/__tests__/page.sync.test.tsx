@@ -69,4 +69,23 @@ describe('campaign encounters page cloud sync card', () => {
 
     expect(screen.queryByText('Encounter backup')).toBeNull();
   });
+
+  it('shows the campaign crumb and the Encounters title', () => {
+    useDmStore.setState({
+      campaigns: [{ code: 'SYNTH1', name: 'Alpha Campaign', createdAt: NOW }],
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Encounters' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Alpha Campaign' })
+    ).toHaveAttribute('href', '/dm/campaign/SYNTH1');
+    expect(
+      screen.getByRole('link', { name: 'RollKeeper home' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('banner')).toHaveLength(1);
+  });
 });

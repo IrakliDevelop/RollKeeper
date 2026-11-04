@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import {
@@ -12,7 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
-import { Badge } from '@/components/ui/layout/badge';
+import { CopyCodeButton } from '@/components/ui/campaign/CopyCodeButton';
 
 interface CreateCampaignDialogProps {
   open: boolean;
@@ -32,11 +31,10 @@ export function CreateCampaignDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [createdCode, setCreatedCode] = useState('');
-  const [copied, setCopied] = useState(false);
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      setError('Campaign name is required');
+      setError('Enter a campaign name.');
       return;
     }
 
@@ -50,28 +48,17 @@ export function CreateCampaignDialog({
         body: JSON.stringify({ dmId, campaignName: name.trim() }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create campaign');
-      }
+      if (!res.ok) throw new Error('create failed');
 
       const data = await res.json();
       setCreatedCode(data.code);
       setStep('success');
       onCampaignCreated(data.code, name.trim());
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to create campaign'
-      );
+    } catch {
+      setError("The campaign wasn't created. Try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCopyCode = async () => {
-    await navigator.clipboard.writeText(createdCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleClose = () => {
@@ -79,7 +66,6 @@ export function CreateCampaignDialog({
     setName('');
     setError('');
     setCreatedCode('');
-    setCopied(false);
     onOpenChange(false);
   };
 
@@ -89,17 +75,16 @@ export function CreateCampaignDialog({
         {step === 'form' ? (
           <>
             <DialogHeader>
-              <DialogTitle>Create Campaign</DialogTitle>
+              <DialogTitle>Create campaign</DialogTitle>
               <DialogDescription>
-                Give your campaign a name. A unique join code will be generated
-                for your players.
+                Name the campaign. You&apos;ll get a code for your players next.
               </DialogDescription>
             </DialogHeader>
 
             <div className="py-4">
               <Input
-                label="Campaign Name"
-                placeholder="e.g. Curse of Strahd"
+                label="Campaign name"
+                placeholder="The Sunken Bell"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 error={error}
@@ -111,7 +96,7 @@ export function CreateCampaignDialog({
             </div>
 
             <DialogFooter>
-              <Button variant="ghost" onClick={handleClose}>
+              <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
               <Button
@@ -119,47 +104,23 @@ export function CreateCampaignDialog({
                 onClick={handleCreate}
                 disabled={loading}
               >
-                {loading ? 'Creating...' : 'Create Campaign'}
+                {loading ? 'Creating…' : 'Create campaign'}
               </Button>
             </DialogFooter>
           </>
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Campaign Created!</DialogTitle>
+              <DialogTitle>Campaign created</DialogTitle>
               <DialogDescription>
-                Share this code with your players so they can sync their
-                characters.
+                Give this code to your players. They enter it under Join
+                campaign on their Characters page.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="py-6 text-center">
-              <p className="text-muted mb-3 text-sm">Campaign Code</p>
-              <div className="mb-4 flex items-center justify-center gap-3">
-                <Badge
-                  variant="info"
-                  size="lg"
-                  className="px-6 py-3 font-mono text-2xl tracking-widest"
-                >
-                  {createdCode}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyCode}
-                  aria-label="Copy campaign code"
-                >
-                  {copied ? (
-                    <Check size={16} className="text-green-500" />
-                  ) : (
-                    <Copy size={16} />
-                  )}
-                </Button>
-              </div>
-              <p className="text-body text-sm">
-                Players can enter this code from their character sheet or
-                dashboard to join.
-              </p>
+            <div className="flex flex-col items-center gap-2 py-6">
+              <p className="type-small text-muted">Campaign code</p>
+              <CopyCodeButton code={createdCode} className="type-num-lg" />
             </div>
 
             <DialogFooter>

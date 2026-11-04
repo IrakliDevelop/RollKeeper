@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, CalendarDays, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
   Card,
@@ -11,7 +10,7 @@ import {
   CardTitle,
   CardContent,
 } from '@/components/ui/layout/card';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { CalendarView } from '@/components/ui/calendar/CalendarView';
 import { CalendarSyncControls } from '@/components/ui/calendar/CalendarSyncControls';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -62,28 +61,13 @@ export default function CalendarPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Back to Campaign
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center gap-3">
-                <CalendarDays className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                <h1 className="text-heading text-xl font-bold">Calendar</h1>
-              </div>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
+      <CampaignHeader
+        crumb={{
+          href: `/dm/campaign/${code}`,
+          label: campaign?.name ?? 'Campaign',
+        }}
+        title={<h1 className="type-heading text-heading">Calendar</h1>}
+      />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         {confirmingReset && (

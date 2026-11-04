@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { CalendarSettingsPanel } from '@/components/ui/calendar/CalendarSettingsPanel';
 import { useCalendarStore } from '@/store/calendarStore';
 import type { CalendarConfig } from '@/types/calendar';
@@ -39,30 +38,10 @@ export default function CalendarSettingsPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}/calendar`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Back to Calendar
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center gap-3">
-                <Settings className="text-muted h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">
-                  Calendar Settings
-                </h1>
-              </div>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
+      <CampaignHeader
+        crumb={{ href: `/dm/campaign/${code}/calendar`, label: 'Calendar' }}
+        title={<h1 className="type-heading text-heading">Calendar settings</h1>}
+      />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <CalendarSettingsPanel config={calendar.config} onSave={handleSave} />

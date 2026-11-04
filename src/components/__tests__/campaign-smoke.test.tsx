@@ -6,6 +6,7 @@ import {
   waitFor,
   cleanup,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { CampaignPlayerData } from '@/types/campaign';
 import type { DmMessage } from '@/types/sharedState';
@@ -213,18 +214,9 @@ describe('DmMessageNotification', () => {
 });
 
 describe('CreateCampaignDialog', () => {
-  it('renders without crashing when open', () => {
-    render(
-      <CreateCampaignDialog
-        open={true}
-        onOpenChange={vi.fn()}
-        onCampaignCreated={vi.fn()}
-        dmId="dm-1"
-      />
-    );
-  });
+  afterEach(() => vi.restoreAllMocks());
 
-  it('displays dialog title and name input', () => {
+  const renderDialog = () =>
     render(
       <CreateCampaignDialog
         open={true}
@@ -233,22 +225,92 @@ describe('CreateCampaignDialog', () => {
         dmId="dm-1"
       />
     );
-    expect(screen.getAllByText('Create Campaign').length).toBeGreaterThan(0);
+
+  it('renders the form copy', () => {
+    renderDialog();
     expect(
-      screen.getAllByPlaceholderText('e.g. Curse of Strahd').length
-    ).toBeGreaterThan(0);
+      screen.getByRole('heading', { name: 'Create campaign' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Campaign name')).toHaveAttribute(
+      'placeholder',
+      'The Sunken Bell'
+    );
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute(
+      'data-variant',
+      'outline'
+    );
   });
 
-  it('displays campaign name label', () => {
-    render(
-      <CreateCampaignDialog
-        open={true}
-        onOpenChange={vi.fn()}
-        onCampaignCreated={vi.fn()}
-        dmId="dm-1"
-      />
+  it('asks for a name before creating', async () => {
+    renderDialog();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
     );
-    expect(screen.getAllByText('Campaign Name').length).toBeGreaterThan(0);
+    expect(
+      await screen.findByText('Enter a campaign name.')
+    ).toBeInTheDocument();
+  });
+
+  it('never shows server error text', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'dmId and campaignName are required' }),
+    } as Response);
+    renderDialog();
+    await userEvent.type(
+      screen.getByLabelText('Campaign name'),
+      'The Sunken Bell'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
+    );
+    expect(
+      await screen.findByText("The campaign wasn't created. Try again.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/dmId/)).toBeNull();
+  });
+
+  it('shows the same message when the request throws', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new Error('socket hang up')
+    );
+    renderDialog();
+    await userEvent.type(
+      screen.getByLabelText('Campaign name'),
+      'The Sunken Bell'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
+    );
+    expect(
+      await screen.findByText("The campaign wasn't created. Try again.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/socket/)).toBeNull();
+  });
+
+  it('shows the code to copy after creating', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ code: 'ABC123' }),
+    } as Response);
+    renderDialog();
+    await userEvent.type(
+      screen.getByLabelText('Campaign name'),
+      'The Sunken Bell'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Campaign created' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Copy code ABC123' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute(
+      'data-variant',
+      'primary'
+    );
   });
 });
 
