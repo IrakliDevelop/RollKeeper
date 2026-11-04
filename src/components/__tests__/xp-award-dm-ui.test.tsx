@@ -55,9 +55,12 @@ describe('XpAwardControl', () => {
     expect(
       screen.getByRole('progressbar', { name: /xp progress to level 4/i })
     ).toHaveAttribute('aria-valuenow', '16.7');
+    expect(screen.getByText('From the last sync')).toBeTruthy();
 
     await user.type(screen.getByLabelText('XP to add'), '300');
-    await user.click(screen.getByRole('button', { name: /send/i }));
+    const send = screen.getByRole('button', { name: 'Send award' });
+    expect(send).toHaveAttribute('data-variant', 'primary');
+    await user.click(send);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const body = lastPostedAward();
@@ -67,7 +70,36 @@ describe('XpAwardControl', () => {
     expect(body.data.award).toMatchObject({ mode: 'add', amount: 300 });
     expect(body.data.award.id).toBeTruthy();
     expect(screen.getByText('1,500')).toBeTruthy();
-    expect(screen.getByText(/projected · 1 pending/i)).toBeTruthy();
+    expect(screen.getByText('Includes 1 award not yet received')).toBeTruthy();
+    const status = screen.getByText('XP award sent');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toHaveClass('text-verdigris-text');
+  });
+
+  it('heads the control and offers two pressed-state modes', () => {
+    render(
+      <XpAwardControl
+        campaignCode="ABC"
+        dmId="dm-1"
+        playerId="p-1"
+        lastSyncedXp={1200}
+        currentLevel={3}
+      />
+    );
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Award XP' })
+    ).toBeTruthy();
+    const group = screen.getByRole('group', { name: 'Award XP' });
+    const add = within(group).getByRole('button', { name: 'Add XP' });
+    const set = within(group).getByRole('button', { name: 'Set total' });
+    expect(add).toHaveAttribute('aria-pressed', 'true');
+    expect(add).toHaveAttribute('data-selected', 'true');
+    expect(set).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.getByLabelText('XP to add')).toHaveAttribute(
+      'placeholder',
+      '300'
+    );
   });
 
   it('starts from the persisted projection and applies set awards immediately', async () => {
@@ -85,13 +117,29 @@ describe('XpAwardControl', () => {
     );
 
     expect(screen.getByText('1,500')).toBeTruthy();
-    await user.click(screen.getByLabelText(/toggle between add and set xp/i));
+    expect(screen.getByText('Includes 1 award not yet received')).toBeTruthy();
+    const set = screen.getByRole('button', { name: 'Set total' });
+    await user.click(set);
+    expect(set).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Add XP' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByLabelText('Total XP')).toHaveAttribute(
+      'placeholder',
+      '6500'
+    );
+    expect(
+      screen.getByText(
+        "Replaces the character's XP total, including changes since the last sync."
+      )
+    ).toBeTruthy();
     await user.type(screen.getByLabelText('Total XP'), '900');
-    await user.click(screen.getByRole('button', { name: /send/i }));
+    await user.click(screen.getByRole('button', { name: 'Send award' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(screen.getByText('900')).toBeTruthy();
-    expect(screen.getByText(/projected · 2 pending/i)).toBeTruthy();
+    expect(screen.getByText('Includes 2 awards not yet received')).toBeTruthy();
   });
 
   it('retry re-posts the ORIGINAL award with the same id', async () => {
@@ -111,11 +159,22 @@ describe('XpAwardControl', () => {
       />
     );
     await user.type(screen.getByLabelText('XP to add'), '100');
-    await user.click(screen.getByRole('button', { name: /send/i }));
-    await screen.findByText('boom');
+    await user.click(screen.getByRole('button', { name: 'Send award' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      "The XP award wasn't sent. Resend to try again."
+    );
+    expect(alert.textContent).toBe(
+      "The XP award wasn't sent. Resend to try again."
+    );
+    expect(alert).toHaveClass('text-blood-text');
+    expect(screen.queryByText('boom')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send award' })).toBeNull();
     const firstAward = lastPostedAward().data.award;
 
-    await user.click(screen.getByRole('button', { name: /retry/i }));
+    const resend = screen.getByRole('button', { name: 'Resend' });
+    expect(resend).toHaveAttribute('data-variant', 'secondary');
+    await user.click(resend);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const retriedAward = lastPostedAward().data.award;
     expect(retriedAward).toEqual(firstAward); // same id — no fresh UUID
@@ -139,15 +198,17 @@ describe('XpAwardControl', () => {
     );
 
     const amountInput = screen.getByLabelText('XP to add');
-    const modeSwitch = screen.getByLabelText(/toggle between add and set xp/i);
     await user.type(amountInput, '100');
-    await user.click(screen.getByRole('button', { name: /send/i }));
-    await screen.findByText('boom');
+    await user.click(screen.getByRole('button', { name: 'Send award' }));
+    await screen.findByRole('alert');
 
     expect(amountInput).toBeDisabled();
-    expect(modeSwitch).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add XP' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Set total' })).toBeDisabled();
     expect(
-      screen.getByText(/retry will resend the original add award of 100 xp/i)
+      screen.getByText(
+        'Resending gives the same 100 XP award. The player gets it once.'
+      )
     ).toBeTruthy();
   });
 });
