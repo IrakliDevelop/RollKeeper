@@ -88,3 +88,21 @@ export const LongTitle: Story = {
     await expect(bar.scrollWidth).toBeLessThanOrEqual(bar.clientWidth);
   },
 };
+
+export const LongCrumb: Story = {
+  args: {
+    crumb: {
+      href: '/dm/campaign/P3HZ9R',
+      label:
+        'The Sunken Bell of the Drowned Kingdom of Vael Therunis and the Seven',
+    },
+    title: <h1 className="type-heading text-heading">Locations</h1>,
+  },
+  globals: { viewport: { value: 'portrait', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole('button', { name: 'Sign in' });
+    const bar = canvas.getByRole('banner');
+    await expect(bar.scrollWidth).toBeLessThanOrEqual(bar.clientWidth);
+  },
+};

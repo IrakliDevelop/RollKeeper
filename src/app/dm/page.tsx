@@ -301,9 +301,9 @@ function CampaignCard({
         </div>
       )}
       <div className="p-4 sm:p-5">
-        <h3 id={nameId} className="type-subheading text-heading break-words">
+        <h2 id={nameId} className="type-subheading text-heading break-words">
           {campaign.name}
-        </h3>
+        </h2>
         <p className="type-small text-body mt-1">
           {playerCount} {playerCount === 1 ? 'player' : 'players'} connected
         </p>

@@ -504,6 +504,15 @@ describe('DmDashboardPage — layout', () => {
     ).toBeInTheDocument();
   });
 
+  it('titles each campaign card with an h2 under the page h1', () => {
+    render(<DmDashboardPage />);
+    expect(
+      screen
+        .getAllByRole('heading', { level: 2 })
+        .map(heading => heading.textContent)
+    ).toEqual(['Alpha Campaign', 'Beta Campaign']);
+  });
+
   it('describes each Open campaign link by its card heading', () => {
     render(<DmDashboardPage />);
     const links = screen.getAllByRole('link', { name: 'Open campaign' });

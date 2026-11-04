@@ -23,6 +23,20 @@ it('renders the crumb as a link named by its label', () => {
   );
 });
 
+it('truncates a long crumb label visually and keeps the full accessible name', () => {
+  const label =
+    'The Sunken Bell of the Drowned Kingdom of Vael Therunis and the Seven Tides';
+  render(
+    <CampaignHeader crumb={{ href: '/dm', label }} title={<h1>Overview</h1>} />
+  );
+  const link = screen.getByRole('link', { name: label });
+  expect(within(link).getByText(label)).toHaveClass(
+    'sm:block',
+    'sm:max-w-48',
+    'sm:truncate'
+  );
+});
+
 it('renders no crumb when none is given', () => {
   render(<CampaignHeader title={<h1>Encounter</h1>} />);
   expect(

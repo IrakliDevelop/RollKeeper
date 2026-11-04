@@ -38,7 +38,9 @@ export function CampaignHeader({
             leftIcon={<ArrowLeft size={20} aria-hidden />}
           >
             <Link href={crumb.href}>
-              <span className="sr-only sm:not-sr-only">{crumb.label}</span>
+              <span className="sr-only sm:not-sr-only sm:block sm:max-w-48 sm:truncate">
+                {crumb.label}
+              </span>
             </Link>
           </Button>
         ) : undefined
