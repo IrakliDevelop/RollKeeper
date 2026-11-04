@@ -75,13 +75,14 @@ describe('CopyCodeButton', () => {
     const { unmount } = render(<CopyCodeButton code="K7QX2M" />);
     await user.click(screen.getByRole('button', { name: 'Copy code K7QX2M' }));
     await screen.findByRole('button', { name: 'Code K7QX2M copied' });
+    expect(vi.getTimerCount()).toBe(1);
     unmount();
+    expect(vi.getTimerCount()).toBe(0);
     expect(() => {
       act(() => {
         vi.advanceTimersByTime(2000);
       });
     }).not.toThrow();
-    expect(vi.getTimerCount()).toBe(0);
     expect(errorSpy).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });
