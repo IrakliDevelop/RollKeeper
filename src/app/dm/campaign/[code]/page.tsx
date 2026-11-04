@@ -10,8 +10,6 @@ import React, {
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  ArrowLeft,
-  Crown,
   Copy,
   Check,
   RefreshCw,
@@ -36,7 +34,8 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/layout/card';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
+import { CopyCodeButton } from '@/components/ui/campaign/CopyCodeButton';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
@@ -328,94 +327,64 @@ export default function CampaignViewPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 min-w-0 items-center gap-3">
-            <div className="flex min-w-0 shrink-0 items-center">
-              <Link href="/dm">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Back to Dashboard
-                </Button>
-              </Link>
-              <div className="ml-6 hidden min-w-0 items-center gap-3 sm:flex">
-                <Crown className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                <h1 className="text-heading text-xl font-bold">
-                  {displayName}
-                </h1>
-                <button
-                  onClick={handleCopyCode}
-                  title="Click to copy campaign code"
-                  className="cursor-pointer"
-                >
-                  <Badge variant="info" className="font-mono tracking-wider">
-                    {code}
-                  </Badge>
-                </button>
-                {copied && (
-                  <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                    <Check size={12} /> Copied
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="ml-auto flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
-              <Link
-                href={`/dm/campaign/${code}/locations`}
-                className="lg:hidden"
-              >
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={<MapPinned size={16} />}
-                >
-                  Locations
-                </Button>
-              </Link>
-              <Link
-                href={`/dm/campaign/${code}/calendar`}
-                className="lg:hidden"
-              >
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={<CalendarDays size={16} />}
-                >
-                  Calendar
-                </Button>
-              </Link>
-              <Link
-                href={`/dm/campaign/${code}/encounters`}
-                className="lg:hidden"
-              >
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={<Swords size={16} />}
-                >
-                  Encounters
-                </Button>
-              </Link>
-              <Link
-                href={`/dm/campaign/${code}/battlemaps`}
-                className="lg:hidden"
-              >
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={<Map size={16} />}
-                >
-                  Battle Maps
-                </Button>
-              </Link>
-              <HeaderTrailing showSystemOption />
-            </div>
+      <CampaignHeader
+        crumb={{ href: '/dm', label: 'Campaigns' }}
+        wrapControls
+        title={
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="type-heading text-heading truncate">
+              {displayName}
+            </h1>
+            <CopyCodeButton code={code} className="shrink-0" />
           </div>
-        </div>
-      </header>
+        }
+        actions={
+          <>
+            <Link href={`/dm/campaign/${code}/locations`} className="lg:hidden">
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<MapPinned size={16} />}
+              >
+                Locations
+              </Button>
+            </Link>
+            <Link href={`/dm/campaign/${code}/calendar`} className="lg:hidden">
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<CalendarDays size={16} />}
+              >
+                Calendar
+              </Button>
+            </Link>
+            <Link
+              href={`/dm/campaign/${code}/encounters`}
+              className="lg:hidden"
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Swords size={16} />}
+              >
+                Encounters
+              </Button>
+            </Link>
+            <Link
+              href={`/dm/campaign/${code}/battlemaps`}
+              className="lg:hidden"
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Map size={16} />}
+              >
+                Battle Maps
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {/* Sync Status Bar */}
       <div className="border-divider border-b">
