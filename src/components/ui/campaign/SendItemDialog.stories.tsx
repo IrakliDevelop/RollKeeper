@@ -14,8 +14,8 @@ const item: InventoryItem = {
   updatedAt: '',
 };
 
-// The third name is one long unbroken word on purpose: a hyphen would let the
-// line wrap and hide an overflow.
+// The third name is long and spaced: unwrapped it is wider than the dialog
+// body, so the Phone story catches a row that stops wrapping.
 const targets: SendItemTarget[] = [
   {
     playerId: 'p1',
@@ -32,7 +32,7 @@ const targets: SendItemTarget[] = [
   {
     playerId: 'p3',
     playerName: 'Jo',
-    characterName: 'Bartholomewunderhillgreenbottle',
+    characterName: 'Bartholomew Underhill Greenbottle of the Misty Hollow Vale',
     characterId: 'c3',
   },
 ];
@@ -76,8 +76,8 @@ export const Default: Story = {
 };
 
 /**
- * At 390px the radio rows stay inside the dialog, and a long unbroken
- * character name neither pushes the dialog nor the page sideways.
+ * At 390px the radio rows stay inside the dialog, and a long character
+ * name wraps and neither pushes the dialog nor the page sideways.
  */
 export const Phone: Story = {
   parameters: {

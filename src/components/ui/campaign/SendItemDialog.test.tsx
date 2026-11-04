@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SendItemDialog, type SendItemTarget } from './SendItemDialog';
@@ -91,10 +91,30 @@ describe('SendItemDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Send item' }));
     expect(onSend).toHaveBeenCalledWith(item, targets[1]);
     expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      for (const radio of screen.getAllByRole('radio')) {
+        expect(radio).not.toBeChecked();
+      }
+    });
   });
 
-  it('reads Sending… while the send runs', () => {
-    renderDialog({ sending: true });
+  it('reads Sending… while the send runs', async () => {
+    const user = userEvent.setup();
+    const { rerender, onClose, onSend } = renderDialog();
+    await user.click(screen.getByRole('radio', { name: 'Mira' }));
+    expect(screen.getByRole('button', { name: 'Send item' })).toBeEnabled();
+
+    rerender(
+      <SendItemDialog
+        open
+        onClose={onClose}
+        item={item}
+        targets={targets}
+        onSend={onSend}
+        sending
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'Mira' })).toBeChecked();
     expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();
   });
 

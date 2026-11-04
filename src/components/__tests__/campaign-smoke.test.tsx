@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   render,
@@ -235,7 +236,9 @@ describe('CreateCampaignDialog', () => {
 describe('SendMessageDialog', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  const renderDialog = (props: Record<string, unknown> = {}) =>
+  const renderDialog = (
+    props: Partial<ComponentProps<typeof SendMessageDialog>> = {}
+  ) =>
     render(
       <SendMessageDialog
         open={true}
@@ -312,7 +315,8 @@ describe('SendMessageDialog', () => {
           })
       )
     );
-    renderDialog();
+    const onClose = vi.fn();
+    renderDialog({ onClose });
     await user.type(screen.getByLabelText('Title'), 'Bridge');
     await user.click(screen.getByRole('button', { name: 'Send message' }));
 
@@ -330,5 +334,16 @@ describe('SendMessageDialog', () => {
     expect(alert.textContent).toBe("The message wasn't sent. Try again.");
     expect(alert.className).toContain('text-blood-text');
     expect(screen.queryByText('boom')).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Send message',
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(false);
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+      'Bridge'
+    );
   });
 });

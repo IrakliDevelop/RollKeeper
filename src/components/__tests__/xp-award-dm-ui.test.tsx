@@ -211,6 +211,76 @@ describe('XpAwardControl', () => {
       )
     ).toBeTruthy();
   });
+
+  it('reads Sending… on Send award while the post is pending', async () => {
+    const user = userEvent.setup();
+    let release!: (v: unknown) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise(r => {
+          release = r;
+        })
+    );
+    render(
+      <XpAwardControl
+        campaignCode="ABC"
+        dmId="dm-1"
+        playerId="p-1"
+        lastSyncedXp={0}
+        currentLevel={1}
+      />
+    );
+    await user.type(screen.getByLabelText('XP to add'), '100');
+    await user.click(screen.getByRole('button', { name: 'Send award' }));
+
+    const sending = screen.getByRole('button', { name: 'Sending…' });
+    expect(sending).toBeDisabled();
+    expect(sending).toHaveAttribute('data-variant', 'primary');
+    expect(screen.getByRole('button', { name: 'Add XP' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Set total' })).toBeDisabled();
+
+    release({ ok: true, json: async () => ({}) });
+    expect(await screen.findByText('XP award sent')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Sending…' })).toBeNull();
+  });
+
+  it('reads Sending… on Resend while the retry is pending', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'boom' }),
+    });
+    render(
+      <XpAwardControl
+        campaignCode="ABC"
+        dmId="dm-1"
+        playerId="p-1"
+        lastSyncedXp={0}
+        currentLevel={1}
+      />
+    );
+    await user.type(screen.getByLabelText('XP to add'), '100');
+    await user.click(screen.getByRole('button', { name: 'Send award' }));
+    await screen.findByRole('alert');
+
+    let release!: (v: unknown) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise(r => {
+          release = r;
+        })
+    );
+    await user.click(screen.getByRole('button', { name: 'Resend' }));
+
+    const sending = screen.getByRole('button', { name: 'Sending…' });
+    expect(sending).toBeDisabled();
+    expect(sending).toHaveAttribute('data-variant', 'secondary');
+
+    release({ ok: true, json: async () => ({}) });
+    expect(await screen.findByText('XP award sent')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Sending…' })).toBeNull();
+  });
 });
 
 describe('AwardXpDialog', () => {
@@ -362,6 +432,39 @@ describe('AwardXpDialog', () => {
       expect(screen.queryByRole('button', { name: 'Sending…' })).toBeNull()
     );
     expect(screen.queryByRole('button', { name: /^Resend/ })).toBeNull();
+  });
+
+  it('reads Sending… on the award button and keeps Resend labelled', async () => {
+    const user = userEvent.setup();
+    failBob();
+    renderDialog();
+    await user.type(screen.getByLabelText('XP to add'), '100');
+    await user.click(
+      screen.getByRole('button', { name: 'Award XP to 2 players' })
+    );
+    await screen.findByRole('alert');
+
+    let release!: (v: unknown) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise(r => {
+          release = r;
+        })
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Award XP to 2 players' })
+    );
+
+    const sending = screen.getByRole('button', { name: 'Sending…' });
+    expect(sending).toHaveAttribute('data-variant', 'primary');
+    expect(sending).toBeDisabled();
+    const resend = screen.getByRole('button', { name: 'Resend to 1' });
+    expect(resend).toBeDisabled();
+
+    release({ ok: true, json: async () => ({}) });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Sending…' })).toBeNull()
+    );
   });
 
   it('after fully successful send, amount is cleared and award button is disabled', async () => {

@@ -34,13 +34,13 @@ export const Default: Story = {
     const screen = body(canvasElement);
     await screen.findByRole('dialog', { name: 'Award XP' });
     await expect(screen.getAllByRole('checkbox')).toHaveLength(3);
-    const disabled = screen.getByRole('button', {
+    const awardButton = screen.getByRole('button', {
       name: 'Award XP to 3 players',
     });
-    await expect(disabled).toBeDisabled();
+    await expect(awardButton).toBeDisabled();
 
     await userEvent.type(screen.getByLabelText('XP to add'), '300');
-    await waitFor(() => expect(disabled).toBeEnabled());
+    await waitFor(() => expect(awardButton).toBeEnabled());
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'Mira' }));
     await expect(
