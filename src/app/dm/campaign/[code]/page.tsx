@@ -280,7 +280,10 @@ export default function CampaignViewPage() {
         />
       )}
 
-      <SendItemDialog {...itemSends.sendItemDialog} />
+      <SendItemDialog
+        {...itemSends.sendItemDialog}
+        emptyMessage="No players in this campaign yet"
+      />
 
       <SendMessageDialog
         open={messageTarget !== null}
