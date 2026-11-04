@@ -120,7 +120,7 @@ describe('PlayerDetailDialog header', () => {
         ...base,
         race: '',
         alignment: '',
-        classes: [],
+        classes: undefined as unknown as CharacterState['classes'],
         class: { ...base.class, name: 'Rogue' },
         level: 4,
         totalLevel: 4,
@@ -188,6 +188,8 @@ describe('PlayerDetailDialog tabs', () => {
   it('has no Spells tab for a character without spells or slots', () => {
     renderDialog(playerFor(makeCharacter()));
     expect(screen.queryByRole('tab', { name: 'Spells' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Inventory' })).toBeInTheDocument();
   });
 
   it('opens on Overview again after closing on Spells', async () => {
