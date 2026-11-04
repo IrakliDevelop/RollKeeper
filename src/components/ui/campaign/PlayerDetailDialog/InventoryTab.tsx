@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Swords, Gem, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
-import { SectionTitle, ensureArray } from './shared';
+import { Section } from '@/components/ui/layout/section';
+import { ensureArray, sentenceCase } from './shared';
 import { CharacterState } from '@/types/character';
 
 interface InventoryTabProps {
@@ -11,152 +11,125 @@ interface InventoryTabProps {
 }
 
 export function InventoryTab({ char }: InventoryTabProps) {
+  const weapons = ensureArray<(typeof char.weapons)[number]>(char.weapons);
+  const items = ensureArray<(typeof char.magicItems)[number]>(char.magicItems);
+  const armor = ensureArray<(typeof char.armorItems)[number]>(char.armorItems);
+
+  if (weapons.length === 0 && items.length === 0 && armor.length === 0) {
+    return (
+      <p className="type-body text-muted py-12 text-center">
+        No weapons, armor or magic items synced.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <WeaponsSection char={char} />
-      <MagicItemsSection char={char} />
-      <ArmorSection char={char} />
-    </div>
-  );
-}
-
-function WeaponsSection({ char }: { char: CharacterState }) {
-  const weapons = ensureArray<(typeof char.weapons)[number]>(char.weapons);
-  if (weapons.length === 0) return null;
-
-  return (
-    <div>
-      <SectionTitle icon={<Swords size={14} />}>Weapons</SectionTitle>
-      <div className="space-y-1.5">
-        {weapons.map((w, index) => (
-          <div
-            key={w.id || `${w.name}-${index}`}
-            className="bg-surface-secondary flex items-center justify-between rounded-lg px-3 py-2"
-          >
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-sm font-medium ${w.isEquipped ? 'text-heading' : 'text-muted'}`}
+      {weapons.length > 0 && (
+        <Section level={3} heading="Weapons">
+          <ul className="divide-divider divide-y">
+            {weapons.map((w, index) => (
+              <li
+                key={w.id || `${w.name}-${index}`}
+                className="flex items-center justify-between gap-3 py-2"
               >
-                {w.name}
-              </span>
-              {w.isEquipped && (
-                <Badge variant="success" size="sm">
-                  Equipped
-                </Badge>
-              )}
-              {w.isAttuned && (
-                <Badge variant="info" size="sm">
-                  Attuned
-                </Badge>
-              )}
-            </div>
-            <span className="text-muted text-xs">
-              {ensureArray<(typeof w.damage)[number]>(w.damage)
-                .map(d => `${d.dice} ${d.type}`)
-                .join(', ') || '—'}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span
+                    className={`type-ui ${w.isEquipped ? 'text-heading' : 'text-muted'}`}
+                  >
+                    {w.name}
+                  </span>
+                  {w.isEquipped && (
+                    <Badge variant="neutral" size="sm">
+                      Equipped
+                    </Badge>
+                  )}
+                  {w.isAttuned && (
+                    <Badge variant="neutral" size="sm">
+                      Attuned
+                    </Badge>
+                  )}
+                </div>
+                <span className="type-small text-muted">
+                  {ensureArray<(typeof w.damage)[number]>(w.damage)
+                    .map(d => `${d.dice} ${d.type}`)
+                    .join(', ') || '—'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
-function MagicItemsSection({ char }: { char: CharacterState }) {
-  const items = ensureArray<(typeof char.magicItems)[number]>(char.magicItems);
-  if (items.length === 0) return null;
-
-  return (
-    <div>
-      <SectionTitle icon={<Gem size={14} />}>Magic Items</SectionTitle>
-      <div className="space-y-1.5">
-        {items.map((item, index) => (
-          <div
-            key={item.id || `${item.name}-${index}`}
-            className="bg-surface-secondary flex items-center justify-between rounded-lg px-3 py-2"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-heading text-sm font-medium">
-                {item.name}
-              </span>
-              {item.rarity && <RarityBadge rarity={item.rarity} />}
-              {item.isAttuned && (
-                <Badge variant="info" size="sm">
-                  Attuned
-                </Badge>
-              )}
-              {item.isEquipped && (
-                <Badge variant="success" size="sm">
-                  Equipped
-                </Badge>
-              )}
-            </div>
-            {item.chargePool && (
-              <span className="text-muted text-xs">
-                {item.chargePool.maxCharges - item.chargePool.usedCharges}/
-                {item.chargePool.maxCharges} charges
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ArmorSection({ char }: { char: CharacterState }) {
-  const armor = ensureArray<(typeof char.armorItems)[number]>(char.armorItems);
-  if (armor.length === 0) return null;
-
-  return (
-    <div>
-      <SectionTitle icon={<Shield size={14} />}>Armor</SectionTitle>
-      <div className="space-y-1.5">
-        {armor.map((a, index) => (
-          <div
-            key={a.id || `${a.name}-${index}`}
-            className="bg-surface-secondary flex items-center justify-between rounded-lg px-3 py-2"
-          >
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-sm font-medium ${a.isEquipped ? 'text-heading' : 'text-muted'}`}
+      {items.length > 0 && (
+        <Section level={3} heading="Magic items">
+          <ul className="divide-divider divide-y">
+            {items.map((item, index) => (
+              <li
+                key={item.id || `${item.name}-${index}`}
+                className="flex items-center justify-between gap-3 py-2"
               >
-                {a.name}
-              </span>
-              {a.isEquipped && (
-                <Badge variant="success" size="sm">
-                  Equipped
-                </Badge>
-              )}
-              <span className="text-muted text-xs capitalize">
-                {a.category}
-              </span>
-            </div>
-            <span className="text-body text-sm font-medium">
-              AC {a.baseAC + (a.enhancementBonus ?? 0)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="type-ui text-heading">{item.name}</span>
+                  {item.rarity && (
+                    <Badge variant="neutral" size="sm">
+                      {sentenceCase(item.rarity)}
+                    </Badge>
+                  )}
+                  {item.isAttuned && (
+                    <Badge variant="neutral" size="sm">
+                      Attuned
+                    </Badge>
+                  )}
+                  {item.isEquipped && (
+                    <Badge variant="neutral" size="sm">
+                      Equipped
+                    </Badge>
+                  )}
+                </div>
+                {item.chargePool && (
+                  <span className="type-small text-muted">
+                    {item.chargePool.maxCharges - item.chargePool.usedCharges}/
+                    {item.chargePool.maxCharges} charges
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
-function RarityBadge({ rarity }: { rarity: string }) {
-  const variantMap: Record<
-    string,
-    'neutral' | 'success' | 'info' | 'warning' | 'danger' | 'primary'
-  > = {
-    common: 'neutral',
-    uncommon: 'success',
-    rare: 'info',
-    'very rare': 'warning',
-    legendary: 'danger',
-    artifact: 'primary',
-  };
-  return (
-    <Badge variant={variantMap[rarity] ?? 'neutral'} size="sm">
-      {rarity}
-    </Badge>
+      {armor.length > 0 && (
+        <Section level={3} heading="Armor">
+          <ul className="divide-divider divide-y">
+            {armor.map((a, index) => (
+              <li
+                key={a.id || `${a.name}-${index}`}
+                className="flex items-center justify-between gap-3 py-2"
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span
+                    className={`type-ui ${a.isEquipped ? 'text-heading' : 'text-muted'}`}
+                  >
+                    {a.name}
+                  </span>
+                  {a.isEquipped && (
+                    <Badge variant="neutral" size="sm">
+                      Equipped
+                    </Badge>
+                  )}
+                  <span className="type-small text-muted">
+                    {sentenceCase(a.category)}
+                  </span>
+                </div>
+                <span className="type-ui text-body">
+                  AC {a.baseAC + (a.enhancementBonus ?? 0)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
   );
 }

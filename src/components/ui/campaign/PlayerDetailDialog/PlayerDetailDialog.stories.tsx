@@ -98,6 +98,23 @@ const casterPlayer: CampaignPlayerData = {
   }),
 };
 
+const longSpellPlayer: CampaignPlayerData = {
+  ...casterPlayer,
+  characterData: {
+    ...casterPlayer.characterData,
+    spells: [
+      ...casterPlayer.characterData.spells,
+      makeSpell({
+        name: "Tasha's Hideous Laughter Of The Unprepared Archmage",
+        level: 1,
+        isPrepared: false,
+        concentration: true,
+        ritual: true,
+      }),
+    ],
+  },
+};
+
 const warlockPlayer: CampaignPlayerData = {
   playerId: 'p2',
   playerName: 'Robin',
@@ -308,5 +325,58 @@ export const AbilitiesOnPhone: Story = {
     await expect(
       within(dialog).getByRole('switch', { name: 'Scores large' })
     ).toBeVisible();
+  },
+};
+
+export const CasterDark: Story = {
+  args: { player: casterPlayer },
+  globals: { theme: 'dark' },
+  play: async ({ canvasElement }) => {
+    const screen = body(canvasElement);
+    await waitFor(() =>
+      expect(screen.getByText('Aria the Wise')).toBeInTheDocument()
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
+    await expect(screen.getByText('Magic Missile')).toBeVisible();
+  },
+};
+
+/**
+ * On a phone only the tab panel scrolls: the tab list stays in view however
+ * long the Overview is, and nothing pushes the page sideways.
+ */
+export const OverviewOnPhone: Story = {
+  args: { player: longSpellPlayer },
+  parameters: {
+    viewport: {
+      options: {
+        phone: {
+          name: 'Phone',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const screen = body(canvasElement);
+    const dialog = await screen.findByRole('dialog');
+    const panel = within(dialog).getByRole('tabpanel');
+    panel.scrollTop = panel.scrollHeight;
+    await waitFor(() => expect(panel.scrollTop).toBeGreaterThan(0));
+    const dialogRect = dialog.getBoundingClientRect();
+    const tabsRect = within(dialog)
+      .getByRole('tablist')
+      .getBoundingClientRect();
+    await expect(tabsRect.top).toBeGreaterThanOrEqual(dialogRect.top);
+    await expect(tabsRect.bottom).toBeLessThanOrEqual(dialogRect.bottom);
+    await expect(tabsRect.bottom).toBeLessThanOrEqual(window.innerHeight);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+
+    // A level 1 spell with every tag still fits the phone width.
+    await userEvent.click(within(dialog).getByRole('tab', { name: 'Spells' }));
+    await within(dialog).findByText(/^Tasha's Hideous Laughter/);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
   },
 };

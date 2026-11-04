@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   makeCharacter,
@@ -103,6 +103,9 @@ describe('SpellsTab', () => {
     expect(
       screen.getAllByRole('img', { name: /slots available/ })
     ).toHaveLength(1);
+    expect(
+      within(screen.getByRole('button', { name: 'Level 1' })).queryByRole('img')
+    ).toBeNull();
   });
 
   it('collapses a level from its heading', async () => {
