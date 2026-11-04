@@ -38,3 +38,8 @@ export function SectionTitle({
     </div>
   );
 }
+
+/** First letter upper-cased, the rest as stored: "very rare" -> "Very rare". */
+export function sentenceCase(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

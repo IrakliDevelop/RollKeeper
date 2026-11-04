@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Eye, Star, Wand2 } from 'lucide-react';
+import { Eye, Star } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
+import { SlotPips } from '@/components/ui/game/SlotPips';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { getTotalLevel } from '@/utils/multiclass';
-import { ensureArray, formatMod } from './shared';
+import { ensureArray, formatMod, sentenceCase } from './shared';
 import {
   calculateSpellAttackBonus,
   calculateSpellSaveDC,
@@ -27,9 +30,9 @@ const LEVEL_NAMES: Record<number, string> = {
 };
 
 const ABILITY_LABEL_MAP: Record<string, string> = {
-  intelligence: 'INT',
-  wisdom: 'WIS',
-  charisma: 'CHA',
+  intelligence: 'Intelligence',
+  wisdom: 'Wisdom',
+  charisma: 'Charisma',
 };
 
 function isValidSlot(value: unknown): value is SpellSlot {
@@ -58,35 +61,24 @@ export function characterHasSpellsToShow(char: CharacterState): boolean {
   return (char.pactMagic?.slots.max ?? 0) > 0;
 }
 
-/** Read-only slot pips — presentational divs, no click handlers. */
-function SlotDots({ max, used }: { max: number; used: number }) {
-  const remaining = max - used;
+/** Slot pips plus a plain "available/total" count, as heading controls. */
+function SlotTrailing({
+  level,
+  max,
+  used,
+}: {
+  level: number | 'pact';
+  max: number;
+  used: number;
+}) {
+  const available = max - used;
   return (
-    <div className="ml-auto flex items-center gap-1.5">
-      <div className="flex gap-1">
-        {Array.from({ length: max }, (_, index) => {
-          const isUsed = index < used;
-          return (
-            <div
-              key={index}
-              className={`h-4 w-4 rounded-full border-2 ${
-                isUsed
-                  ? 'border-red-500 bg-red-500 opacity-70'
-                  : 'border-emerald-400 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.4)]'
-              }`}
-              title={`Slot ${index + 1} — ${isUsed ? 'Used' : 'Available'}`}
-            />
-          );
-        })}
-      </div>
-      <span
-        className={`text-[10px] font-bold ${
-          remaining === 0 ? 'text-accent-red-text' : 'text-heading'
-        }`}
-      >
-        {remaining}/{max}
+    <>
+      <SlotPips level={level} total={max} available={available} />
+      <span aria-hidden="true" className="type-small text-muted tabular-nums">
+        {available}/{max}
       </span>
-    </div>
+    </>
   );
 }
 
@@ -106,63 +98,58 @@ function PlayerSpellRow({
   const tags = spell.tags ?? [];
 
   return (
-    <div className="bg-surface-raised space-y-0.5 px-3 py-1.5">
-      <div className="flex items-center gap-2">
-        {markPrepared && isPrepared && (
-          <Star className="text-accent-amber-text h-3.5 w-3.5 shrink-0 fill-current" />
-        )}
-        <span
-          className={`min-w-0 flex-1 truncate text-sm font-medium ${
-            dimmed ? 'text-muted' : 'text-heading'
-          }`}
-        >
-          {spell.name}
+    <li className="flex items-center gap-2 py-2 pointer-coarse:min-h-11">
+      {markPrepared && isPrepared && (
+        <span role="img" aria-label="Prepared" className="shrink-0">
+          <Star
+            className="text-brass-text size-3.5 fill-current"
+            aria-hidden="true"
+          />
         </span>
-        <Badge variant={isCantrip ? 'warning' : 'secondary'} size="sm">
-          {isCantrip ? 'C' : `L${spell.level}`}
-        </Badge>
-        {spell.school && spell.school !== 'Unknown' && (
-          <span className="text-faint hidden text-xs sm:inline">
-            {spell.school}
-          </span>
-        )}
-        {dimmed && (
-          <Badge variant="neutral" size="sm">
-            Not prepared
-          </Badge>
-        )}
-        {spell.concentration && (
-          <Badge variant="info" size="sm">
-            C
-          </Badge>
-        )}
-        {spell.ritual && (
-          <Badge variant="neutral" size="sm">
-            R
-          </Badge>
-        )}
-        <button
-          type="button"
-          onClick={onView}
-          className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
-          title="View spell details"
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 pl-5">
-          {tags.map(tag => (
-            <span
-              key={tag}
-              className="border-accent-amber-border bg-accent-amber-bg text-accent-amber-text rounded border px-1.5 py-0 text-[10px] font-medium"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
       )}
-    </div>
+      <span
+        className={`type-ui min-w-0 truncate ${
+          dimmed ? 'text-muted' : 'text-heading'
+        }`}
+      >
+        {spell.name}
+      </span>
+      {spell.school && spell.school !== 'Unknown' && (
+        <span className="type-small text-muted hidden sm:inline">
+          {spell.school}
+        </span>
+      )}
+      {dimmed && (
+        <Badge variant="neutral" size="sm">
+          Not prepared
+        </Badge>
+      )}
+      {spell.concentration && (
+        <Badge variant="magic" size="sm">
+          Concentration
+        </Badge>
+      )}
+      {spell.ritual && (
+        <Badge variant="neutral" size="sm">
+          Ritual
+        </Badge>
+      )}
+      {tags.map(tag => (
+        <Badge key={tag} variant="neutral" size="sm">
+          {tag}
+        </Badge>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        className="ml-auto px-1.5"
+        aria-label={`View ${spell.name}`}
+        onClick={onView}
+      >
+        <Eye size={14} aria-hidden="true" />
+      </Button>
+    </li>
   );
 }
 
@@ -232,118 +219,91 @@ export function SpellsTab({ char }: SpellsTabProps) {
 
   if (sortedLevels.length === 0 && !hasPact) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <Wand2 className="text-faint mb-2 h-8 w-8" />
-        <p className="text-muted text-sm">No spells synced</p>
-      </div>
+      <p className="type-body text-muted py-12 text-center">No spells synced</p>
+    );
+  }
+
+  const statsParts: React.ReactNode[] = [];
+  if (ability) {
+    statsParts.push(ABILITY_LABEL_MAP[ability] ?? sentenceCase(ability));
+  }
+  if (spellAttack !== null) {
+    statsParts.push(
+      <>
+        Spell attack{' '}
+        <span className="tabular-nums">{formatMod(spellAttack)}</span>
+      </>
+    );
+  }
+  if (spellDC !== null) {
+    statsParts.push(
+      <>
+        Spell save DC <span className="tabular-nums">{spellDC}</span>
+      </>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Spellcasting stats — read-only, honors player overrides */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {ability && (
-          <Badge variant="neutral" size="sm">
-            {ABILITY_LABEL_MAP[ability] ?? ability}
-          </Badge>
-        )}
-        {spellAttack !== null && (
-          <Badge variant="info" size="sm">
-            Spell Attack: {formatMod(spellAttack)}
-          </Badge>
-        )}
-        {spellDC !== null && (
-          <Badge variant="warning" size="sm">
-            Save DC: {spellDC}
-          </Badge>
-        )}
-      </div>
-
-      {/* Pact magic — separate from numbered levels */}
-      {hasPact && pact && (
-        <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
-          <div className="bg-accent-purple-bg flex w-full items-center gap-2 px-3 py-2">
-            <span className="text-accent-purple-text text-sm font-semibold">
-              Pact Magic (Lv {pact.level})
-            </span>
-            <SlotDots max={pact.slots.max} used={pact.slots.used} />
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* Spellcasting stats: read-only, honors player overrides */}
+      {statsParts.length > 0 && (
+        <p className="type-ui text-body">
+          {statsParts.map((part, index) => (
+            <React.Fragment key={index}>
+              {index > 0 && ' · '}
+              {part}
+            </React.Fragment>
+          ))}
+        </p>
       )}
 
-      {/* Level groups */}
-      <div className="space-y-2">
-        {sortedLevels.map(level => {
-          const levelSpells = spellsByLevel[level] ?? [];
-          const isCollapsed = collapsedLevels.has(level);
-          const isCantrip = level === 0;
-          const slot = isCantrip ? null : getSlot(char, level);
-          const hasSlots = !!slot && slot.max > 0;
+      {/* Pact magic: separate from numbered levels */}
+      {hasPact && pact && (
+        <Section
+          level={4}
+          heading={`Pact magic, level ${pact.level}`}
+          trailing={
+            <SlotTrailing
+              level="pact"
+              max={pact.slots.max}
+              used={pact.slots.used}
+            />
+          }
+        />
+      )}
 
-          return (
-            <div
-              key={level}
-              className={`overflow-hidden rounded-lg border-2 ${
-                isCantrip
-                  ? 'border-accent-amber-border'
-                  : 'border-accent-purple-border'
-              }`}
-            >
-              <div
-                className={`flex w-full items-center gap-2 px-3 py-2 ${
-                  isCantrip ? 'bg-accent-amber-bg' : 'bg-accent-purple-bg'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleLevel(level)}
-                  className="flex items-center gap-2"
-                >
-                  {isCollapsed ? (
-                    <ChevronRight
-                      className={`h-4 w-4 ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
-                    />
-                  ) : (
-                    <ChevronDown
-                      className={`h-4 w-4 ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
-                    />
-                  )}
-                  <span
-                    className={`text-sm font-semibold ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
-                  >
-                    {LEVEL_NAMES[level] ?? `Level ${level}`}
-                  </span>
-                  {levelSpells.length > 0 && (
-                    <Badge
-                      variant={isCantrip ? 'warning' : 'secondary'}
-                      size="sm"
-                    >
-                      {levelSpells.length}
-                    </Badge>
-                  )}
-                </button>
-                {hasSlots && slot && (
-                  <SlotDots max={slot.max} used={slot.used} />
-                )}
-              </div>
+      {sortedLevels.map(level => {
+        const levelSpells = spellsByLevel[level] ?? [];
+        const slot = level === 0 ? null : getSlot(char, level);
 
-              {!isCollapsed && levelSpells.length > 0 && (
-                <div className="divide-divider divide-y">
-                  {levelSpells.map(spell => (
-                    <PlayerSpellRow
-                      key={spell.id}
-                      spell={spell}
-                      showPreparedState={showPreparedState}
-                      onView={() => setViewingSpell(spell)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+        return (
+          <Section
+            key={level}
+            level={4}
+            heading={LEVEL_NAMES[level] ?? `Level ${level}`}
+            collapsed={collapsedLevels.has(level)}
+            onCollapsedChange={() => toggleLevel(level)}
+            trailing={
+              slot && slot.max > 0 ? (
+                <SlotTrailing level={level} max={slot.max} used={slot.used} />
+              ) : undefined
+            }
+          >
+            {levelSpells.length > 0 && (
+              <ul className="divide-divider divide-y">
+                {levelSpells.map(spell => (
+                  <PlayerSpellRow
+                    key={spell.id}
+                    spell={spell}
+                    showPreparedState={showPreparedState}
+                    onView={() => setViewingSpell(spell)}
+                  />
+                ))}
+              </ul>
+            )}
+          </Section>
+        );
+      })}
 
       {viewingSpell && (
         <SpellDetailsModal

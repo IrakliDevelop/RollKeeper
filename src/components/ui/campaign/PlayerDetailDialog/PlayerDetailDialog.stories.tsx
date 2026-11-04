@@ -174,15 +174,20 @@ export const Caster: Story = {
     await expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
     // Stats header from character utils: wizard INT 18, level 5 → DC 15, Atk +7
-    await expect(screen.getByText(/save dc: 15/i)).toBeInTheDocument();
-    await expect(screen.getByText(/spell attack: \+7/i)).toBeInTheDocument();
+    await expect(screen.getByText(/^Intelligence/)).toHaveTextContent(
+      'Intelligence · Spell attack +7 · Spell save DC 15'
+    );
     // Level groups
     await expect(screen.getByText('Cantrips')).toBeInTheDocument();
     await expect(screen.getByText('Level 1')).toBeInTheDocument();
     await expect(screen.getByText('Level 2')).toBeInTheDocument();
     // Slot counts: remaining/max
-    await expect(screen.getByText('3/4')).toBeInTheDocument();
-    await expect(screen.getByText('1/3')).toBeInTheDocument();
+    await expect(
+      screen.getByRole('img', { name: '3 of 4 level 1 slots available' })
+    ).toBeInTheDocument();
+    await expect(
+      screen.getByRole('img', { name: '1 of 3 level 2 slots available' })
+    ).toBeInTheDocument();
     // Spells listed, prepared marking
     await expect(screen.getByText('Shield')).toBeInTheDocument();
     await expect(screen.getByText('Identify')).toBeInTheDocument();
@@ -200,9 +205,13 @@ export const Warlock: Story = {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Vex')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
-    await expect(screen.getByText('Pact Magic (Lv 3)')).toBeInTheDocument();
-    // 2 pact slots, 1 used → 1/2
-    await expect(screen.getByText('1/2')).toBeInTheDocument();
+    await expect(
+      screen.getByRole('heading', { name: 'Pact magic, level 3' })
+    ).toBeInTheDocument();
+    // 2 pact slots, 1 used → 1 available
+    await expect(
+      screen.getByRole('img', { name: '1 of 2 pact slots available' })
+    ).toBeInTheDocument();
     await expect(screen.getByText('Eldritch Blast')).toBeInTheDocument();
     // Warlock has no per-spell isPrepared flags → no prepared/unprepared marking
     await expect(screen.queryByText('Not prepared')).not.toBeInTheDocument();
