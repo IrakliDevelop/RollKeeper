@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import {
+  render,
+  screen,
+  waitFor,
+  cleanup,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { XpAwardControl } from '@/components/ui/campaign/XpAwardControl';
 import { AwardXpDialog } from '@/components/ui/campaign/AwardXpDialog';
@@ -149,9 +155,8 @@ describe('XpAwardControl', () => {
 describe('AwardXpDialog', () => {
   const players = [makePlayer('p-1', 'Alice'), makePlayer('p-2', 'Bob')];
 
-  it('posts one add award per selected player', async () => {
-    const user = userEvent.setup();
-    render(
+  function renderDialog() {
+    return render(
       <AwardXpDialog
         open
         onClose={() => {}}
@@ -160,8 +165,28 @@ describe('AwardXpDialog', () => {
         dmId="dm-1"
       />
     );
+  }
+
+  function failBob() {
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      if (body.data.playerId === 'p-2') {
+        return { ok: false, status: 500, json: async () => ({}) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+  }
+
+  const row = (name: string) =>
+    screen.getByRole('checkbox', { name }).closest('label') as HTMLElement;
+
+  it('posts one add award per selected player', async () => {
+    const user = userEvent.setup();
+    renderDialog();
     await user.type(screen.getByLabelText(/xp to add/i), '250');
-    await user.click(screen.getByRole('button', { name: /award to 2/i }));
+    await user.click(
+      screen.getByRole('button', { name: 'Award XP to 2 players' })
+    );
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const bodies = fetchMock.mock.calls.map(([, init]) =>
@@ -175,28 +200,56 @@ describe('AwardXpDialog', () => {
     expect(new Set(ids).size).toBe(2); // distinct ids per player
   });
 
-  it('shows per-player failure and retries with the original award', async () => {
-    const user = userEvent.setup();
-    // First wave: p-1 ok, p-2 fails
-    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
-      const body = JSON.parse(init.body as string);
-      if (body.data.playerId === 'p-2') {
-        return { ok: false, status: 500, json: async () => ({}) };
-      }
-      return { ok: true, json: async () => ({}) };
-    });
-    render(
-      <AwardXpDialog
-        open
-        onClose={() => {}}
-        players={players}
-        campaignCode="ABC"
-        dmId="dm-1"
-      />
+  it('titles the dialog and labels the amount', () => {
+    renderDialog();
+    expect(screen.getByRole('dialog', { name: 'Award XP' })).toBeTruthy();
+    expect(screen.getByLabelText('XP to add')).toHaveAttribute(
+      'placeholder',
+      '300'
     );
-    await user.type(screen.getByLabelText(/xp to add/i), '100');
-    await user.click(screen.getByRole('button', { name: /award to 2/i }));
-    await screen.findByText(/failed for/i);
+    const group = screen.getByRole('group', { name: 'Players' });
+    for (const name of ["Alice's hero", "Bob's hero"]) {
+      const box = within(group).getByRole('checkbox', { name });
+      expect(box).toHaveAttribute('aria-checked', 'true');
+    }
+    const close = screen
+      .getAllByRole('button', { name: 'Close' })
+      .find(b => b.dataset.variant === 'outline');
+    expect(close).toBeTruthy();
+  });
+
+  it('counts the selected players in the award button', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.type(screen.getByLabelText('XP to add'), '100');
+
+    await user.click(screen.getByRole('checkbox', { name: "Bob's hero" }));
+    const one = screen.getByRole('button', { name: 'Award XP to 1 player' });
+    expect(one).toBeEnabled();
+
+    await user.click(screen.getByRole('checkbox', { name: "Alice's hero" }));
+    const none = screen.getByRole('button', { name: 'Award XP to 0 players' });
+    expect(none).toBeDisabled();
+  });
+
+  it('marks each player sent or not sent and resends the original award', async () => {
+    const user = userEvent.setup();
+    failBob();
+    renderDialog();
+    await user.type(screen.getByLabelText('XP to add'), '100');
+    await user.click(
+      screen.getByRole('button', { name: 'Award XP to 2 players' })
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      "Not sent to Bob's hero. Resending gives them the same award."
+    );
+    expect(alert).toHaveClass('text-blood-text');
+    const sent = within(row("Alice's hero")).getByText('Sent');
+    const notSent = within(row("Bob's hero")).getByText('Not sent');
+    expect(sent).toHaveClass('text-muted');
+    expect(notSent).toHaveClass('text-muted');
 
     const failedBody = fetchMock.mock.calls
       .map(([, init]) => JSON.parse((init as RequestInit).body as string))
@@ -204,28 +257,61 @@ describe('AwardXpDialog', () => {
 
     fetchMock.mockClear();
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
-    await user.click(screen.getByRole('button', { name: /retry failed/i }));
+    const resend = screen.getByRole('button', { name: 'Resend to 1' });
+    expect(resend).toHaveAttribute('data-variant', 'secondary');
+    await user.click(resend);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const retried = lastPostedAward();
     expect(retried.data.playerId).toBe('p-2');
     expect(retried.data.award).toEqual(failedBody.data.award); // verbatim, same id
+
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(within(row("Bob's hero")).getByText('Sent')).toBeTruthy();
+  });
+
+  it('shows Sending… only on the button that was pressed', async () => {
+    const user = userEvent.setup();
+    failBob();
+    renderDialog();
+    await user.type(screen.getByLabelText('XP to add'), '100');
+    await user.click(
+      screen.getByRole('button', { name: 'Award XP to 2 players' })
+    );
+    await screen.findByRole('alert');
+
+    let release!: (v: unknown) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise(r => {
+          release = r;
+        })
+    );
+    await user.click(screen.getByRole('button', { name: 'Resend to 1' }));
+
+    expect(screen.getByRole('button', { name: 'Sending…' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Award XP to 2 players' })
+    ).toBeDisabled();
+
+    release({ ok: true, json: async () => ({}) });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Sending…' })).toBeNull()
+    );
+    expect(screen.queryByRole('button', { name: /^Resend/ })).toBeNull();
   });
 
   it('after fully successful send, amount is cleared and award button is disabled', async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
-    render(
-      <AwardXpDialog
-        open
-        onClose={() => {}}
-        players={players}
-        campaignCode="ABC"
-        dmId="dm-1"
-      />
-    );
+    renderDialog();
 
     const amountInput = screen.getByLabelText(/xp to add/i) as HTMLInputElement;
-    const awardButton = screen.getByRole('button', { name: /award to 2/i });
+    const awardButton = screen.getByRole('button', {
+      name: 'Award XP to 2 players',
+    });
 
     await user.type(amountInput, '250');
     expect(awardButton).not.toBeDisabled();
@@ -234,7 +320,7 @@ describe('AwardXpDialog', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
     // After success, amount should be cleared
-    expect(amountInput.value).toBe('');
+    await waitFor(() => expect(amountInput.value).toBe(''));
     // Button should be disabled since amount is now required and empty
     expect(awardButton).toBeDisabled();
   });
