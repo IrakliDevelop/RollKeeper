@@ -49,7 +49,7 @@ function fighter(overrides: Partial<CharacterState> = {}): CharacterState {
 describe('OverviewTab abilities', () => {
   it('shows the six abilities as a ledger row with every save', () => {
     const { container } = render(
-      <OverviewTab char={fighter()} counterValue={0} />
+      <OverviewTab name="Thorin" char={fighter()} counterValue={0} />
     );
     expect(container.querySelectorAll('[data-ledger-cell]')).toHaveLength(6);
     // Level 5: proficiency bonus +3.
@@ -65,7 +65,7 @@ describe('OverviewTab abilities', () => {
   });
 
   it('is read-only: no rolls, no score editor', () => {
-    render(<OverviewTab char={fighter()} counterValue={0} />);
+    render(<OverviewTab name="Thorin" char={fighter()} counterValue={0} />);
     expect(screen.queryByRole('button', { name: /^Roll / })).toBeNull();
     expect(
       screen.queryByRole('button', { name: /^Strength: modifier/ })
@@ -74,7 +74,7 @@ describe('OverviewTab abilities', () => {
 
   it('heads the row "Abilities" with the DM’s own "Scores large" switch', () => {
     const { container } = render(
-      <OverviewTab char={fighter()} counterValue={0} />
+      <OverviewTab name="Thorin" char={fighter()} counterValue={0} />
     );
     expect(
       screen.getByRole('heading', { level: 3, name: 'Abilities' })
@@ -93,7 +93,7 @@ describe('OverviewTab abilities', () => {
     const old = fighter({
       savingThrows: undefined as unknown as CharacterState['savingThrows'],
     });
-    render(<OverviewTab char={old} counterValue={0} />);
+    render(<OverviewTab name="Thorin" char={old} counterValue={0} />);
     expect(
       screen.getByRole('img', { name: 'Strength saving throw +3' })
     ).toBeInTheDocument();
@@ -102,6 +102,7 @@ describe('OverviewTab abilities', () => {
   it('uses the total level for a multiclass character’s saves', () => {
     render(
       <OverviewTab
+        name="Thorin"
         char={fighter({ level: 1, totalLevel: 5 })}
         counterValue={0}
       />
@@ -113,7 +114,7 @@ describe('OverviewTab abilities', () => {
 
   it('animates a swap made with its own switch', () => {
     const { container } = render(
-      <OverviewTab char={fighter()} counterValue={0} />
+      <OverviewTab name="Thorin" char={fighter()} counterValue={0} />
     );
     fireEvent.click(screen.getByRole('switch', { name: 'Scores large' }));
     expect(

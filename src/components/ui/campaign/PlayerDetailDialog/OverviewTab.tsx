@@ -113,6 +113,8 @@ function getHpColor(current: number, max: number): string {
 
 interface OverviewTabProps {
   char: CharacterState;
+  /** The character's display name, for labels naming whose tally it is. */
+  name: string;
   customCounterLabel?: string;
   counterValue: number;
   onAdjustCounter?: (delta: number) => void;

@@ -2,11 +2,12 @@
 
 import { useId, useState } from 'react';
 import Image from 'next/image';
-import { Minus, Plus, UserX } from 'lucide-react';
+import { UserX } from 'lucide-react';
 import { ImageLightbox } from '@/components/ui/feedback/ImageLightbox';
 import { Button } from '@/components/ui/forms/button';
 import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import { Badge } from '@/components/ui/layout/badge';
+import { CounterStepper } from './CounterStepper';
 import { HpReadout } from './HpReadout';
 import {
   calculateCharacterArmorClass,
@@ -79,53 +80,6 @@ function RowAvatar({ src, name }: { src?: string; name: string }) {
         <ImageLightbox src={src} alt={name} onClose={() => setOpen(false)} />
       )}
     </>
-  );
-}
-
-function RosterCounter({
-  label,
-  value,
-  name,
-  onAdjust,
-}: {
-  label: string;
-  value: number;
-  name: string;
-  onAdjust: (delta: number) => void;
-}) {
-  const labelId = useId();
-  return (
-    <div
-      role="group"
-      aria-labelledby={labelId}
-      className="flex items-center gap-1"
-    >
-      <span id={labelId} className="type-small text-muted mr-1">
-        {label}
-      </span>
-      <Button
-        variant="ghost"
-        size="xs"
-        className="px-1.5"
-        aria-label={`Remove 1 ${label} from ${name}`}
-        disabled={value <= 0}
-        onClick={() => onAdjust(-1)}
-      >
-        <Minus size={14} aria-hidden="true" />
-      </Button>
-      <span className="type-ui text-heading min-w-5 text-center tabular-nums">
-        {value}
-      </span>
-      <Button
-        variant="ghost"
-        size="xs"
-        className="px-1.5"
-        aria-label={`Add 1 ${label} to ${name}`}
-        onClick={() => onAdjust(1)}
-      >
-        <Plus size={14} aria-hidden="true" />
-      </Button>
-    </div>
   );
 }
 
@@ -261,7 +215,7 @@ export function PlayerRosterRow({
             </Badge>
           )}
           {customCounterLabel && onAdjustCounter && (
-            <RosterCounter
+            <CounterStepper
               label={customCounterLabel}
               value={counterValue}
               name={name}

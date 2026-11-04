@@ -172,7 +172,7 @@ export const Caster: Story = {
     );
     // Spell Slots section no longer on Overview
     await expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /spells/i }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
     // Stats header from character utils: wizard INT 18, level 5 → DC 15, Atk +7
     await expect(screen.getByText(/save dc: 15/i)).toBeInTheDocument();
     await expect(screen.getByText(/spell attack: \+7/i)).toBeInTheDocument();
@@ -189,7 +189,7 @@ export const Caster: Story = {
     const notPrepared = screen.getAllByText('Not prepared');
     await expect(notPrepared).toHaveLength(2); // Identify, Web
     // Inventory still works
-    await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Inventory' }));
     await expect(screen.getByText('Quarterstaff')).toBeInTheDocument();
   },
 };
@@ -199,7 +199,7 @@ export const Warlock: Story = {
   play: async ({ canvasElement }) => {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Vex')).toBeInTheDocument());
-    await userEvent.click(screen.getByRole('button', { name: /spells/i }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
     await expect(screen.getByText('Pact Magic (Lv 3)')).toBeInTheDocument();
     // 2 pact slots, 1 used → 1/2
     await expect(screen.getByText('1/2')).toBeInTheDocument();
@@ -215,9 +215,9 @@ export const NonCaster: Story = {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Grunk')).toBeInTheDocument());
     await expect(
-      screen.queryByRole('button', { name: /spells/i })
+      screen.queryByRole('tab', { name: 'Spells' })
     ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Inventory' }));
     await expect(screen.getByText('Greataxe')).toBeInTheDocument();
   },
 };
