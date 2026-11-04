@@ -107,8 +107,8 @@ describe('useCampaignItemSends', () => {
     });
     expect(addToast).toHaveBeenCalledWith({
       type: 'success',
-      title: 'Item Sent',
-      message: 'Rope sent to Thorin',
+      title: 'Item sent',
+      message: 'Rope sent to Thorin.',
     });
     expect(result.current.sendItemDialog.sending).toBe(false);
   });
@@ -153,8 +153,8 @@ describe('useCampaignItemSends', () => {
     );
     expect(addToast).toHaveBeenCalledWith({
       type: 'error',
-      title: 'Failed',
-      message: 'Could not send item',
+      title: 'Item not sent',
+      message: "Rope wasn't sent to Thorin. Try again.",
     });
     expect(result.current.sendItemDialog.sending).toBe(false);
   });
@@ -180,7 +180,7 @@ describe('useCampaignItemSends', () => {
     });
     expect(addToast).toHaveBeenCalledWith({
       type: 'success',
-      title: 'Magic Item Given',
+      title: 'Magic item sent',
       message: 'Cloak of Elvenkind sent to Thorin. The library copy was kept.',
     });
   });
@@ -193,8 +193,8 @@ describe('useCampaignItemSends', () => {
     await act(() => result.current.giveLibraryMagicItem(cloak, target));
     expect(addToast).toHaveBeenCalledWith({
       type: 'error',
-      title: 'Magic Item Not Sent',
-      message: 'Could not send Cloak of Elvenkind to Thorin.',
+      title: 'Magic item not sent',
+      message: "Cloak of Elvenkind wasn't sent to Thorin. Try again.",
     });
   });
 

@@ -36,7 +36,6 @@ vi.mock('@/components/ui/forms/RichTextEditor', () => ({
   ),
 }));
 
-import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
 import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
@@ -76,87 +75,6 @@ const mockMessages: DmMessage[] = [
     sentAt: new Date().toISOString(),
   },
 ];
-
-describe('PlayerSummaryCard', () => {
-  it('renders without crashing', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-  });
-
-  it('displays character name and class', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('Thorin').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Fighter').length).toBeGreaterThan(0);
-  });
-
-  it('displays HP information', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('30 / 44 HP').length).toBeGreaterThan(0);
-  });
-
-  it('displays player name', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('Alice').length).toBeGreaterThan(0);
-  });
-
-  it('displays race', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('Dwarf').length).toBeGreaterThan(0);
-  });
-
-  it('opens the character image full size without triggering the card action', () => {
-    const onClick = vi.fn();
-    const playerWithAvatar: CampaignPlayerData = {
-      ...mockPlayer,
-      characterData: makeCharacter({
-        ...mockPlayer.characterData,
-        avatar: 'data:image/png;base64,cG9ydHJhaXQ=',
-      }),
-    };
-
-    render(<PlayerSummaryCard player={playerWithAvatar} onClick={onClick} />);
-    fireEvent.click(
-      screen.getByRole('button', { name: /view thorin image full size/i })
-    );
-
-    expect(
-      screen.getByRole('dialog', { name: /thorin full-size image/i })
-    ).toBeInTheDocument();
-    expect(onClick).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: /close image/i }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(onClick).not.toHaveBeenCalled();
-  });
-});
-
-describe('PlayerSummaryCard remove action', () => {
-  it('renders remove button when onRemove is provided and calls it without triggering card onClick', () => {
-    const onRemove = vi.fn();
-    const onClick = vi.fn();
-    render(
-      <PlayerSummaryCard
-        player={mockPlayer}
-        onRemove={onRemove}
-        onClick={onClick}
-      />
-    );
-
-    const btn = screen.getByRole('button', {
-      name: /remove .* from campaign/i,
-    });
-    fireEvent.click(btn);
-
-    expect(onRemove).toHaveBeenCalledTimes(1);
-    expect(onClick).not.toHaveBeenCalled();
-  });
-
-  it('does not render remove button without onRemove', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(
-      screen.queryByRole('button', { name: /remove .* from campaign/i })
-    ).toBeNull();
-  });
-});
 
 describe('DmMessageNotification', () => {
   it('renders without crashing', () => {
