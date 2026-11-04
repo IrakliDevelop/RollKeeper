@@ -195,6 +195,23 @@ describe('CampaignPlayersSection', () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
+  it('disables Try again while the retry runs', async () => {
+    let resolve: () => void = () => {};
+    onRefresh.mockImplementation(
+      () =>
+        new Promise<void>(r => {
+          resolve = r;
+        })
+    );
+    renderSection({ error: 'boom', players: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeDisabled();
+    resolve();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+    );
+  });
+
   it('hides a stale roster while the players fail to load', () => {
     renderSection({ error: 'boom' });
     expect(
@@ -252,14 +269,12 @@ describe('CampaignPlayersSection', () => {
       playerCounters: { p1: 2 },
     });
     const row = within(screen.getByTestId('player-row-p1'));
-    expect(row.getByRole('group', { name: 'Desperation' })).toHaveTextContent(
-      '2'
-    );
-    expect(
-      within(screen.getByTestId('player-row-p2')).getByRole('group', {
-        name: 'Desperation',
-      })
-    ).toHaveTextContent('0');
+    const counterValue = (r: ReturnType<typeof within>) =>
+      r
+        .getByRole('group', { name: 'Desperation' })
+        .querySelector('span.tabular-nums')?.textContent;
+    expect(counterValue(row)).toBe('2');
+    expect(counterValue(within(screen.getByTestId('player-row-p2')))).toBe('0');
     fireEvent.click(
       row.getByRole('button', { name: 'Add 1 Desperation to Thorin' })
     );

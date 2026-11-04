@@ -132,7 +132,7 @@ export const Roster: Story = {
     await expect(
       canvas.getByRole('heading', { level: 2, name: 'Players (5)' })
     ).toBeInTheDocument();
-    await expect(canvas.getAllByRole('listitem').length).toBeGreaterThan(4);
+    await expect(canvas.getAllByTestId(/^player-row-/)).toHaveLength(5);
   },
 };
 

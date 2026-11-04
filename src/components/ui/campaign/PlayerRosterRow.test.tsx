@@ -190,9 +190,8 @@ describe('PlayerRosterRow', () => {
       screen.getByRole('button', { name: 'Add 1 Desperation to Thorin' })
     );
     expect(onAdjustCounter).toHaveBeenCalledWith(1);
-    expect(
-      screen.getByRole('group', { name: 'Desperation' })
-    ).toHaveTextContent('0');
+    const group = screen.getByRole('group', { name: 'Desperation' });
+    expect(group.querySelector('span.tabular-nums')?.textContent).toBe('0');
   });
 
   it('hides the counter without a label', () => {
@@ -200,14 +199,41 @@ describe('PlayerRosterRow', () => {
     expect(screen.queryByRole('button', { name: /^Add 1/ })).toBeNull();
   });
 
-  it.each([
-    [0, 'Synced just now', 'text-muted'],
-    [90, 'Last synced 1 min ago', 'text-muted'],
-    [180, 'Last synced 3 min ago', 'text-ember-text'],
-    [7200, 'Last synced 2 h ago', 'text-ember-text'],
-  ])('says how fresh a sync %is ago is', (secondsAgo, text, colour) => {
-    renderRow(syncedAt(new Date(Date.now() - secondsAgo * 1000).toISOString()));
-    expect(screen.getByText(text)).toHaveClass(colour);
+  it('hides the counter without a handler', () => {
+    renderRow(mockPlayer, { customCounterLabel: 'Desperation' });
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Add 1/ })).toBeNull();
+  });
+
+  describe('sync freshness', () => {
+    const NOW = new Date('2026-11-04T12:00:00.000Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it.each([
+      [0, 'Synced just now', 'text-muted'],
+      [59, 'Synced just now', 'text-muted'],
+      [60, 'Last synced 1 min ago', 'text-muted'],
+      [90, 'Last synced 1 min ago', 'text-muted'],
+      [119, 'Last synced 1 min ago', 'text-muted'],
+      [120, 'Last synced 2 min ago', 'text-ember-text'],
+      [180, 'Last synced 3 min ago', 'text-ember-text'],
+      [7200, 'Last synced 2 h ago', 'text-ember-text'],
+    ])('says how fresh a sync %is ago is', (secondsAgo, text, colour) => {
+      renderRow(
+        syncedAt(new Date(NOW.getTime() - secondsAgo * 1000).toISOString())
+      );
+      const label = screen.getByText(text);
+      expect(label).toHaveClass(colour);
+      if (colour === 'text-muted')
+        expect(label).not.toHaveClass('text-ember-text');
+    });
   });
 
   it('reads a future sync time as just now', () => {

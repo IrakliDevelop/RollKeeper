@@ -190,6 +190,26 @@ describe('BannerImageControls', () => {
     );
   });
 
+  it('keeps a successful upload when deleting the old banner fails', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ url: NEW }),
+      } as Response)
+      .mockRejectedValueOnce(new Error('offline'));
+    const { container } = render(
+      <BannerImageControls
+        bannerUrl={OLD}
+        campaignCode="K7QX2M"
+        onBannerChange={onBannerChange}
+      />
+    );
+    chooseFile(container, imageFile());
+    await waitFor(() => expect(onBannerChange).toHaveBeenCalledWith(NEW));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('disables the buttons while the upload runs', () => {
     vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
     const { container } = render(

@@ -30,9 +30,13 @@ export const Row: Story = {
   globals: { viewport: { value: 'phone', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByRole('link')).toHaveLength(4);
-    const list = canvas.getByRole('list');
-    await expect(list.scrollWidth).toBeLessThanOrEqual(list.clientWidth);
+    const links = canvas.getAllByRole('link');
+    await expect(links).toHaveLength(4);
+    for (const link of links) {
+      await expect(link.getBoundingClientRect().right).toBeLessThanOrEqual(
+        window.innerWidth
+      );
+    }
   },
 };
 

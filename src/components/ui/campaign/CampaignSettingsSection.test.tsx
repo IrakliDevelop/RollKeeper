@@ -104,6 +104,13 @@ describe('CampaignSettingsSection', () => {
     expect(onCustomCounterLabelChange).toHaveBeenCalledWith('Doom');
   });
 
+  it('commits once when Enter is followed by blur', async () => {
+    renderSettings();
+    await user.type(field(), 'Doom{Enter}');
+    await user.tab();
+    expect(onCustomCounterLabelChange).toHaveBeenCalledExactlyOnceWith('Doom');
+  });
+
   it('clears the counter when the field is emptied', async () => {
     renderSettings({ customCounterLabel: 'Desperation' });
     await user.clear(field());

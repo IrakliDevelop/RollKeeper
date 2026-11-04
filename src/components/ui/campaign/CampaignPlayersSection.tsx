@@ -23,12 +23,19 @@ export interface CampaignPlayersSectionProps {
   playerCounters?: Record<string, number>;
   onAdjustCounter: (playerId: string, delta: number) => void;
   onViewPlayer: (player: CampaignPlayerData) => void;
+  /** Must not reject; the caller handles its own errors. */
   onRemovePlayer: (player: CampaignPlayerData) => void | Promise<void>;
   onMessageAll: () => void;
   onAwardXp: () => void;
 }
 
-function PlayersError({ onRetry }: { onRetry: () => void }) {
+function PlayersError({
+  onRetry,
+  refreshing,
+}: {
+  onRetry: () => void;
+  refreshing: boolean;
+}) {
   return (
     <div className="py-12 text-center">
       <h3 className="type-subheading text-heading">
@@ -41,6 +48,7 @@ function PlayersError({ onRetry }: { onRetry: () => void }) {
         type="button"
         variant="secondary"
         className="mt-4"
+        loading={refreshing}
         onClick={onRetry}
       >
         Try again
@@ -132,7 +140,7 @@ export function CampaignPlayersSection({
   if (loading) {
     body = <p className="text-muted py-12 text-center">Loading players…</p>;
   } else if (error) {
-    body = <PlayersError onRetry={handleRefresh} />;
+    body = <PlayersError onRetry={handleRefresh} refreshing={refreshing} />;
   } else if (players.length === 0) {
     body = <PlayersInvite code={code} />;
   } else {

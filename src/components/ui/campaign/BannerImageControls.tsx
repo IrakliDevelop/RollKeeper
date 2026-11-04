@@ -65,7 +65,11 @@ export function BannerImageControls({
 
       // Delete the old banner from S3 only when it lives there.
       if (bannerUrl && bannerUrl.includes('s3.amazonaws.com')) {
-        await deleteStoredBanner(bannerUrl);
+        try {
+          await deleteStoredBanner(bannerUrl);
+        } catch {
+          // A cleanup failure must not discard the new upload.
+        }
       }
       onBannerChange(url);
     } catch {

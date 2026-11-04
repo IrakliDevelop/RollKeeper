@@ -113,6 +113,32 @@ describe('useCampaignItemSends', () => {
     expect(result.current.sendItemDialog.sending).toBe(false);
   });
 
+  it('reports sending while the NPC item request is in flight', async () => {
+    let resolve: (value: Response) => void = () => {};
+    vi.mocked(fetch).mockReturnValue(
+      new Promise<Response>(r => {
+        resolve = r;
+      })
+    );
+    const { result } = renderSends();
+    const target = result.current.sendTargets[0];
+    act(() => result.current.openNpcItemSend(rope, 'Grimble'));
+    expect(result.current.sendItemDialog.sending).toBe(false);
+    let pending: Promise<void> = Promise.resolve();
+    act(() => {
+      pending = result.current.sendItemDialog.onSend(
+        result.current.sendItemDialog.item!,
+        target
+      );
+    });
+    expect(result.current.sendItemDialog.sending).toBe(true);
+    await act(async () => {
+      resolve({ ok: true } as Response);
+      await pending;
+    });
+    expect(result.current.sendItemDialog.sending).toBe(false);
+  });
+
   it('says the NPC item was not sent', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);

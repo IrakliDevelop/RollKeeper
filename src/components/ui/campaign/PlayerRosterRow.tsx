@@ -113,7 +113,7 @@ function RosterCounter({
       >
         <Minus size={14} aria-hidden="true" />
       </Button>
-      <span className="type-ui text-heading w-5 text-center tabular-nums">
+      <span className="type-ui text-heading min-w-5 text-center tabular-nums">
         {value}
       </span>
       <Button

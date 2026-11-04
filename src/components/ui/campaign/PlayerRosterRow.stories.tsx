@@ -132,6 +132,30 @@ export const NoRaceNoClass: Story = {
   },
 };
 
+export const LargeTally: Story = {
+  args: { counterValue: 123 },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const group = canvas.getByRole('group', { name: 'Desperation' });
+    const value = within(group).getByText('123');
+    const plus = canvas.getByRole('button', {
+      name: 'Add 1 Desperation to Thorin',
+    });
+    const minus = canvas.getByRole('button', {
+      name: 'Remove 1 Desperation from Thorin',
+    });
+    // The digits must fit inside the value box, not spill over the buttons.
+    await expect(value.scrollWidth).toBeLessThanOrEqual(value.clientWidth);
+    const valueBox = value.getBoundingClientRect();
+    await expect(valueBox.right).toBeLessThanOrEqual(
+      plus.getBoundingClientRect().left
+    );
+    await expect(valueBox.left).toBeGreaterThanOrEqual(
+      minus.getBoundingClientRect().right
+    );
+  },
+};
+
 export const Phone: Story = {
   args: Bloodied.args,
   globals: { viewport: { value: 'phone', isRotated: false } },
