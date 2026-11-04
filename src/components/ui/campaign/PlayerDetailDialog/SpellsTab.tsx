@@ -98,52 +98,54 @@ function PlayerSpellRow({
   const tags = spell.tags ?? [];
 
   return (
-    <li className="flex items-center gap-2 py-2 pointer-coarse:min-h-11">
+    <li className="flex items-start gap-2 py-2 pointer-coarse:min-h-11">
       {markPrepared && isPrepared && (
-        <span role="img" aria-label="Prepared" className="shrink-0">
+        <span role="img" aria-label="Prepared" className="mt-1 shrink-0">
           <Star
             className="text-brass-text size-3.5 fill-current"
             aria-hidden="true"
           />
         </span>
       )}
-      <span
-        className={`type-ui min-w-0 truncate ${
-          dimmed ? 'text-muted' : 'text-heading'
-        }`}
-      >
-        {spell.name}
-      </span>
-      {spell.school && spell.school !== 'Unknown' && (
-        <span className="type-small text-muted hidden sm:inline">
-          {spell.school}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className={`type-ui min-w-0 break-words ${
+            dimmed ? 'text-muted' : 'text-heading'
+          }`}
+        >
+          {spell.name}
         </span>
-      )}
-      {dimmed && (
-        <Badge variant="neutral" size="sm">
-          Not prepared
-        </Badge>
-      )}
-      {spell.concentration && (
-        <Badge variant="magic" size="sm">
-          Concentration
-        </Badge>
-      )}
-      {spell.ritual && (
-        <Badge variant="neutral" size="sm">
-          Ritual
-        </Badge>
-      )}
-      {tags.map(tag => (
-        <Badge key={tag} variant="neutral" size="sm">
-          {tag}
-        </Badge>
-      ))}
+        {spell.school && spell.school !== 'Unknown' && (
+          <span className="type-small text-muted hidden sm:inline">
+            {spell.school}
+          </span>
+        )}
+        {dimmed && (
+          <Badge variant="neutral" size="sm">
+            Not prepared
+          </Badge>
+        )}
+        {spell.concentration && (
+          <Badge variant="magic" size="sm">
+            Concentration
+          </Badge>
+        )}
+        {spell.ritual && (
+          <Badge variant="neutral" size="sm">
+            Ritual
+          </Badge>
+        )}
+        {tags.map(tag => (
+          <Badge key={tag} variant="neutral" size="sm">
+            {tag}
+          </Badge>
+        ))}
+      </div>
       <Button
         type="button"
         variant="ghost"
         size="xs"
-        className="ml-auto px-1.5"
+        className="ml-auto shrink-0 px-1.5"
         aria-label={`View ${spell.name}`}
         onClick={onView}
       >

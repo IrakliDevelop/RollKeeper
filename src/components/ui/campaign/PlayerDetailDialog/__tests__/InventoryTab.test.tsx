@@ -123,6 +123,15 @@ describe('InventoryTab', () => {
     expect(screen.getByText('AC 17')).toBeVisible();
   });
 
+  it('shows armor from an older blob that has no category', () => {
+    const old = armor({ name: 'Old Plate' }) as Partial<ArmorItem>;
+    delete old.category;
+    render(
+      <InventoryTab char={character({ armorItems: [old as ArmorItem] })} />
+    );
+    expect(screen.getByText('Old Plate')).toBeVisible();
+  });
+
   it('says so when nothing is synced', () => {
     render(<InventoryTab char={character({})} />);
     expect(

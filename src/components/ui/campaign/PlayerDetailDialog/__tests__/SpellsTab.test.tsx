@@ -108,6 +108,24 @@ describe('SpellsTab', () => {
     ).toBeNull();
   });
 
+  it('lets a long spell name wrap instead of truncating', () => {
+    const char = wizard();
+    char.spells = [
+      makeSpell({
+        name: 'Long Named Spell',
+        level: 1,
+        isPrepared: false,
+        concentration: true,
+        ritual: true,
+      }),
+    ];
+    render(<SpellsTab char={char} />);
+    const name = screen.getByText('Long Named Spell');
+    expect(name.className).not.toContain('truncate');
+    expect(name.className).toContain('break-words');
+    expect(screen.getByText('Ritual')).toBeVisible();
+  });
+
   it('collapses a level from its heading', async () => {
     const user = userEvent.setup();
     render(<SpellsTab char={wizard()} />);

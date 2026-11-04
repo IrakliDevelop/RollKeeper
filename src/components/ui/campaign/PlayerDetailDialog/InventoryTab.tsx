@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Badge } from '@/components/ui/layout/badge';
 import { Section } from '@/components/ui/layout/section';
 import { ensureArray, sentenceCase } from './shared';
@@ -119,7 +118,7 @@ export function InventoryTab({ char }: InventoryTabProps) {
                     </Badge>
                   )}
                   <span className="type-small text-muted">
-                    {sentenceCase(a.category)}
+                    {a.category && sentenceCase(a.category)}
                   </span>
                 </div>
                 <span className="type-ui text-body">

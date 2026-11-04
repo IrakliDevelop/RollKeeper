@@ -338,6 +338,10 @@ export const CasterDark: Story = {
     );
     await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
     await expect(screen.getByText('Magic Missile')).toBeVisible();
+    // The Storybook theme global sets data-theme on the document root.
+    await waitFor(() =>
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    );
   },
 };
 
@@ -374,9 +378,19 @@ export const OverviewOnPhone: Story = {
     await expect(tabsRect.bottom).toBeLessThanOrEqual(window.innerHeight);
     await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
 
-    // A level 1 spell with every tag still fits the phone width.
+    // A level 1 spell with every tag wraps under its name instead of squeezing it.
     await userEvent.click(within(dialog).getByRole('tab', { name: 'Spells' }));
-    await within(dialog).findByText(/^Tasha's Hideous Laughter/);
+    const name = await within(dialog).findByText(/^Tasha's Hideous Laughter/);
+    await expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
+    await expect(name.getBoundingClientRect().width).toBeGreaterThanOrEqual(
+      150
+    );
+    const row = name.closest('li')!;
+    await expect(within(row).getByText('Ritual')).toBeVisible();
+    const view = within(dialog).getByRole('button', {
+      name: `View ${name.textContent}`,
+    });
+    await expect(view.getBoundingClientRect().right).toBeLessThanOrEqual(390);
     await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
   },
 };
