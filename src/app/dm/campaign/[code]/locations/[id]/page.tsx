@@ -3,9 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, MapPinned } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { useLocationStore } from '@/store/locationStore';
@@ -63,30 +63,14 @@ export default function LocationEditorPage() {
       {campaign && (
         <CampaignSettingsSyncControls campaign={campaign} headless />
       )}
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}/locations`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Locations
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">
-                  {location.name}
-                </h1>
-              </div>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
+      <CampaignHeader
+        crumb={{ href: `/dm/campaign/${code}/locations`, label: 'Locations' }}
+        title={
+          <h1 className="type-heading text-heading truncate">
+            {location.name}
+          </h1>
+        }
+      />
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DmLocationEditor

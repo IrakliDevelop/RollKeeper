@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, MapPinned, Plus } from 'lucide-react';
+import { MapPinned, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import {
   Dialog,
   DialogContent,
@@ -105,130 +104,109 @@ export default function CampaignLocationsPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  {campaign?.name ?? 'Campaign'}
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">Locations</h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    leftIcon={<Plus size={16} />}
-                  >
-                    New Location
-                  </Button>
-                </DialogTrigger>
-                <DialogContent size="sm">
-                  <DialogHeader>
-                    <DialogTitle>New Location</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit}>
-                    <DialogBody className="flex flex-col gap-4 px-6 pt-4">
-                      <div>
-                        <label className="text-body mb-1.5 block text-sm font-medium">
-                          Location Name
-                        </label>
-                        <Input
-                          value={locationName}
-                          onChange={e => setLocationName(e.target.value)}
-                          placeholder="e.g. Tavern, Dungeon Level 1"
-                          required
-                          autoFocus
-                        />
-                      </div>
-                      <div>
-                        <label className="text-body mb-1.5 block text-sm font-medium">
-                          Map Image
-                        </label>
-                        <div
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`border-divider bg-surface hover:border-body flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
-                            mapFile ? 'border-accent-emerald-border' : ''
-                          }`}
-                        >
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            required
-                            onChange={e =>
-                              setMapFile(e.target.files?.[0] ?? null)
-                            }
-                            className="hidden"
+      <CampaignHeader
+        crumb={{
+          href: `/dm/campaign/${code}`,
+          label: campaign?.name ?? 'Campaign',
+        }}
+        title={<h1 className="type-heading text-heading">Locations</h1>}
+        actions={
+          <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+            <DialogTrigger asChild>
+              <Button variant="primary" size="sm" leftIcon={<Plus size={16} />}>
+                New Location
+              </Button>
+            </DialogTrigger>
+            <DialogContent size="sm">
+              <DialogHeader>
+                <DialogTitle>New Location</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <DialogBody className="flex flex-col gap-4 px-6 pt-4">
+                  <div>
+                    <label className="text-body mb-1.5 block text-sm font-medium">
+                      Location Name
+                    </label>
+                    <Input
+                      value={locationName}
+                      onChange={e => setLocationName(e.target.value)}
+                      placeholder="e.g. Tavern, Dungeon Level 1"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="text-body mb-1.5 block text-sm font-medium">
+                      Map Image
+                    </label>
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-divider bg-surface hover:border-body flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
+                        mapFile ? 'border-accent-emerald-border' : ''
+                      }`}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        required
+                        onChange={e => setMapFile(e.target.files?.[0] ?? null)}
+                        className="hidden"
+                      />
+                      {mapFile ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <MapPinned
+                            size={24}
+                            className="text-accent-emerald-text"
                           />
-                          {mapFile ? (
-                            <div className="flex flex-col items-center gap-1">
-                              <MapPinned
-                                size={24}
-                                className="text-accent-emerald-text"
-                              />
-                              <span className="text-body text-sm font-medium">
-                                {mapFile.name}
-                              </span>
-                              <span className="text-muted text-xs">
-                                Click to change
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center gap-1">
-                              <Plus size={24} className="text-muted" />
-                              <span className="text-body text-sm font-medium">
-                                Choose an image
-                              </span>
-                              <span className="text-muted text-xs">
-                                PNG, JPG, or WebP
-                              </span>
-                            </div>
-                          )}
+                          <span className="text-body text-sm font-medium">
+                            {mapFile.name}
+                          </span>
+                          <span className="text-muted text-xs">
+                            Click to change
+                          </span>
                         </div>
-                      </div>
-                      {uploadError && (
-                        <p className="text-accent-red-text text-sm">
-                          {uploadError}
-                        </p>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1">
+                          <Plus size={24} className="text-muted" />
+                          <span className="text-body text-sm font-medium">
+                            Choose an image
+                          </span>
+                          <span className="text-muted text-xs">
+                            PNG, JPG, or WebP
+                          </span>
+                        </div>
                       )}
-                    </DialogBody>
-                    <DialogFooter className="mt-4">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => handleDialogClose(false)}
-                        disabled={uploading}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        disabled={uploading || !locationName.trim() || !mapFile}
-                      >
-                        {uploading ? 'Uploading...' : 'Create Location'}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-              <HeaderTrailing showSystemOption />
-            </div>
-          </div>
-        </div>
-      </header>
+                    </div>
+                  </div>
+                  {uploadError && (
+                    <p className="text-accent-red-text text-sm">
+                      {uploadError}
+                    </p>
+                  )}
+                </DialogBody>
+                <DialogFooter className="mt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleDialogClose(false)}
+                    disabled={uploading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={uploading || !locationName.trim() || !mapFile}
+                  >
+                    {uploading ? 'Uploading...' : 'Create Location'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {locations.length === 0 ? (

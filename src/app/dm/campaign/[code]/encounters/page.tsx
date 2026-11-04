@@ -1,11 +1,8 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/forms/button';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { CombatLogArchiveSyncControls } from '@/components/ui/campaign/CombatLogArchiveSyncControls';
 import { EncounterSyncControls } from '@/components/ui/campaign/EncounterSyncControls';
 import { EncounterList } from '@/components/ui/encounter/EncounterList';
@@ -29,26 +26,13 @@ export default function CampaignEncountersPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-3">
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                leftIcon={<ArrowLeft size={20} />}
-              >
-                <Link href={`/dm/campaign/${code}`}>
-                  {campaign?.name ?? 'Campaign'}
-                </Link>
-              </Button>
-              <h1 className="type-heading text-heading">Encounters</h1>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
+      <CampaignHeader
+        crumb={{
+          href: `/dm/campaign/${code}`,
+          label: campaign?.name ?? 'Campaign',
+        }}
+        title={<h1 className="type-heading text-heading">Encounters</h1>}
+      />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <EncounterList campaignCode={code} />
