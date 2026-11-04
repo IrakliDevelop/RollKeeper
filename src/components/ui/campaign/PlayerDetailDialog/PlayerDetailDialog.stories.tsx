@@ -98,6 +98,23 @@ const casterPlayer: CampaignPlayerData = {
   }),
 };
 
+const longSpellPlayer: CampaignPlayerData = {
+  ...casterPlayer,
+  characterData: {
+    ...casterPlayer.characterData,
+    spells: [
+      ...casterPlayer.characterData.spells,
+      makeSpell({
+        name: "Tasha's Hideous Laughter Of The Unprepared Archmage",
+        level: 1,
+        isPrepared: false,
+        concentration: true,
+        ritual: true,
+      }),
+    ],
+  },
+};
+
 const warlockPlayer: CampaignPlayerData = {
   playerId: 'p2',
   playerName: 'Robin',
@@ -172,24 +189,29 @@ export const Caster: Story = {
     );
     // Spell Slots section no longer on Overview
     await expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /spells/i }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
     // Stats header from character utils: wizard INT 18, level 5 → DC 15, Atk +7
-    await expect(screen.getByText(/save dc: 15/i)).toBeInTheDocument();
-    await expect(screen.getByText(/spell attack: \+7/i)).toBeInTheDocument();
+    await expect(screen.getByText(/^Intelligence/)).toHaveTextContent(
+      'Intelligence · Spell attack +7 · Spell save DC 15'
+    );
     // Level groups
     await expect(screen.getByText('Cantrips')).toBeInTheDocument();
     await expect(screen.getByText('Level 1')).toBeInTheDocument();
     await expect(screen.getByText('Level 2')).toBeInTheDocument();
     // Slot counts: remaining/max
-    await expect(screen.getByText('3/4')).toBeInTheDocument();
-    await expect(screen.getByText('1/3')).toBeInTheDocument();
+    await expect(
+      screen.getByRole('img', { name: '3 of 4 level 1 slots available' })
+    ).toBeInTheDocument();
+    await expect(
+      screen.getByRole('img', { name: '1 of 3 level 2 slots available' })
+    ).toBeInTheDocument();
     // Spells listed, prepared marking
     await expect(screen.getByText('Shield')).toBeInTheDocument();
     await expect(screen.getByText('Identify')).toBeInTheDocument();
     const notPrepared = screen.getAllByText('Not prepared');
     await expect(notPrepared).toHaveLength(2); // Identify, Web
     // Inventory still works
-    await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Inventory' }));
     await expect(screen.getByText('Quarterstaff')).toBeInTheDocument();
   },
 };
@@ -199,10 +221,14 @@ export const Warlock: Story = {
   play: async ({ canvasElement }) => {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Vex')).toBeInTheDocument());
-    await userEvent.click(screen.getByRole('button', { name: /spells/i }));
-    await expect(screen.getByText('Pact Magic (Lv 3)')).toBeInTheDocument();
-    // 2 pact slots, 1 used → 1/2
-    await expect(screen.getByText('1/2')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
+    await expect(
+      screen.getByRole('heading', { name: 'Pact magic, level 3' })
+    ).toBeInTheDocument();
+    // 2 pact slots, 1 used → 1 available
+    await expect(
+      screen.getByRole('img', { name: '1 of 2 pact slots available' })
+    ).toBeInTheDocument();
     await expect(screen.getByText('Eldritch Blast')).toBeInTheDocument();
     // Warlock has no per-spell isPrepared flags → no prepared/unprepared marking
     await expect(screen.queryByText('Not prepared')).not.toBeInTheDocument();
@@ -215,9 +241,9 @@ export const NonCaster: Story = {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Grunk')).toBeInTheDocument());
     await expect(
-      screen.queryByRole('button', { name: /spells/i })
+      screen.queryByRole('tab', { name: 'Spells' })
     ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Inventory' }));
     await expect(screen.getByText('Greataxe')).toBeInTheDocument();
   },
 };
@@ -232,12 +258,30 @@ function cellsPerRow(root: HTMLElement) {
   return tops.filter(top => top === tops[0]).length;
 }
 
+/** Neither header action sits under the dialog's Close button. */
+async function expectActionsClearOfClose(dialog: HTMLElement) {
+  const close = within(dialog)
+    .getByRole('button', { name: 'Close' })
+    .getBoundingClientRect();
+  for (const name of ['Export character', 'Message']) {
+    const rect = within(dialog)
+      .getByRole('button', { name })
+      .getBoundingClientRect();
+    const overlaps =
+      rect.left < close.right &&
+      rect.right > close.left &&
+      rect.top < close.bottom &&
+      rect.bottom > close.top;
+    await expect(overlaps).toBe(false);
+  }
+}
+
 /**
  * The DM's view of a player's abilities: a read-only ledger row, six
  * across, with the DM's own "Scores large" switch (this device only).
  */
 export const Abilities: Story = {
-  args: { player: nonCasterPlayer },
+  args: { player: nonCasterPlayer, onSendMessage: fn() },
   parameters: {
     viewport: {
       options: {
@@ -253,6 +297,7 @@ export const Abilities: Story = {
   play: async ({ canvasElement }) => {
     const screen = body(canvasElement);
     const dialog = await screen.findByRole('dialog');
+    await expectActionsClearOfClose(dialog);
     await expect(
       within(dialog).getByRole('heading', { level: 3, name: 'Abilities' })
     ).toBeInTheDocument();
@@ -299,5 +344,77 @@ export const AbilitiesOnPhone: Story = {
     await expect(
       within(dialog).getByRole('switch', { name: 'Scores large' })
     ).toBeVisible();
+  },
+};
+
+export const CasterDark: Story = {
+  args: { player: casterPlayer },
+  globals: { theme: 'dark' },
+  play: async ({ canvasElement }) => {
+    const screen = body(canvasElement);
+    await waitFor(() =>
+      expect(screen.getByText('Aria the Wise')).toBeInTheDocument()
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Spells' }));
+    await expect(screen.getByText('Magic Missile')).toBeVisible();
+    // The Storybook theme global sets data-theme on the document root.
+    await waitFor(() =>
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    );
+  },
+};
+
+/**
+ * On a phone only the tab panel scrolls: the tab list stays in view however
+ * long the Overview is, and nothing pushes the page sideways.
+ */
+export const OverviewOnPhone: Story = {
+  args: { player: longSpellPlayer, onSendMessage: fn() },
+  parameters: {
+    viewport: {
+      options: {
+        phone: {
+          name: 'Phone',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const screen = body(canvasElement);
+    const dialog = await screen.findByRole('dialog');
+    await expectActionsClearOfClose(dialog);
+    const panel = within(dialog).getByRole('tabpanel');
+    panel.scrollTop = panel.scrollHeight;
+    await waitFor(() => expect(panel.scrollTop).toBeGreaterThan(0));
+    const dialogRect = dialog.getBoundingClientRect();
+    const tablist = within(dialog).getByRole('tablist');
+    // A long Overview must not squash the tab list: its labels stay whole.
+    // The 1px is the active tab's border, which overlaps the list's rule.
+    await expect(tablist.clientHeight + 1).toBeGreaterThanOrEqual(
+      tablist.scrollHeight
+    );
+    const tabsRect = tablist.getBoundingClientRect();
+    await expect(tabsRect.top).toBeGreaterThanOrEqual(dialogRect.top);
+    await expect(tabsRect.bottom).toBeLessThanOrEqual(dialogRect.bottom);
+    await expect(tabsRect.bottom).toBeLessThanOrEqual(window.innerHeight);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+
+    // A level 1 spell with every tag wraps under its name instead of squeezing it.
+    await userEvent.click(within(dialog).getByRole('tab', { name: 'Spells' }));
+    const name = await within(dialog).findByText(/^Tasha's Hideous Laughter/);
+    await expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
+    await expect(name.getBoundingClientRect().width).toBeGreaterThanOrEqual(
+      150
+    );
+    const row = name.closest('li')!;
+    await expect(within(row).getByText('Ritual')).toBeVisible();
+    const view = within(dialog).getByRole('button', {
+      name: `View ${name.textContent}`,
+    });
+    await expect(view.getBoundingClientRect().right).toBeLessThanOrEqual(390);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
   },
 };
