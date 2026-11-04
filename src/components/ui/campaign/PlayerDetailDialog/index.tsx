@@ -116,7 +116,7 @@ export function PlayerDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="xl">
-        <DialogHeader>
+        <DialogHeader className="pr-10">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <DialogTitle>{name}</DialogTitle>

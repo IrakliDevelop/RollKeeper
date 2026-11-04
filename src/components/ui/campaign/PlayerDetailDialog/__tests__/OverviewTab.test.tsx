@@ -229,6 +229,18 @@ describe('OverviewTab vitals and status', () => {
     expect(none).toHaveTextContent('0');
   });
 
+  it('caps the heroic inspiration pips at ten', () => {
+    render(
+      <OverviewTab
+        name="Thorin"
+        char={fighter({ heroicInspiration: { count: 12, maxCount: 12 } })}
+        counterValue={0}
+      />
+    );
+    const twelve = screen.getByRole('img', { name: 'Heroic inspiration 12' });
+    expect(twelve.querySelectorAll('span.rounded-full')).toHaveLength(10);
+  });
+
   it('steps the counter with named buttons', () => {
     const onAdjust = vi.fn();
     const { rerender } = render(
@@ -367,10 +379,11 @@ describe('OverviewTab vitals and status', () => {
     expect(
       screen.getByText('1 of 3 attunement slots used')
     ).toBeInTheDocument();
-    expect(screen.queryByText('Normal')).toBeNull();
+    // A normal load shows the weight and no status badge.
     expect(
       within(encumbranceSection()).getByText(/ lb\.$/)
     ).toBeInTheDocument();
+    expect(encumbranceSection().querySelector('[data-variant]')).toBeNull();
 
     rerender(
       <OverviewTab
@@ -384,6 +397,27 @@ describe('OverviewTab vitals and status', () => {
       />
     );
     expect(screen.getByText('Over capacity')).toBeInTheDocument();
+  });
+
+  it.each([
+    // Strength 16: encumbered above 80 lb., heavily above 160, capacity 240.
+    [100, 'Encumbered'],
+    [200, 'Heavily encumbered'],
+  ])('badges a %i lb. load as %s', (weight, label) => {
+    render(
+      <OverviewTab
+        name="Thorin"
+        char={fighter({
+          inventoryItems: [
+            { id: 'i1', name: 'Ingots', weight, quantity: 1 },
+          ] as unknown as CharacterState['inventoryItems'],
+        })}
+        counterValue={0}
+      />
+    );
+    expect(
+      within(encumbranceSection()).getByText(label).closest('[data-variant]')
+    ).toHaveAttribute('data-variant', 'warning');
   });
 
   it('draws an empty bar at zero carrying capacity', () => {

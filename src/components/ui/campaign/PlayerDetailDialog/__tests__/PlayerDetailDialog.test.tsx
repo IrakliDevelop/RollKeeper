@@ -113,6 +113,17 @@ describe('PlayerDetailDialog header', () => {
     expect(screen.getByRole('heading', { name: 'Thorin' })).toBeInTheDocument();
   });
 
+  it('keeps the header actions clear of the Close button', () => {
+    renderDialog(playerFor(makeCharacter({ name: 'Thorin' })));
+    const header = screen
+      .getByRole('heading', { name: 'Thorin' })
+      .closest('div.pr-10');
+    expect(header).not.toBeNull();
+    expect(header).toContainElement(
+      screen.getByRole('button', { name: 'Export character' })
+    );
+  });
+
   it('leaves out a missing race and alignment', () => {
     const base = makeCharacter();
     renderDialog(

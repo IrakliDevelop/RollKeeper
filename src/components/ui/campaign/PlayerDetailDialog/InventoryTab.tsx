@@ -49,7 +49,7 @@ export function InventoryTab({ char }: InventoryTabProps) {
                     </Badge>
                   )}
                 </div>
-                <span className="type-small text-muted">
+                <span className="type-small text-muted shrink-0 text-right">
                   {ensureArray<(typeof w.damage)[number]>(w.damage)
                     .map(d => `${d.dice} ${d.type}`)
                     .join(', ') || '—'}
@@ -87,7 +87,7 @@ export function InventoryTab({ char }: InventoryTabProps) {
                   )}
                 </div>
                 {item.chargePool && (
-                  <span className="type-small text-muted">
+                  <span className="type-small text-muted shrink-0 text-right">
                     {item.chargePool.maxCharges - item.chargePool.usedCharges}/
                     {item.chargePool.maxCharges} charges
                   </span>
@@ -117,9 +117,11 @@ export function InventoryTab({ char }: InventoryTabProps) {
                       Equipped
                     </Badge>
                   )}
-                  <span className="type-small text-muted">
-                    {a.category && sentenceCase(a.category)}
-                  </span>
+                  {a.category && (
+                    <span className="type-small text-muted">
+                      {sentenceCase(a.category)}
+                    </span>
+                  )}
                 </div>
                 <span className="type-ui text-body">
                   AC {a.baseAC + (a.enhancementBonus ?? 0)}

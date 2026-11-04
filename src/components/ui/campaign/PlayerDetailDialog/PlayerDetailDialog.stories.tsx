@@ -258,12 +258,30 @@ function cellsPerRow(root: HTMLElement) {
   return tops.filter(top => top === tops[0]).length;
 }
 
+/** Neither header action sits under the dialog's Close button. */
+async function expectActionsClearOfClose(dialog: HTMLElement) {
+  const close = within(dialog)
+    .getByRole('button', { name: 'Close' })
+    .getBoundingClientRect();
+  for (const name of ['Export character', 'Message']) {
+    const rect = within(dialog)
+      .getByRole('button', { name })
+      .getBoundingClientRect();
+    const overlaps =
+      rect.left < close.right &&
+      rect.right > close.left &&
+      rect.top < close.bottom &&
+      rect.bottom > close.top;
+    await expect(overlaps).toBe(false);
+  }
+}
+
 /**
  * The DM's view of a player's abilities: a read-only ledger row, six
  * across, with the DM's own "Scores large" switch (this device only).
  */
 export const Abilities: Story = {
-  args: { player: nonCasterPlayer },
+  args: { player: nonCasterPlayer, onSendMessage: fn() },
   parameters: {
     viewport: {
       options: {
@@ -279,6 +297,7 @@ export const Abilities: Story = {
   play: async ({ canvasElement }) => {
     const screen = body(canvasElement);
     const dialog = await screen.findByRole('dialog');
+    await expectActionsClearOfClose(dialog);
     await expect(
       within(dialog).getByRole('heading', { level: 3, name: 'Abilities' })
     ).toBeInTheDocument();
@@ -350,7 +369,7 @@ export const CasterDark: Story = {
  * long the Overview is, and nothing pushes the page sideways.
  */
 export const OverviewOnPhone: Story = {
-  args: { player: longSpellPlayer },
+  args: { player: longSpellPlayer, onSendMessage: fn() },
   parameters: {
     viewport: {
       options: {
@@ -366,6 +385,7 @@ export const OverviewOnPhone: Story = {
   play: async ({ canvasElement }) => {
     const screen = body(canvasElement);
     const dialog = await screen.findByRole('dialog');
+    await expectActionsClearOfClose(dialog);
     const panel = within(dialog).getByRole('tabpanel');
     panel.scrollTop = panel.scrollHeight;
     await waitFor(() => expect(panel.scrollTop).toBeGreaterThan(0));

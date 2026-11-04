@@ -130,6 +130,11 @@ describe('InventoryTab', () => {
       <InventoryTab char={character({ armorItems: [old as ArmorItem] })} />
     );
     expect(screen.getByText('Old Plate')).toBeVisible();
+    const row = screen.getByText('Old Plate').closest('li')!;
+    const empty = Array.from(row.querySelectorAll('span')).filter(
+      span => span.textContent === ''
+    );
+    expect(empty).toHaveLength(0);
   });
 
   it('says so when nothing is synced', () => {
