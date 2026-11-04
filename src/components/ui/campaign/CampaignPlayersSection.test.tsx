@@ -168,6 +168,27 @@ describe('CampaignPlayersSection', () => {
     expect(screen.queryByTestId('player-row-p1')).toBeNull();
   });
 
+  it.each([
+    ['loading', { loading: true, players: [] }, 'Loading players…'],
+    ['error', { error: 'x' }, "Couldn't load the players"],
+    ['empty', { players: [] }, 'Invite your players'],
+  ] as [string, Partial<CampaignPlayersSectionProps>, string][])(
+    'shows the %s state even when the section is saved as closed',
+    (_state, overrides, text) => {
+      renderSection({ open: false, ...overrides });
+      expect(screen.getByText(text)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Players' })).toBeNull();
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'Players' })
+      ).toBeInTheDocument();
+      if (overrides.error) {
+        expect(
+          screen.getByRole('button', { name: 'Try again' })
+        ).toBeInTheDocument();
+      }
+    }
+  );
+
   it('shows Loading players… while the first fetch runs', () => {
     renderSection({ loading: true, players: [] });
     expect(

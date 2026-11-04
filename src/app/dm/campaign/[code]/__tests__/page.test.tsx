@@ -16,7 +16,7 @@ import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
-import type { CampaignPlayerData } from '@/types/campaign';
+import type { CampaignInfo, CampaignPlayerData } from '@/types/campaign';
 
 import CampaignViewPage from '../page';
 
@@ -107,7 +107,7 @@ function mockSync(overrides: Partial<SyncResult> = {}) {
   } as SyncResult);
 }
 
-function seedCampaign(extra: Record<string, unknown> = {}) {
+function seedCampaign(extra: Partial<CampaignInfo> = {}) {
   useDmStore.setState({
     dmId: 'dm-synth',
     campaigns: [
@@ -185,6 +185,11 @@ it('shows the banner only when one is set', () => {
   const img = document.querySelector('main img');
   expect(img).not.toBeNull();
   expect(img).toHaveAttribute('alt', '');
+  expect(img!.parentElement).toHaveClass(
+    'aspect-[16/7]',
+    'max-h-48',
+    'lg:aspect-video'
+  );
 });
 
 it('drops the rail banner when it is removed', async () => {
@@ -253,6 +258,13 @@ it('keeps the settings during a players error', async () => {
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
   );
+});
+
+it('keeps the retry reachable when the players section is saved as closed', () => {
+  seedCampaign({ dmDashboardUi: { playersSectionOpen: false } });
+  mockSync({ error: 'Failed to fetch players', players: [] });
+  render(<CampaignViewPage />);
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });
 
 it('invites players with the campaign code when nobody has joined', () => {
@@ -407,6 +419,7 @@ describe('removing a player', () => {
       '/api/campaign/K7QX2M/players/p1',
       expect.objectContaining({
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dmId: 'dm-synth' }),
       })
     );
@@ -460,6 +473,12 @@ describe('removing a player', () => {
       await screen.findByRole('heading', { level: 4, name: 'Player removed' })
     ).toBeInTheDocument();
     await waitFor(() => expect(refresh).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(console.error).toHaveBeenCalledWith(
+        'Failed to refresh players:',
+        expect.any(Error)
+      )
+    );
     expect(
       screen.queryByRole('heading', { level: 4, name: 'Player not removed' })
     ).toBeNull();

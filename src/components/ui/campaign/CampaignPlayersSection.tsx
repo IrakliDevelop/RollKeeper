@@ -199,8 +199,10 @@ export function CampaignPlayersSection({
       heading={hasPlayers ? `Players (${players.length})` : 'Players'}
       level={2}
       wrapHeading
-      collapsed={!open}
-      onCollapsedChange={collapsed => onOpenChange(!collapsed)}
+      collapsed={hasPlayers ? !open : undefined}
+      onCollapsedChange={
+        hasPlayers ? collapsed => onOpenChange(!collapsed) : undefined
+      }
       trailing={trailing}
     >
       {body}

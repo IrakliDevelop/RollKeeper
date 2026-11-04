@@ -174,7 +174,7 @@ export default function CampaignViewPage() {
           {bannerUrl && (
             <CampaignBanner
               src={bannerUrl}
-              className="aspect-[16/7] lg:aspect-video"
+              className="aspect-[16/7] max-h-48 lg:aspect-video"
             />
           )}
           <CampaignNav code={code} className="lg:hidden" />
