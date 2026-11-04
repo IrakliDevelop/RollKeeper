@@ -233,7 +233,9 @@ describe('CreateCampaignDialog', () => {
 });
 
 describe('SendMessageDialog', () => {
-  it('renders without crashing when open', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const renderDialog = (props: Record<string, unknown> = {}) =>
     render(
       <SendMessageDialog
         open={true}
@@ -241,51 +243,92 @@ describe('SendMessageDialog', () => {
         players={[mockPlayer]}
         campaignCode="ABC123"
         dmId="dm-1"
+        {...props}
       />
     );
+
+  it('renders without crashing when open', () => {
+    renderDialog();
   });
 
   it('displays dialog title and recipient info', () => {
-    render(
-      <SendMessageDialog
-        open={true}
-        onClose={vi.fn()}
-        players={[mockPlayer]}
-        campaignCode="ABC123"
-        dmId="dm-1"
-      />
-    );
+    renderDialog();
     expect(
-      screen.getAllByText('Send Message to Player').length
-    ).toBeGreaterThan(0);
-    expect(screen.getAllByText('All players (1)').length).toBeGreaterThan(0);
+      screen.getByRole('dialog', { name: 'Message all players' })
+    ).toBeTruthy();
+    expect(screen.getByText('To').tagName).toBe('DT');
+    expect(screen.getByText('All players (1)').tagName).toBe('DD');
+  });
+
+  it('names the character when sent to one player', () => {
+    renderDialog({ targetPlayer: mockPlayer });
+    expect(screen.getByRole('dialog', { name: 'Message Thorin' })).toBeTruthy();
+    expect(screen.getByText('Thorin (Alice)')).toBeTruthy();
   });
 
   it('displays title input', () => {
-    render(
-      <SendMessageDialog
-        open={true}
-        onClose={vi.fn()}
-        players={[mockPlayer]}
-        campaignCode="ABC123"
-        dmId="dm-1"
-      />
+    renderDialog();
+    expect(screen.getByLabelText('Title').getAttribute('placeholder')).toBe(
+      'The bridge is out'
     );
-    expect(
-      screen.getAllByPlaceholderText('Message title...').length
-    ).toBeGreaterThan(0);
   });
 
   it('displays rich text editor', () => {
-    render(
-      <SendMessageDialog
-        open={true}
-        onClose={vi.fn()}
-        players={[mockPlayer]}
-        campaignCode="ABC123"
-        dmId="dm-1"
-      />
-    );
+    renderDialog();
     expect(screen.getAllByTestId('rich-text-editor').length).toBeGreaterThan(0);
+    expect(screen.getByText('Message (optional)')).toBeTruthy();
+  });
+
+  it('clears the draft when Cancel closes it', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const props = {
+      onClose,
+      players: [mockPlayer],
+      campaignCode: 'ABC123',
+      dmId: 'dm-1',
+    };
+    const { rerender } = render(<SendMessageDialog open {...props} />);
+    await user.type(screen.getByLabelText('Title'), 'Bridge');
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancel.getAttribute('data-variant')).toBe('outline');
+    await user.click(cancel);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<SendMessageDialog open={false} {...props} />);
+    rerender(<SendMessageDialog open {...props} />);
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('');
+  });
+
+  it('shows a fixed error, not the server message', async () => {
+    const user = userEvent.setup();
+    let release!: (v: unknown) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(r => {
+            release = r;
+          })
+      )
+    );
+    renderDialog();
+    await user.type(screen.getByLabelText('Title'), 'Bridge');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+
+    expect(
+      (screen.getByRole('button', { name: 'Sending…' }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement)
+        .disabled
+    ).toBe(false);
+
+    release({ ok: false, status: 500, json: async () => ({ error: 'boom' }) });
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe("The message wasn't sent. Try again.");
+    expect(alert.className).toContain('text-blood-text');
+    expect(screen.queryByText('boom')).toBeNull();
   });
 });

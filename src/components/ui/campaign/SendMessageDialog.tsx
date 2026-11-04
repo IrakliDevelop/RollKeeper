@@ -42,18 +42,14 @@ export function SendMessageDialog({
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const sendToAll = !targetPlayer;
+  const [failed, setFailed] = useState(false);
 
   const handleSend = async () => {
     if (!title.trim()) return;
 
-    const playerIds = sendToAll
-      ? players.map(p => p.playerId)
-      : targetPlayer
-        ? [targetPlayer.playerId]
-        : [];
+    const playerIds = targetPlayer
+      ? [targetPlayer.playerId]
+      : players.map(p => p.playerId);
 
     if (playerIds.length === 0) return;
 
@@ -65,7 +61,7 @@ export function SendMessageDialog({
     };
 
     setSending(true);
-    setError(null);
+    setFailed(false);
 
     try {
       const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
@@ -86,8 +82,8 @@ export function SendMessageDialog({
       setTitle('');
       setContent('');
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+    } catch {
+      setFailed(true);
     } finally {
       setSending(false);
     }
@@ -97,59 +93,62 @@ export function SendMessageDialog({
     if (!isOpen) {
       setTitle('');
       setContent('');
-      setError(null);
+      setFailed(false);
       onClose();
     }
   };
 
-  const recipientLabel = sendToAll
-    ? `All players (${players.length})`
-    : targetPlayer
-      ? `${targetPlayer.characterName} (${targetPlayer.playerName})`
-      : 'No recipient';
+  const recipientLabel = targetPlayer
+    ? `${targetPlayer.characterName} (${targetPlayer.playerName})`
+    : `All players (${players.length})`;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Send Message to Player</DialogTitle>
+          <DialogTitle>
+            {targetPlayer
+              ? `Message ${targetPlayer.characterName}`
+              : 'Message all players'}
+          </DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-4">
-          {/* Recipient */}
-          <div className="space-y-2">
-            <label className="text-body text-sm font-medium">To</label>
-            <div className="text-heading text-sm">{recipientLabel}</div>
-          </div>
+          <dl className="space-y-1">
+            <dt className="type-ui text-heading">To</dt>
+            <dd className="type-body text-heading">{recipientLabel}</dd>
+          </dl>
 
-          {/* Title */}
-          <div className="space-y-1">
-            <label className="text-body text-sm font-medium">Title</label>
-            <Input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Message title..."
-              autoFocus
-            />
-          </div>
+          <Input
+            label="Title"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="The bridge is out"
+            autoFocus
+          />
 
-          {/* Content */}
-          <div className="space-y-1">
-            <label className="text-body text-sm font-medium">
-              Message <span className="text-faint font-normal">(optional)</span>
-            </label>
+          <div className="space-y-1.5">
+            <p className="type-ui text-heading">Message (optional)</p>
             <RichTextEditor
-              ariaLabel="Message"
+              ariaLabel="Message (optional)"
               content={content}
               onChange={setContent}
-              placeholder="Write your message..."
+              placeholder="Meet at the Rusty Anchor after the session."
               minHeight="120px"
             />
           </div>
 
-          {error && <p className="text-accent-red-text text-sm">{error}</p>}
+          {failed && (
+            <p role="alert" className="type-small text-blood-text">
+              The message wasn&apos;t sent. Try again.
+            </p>
+          )}
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button
@@ -158,7 +157,7 @@ export function SendMessageDialog({
             onClick={handleSend}
             disabled={!title.trim() || sending}
           >
-            {sending ? 'Sending...' : 'Send'}
+            {sending ? 'Sending…' : 'Send message'}
           </Button>
         </DialogFooter>
       </DialogContent>
