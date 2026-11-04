@@ -1,12 +1,6 @@
 'use client';
 
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useCallback,
-} from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -42,6 +36,7 @@ import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
 import { AwardXpDialog } from '@/components/ui/campaign/AwardXpDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
+import { useCampaignItemSends } from '@/hooks/useCampaignItemSends';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
@@ -51,31 +46,7 @@ import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { CampaignPlayerData } from '@/types/campaign';
-import {
-  SendItemDialog,
-  SendItemTarget,
-} from '@/components/ui/campaign/SendItemDialog';
-import type { ItemTransfer } from '@/types/sharedState';
-import type { InventoryItem, MagicItem } from '@/types/character';
-import type { NPCInventoryItem } from '@/types/encounter';
-
-function npcItemToInventoryItem(npcItem: NPCInventoryItem): InventoryItem {
-  return {
-    id: npcItem.id,
-    name: npcItem.name,
-    quantity: npcItem.quantity,
-    category: npcItem.category || 'misc',
-    description: npcItem.description,
-    weight: npcItem.weight,
-    value: npcItem.value,
-    rarity: npcItem.rarity as InventoryItem['rarity'],
-    type: npcItem.type as InventoryItem['type'],
-    location: 'Backpack',
-    tags: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-}
+import { SendItemDialog } from '@/components/ui/campaign/SendItemDialog';
 
 export default function CampaignViewPage() {
   const params = useParams();
@@ -120,16 +91,9 @@ export default function CampaignViewPage() {
   const [playerToRemove, setPlayerToRemove] =
     useState<CampaignPlayerData | null>(null);
   const { toasts, addToast, dismissToast } = useToast();
+  const itemSends = useCampaignItemSends({ code, dmId, players, addToast });
   const knownPlayerIdsRef = useRef<Set<string>>(new Set());
 
-  const [npcSendingItem, setNpcSendingItem] = useState<NPCInventoryItem | null>(
-    null
-  );
-  const [npcSendingNpcName, setNpcSendingNpcName] = useState<string | null>(
-    null
-  );
-  const [npcSendDialogOpen, setNpcSendDialogOpen] = useState(false);
-  const [isNpcSendingItem, setIsNpcSendingItem] = useState(false);
   const [awardXpOpen, setAwardXpOpen] = useState(false);
 
   const playersSectionOpen =
@@ -168,100 +132,6 @@ export default function CampaignViewPage() {
 
     knownPlayerIdsRef.current = currentIds;
   }, [players, loading, addToast]);
-
-  const npcSendTargets: SendItemTarget[] = useMemo(
-    () =>
-      players.map(p => ({
-        playerId: p.playerId,
-        playerName: p.playerName,
-        characterName: p.characterName,
-        characterId: p.characterId,
-      })),
-    [players]
-  );
-
-  const handleNpcSendItem = useCallback(
-    async (item: InventoryItem, target: SendItemTarget) => {
-      setIsNpcSendingItem(true);
-      try {
-        const transfer: ItemTransfer = {
-          id: `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          item,
-          fromPlayerName: 'DM',
-          fromCharacterName: npcSendingNpcName ?? 'NPC',
-          fromType: 'npc',
-          sentAt: new Date().toISOString(),
-        };
-
-        const res = await fetch(`/api/campaign/${code}/shared`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            feature: 'item_transfer',
-            data: { transfer, playerId: target.playerId },
-            dmId,
-          }),
-        });
-
-        if (!res.ok) throw new Error('Failed to send item');
-
-        addToast({
-          type: 'success',
-          title: 'Item Sent',
-          message: `${item.name} sent to ${target.characterName}`,
-        });
-      } catch (err) {
-        console.error('Failed to send item:', err);
-        addToast({
-          type: 'error',
-          title: 'Failed',
-          message: 'Could not send item',
-        });
-      } finally {
-        setIsNpcSendingItem(false);
-      }
-    },
-    [code, dmId, npcSendingNpcName, addToast]
-  );
-
-  const handleGiveLibraryMagicItem = useCallback(
-    async (item: MagicItem, target: SendItemTarget) => {
-      const transfer: ItemTransfer = {
-        id: `transfer-${crypto.randomUUID()}`,
-        item,
-        itemKind: 'magic',
-        fromPlayerName: 'DM',
-        fromCharacterName: 'Magic Item Library',
-        fromType: 'dm',
-        sentAt: new Date().toISOString(),
-      };
-      try {
-        const response = await fetch(`/api/campaign/${code}/shared`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            feature: 'item_transfer',
-            data: { transfer, playerId: target.playerId },
-            dmId,
-          }),
-        });
-        if (!response.ok) throw new Error('Failed to give magic item');
-        addToast({
-          type: 'success',
-          title: 'Magic Item Given',
-          message: `${item.name} sent to ${target.characterName}. The library copy was kept.`,
-        });
-      } catch (error) {
-        console.error('Failed to give magic item:', error);
-        addToast({
-          type: 'error',
-          title: 'Magic Item Not Sent',
-          message: `Could not send ${item.name} to ${target.characterName}.`,
-        });
-      }
-    },
-    [addToast, code, dmId]
-  );
 
   const handleRemovePlayer = useCallback(async () => {
     if (!playerToRemove) return;
@@ -734,24 +604,16 @@ export default function CampaignViewPage() {
               campaignCode={code}
               kind="npc"
               showLibraryExtras={false}
-              players={npcSendTargets}
-              onSendItemToPlayer={(item, npcName) => {
-                setNpcSendingItem(item);
-                setNpcSendingNpcName(npcName);
-                setNpcSendDialogOpen(true);
-              }}
+              players={itemSends.sendTargets}
+              onSendItemToPlayer={itemSends.openNpcItemSend}
             />
             <NPCSection
               campaignCode={code}
               kind="monster"
               showSpellSlotSettings={false}
-              players={npcSendTargets}
-              onGiveMagicItemToPlayer={handleGiveLibraryMagicItem}
-              onSendItemToPlayer={(item, npcName) => {
-                setNpcSendingItem(item);
-                setNpcSendingNpcName(npcName);
-                setNpcSendDialogOpen(true);
-              }}
+              players={itemSends.sendTargets}
+              onGiveMagicItemToPlayer={itemSends.giveLibraryMagicItem}
+              onSendItemToPlayer={itemSends.openNpcItemSend}
             />
           </>
         )}
@@ -788,18 +650,7 @@ export default function CampaignViewPage() {
         />
       )}
 
-      <SendItemDialog
-        open={npcSendDialogOpen}
-        onClose={() => {
-          setNpcSendDialogOpen(false);
-          setNpcSendingItem(null);
-          setNpcSendingNpcName(null);
-        }}
-        item={npcSendingItem ? npcItemToInventoryItem(npcSendingItem) : null}
-        targets={npcSendTargets}
-        onSend={handleNpcSendItem}
-        sending={isNpcSendingItem}
-      />
+      <SendItemDialog {...itemSends.sendItemDialog} />
 
       <SendMessageDialog
         open={messageTarget !== null}
