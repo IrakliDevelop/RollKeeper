@@ -390,9 +390,13 @@ export const OverviewOnPhone: Story = {
     panel.scrollTop = panel.scrollHeight;
     await waitFor(() => expect(panel.scrollTop).toBeGreaterThan(0));
     const dialogRect = dialog.getBoundingClientRect();
-    const tabsRect = within(dialog)
-      .getByRole('tablist')
-      .getBoundingClientRect();
+    const tablist = within(dialog).getByRole('tablist');
+    // A long Overview must not squash the tab list: its labels stay whole.
+    // The 1px is the active tab's border, which overlaps the list's rule.
+    await expect(tablist.clientHeight + 1).toBeGreaterThanOrEqual(
+      tablist.scrollHeight
+    );
+    const tabsRect = tablist.getBoundingClientRect();
     await expect(tabsRect.top).toBeGreaterThanOrEqual(dialogRect.top);
     await expect(tabsRect.bottom).toBeLessThanOrEqual(dialogRect.bottom);
     await expect(tabsRect.bottom).toBeLessThanOrEqual(window.innerHeight);

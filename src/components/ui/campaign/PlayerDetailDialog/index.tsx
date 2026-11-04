@@ -152,7 +152,8 @@ export function PlayerDetailDialog({
             activeTab === 'spells' && !showSpellsTab ? 'overview' : activeTab
           }
           onValueChange={v => setActiveTab(v as DetailTab)}
-          className="flex min-h-0 flex-1 flex-col"
+          // The list scrolls sideways, so it can shrink; keep it whole.
+          className="flex min-h-0 flex-1 flex-col [&>[role=tablist]]:shrink-0"
           contentClassName="min-h-0 flex-1 overflow-y-auto"
           tabs={tabs}
         />
