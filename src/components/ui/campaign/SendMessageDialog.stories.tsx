@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { SendMessageDialog } from './SendMessageDialog';
 import type { CampaignPlayerData } from '@/types/campaign';
 
@@ -68,5 +69,37 @@ export const OnePlayer: Story = {
       expect(screen.getByText('Thorin (Alice)')).toBeVisible()
     );
     await expectEditor(screen);
+  },
+};
+
+// The page clears the recipient as it closes the dialog, like this harness.
+function ClosingHarness() {
+  const [target, setTarget] = useState<CampaignPlayerData | null>(players[0]);
+  return (
+    <SendMessageDialog
+      open={target !== null}
+      onClose={() => setTarget(null)}
+      targetPlayer={target}
+      players={players}
+      campaignCode="ABC123"
+      dmId="dm-1"
+    />
+  );
+}
+
+export const KeepsRecipientWhileClosing: Story = {
+  render: () => <ClosingHarness />,
+  play: async ({ canvasElement }) => {
+    const screen = body(canvasElement);
+    await screen.findByRole('dialog', { name: 'Message Thorin' });
+    await expectEditor(screen);
+    await userEvent.keyboard('{Escape}');
+    // The dialog stays mounted while it fades out.
+    const closing = canvasElement.ownerDocument.querySelector(
+      '[role=dialog][data-state=closed]'
+    );
+    await expect(closing).not.toBeNull();
+    await expect(closing).toHaveTextContent('Message Thorin');
+    await expect(closing).toHaveTextContent('Thorin (Alice)');
   },
 };

@@ -43,6 +43,11 @@ export function SendMessageDialog({
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);
+  // The page clears the recipient as it closes the dialog; keep showing the
+  // last one so the title doesn't change while the dialog fades out.
+  const [shownTarget, setShownTarget] = useState(targetPlayer);
+  if (open && targetPlayer !== shownTarget) setShownTarget(targetPlayer);
+  const recipient = open ? targetPlayer : shownTarget;
 
   const handleSend = async () => {
     if (!title.trim()) return;
@@ -98,8 +103,8 @@ export function SendMessageDialog({
     }
   };
 
-  const recipientLabel = targetPlayer
-    ? `${targetPlayer.characterName} (${targetPlayer.playerName})`
+  const recipientLabel = recipient
+    ? `${recipient.characterName} (${recipient.playerName})`
     : `All players (${players.length})`;
 
   return (
@@ -107,8 +112,8 @@ export function SendMessageDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {targetPlayer
-              ? `Message ${targetPlayer.characterName}`
+            {recipient
+              ? `Message ${recipient.characterName}`
               : 'Message all players'}
           </DialogTitle>
         </DialogHeader>
