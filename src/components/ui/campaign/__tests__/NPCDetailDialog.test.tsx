@@ -197,9 +197,13 @@ describe('NPCDetailDialog — header', () => {
     expect(screen.getAllByRole('button', { name: 'Delete NPC' })).toHaveLength(
       1
     );
-    const header = screen.getByRole('heading', { name: 'Merchant Mo' })
-      .parentElement as HTMLElement;
-    expect(header.querySelector('button')).toBeNull();
+    const header = screen
+      .getByRole('heading', { name: 'Merchant Mo' })
+      .closest('[class*="pr-10"]') as HTMLElement;
+    expect(header).not.toBeNull();
+    expect(
+      within(header).queryByRole('button', { name: /Edit|Delete/ })
+    ).toBeNull();
   });
 
   it('describes the dialog with the meta line and prints the private note apart', () => {
@@ -492,6 +496,44 @@ function InventoryHarness({ initial }: { initial: CampaignNPC }) {
   );
 }
 
+describe('NPCDetailDialog — footer presence', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders no footer when it would be empty', () => {
+    setup(makeNpc(), { readOnly: true });
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.querySelector('[class*="justify-between"]')).toBeNull();
+    cleanup();
+    setup(makeNpc(), { onEdit: vi.fn(), onDelete: vi.fn() });
+    expect(
+      screen.getByRole('dialog').querySelector('[class*="justify-between"]')
+    ).not.toBeNull();
+  });
+});
+
+describe('NPCDetailDialog — quantity without a stepper', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('shows ×n for a stack when only Send is offered', () => {
+    setup(makeNpc({ inventory: [ROPE] }), {
+      initialTab: 'inventory',
+      onSendItemToPlayer: vi.fn(),
+    });
+    const row = itemRow('Rope');
+    expect(row).toHaveTextContent('×2');
+    expect(
+      within(row).getByRole('button', { name: 'Send Rope to a player' })
+    ).toBeInTheDocument();
+  });
+});
+
 describe('NPCDetailDialog — Inventory tab', () => {
   beforeEach(() => {
     useNPCStore.setState({ npcsByCampaign: {} });
@@ -675,6 +717,34 @@ describe('NPCDetailDialog — Inventory tab', () => {
       );
     });
 
+    it('removes from the latest inventory when it changed while the confirm was open', async () => {
+      const onUpdateInventory = vi.fn();
+      const npc = makeNpc({ inventory: [ROPE, LAMP] });
+      const { rerender } = setup(npc, {
+        initialTab: 'inventory',
+        onUpdateInventory,
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Rope' }));
+      const alert = await screen.findByRole('alertdialog', {
+        name: 'Remove Rope?',
+      });
+      rerender(
+        <NPCDetailDialog
+          npc={{ ...npc, inventory: [ROPE, LAMP, KEY] }}
+          open={true}
+          onOpenChange={vi.fn()}
+          initialTab="inventory"
+          onUpdateInventory={onUpdateInventory}
+        />
+      );
+      fireEvent.click(
+        within(alert).getByRole('button', { name: 'Remove item' })
+      );
+      await waitFor(() =>
+        expect(onUpdateInventory).toHaveBeenCalledWith('npc-1', [LAMP, KEY])
+      );
+    });
+
     it('moves focus to the next row, then the previous, then Add item', async () => {
       vi.useFakeTimers();
       const npc = makeNpc({ inventory: [ROPE, LAMP, KEY] });
@@ -798,6 +868,27 @@ describe('NPCDetailDialog — Inventory tab', () => {
       });
       await waitFor(() =>
         expect(screen.queryByRole('dialog', { name: 'Rope' })).toBeNull()
+      );
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('dialog', { name: 'Merchant Mo' })
+      ).toBeInTheDocument();
+    });
+
+    it('Escape closes only the Add item form', async () => {
+      const { onOpenChange } = setup(makeNpc({ inventory: [KEY] }), {
+        initialTab: 'inventory',
+        onUpdateInventory: vi.fn(),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
+      expect(
+        screen.getByRole('dialog', { name: 'Add item' })
+      ).toBeInTheDocument();
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: 'Escape',
+      });
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Add item' })).toBeNull()
       );
       expect(onOpenChange).not.toHaveBeenCalled();
       expect(

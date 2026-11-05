@@ -183,6 +183,17 @@ const NARROW = npcOf({
   lastDetailTab: 'stats',
 });
 
+const NARROW_CASTER = npcOf({
+  ...NARROW,
+  id: 'npc-9',
+  spellcasting: {
+    casterLevel: 3,
+    ability: 'intelligence',
+    slotsUsed: {},
+    spells: [],
+  },
+});
+
 const CARRIER = npcOf({ id: 'npc-6', inventory: [SWORD, ROPE, POTION] });
 const EMPTY_HANDED = npcOf({ id: 'npc-7', name: 'Old Tam', inventory: [] });
 const LORELESS = npcOf({ id: 'npc-8', name: 'Mira Stonehollow' });
@@ -280,8 +291,11 @@ export const NoStatBlock: Story = {
   beforeEach: seed(MIRA),
   play: async ({ canvasElement }) => {
     const dialog = await openDialog(canvasElement);
-    await expect(within(dialog).getByText('STR')).toBeVisible();
-    await expect(within(dialog).getByText('+2')).toBeVisible(); // WIS 14
+    const term = within(dialog).getByText('STR');
+    await expect(term).toBeVisible();
+    // STR 8 sits beside its term, with the -1 modifier under it.
+    await expect(term.nextElementSibling).toHaveTextContent('8');
+    await expect(term.nextElementSibling).toHaveTextContent('-1');
   },
 };
 
@@ -413,7 +427,7 @@ export const Shop: Story = {
 /**
  * On a phone the tab list stays whole (every tab, Shop included, inside its
  * box), a long name wraps inside the title, and nothing pushes the page wider
- * than the screen. A spellcaster adds a fifth tab; see the task report.
+ * than the screen. The caster story below adds a fifth tab.
  */
 export const Narrow390: Story = {
   args: { npcId: NARROW.id },
@@ -454,6 +468,56 @@ export const Narrow390: Story = {
       () => {
         const listRect = tablist.getBoundingClientRect();
         const shopRect = shop.getBoundingClientRect();
+        expect(shopRect.left).toBeGreaterThanOrEqual(listRect.left - 1);
+        expect(shopRect.right).toBeLessThanOrEqual(listRect.right + 1);
+      },
+      { timeout: 3000 }
+    );
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+  },
+};
+
+/** Five tabs overflow the list at 390; focusing Shop scrolls it into view. */
+export const Narrow390Caster: Story = {
+  args: { npcId: NARROW_CASTER.id },
+  beforeEach: seed(NARROW_CASTER),
+  parameters: {
+    viewport: {
+      options: {
+        phone: {
+          name: 'Phone',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const dialog = await openDialog(canvasElement);
+    const dialogRect = dialog.getBoundingClientRect();
+    const tablist = within(dialog).getByRole('tablist');
+    // The tab list keeps its labels whole.
+    // The 1px is the active tab's border, which overlaps the list's rule.
+    await expect(tablist.clientHeight + 1).toBeGreaterThanOrEqual(
+      tablist.scrollHeight
+    );
+    const tabsRect = tablist.getBoundingClientRect();
+    await expect(tabsRect.top).toBeGreaterThanOrEqual(dialogRect.top);
+    await expect(tabsRect.bottom).toBeLessThanOrEqual(dialogRect.bottom);
+    await expect(tabsRect.bottom).toBeLessThanOrEqual(window.innerHeight);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+
+    const title = within(dialog).getByRole('heading', { name: LONG_NAME });
+    await expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth);
+
+    const shop = within(dialog).getByRole('tab', { name: 'Shop' });
+    shop.focus();
+    await waitFor(
+      () => {
+        const listRect = tablist.getBoundingClientRect();
+        const shopRect = shop.getBoundingClientRect();
+        expect(tablist.scrollLeft).toBeGreaterThan(0);
         expect(shopRect.left).toBeGreaterThanOrEqual(listRect.left - 1);
         expect(shopRect.right).toBeLessThanOrEqual(listRect.right + 1);
       },

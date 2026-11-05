@@ -67,6 +67,7 @@ interface StatBlockTabProps {
 
 export function StatBlockTab({ npc, readOnly }: StatBlockTabProps) {
   const statBlock = npc.monsterStatBlock;
+  const scores = npc.abilityScores;
   const extras = extraPairs(npc);
   // A repeated tag would print twice, so show each once.
   const tags = [...new Set(npc.tags ?? [])];
@@ -200,10 +201,10 @@ export function StatBlockTab({ npc, readOnly }: StatBlockTabProps) {
           }
         />
       ) : (
-        npc.abilityScores && (
+        scores && (
           <dl className="grid grid-cols-6 gap-2 text-center">
             {ABILITIES.map(({ key, label }) => {
-              const score = npc.abilityScores![key];
+              const score = scores[key];
               return (
                 <div key={key}>
                   <dt className="type-small text-muted">{label}</dt>

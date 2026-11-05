@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Section } from '@/components/ui/layout/section';
@@ -54,6 +54,9 @@ export function InventoryTab({
 
   const inventory = useMemo(() => npc.inventory ?? [], [npc.inventory]);
   const itemIds = useMemo(() => inventory.map(i => i.id), [inventory]);
+  // The confirm is async; removal must filter what is carried when it resolves.
+  const latestInventoryRef = useRef(inventory);
+  latestInventoryRef.current = inventory;
   const { fallbackRef, registerTarget, removeThenFocus } =
     useFocusAfterRemove(itemIds);
 
@@ -96,11 +99,15 @@ export function InventoryTab({
       tone: 'danger',
     });
     if (!confirmed) return;
-    removeThenFocus(item.id, itemIds, () =>
-      onUpdateInventory(
-        npc.id,
-        inventory.filter(i => i.id !== item.id)
-      )
+    const latest = latestInventoryRef.current;
+    removeThenFocus(
+      item.id,
+      latest.map(i => i.id),
+      () =>
+        onUpdateInventory(
+          npc.id,
+          latest.filter(i => i.id !== item.id)
+        )
     );
   };
 

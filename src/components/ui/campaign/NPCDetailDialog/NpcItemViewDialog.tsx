@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/forms/button';
 import RichTextRenderer from '@/components/ui/utils/RichTextRenderer';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import { sentenceCase } from '../PlayerDetailDialog/shared';
-import { itemKindParts } from './NpcInventoryRow';
+import { itemKindParts } from './NPCDetailDialog.utils';
 import type { NPCInventoryItem } from '@/types/encounter';
 
 interface NpcItemViewDialogProps {

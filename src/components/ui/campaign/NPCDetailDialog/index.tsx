@@ -89,6 +89,18 @@ export function NPCDetailDialog({
   const avatar = npc.avatarUrl?.trim();
   const showSpellsTab = !!npc.spellcasting;
 
+  const canEditDelete = !readOnly && !!onEdit && !!onDelete;
+  const showAddSpell = activeTab === 'spells' && showSpellsTab;
+  const hasFooter = !!npc.monsterStatBlock || showAddSpell || canEditDelete;
+
+  // The tab list scrolls sideways; a tab reached by keyboard must be in view.
+  const revealFocusedTab = (event: React.FocusEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.matches('[role="tab"]')) {
+      target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  };
+
   const editNpc = () => {
     onEdit?.(npc);
     onOpenChange(false);
@@ -190,36 +202,45 @@ export function NPCDetailDialog({
           </div>
         </DialogHeader>
 
-        <SubTabs
-          label={copy.sheetLabel}
-          value={activeTab === 'spells' && !showSpellsTab ? 'stats' : activeTab}
-          onValueChange={value => handleTabChange(value as DetailTab)}
-          // The list scrolls sideways, so it can shrink; keep it whole.
-          className="flex min-h-0 flex-1 flex-col [&>[role=tablist]]:shrink-0"
-          contentClassName="min-h-0 flex-1 overflow-y-auto"
-          tabs={tabs}
-        />
+        <div
+          className="flex min-h-0 flex-1 flex-col"
+          onFocusCapture={revealFocusedTab}
+        >
+          <SubTabs
+            label={copy.sheetLabel}
+            value={
+              activeTab === 'spells' && !showSpellsTab ? 'stats' : activeTab
+            }
+            onValueChange={value => handleTabChange(value as DetailTab)}
+            // The list scrolls sideways, so it can shrink; keep it whole.
+            className="flex min-h-0 flex-1 flex-col [&>[role=tablist]]:shrink-0"
+            contentClassName="min-h-0 flex-1 overflow-y-auto"
+            tabs={tabs}
+          />
+        </div>
 
-        <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
-            {npc.monsterStatBlock && <NPCStatBlockExport npc={npc} />}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {activeTab === 'spells' && showSpellsTab && (
-              <Button size="sm" onClick={() => addSpellRef.current?.()}>
-                Add spell
-              </Button>
-            )}
-            {!readOnly && onEdit && onDelete && (
-              <>
-                <Button onClick={editNpc}>{copy.editLabel}</Button>
-                <Button variant="danger" onClick={() => onDelete(npc)}>
-                  {copy.deleteConfirm}
+        {hasFooter && (
+          <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {npc.monsterStatBlock && <NPCStatBlockExport npc={npc} />}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {showAddSpell && (
+                <Button size="sm" onClick={() => addSpellRef.current?.()}>
+                  Add spell
                 </Button>
-              </>
-            )}
-          </div>
-        </DialogFooter>
+              )}
+              {canEditDelete && (
+                <>
+                  <Button onClick={editNpc}>{copy.editLabel}</Button>
+                  <Button variant="danger" onClick={() => onDelete(npc)}>
+                    {copy.deleteConfirm}
+                  </Button>
+                </>
+              )}
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
