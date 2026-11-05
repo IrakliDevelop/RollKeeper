@@ -1,0 +1,455 @@
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { useDmStore } from '@/store/dmStore';
+import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
+import { useNPCStore } from '@/store/npcStore';
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
+import type { CampaignInfo } from '@/types/campaign';
+import type { CampaignNPC } from '@/types/encounter';
+
+import { NpcSyncProvider } from '../NpcSyncControls';
+import { NpcLibrarySection } from './NpcLibrarySection';
+
+const NEW_NPC_DATA: Omit<
+  CampaignNPC,
+  'id' | 'campaignCode' | 'createdAt' | 'updatedAt'
+> = {
+  name: 'Wren',
+  armorClass: '12',
+  maxHp: 9,
+  speed: '30 ft.',
+};
+
+vi.mock('@/components/ui/campaign/NPCFormDialog', () => ({
+  NPCFormDialog: ({
+    open,
+    entityLabel,
+    onSave,
+  }: {
+    open: boolean;
+    entityLabel?: string;
+    onSave: (data: typeof NEW_NPC_DATA) => void;
+  }) =>
+    open ? (
+      <div role="dialog" aria-label={`Form ${entityLabel}`}>
+        <button onClick={() => onSave(NEW_NPC_DATA)}>Save form</button>
+      </div>
+    ) : null,
+}));
+
+vi.mock('@/components/ui/campaign/NPCDetailDialog', () => ({
+  NPCDetailDialog: ({
+    open,
+    npc,
+    onDelete,
+  }: {
+    open: boolean;
+    npc: CampaignNPC | null;
+    onDelete?: (npc: CampaignNPC) => void;
+  }) =>
+    open && npc ? (
+      <div role="dialog" aria-label={npc.name}>
+        <button onClick={() => onDelete?.(npc)}>Delete from dialog</button>
+      </div>
+    ) : null,
+}));
+
+// Its data hooks fetch on mount.
+vi.mock(
+  '@/components/ui/campaign/MagicItemLibrary/MagicItemLibraryDialog',
+  () => ({
+    MagicItemLibraryDialog: () => null,
+  })
+);
+
+const CODE = 'K7QX2M';
+
+const creature = (
+  id: string,
+  name: string,
+  extra: Partial<CampaignNPC> = {}
+): CampaignNPC => ({
+  id,
+  campaignCode: CODE,
+  name,
+  armorClass: '13',
+  maxHp: 11,
+  speed: '30 ft.',
+  createdAt: '2026-09-12T00:00:00.000Z',
+  updatedAt: '2026-09-12T00:00:00.000Z',
+  ...extra,
+});
+
+const seed = (
+  npcs: CampaignNPC[],
+  dmDashboardUi?: CampaignInfo['dmDashboardUi']
+) => {
+  useNPCStore.setState({ npcsByCampaign: { [CODE]: npcs } });
+  useDmStore.setState({
+    campaigns: [
+      {
+        code: CODE,
+        name: 'Saltmarsh',
+        createdAt: '2026-08-23T00:00:00.000Z',
+        ...(dmDashboardUi ? { dmDashboardUi } : {}),
+      },
+    ],
+  });
+};
+
+const dashboardUi = () =>
+  useDmStore.getState().getCampaign(CODE)?.dmDashboardUi;
+
+const storedNames = () =>
+  (useNPCStore.getState().npcsByCampaign[CODE] ?? []).map(n => n.name);
+
+const viewButton = (name: string) =>
+  screen.getByRole('button', { name: 'View', description: name });
+
+const levelHeadings = (level: number) =>
+  screen.getAllByRole('heading', { level }).map(h => h.textContent);
+
+describe('NpcLibrarySection', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })
+    );
+    useMagicItemLibraryStore.setState({ itemsByCampaign: {} });
+    seed([]);
+    renderConfirmDialogHost();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('heads an empty library without a count or a disclosure', () => {
+    seed([], { npcSectionOpen: false });
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'NPCs' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^NPCs/ })).toBeNull();
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'No NPCs yet' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'NPCs you create here can join any encounter in this campaign.'
+      )
+    ).toBeInTheDocument();
+    const creates = screen.getAllByRole('button', { name: 'Create NPC' });
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toHaveAttribute('data-variant', 'secondary');
+    expect(screen.queryByRole('textbox', { name: 'Search NPCs' })).toBeNull();
+
+    fireEvent.click(creates[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
+
+    expect(dashboardUi()?.npcSectionOpen).toBe(true);
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Wren' })
+    ).toBeInTheDocument();
+  });
+
+  it('heads an empty custom monster library with its own copy', () => {
+    render(<NpcLibrarySection campaignCode={CODE} kind="monster" />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Custom monsters' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'No custom monsters yet' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Custom monsters you create here can join any encounter in this campaign.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create custom monster' })
+    ).toBeInTheDocument();
+  });
+
+  it('counts the entries and collapses into dmDashboardUi', () => {
+    seed([creature('a', 'Brenn Ironhand'), creature('b', 'Mira')]);
+    const { container } = render(<NpcLibrarySection campaignCode={CODE} />);
+
+    const toggle = screen.getByRole('button', { name: 'NPCs (2)' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Create NPC' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+
+    fireEvent.click(toggle);
+
+    expect(dashboardUi()?.npcSectionOpen).toBe(false);
+    expect(screen.queryByRole('button', { name: 'View' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Create NPC' })
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[aria-controls^="dm-campaign-"]')
+    ).toBeNull();
+  });
+
+  it('lists the entries as a list in store order', () => {
+    seed([creature('a', 'Brenn Ironhand'), creature('b', 'Mira')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    expect(levelHeadings(3)).toEqual(['Brenn Ironhand', 'Mira']);
+    const row = screen
+      .getByRole('heading', { level: 3, name: 'Brenn Ironhand' })
+      .closest('li');
+    expect(row).not.toBeNull();
+    expect(row!.closest('ul')).toHaveClass('divide-y');
+
+    const section = screen
+      .getByRole('heading', { level: 2, name: 'NPCs (2)' })
+      .closest('section')!;
+    expect(section.querySelector('[class*="accent-"]')).toBeNull();
+    expect(section.querySelector('[data-variant="primary"]')).toBeNull();
+  });
+
+  it('opens the detail dialog from View', () => {
+    seed([
+      creature('a', 'Brenn Ironhand', {
+        description: 'Runs the Rusty Anchor.',
+      }),
+    ]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    fireEvent.click(screen.getByText('Runs the Rusty Anchor.'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(viewButton('Brenn Ironhand'));
+    expect(
+      screen.getByRole('dialog', { name: 'Brenn Ironhand' })
+    ).toBeInTheDocument();
+  });
+
+  it('opens the form with the current entity label', () => {
+    const { unmount } = render(<NpcLibrarySection campaignCode={CODE} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create NPC' }));
+    expect(
+      screen.getByRole('dialog', { name: 'Form NPC' })
+    ).toBeInTheDocument();
+    unmount();
+
+    render(<NpcLibrarySection campaignCode={CODE} kind="monster" />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create custom monster' })
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Form Custom Monster' })
+    ).toBeInTheDocument();
+  });
+
+  it('searches by name and filters by tag', () => {
+    seed([
+      creature('a', 'Brenn Ironhand', { tags: ['merchant'] }),
+      creature('b', 'Mira', { tags: ['guard'] }),
+    ]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    const search = screen.getByRole('textbox', { name: 'Search NPCs' });
+    expect(search).toHaveAttribute('placeholder', 'Brenn');
+    fireEvent.change(search, { target: { value: 'mir' } });
+    expect(levelHeadings(3)).toEqual(['Mira']);
+    fireEvent.change(search, { target: { value: '' } });
+
+    const group = screen.getByRole('group', { name: 'Filter by tag' });
+    const tagButtons = within(group).getAllByRole('button');
+    expect(tagButtons.map(b => b.textContent)).toEqual(['guard', 'merchant']);
+    tagButtons.forEach(b => expect(b).toHaveAttribute('aria-pressed', 'false'));
+
+    const merchant = within(group).getByRole('button', { name: 'merchant' });
+    fireEvent.click(merchant);
+    expect(merchant).toHaveAttribute('aria-pressed', 'true');
+    expect(merchant).toHaveAttribute('data-selected', 'true');
+    expect(levelHeadings(3)).toEqual(['Brenn Ironhand']);
+    const clearTags = within(group).getByRole('button', { name: 'Clear tags' });
+    expect(clearTags).toHaveAttribute('data-variant', 'ghost');
+
+    fireEvent.click(clearTags);
+    expect(levelHeadings(3)).toEqual(['Brenn Ironhand', 'Mira']);
+    expect(screen.queryByRole('button', { name: 'Clear tags' })).toBeNull();
+  });
+
+  it('says when nothing matches and clears the filters', () => {
+    seed([creature('a', 'Brenn Ironhand'), creature('b', 'Mira')]);
+    const { unmount } = render(<NpcLibrarySection campaignCode={CODE} />);
+
+    const search = screen.getByRole('textbox', { name: 'Search NPCs' });
+    fireEvent.change(search, { target: { value: 'zzz' } });
+    expect(
+      screen.getByText('No NPCs match these filters.')
+    ).toBeInTheDocument();
+    const clear = screen.getByRole('button', { name: 'Clear filters' });
+    expect(clear).toHaveAttribute('data-variant', 'ghost');
+
+    fireEvent.click(clear);
+    expect(search).toHaveValue('');
+    expect(search).toHaveFocus();
+    expect(levelHeadings(3)).toEqual(['Brenn Ironhand', 'Mira']);
+    unmount();
+
+    seed([creature('m', 'Dire Wolf', { kind: 'monster' })]);
+    render(<NpcLibrarySection campaignCode={CODE} kind="monster" />);
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Search custom monsters' }),
+      { target: { value: 'zzz' } }
+    );
+    expect(
+      screen.getByText('No custom monsters match these filters.')
+    ).toBeInTheDocument();
+  });
+
+  it('groups entries under level-3 sections, Ungrouped last', () => {
+    seed([
+      creature('g', 'Gate warden', { group: 'Town guard' }),
+      creature('b1', 'Red Cap', { group: 'Bandits' }),
+      creature('b2', 'Knife Sal', { group: 'Bandits' }),
+      creature('u', 'Loner'),
+    ]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    expect(levelHeadings(3)).toEqual([
+      'Bandits (2)',
+      'Town guard (1)',
+      'Ungrouped (1)',
+    ]);
+    expect(levelHeadings(4)).toEqual([
+      'Red Cap',
+      'Knife Sal',
+      'Gate warden',
+      'Loner',
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bandits (2)' }));
+    expect(dashboardUi()?.npcCollapsedGroupNames).toEqual(['Bandits']);
+    expect(screen.queryByRole('heading', { name: 'Red Cap' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Knife Sal' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bandits (2)' }));
+    expect(dashboardUi()?.npcCollapsedGroupNames).toEqual([]);
+  });
+
+  it('asks before deleting and names the library', async () => {
+    seed([creature('m', 'Dire Wolf', { kind: 'monster' })]);
+    const { unmount } = render(
+      <NpcLibrarySection campaignCode={CODE} kind="monster" />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Dire Wolf' }));
+    let dialog = await findConfirmDialog();
+    expect(dialog).toHaveTextContent('Delete Dire Wolf?');
+    expect(dialog).toHaveTextContent(
+      "Dire Wolf is removed from this campaign's custom monsters. Encounters that already include them keep their copy."
+    );
+    await clickConfirmDialogButton('Cancel');
+    expect(storedNames()).toEqual(['Dire Wolf']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Dire Wolf' }));
+    await clickConfirmDialogButton('Delete custom monster');
+    expect(storedNames()).toEqual([]);
+    unmount();
+
+    seed([creature('a', 'Brenn Ironhand')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete Brenn Ironhand' })
+    );
+    dialog = await findConfirmDialog();
+    expect(dialog).toHaveTextContent(
+      "Brenn Ironhand is removed from this campaign's NPCs. Encounters that already include them keep their copy."
+    );
+    await clickConfirmDialogButton('Delete NPC');
+    expect(storedNames()).toEqual([]);
+  });
+
+  it('moves focus to the next row, the previous row, then Create after a delete', async () => {
+    seed([creature('a', 'A'), creature('b', 'B'), creature('c', 'C')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete B' }));
+    await clickConfirmDialogButton('Delete NPC');
+    await waitFor(() => expect(viewButton('C')).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete C' }));
+    await clickConfirmDialogButton('Delete NPC');
+    await waitFor(() => expect(viewButton('A')).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete A' }));
+    await clickConfirmDialogButton('Delete NPC');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Create NPC' })).toHaveFocus()
+    );
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'No NPCs yet' })
+    ).toBeInTheDocument();
+  });
+
+  it('deletes from the detail dialog through the same confirm', async () => {
+    seed([creature('a', 'A'), creature('b', 'B')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    fireEvent.click(viewButton('A'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete from dialog' }));
+    const dialog = await findConfirmDialog();
+    expect(dialog).toHaveTextContent('Delete A?');
+
+    await clickConfirmDialogButton('Delete NPC');
+    expect(screen.queryByRole('dialog', { name: 'A' })).toBeNull();
+    expect(storedNames()).toEqual(['B']);
+    await waitFor(() => expect(viewButton('B')).toHaveFocus());
+  });
+
+  it('keeps the sync controls and the magic item library as siblings after the monster section', () => {
+    vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
+    seed([creature('m', 'Dire Wolf', { kind: 'monster' })], {
+      monsterSectionOpen: false,
+    });
+    render(
+      <NpcSyncProvider campaignCode={CODE}>
+        <NpcLibrarySection
+          campaignCode={CODE}
+          kind="monster"
+          showLibraryExtras
+          onGiveMagicItemToPlayer={async () => {}}
+        />
+      </NpcSyncProvider>
+    );
+
+    const monster = screen
+      .getByRole('heading', { level: 2, name: 'Custom monsters (1)' })
+      .closest('section')!;
+    const magic = screen.getByRole('heading', { name: /^Magic Item Library/ });
+    expect(monster).not.toContainElement(magic);
+    expect(
+      monster.compareDocumentPosition(magic) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(monster).not.toContainElement(screen.getByText('NPC cloud sync'));
+  });
+});

@@ -228,7 +228,6 @@ export default function CampaignViewPage() {
               <NPCSection
                 campaignCode={code}
                 kind="monster"
-                showSpellSlotSettings={false}
                 players={itemSends.sendTargets}
                 onGiveMagicItemToPlayer={itemSends.giveLibraryMagicItem}
                 onSendItemToPlayer={itemSends.openNpcItemSend}

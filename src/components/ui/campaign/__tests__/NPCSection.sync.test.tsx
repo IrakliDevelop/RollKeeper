@@ -53,6 +53,23 @@ describe('NPCSection cloud sync mount', () => {
 
   it('mounts the cloud sync card while the NPC section is collapsed', () => {
     vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
+    useNPCStore.setState({
+      npcsByCampaign: {
+        'empty-campaign': [
+          {
+            id: 'npc-brenn',
+            campaignCode: 'empty-campaign',
+            name: 'Brenn',
+            armorClass: '15',
+            maxHp: 44,
+            speed: '30 ft.',
+            inventory: [],
+            createdAt: '2026-09-12T00:00:00.000Z',
+            updatedAt: '2026-09-12T00:00:00.000Z',
+          },
+        ],
+      },
+    });
     useDmStore.setState({
       campaigns: [
         {
@@ -69,9 +86,13 @@ describe('NPCSection cloud sync mount', () => {
       </NpcSyncProvider>
     );
 
-    // Edits made from the always-visible header must still reach the sync
+    // Edits made from the always-visible heading must still reach the sync
     // effect, so the controls cannot live inside the collapsible block.
-    expect(screen.queryByText(/No NPCs yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Brenn')).toBeNull();
+    expect(screen.getByRole('button', { name: 'NPCs (1)' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
     expect(screen.getByText('NPC cloud sync')).toBeInTheDocument();
   });
 
@@ -115,21 +136,28 @@ describe('NPCSection cloud sync mount', () => {
         <NPCSection
           campaignCode="empty-campaign"
           kind="monster"
-          showSpellSlotSettings={false}
           showLibraryExtras={false}
         />
       </>
     );
 
-    expect(screen.getByText('NPCs (1)')).toBeInTheDocument();
-    expect(screen.getByText('Custom Monsters (0)')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'NPCs (1)' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Custom monsters' })
+    ).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', {
         name: /move shapechanger to custom monsters/i,
       })
     );
-    expect(screen.getByText('NPCs (0)')).toBeInTheDocument();
-    expect(screen.getByText('Custom Monsters (1)')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'NPCs' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Custom monsters (1)' })
+    ).toBeInTheDocument();
     expect(
       useNPCStore.getState().getNPC('empty-campaign', 'npc-legacy')
     ).toMatchObject({
@@ -162,13 +190,12 @@ describe('NPCSection cloud sync mount', () => {
     const props = {
       campaignCode: 'empty-campaign',
       kind: 'monster' as const,
-      showSpellSlotSettings: false,
       showLibraryExtras: false,
     };
     const { unmount } = render(<NPCSection {...props} />);
 
     expect(screen.getByText('Dire Wolf')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Lair/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lair (1)' }));
 
     expect(
       useDmStore.getState().getCampaign('empty-campaign')?.dmDashboardUi
@@ -184,38 +211,54 @@ describe('NPCSection cloud sync mount', () => {
         ?.monsterCollapsedGroupNames
     ).toEqual(['Lair']);
     expect(screen.queryByText('Dire Wolf')).not.toBeInTheDocument();
-    expect(screen.getByText('Lair')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lair (1)' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
   });
 
   it('persists the custom monster collapsed state across a remount', () => {
+    useNPCStore.setState({
+      npcsByCampaign: {
+        'empty-campaign': [
+          {
+            id: 'monster-wolf',
+            campaignCode: 'empty-campaign',
+            name: 'Dire Wolf',
+            kind: 'monster',
+            armorClass: '14',
+            maxHp: 37,
+            speed: '50 ft.',
+            inventory: [],
+            createdAt: '2026-09-12T00:00:00.000Z',
+            updatedAt: '2026-09-12T00:00:00.000Z',
+          },
+        ],
+      },
+    });
     const props = {
       campaignCode: 'empty-campaign',
       kind: 'monster' as const,
-      showSpellSlotSettings: false,
       showLibraryExtras: false,
     };
     const { unmount } = render(<NPCSection {...props} />);
 
     fireEvent.click(
-      screen.getByRole('button', { name: /collapse custom monsters/i })
+      screen.getByRole('button', { name: 'Custom monsters (1)' })
     );
 
     expect(
       useDmStore.getState().getCampaign('empty-campaign')?.dmDashboardUi
         ?.monsterSectionOpen
     ).toBe(false);
-    expect(
-      screen.queryByText('No Custom Monsters yet')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Dire Wolf')).toBeNull();
 
     unmount();
     render(<NPCSection {...props} />);
 
     expect(
-      screen.getByRole('button', { name: /expand custom monsters/i })
+      screen.getByRole('button', { name: 'Custom monsters (1)' })
     ).toHaveAttribute('aria-expanded', 'false');
-    expect(
-      screen.queryByText('No Custom Monsters yet')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Dire Wolf')).toBeNull();
   });
 });
