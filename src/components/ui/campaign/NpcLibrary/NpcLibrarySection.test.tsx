@@ -697,7 +697,10 @@ describe('NpcLibrarySection', () => {
     const monster = screen
       .getByRole('heading', { level: 2, name: 'Custom monsters (1)' })
       .closest('section')!;
-    const magic = screen.getByRole('heading', { name: /^Magic Item Library/ });
+    const magic = screen.getByRole('heading', {
+      level: 2,
+      name: 'Magic items',
+    });
     expect(monster).not.toContainElement(magic);
     expect(
       monster.compareDocumentPosition(magic) & Node.DOCUMENT_POSITION_FOLLOWING

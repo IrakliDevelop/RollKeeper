@@ -56,9 +56,7 @@ export function AllItemsAutocomplete({
         value={query}
         onChange={event => setQuery(event.target.value)}
         placeholder={
-          loading
-            ? 'Loading item compendium…'
-            : 'Search weapons, armor, gear, or magic items…'
+          loading ? 'Loading item compendium…' : 'Cloak of elvenkind'
         }
         leftIcon={<Search size={16} />}
         disabled={loading}
