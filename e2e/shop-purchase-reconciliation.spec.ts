@@ -582,11 +582,15 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
       .poll(
         async () => {
           const [pp, gp, ep, sp, cp] = await Promise.all(
-            (['PP', 'GP', 'EP', 'SP', 'CP'] as const).map(label =>
-              dmDialog2
-                .getByRole('textbox', { name: `${label} balance` })
-                .inputValue()
-            )
+            (
+              [
+                'PP (platinum pieces)',
+                'GP (gold pieces)',
+                'EP (electrum pieces)',
+                'SP (silver pieces)',
+                'CP (copper pieces)',
+              ] as const
+            ).map(name => dmDialog2.getByRole('textbox', { name }).inputValue())
           );
           return (
             Number(pp) * CURRENCY_VALUES.platinum +

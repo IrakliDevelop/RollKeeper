@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   creatureMetaLine,
   creaturePassives,
+  creatureVitalParts,
   creatureVitals,
   LIBRARY_COPY,
 } from './NpcLibrary.utils';
@@ -81,6 +82,34 @@ describe('creatureVitals', () => {
   });
 });
 
+describe('creatureVitalParts', () => {
+  it('returns AC and Speed as labelled values', () => {
+    expect(creatureVitalParts(makeNpc())).toEqual([
+      { label: 'AC', value: '15' },
+      { label: 'Speed', value: '30 ft.' },
+    ]);
+  });
+
+  it('adds the temp AC to the AC value', () => {
+    expect(creatureVitalParts(makeNpc({ tempAc: '2' }))[0]).toEqual({
+      label: 'AC',
+      value: '15 (+2)',
+    });
+    expect(creatureVitalParts(makeNpc({ tempAc: '-2' }))[0].value).toBe(
+      '15 (-2)'
+    );
+  });
+
+  it('leaves out Speed when it is blank', () => {
+    expect(creatureVitalParts(makeNpc({ speed: '  ' }))).toEqual([
+      { label: 'AC', value: '15' },
+    ]);
+    expect(creatureVitalParts(makeNpc({ speed: undefined }))).toEqual([
+      { label: 'AC', value: '15' },
+    ]);
+  });
+});
+
 describe('creaturePassives', () => {
   it('lists only the passive scores that are set', () => {
     expect(
@@ -122,6 +151,8 @@ describe('LIBRARY_COPY', () => {
       noMatch: 'No NPCs match these filters.',
       deleteConfirm: 'Delete NPC',
       entityLabel: 'NPC',
+      editLabel: 'Edit NPC',
+      sheetLabel: 'NPC sheet',
     });
     expect(npcMove('Brenn')).toBe('Move Brenn to custom monsters');
     expect(npcDelete('Brenn')).toBe(
@@ -144,6 +175,8 @@ describe('LIBRARY_COPY', () => {
       noMatch: 'No custom monsters match these filters.',
       deleteConfirm: 'Delete custom monster',
       entityLabel: 'Custom Monster',
+      editLabel: 'Edit custom monster',
+      sheetLabel: 'Custom monster sheet',
     });
     expect(monsterMove('Dire Wolf')).toBe('Move Dire Wolf to NPCs');
     expect(monsterDelete('Dire Wolf')).toBe(
