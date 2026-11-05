@@ -14,6 +14,8 @@ export interface LibraryCopy {
   deleteMessage: (name: string) => string;
   deleteConfirm: string;
   entityLabel: 'NPC' | 'Custom Monster';
+  editLabel: string;
+  sheetLabel: string;
 }
 
 export const LIBRARY_COPY: Record<CampaignCreatureKind, LibraryCopy> = {
@@ -30,6 +32,8 @@ export const LIBRARY_COPY: Record<CampaignCreatureKind, LibraryCopy> = {
       `${name} is removed from this campaign's NPCs. Encounters that already include them keep their copy.`,
     deleteConfirm: 'Delete NPC',
     entityLabel: 'NPC',
+    editLabel: 'Edit NPC',
+    sheetLabel: 'NPC sheet',
   },
   monster: {
     heading: 'Custom monsters',
@@ -45,6 +49,8 @@ export const LIBRARY_COPY: Record<CampaignCreatureKind, LibraryCopy> = {
       `${name} is removed from this campaign's custom monsters. Encounters that already include them keep their copy.`,
     deleteConfirm: 'Delete custom monster',
     entityLabel: 'Custom Monster',
+    editLabel: 'Edit custom monster',
+    sheetLabel: 'Custom monster sheet',
   },
 };
 
@@ -59,15 +65,31 @@ export const creatureMetaLine = (npc: CampaignNPC): string => {
   return parts.filter(Boolean).join(' · ');
 };
 
+export type CreatureVitalPart = { label: 'AC' | 'Speed'; value: string };
+
+/** AC and speed as stored, as label/value pairs; free-text values are printed unchanged. */
+export const creatureVitalParts = (npc: CampaignNPC): CreatureVitalPart[] => {
+  const tempAc = parseAcBonus(npc.tempAc);
+  const parts: CreatureVitalPart[] = [
+    {
+      label: 'AC',
+      value: `${npc.armorClass}${
+        tempAc !== 0 ? ` (${tempAc > 0 ? '+' : ''}${tempAc})` : ''
+      }`,
+    },
+  ];
+  if (npc.speed?.trim()) parts.push({ label: 'Speed', value: npc.speed });
+  return parts;
+};
+
 /** AC, HP and speed as stored; free-text values are printed unchanged. */
 export const creatureVitals = (npc: CampaignNPC): string[] => {
-  const tempAc = parseAcBonus(npc.tempAc);
-  const ac = `AC ${npc.armorClass}${
-    tempAc !== 0 ? ` (${tempAc > 0 ? '+' : ''}${tempAc})` : ''
-  }`;
-  const vitals = [ac, `${npc.maxHp} HP`];
-  if (npc.speed?.trim()) vitals.push(`Speed ${npc.speed}`);
-  return vitals;
+  const [ac, ...rest] = creatureVitalParts(npc);
+  return [
+    `AC ${ac.value}`,
+    `${npc.maxHp} HP`,
+    ...rest.map(part => `${part.label} ${part.value}`),
+  ];
 };
 
 export type CreaturePassive = {
