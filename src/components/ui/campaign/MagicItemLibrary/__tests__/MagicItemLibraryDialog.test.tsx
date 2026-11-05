@@ -118,5 +118,18 @@ describe('MagicItemLibraryDialog', () => {
     expect(
       screen.getByRole('dialog', { name: 'Edit magic item' })
     ).toBeInTheDocument();
+
+    rerender(
+      <MagicItemLibraryDialog
+        open
+        onOpenChange={() => {}}
+        item={stored('  Moonlit Compass ')}
+        onSave={() => {}}
+      />
+    );
+    // Accessible names collapse whitespace, so read the raw title text.
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(
+      'Edit Moonlit Compass'
+    );
   });
 });

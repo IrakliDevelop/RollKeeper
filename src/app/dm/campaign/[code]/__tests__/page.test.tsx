@@ -168,9 +168,10 @@ it('links the four campaign pages from the rail', () => {
   expect(document.querySelectorAll('a[class*="accent-"]')).toHaveLength(0);
   // V156/V164: no primary in the overview body. NPCSection is mocked above, so
   // this assertion can't see the libraries; MagicItemLibrarySection.test pins
-  // their secondary Create. The cloud sync cards ('Turn on cloud sync') keep
-  // their primary while their flags are on, and CampaignSettingsSyncControls is
-  // mocked (cloud controls, launch Q4).
+  // the magic item Create, and NpcLibrarySection.test pins the NPC libraries'.
+  // The cloud sync cards ('Turn on cloud sync') keep their primary while their
+  // flags are on, and CampaignSettingsSyncControls is mocked (cloud controls,
+  // launch Q4).
   expect(
     document.querySelectorAll(
       'main button[data-variant="primary"], main a[data-variant="primary"]'

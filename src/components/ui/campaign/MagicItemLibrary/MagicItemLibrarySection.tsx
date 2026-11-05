@@ -84,8 +84,13 @@ export function MagicItemLibrarySection({
     setQuery('');
     setTag('all');
   }
+  // The tag's last carrier may have been deleted or edited, which leaves the
+  // select with no entry for it.
+  if (tag !== 'all' && !tags.includes(tag)) setTag('all');
 
   const handleCreate = () => {
+    // The editor keeps its last item while it fades out, so only a new Create
+    // clears it.
     setEditing(null);
     setEditorOpen(true);
   };
@@ -131,7 +136,6 @@ export function MagicItemLibrarySection({
       }
     }
     setEditorOpen(false);
-    setEditing(null);
   };
 
   const handleGive = async (
@@ -283,10 +287,7 @@ export function MagicItemLibrarySection({
 
       <MagicItemLibraryDialog
         open={editorOpen}
-        onOpenChange={open => {
-          setEditorOpen(open);
-          if (!open) setEditing(null);
-        }}
+        onOpenChange={setEditorOpen}
         item={editing}
         onSave={handleSave}
       />

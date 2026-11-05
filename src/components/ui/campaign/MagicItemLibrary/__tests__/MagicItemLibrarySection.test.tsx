@@ -39,17 +39,33 @@ const NEW_ITEM_DATA: Omit<
   tags: [],
 };
 
+// The stub stays mounted while closed so tests can read which item the real
+// dialog would still be holding during its exit.
 vi.mock('../MagicItemLibraryDialog', () => ({
   MagicItemLibraryDialog: ({
     open,
+    item,
+    onOpenChange,
     onSave,
   }: {
     open: boolean;
+    item: { name: string } | null;
+    onOpenChange: (open: boolean) => void;
     onSave: (data: typeof NEW_ITEM_DATA) => void;
-  }) =>
-    open ? (
-      <button onClick={() => onSave(NEW_ITEM_DATA)}>Save item</button>
-    ) : null,
+  }) => (
+    <div
+      data-testid="editor"
+      data-open={open}
+      data-title={item ? `Edit ${item.name}` : 'Create magic item'}
+    >
+      {open && (
+        <>
+          <button onClick={() => onSave(NEW_ITEM_DATA)}>Save item</button>
+          <button onClick={() => onOpenChange(false)}>Close editor</button>
+        </>
+      )}
+    </div>
+  ),
 }));
 
 const item = (
@@ -372,6 +388,98 @@ describe('MagicItemLibrarySection', () => {
     await waitFor(() => expect(giveButton('Potion of Healing')).toHaveFocus());
   });
 
+  it('clears a search left over from an emptied library', async () => {
+    const user = userEvent.setup();
+    seed([potion]);
+    renderSection();
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search magic items' }),
+      'potion'
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete Potion of Healing' })
+    );
+    await clickConfirmDialogButton('Delete magic item');
+    fireEvent.click(screen.getByRole('button', { name: 'Create magic item' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save item' }));
+
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Ring of Warmth' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Search magic items' })
+    ).toHaveValue('');
+  });
+
+  it('falls back to all tags when the last template with the tag is deleted', async () => {
+    const user = userEvent.setup();
+    seed([potion, item('ring', 'Ring of Warmth')]);
+    renderSection();
+
+    await user.click(screen.getByRole('combobox', { name: 'Filter by tag' }));
+    await user.click(screen.getByRole('option', { name: 'quest' }));
+    expect(screen.queryByText('Ring of Warmth')).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete Potion of Healing' })
+    );
+    await clickConfirmDialogButton('Delete magic item');
+
+    expect(
+      screen.getByRole('combobox', { name: 'Filter by tag' })
+    ).toHaveTextContent('All tags');
+    expect(screen.getByText('Ring of Warmth')).toBeInTheDocument();
+    expect(
+      screen.queryByText('No magic items match these filters.')
+    ).toBeNull();
+  });
+
+  describe('editor dialog', () => {
+    const editor = () => screen.getByTestId('editor');
+
+    it('keeps its item while it closes and clears it for a new template', async () => {
+      seed([potion, item('ring', 'Ring of Warmth')]);
+      renderSection();
+
+      expect(editor()).toHaveAttribute('data-title', 'Create magic item');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Edit Potion of Healing' })
+      );
+      expect(editor()).toHaveAttribute('data-open', 'true');
+      expect(editor()).toHaveAttribute('data-title', 'Edit Potion of Healing');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close editor' }));
+      expect(editor()).toHaveAttribute('data-open', 'false');
+      expect(editor()).toHaveAttribute('data-title', 'Edit Potion of Healing');
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create magic item' })
+      );
+      expect(editor()).toHaveAttribute('data-open', 'true');
+      expect(editor()).toHaveAttribute('data-title', 'Create magic item');
+      fireEvent.click(screen.getByRole('button', { name: 'Close editor' }));
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Edit Ring of Warmth' })
+      );
+      expect(editor()).toHaveAttribute('data-title', 'Edit Ring of Warmth');
+    });
+
+    it('keeps its item while a save closes it', () => {
+      seed([potion]);
+      renderSection();
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Edit Potion of Healing' })
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Save item' }));
+
+      expect(editor()).toHaveAttribute('data-open', 'false');
+      expect(editor()).toHaveAttribute('data-title', 'Edit Potion of Healing');
+    });
+  });
+
   describe('give a copy dialog', () => {
     const aria = {
       playerId: 'player-1',
@@ -445,6 +553,37 @@ describe('MagicItemLibrarySection', () => {
       await user.click(within(dialog).getByRole('combobox'));
       expect(screen.getByText('Players')).toBeInTheDocument();
       expect(screen.queryByText('NPCs and monsters')).toBeNull();
+    });
+
+    // Radix renders the separator as an aria-hidden div with no role.
+    const SEPARATOR = '[aria-hidden="true"]';
+
+    it('separates the groups only when both have entries', async () => {
+      seed([potion]);
+      seedNpcs();
+      const user = userEvent.setup();
+      const { unmount } = renderSection([aria]);
+
+      let dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      expect(
+        screen.getByRole('listbox').querySelectorAll(SEPARATOR)
+      ).toHaveLength(1);
+      unmount();
+      cleanup();
+
+      renderSection();
+      dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      expect(screen.getByRole('listbox').querySelector(SEPARATOR)).toBeNull();
+      unmount();
+      cleanup();
+
+      useNPCStore.setState({ npcsByCampaign: {} });
+      renderSection([aria]);
+      dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      expect(screen.getByRole('listbox').querySelector(SEPARATOR)).toBeNull();
     });
 
     it('says when nobody can receive a copy', async () => {
@@ -532,7 +671,7 @@ describe('MagicItemLibrarySection', () => {
       ).toBeDisabled();
     });
 
-    it('keeps the title while the dialog closes', () => {
+    it('never renders an empty give title', () => {
       const props = {
         players: [],
         npcs: [],
@@ -552,6 +691,102 @@ describe('MagicItemLibrarySection', () => {
       // here; what must never appear is a title with its name missing.
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(screen.queryByText(/^Give a copy of\s*$/)).toBeNull();
+    });
+
+    describe('with the dialog driven directly', () => {
+      const ring = item('ring', 'Ring of Warmth');
+      const pick = async (
+        user: ReturnType<typeof userEvent.setup>,
+        name: string
+      ) => {
+        const dialog = screen.getByRole('dialog');
+        await user.click(within(dialog).getByRole('combobox'));
+        await user.click(screen.getByRole('option', { name }));
+        return dialog;
+      };
+
+      it('does not close or spin the dialog opened for another item while a give is in flight', async () => {
+        const user = userEvent.setup();
+        let finish: () => void = () => {};
+        const onGive = vi.fn(
+          () =>
+            new Promise<void>(resolve => {
+              finish = resolve;
+            })
+        );
+        const onClose = vi.fn();
+        const props = { players: [aria], npcs: [], onGive, onClose };
+        const { rerender } = render(
+          <GiveMagicItemDialog item={potion} {...props} />
+        );
+
+        const first = await pick(user, 'Aria');
+        await user.click(
+          within(first).getByRole('button', { name: 'Give copy' })
+        );
+        expect(
+          within(first).getByRole('button', { name: 'Give copy' })
+        ).toBeDisabled();
+
+        rerender(<GiveMagicItemDialog item={null} {...props} />);
+        rerender(<GiveMagicItemDialog item={ring} {...props} />);
+        const second = screen.getByRole('dialog', {
+          name: 'Give a copy of Ring of Warmth',
+        });
+        await pick(user, 'Aria');
+        expect(
+          within(second).getByRole('button', { name: 'Give copy' })
+        ).toBeEnabled();
+
+        await act(async () => {
+          finish();
+        });
+
+        expect(onClose).not.toHaveBeenCalled();
+        expect(
+          within(second).getByRole('button', { name: 'Give copy' })
+        ).toBeEnabled();
+      });
+
+      it('closes after a give when its dialog is still the open one', async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+        render(
+          <GiveMagicItemDialog
+            item={potion}
+            players={[aria]}
+            npcs={[]}
+            onGive={async () => {}}
+            onClose={onClose}
+          />
+        );
+
+        const dialog = await pick(user, 'Aria');
+        await user.click(
+          within(dialog).getByRole('button', { name: 'Give copy' })
+        );
+
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      });
+
+      it('closes without giving when the pick has left the campaign', async () => {
+        const user = userEvent.setup();
+        const onGive = vi.fn(async () => {});
+        const onClose = vi.fn();
+        const props = { npcs: [], onGive, onClose };
+        const { rerender } = render(
+          <GiveMagicItemDialog item={potion} players={[aria]} {...props} />
+        );
+
+        const dialog = await pick(user, 'Aria');
+        rerender(<GiveMagicItemDialog item={potion} players={[]} {...props} />);
+        await user.click(
+          within(dialog).getByRole('button', { name: 'Give copy' })
+        );
+
+        expect(onGive).not.toHaveBeenCalled();
+        expect(onClose).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

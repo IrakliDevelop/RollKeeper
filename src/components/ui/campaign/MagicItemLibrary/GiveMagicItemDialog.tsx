@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
@@ -54,16 +54,25 @@ export function GiveMagicItemDialog({
   const [shown, setShown] = useState(item);
   if (item && item !== shown) setShown(item);
   const [recipient, setRecipient] = useState('');
-  const [giving, setGiving] = useState(false);
+  // Start each opening without a pick. Clearing on close would flip the
+  // fading dialog back to its empty state, and reopening the same template
+  // passes the same object, so the item's identity cannot signal an opening.
+  const [wasOpen, setWasOpen] = useState(!!item);
+  if (!!item !== wasOpen) {
+    setWasOpen(!!item);
+    if (item) setRecipient('');
+  }
+  // The item a give is in flight for, so another item's dialog is not left
+  // loading, and the give's end does not close a dialog opened since.
+  const [givingItem, setGivingItem] = useState<CustomMagicItem | null>(null);
+  const openItemRef = useRef(item);
+  useEffect(() => {
+    openItemRef.current = item;
+  }, [item]);
   const triggerId = useId();
   const helperId = useId();
 
   const nobody = players.length === 0 && npcs.length === 0;
-
-  const close = () => {
-    setRecipient('');
-    onClose();
-  };
 
   const resolveRecipient = (): GiveRecipient | null => {
     if (recipient.startsWith(PLAYER_PREFIX)) {
@@ -80,22 +89,27 @@ export function GiveMagicItemDialog({
   };
 
   const handleGive = async () => {
+    if (!shown || !recipient) return;
     const chosen = resolveRecipient();
-    if (!shown || !chosen) return;
-    setGiving(true);
+    if (!chosen) {
+      // The pick has left the campaign since it was made.
+      onClose();
+      return;
+    }
+    setGivingItem(shown);
     try {
       await onGive(shown, chosen);
     } finally {
-      setGiving(false);
+      setGivingItem(current => (current === shown ? null : current));
     }
-    close();
+    if (openItemRef.current === shown) onClose();
   };
 
   return (
     <Dialog
       open={!!item}
       onOpenChange={open => {
-        if (!open) close();
+        if (!open) onClose();
       }}
     >
       {shown && (
@@ -159,14 +173,14 @@ export function GiveMagicItemDialog({
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={close}>
+            <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button
               variant="primary"
               leftIcon={<UserRound size={16} aria-hidden="true" />}
               disabled={!recipient}
-              loading={giving}
+              loading={!!shown && givingItem === shown}
               onClick={handleGive}
             >
               Give copy

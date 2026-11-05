@@ -157,7 +157,7 @@ export function MagicItemLibraryDialog({
           <DialogTitle>
             {item
               ? item.name.trim()
-                ? `Edit ${item.name}`
+                ? `Edit ${item.name.trim()}`
                 : 'Edit magic item'
               : 'Create magic item'}
           </DialogTitle>
