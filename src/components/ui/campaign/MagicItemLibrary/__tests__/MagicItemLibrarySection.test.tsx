@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,6 +19,7 @@ import {
 } from '@/test/confirmDialog';
 import type { CampaignInfo } from '@/types/campaign';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
+import { GiveMagicItemDialog } from '../GiveMagicItemDialog';
 import { MagicItemLibrarySection } from '../MagicItemLibrarySection';
 
 const CODE = 'empty-campaign';
@@ -370,40 +372,186 @@ describe('MagicItemLibrarySection', () => {
     await waitFor(() => expect(giveButton('Potion of Healing')).toHaveFocus());
   });
 
-  it('groups give recipients into players and NPCs', async () => {
-    seed([potion]);
-    useNPCStore.setState({
-      npcsByCampaign: {
-        [CODE]: [
-          {
-            id: 'npc-1',
-            campaignCode: CODE,
-            name: 'Sildar',
-            armorClass: '16',
-            maxHp: 27,
-            speed: '30 ft.',
-            createdAt: NOW,
-            updatedAt: NOW,
-          },
-        ],
-      },
+  describe('give a copy dialog', () => {
+    const aria = {
+      playerId: 'player-1',
+      playerName: 'Alice',
+      characterId: 'character-1',
+      characterName: 'Aria',
+    };
+    const sildar = {
+      id: 'npc-1',
+      campaignCode: CODE,
+      name: 'Sildar',
+      armorClass: '16',
+      maxHp: 27,
+      speed: '30 ft.',
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    const seedNpcs = () =>
+      useNPCStore.setState({ npcsByCampaign: { [CODE]: [sildar] } });
+    const openGive = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(giveButton('Potion of Healing'));
+      return screen.getByRole('dialog', {
+        name: 'Give a copy of Potion of Healing',
+      });
+    };
+
+    it('asks who gets the copy', async () => {
+      seed([potion]);
+      seedNpcs();
+      const user = userEvent.setup();
+      renderSection([aria]);
+
+      const dialog = await openGive(user);
+      expect(dialog).toHaveAccessibleDescription(
+        'They get their own copy. The template stays in your library.'
+      );
+      const select = within(dialog).getByRole('combobox', { name: 'Give to' });
+      expect(select).toHaveTextContent('Choose a player or NPC');
+      expect(
+        within(dialog).getByRole('button', { name: 'Cancel' })
+      ).toHaveAttribute('data-variant', 'outline');
+      const give = within(dialog).getByRole('button', { name: 'Give copy' });
+      expect(give).toHaveAttribute('data-variant', 'primary');
+      expect(give).toBeDisabled();
+
+      await user.click(select);
+      expect(screen.getByText('Players')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Aria' })).toBeInTheDocument();
+      expect(screen.getByText('NPCs and monsters')).toBeInTheDocument();
+      expect(
+        screen.getByRole('option', { name: 'Sildar' })
+      ).toBeInTheDocument();
     });
-    const user = userEvent.setup();
-    renderSection([
-      {
-        playerId: 'player-1',
-        playerName: 'Alice',
-        characterId: 'character-1',
-        characterName: 'Aria',
-      },
-    ]);
 
-    await user.click(screen.getByRole('button', { name: 'Give copy' }));
-    await user.click(screen.getByRole('combobox'));
+    it('leaves out a group with no entries', async () => {
+      seed([potion]);
+      seedNpcs();
+      const user = userEvent.setup();
+      const { unmount } = renderSection();
 
-    expect(screen.getByText('Players')).toBeInTheDocument();
-    expect(screen.getByText('Aria')).toBeInTheDocument();
-    expect(screen.getByText('NPCs')).toBeInTheDocument();
-    expect(screen.getByText('Sildar')).toBeInTheDocument();
+      let dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      expect(screen.queryByText('Players')).toBeNull();
+      expect(screen.getByText('NPCs and monsters')).toBeInTheDocument();
+      unmount();
+      cleanup();
+
+      useNPCStore.setState({ npcsByCampaign: {} });
+      renderSection([aria]);
+      dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      expect(screen.getByText('Players')).toBeInTheDocument();
+      expect(screen.queryByText('NPCs and monsters')).toBeNull();
+    });
+
+    it('says when nobody can receive a copy', async () => {
+      seed([potion]);
+      const user = userEvent.setup();
+      renderSection();
+
+      const dialog = await openGive(user);
+      expect(
+        within(dialog).getByRole('combobox', { name: 'Give to' })
+      ).toHaveAccessibleDescription('No players or NPCs in this campaign yet.');
+      expect(
+        within(dialog).getByRole('button', { name: 'Give copy' })
+      ).toBeDisabled();
+    });
+
+    it('gives a copy to a player and to an NPC', async () => {
+      seed([potion]);
+      seedNpcs();
+      const onGiveToPlayer = vi.fn(async () => {});
+      const user = userEvent.setup();
+      render(
+        <MagicItemLibrarySection
+          campaignCode={CODE}
+          players={[aria]}
+          onGiveToPlayer={onGiveToPlayer}
+        />
+      );
+
+      let dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      await user.click(screen.getByRole('option', { name: 'Aria' }));
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Give copy' })
+      );
+
+      await waitFor(() => expect(onGiveToPlayer).toHaveBeenCalledTimes(1));
+      const [given, target] = onGiveToPlayer.mock.calls[0] as unknown as [
+        Record<string, unknown>,
+        unknown,
+      ];
+      expect(given.name).toBe('Potion of Healing');
+      for (const key of ['campaignCode', 'tags', 'group', 'sourceItemId']) {
+        expect(given).not.toHaveProperty(key);
+      }
+      expect(target).toEqual(aria);
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+      dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      await user.click(screen.getByRole('option', { name: 'Sildar' }));
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Give copy' })
+      );
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      const inventory =
+        useNPCStore.getState().npcsByCampaign[CODE][0].inventory ?? [];
+      expect(inventory).toHaveLength(1);
+      expect(inventory[0]).toMatchObject({
+        name: 'Potion of Healing',
+        category: 'magic item',
+      });
+      expect(onGiveToPlayer).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the pick when the dialog closes', async () => {
+      seed([potion]);
+      const user = userEvent.setup();
+      renderSection([aria]);
+
+      let dialog = await openGive(user);
+      await user.click(within(dialog).getByRole('combobox'));
+      await user.click(screen.getByRole('option', { name: 'Aria' }));
+      expect(within(dialog).getByRole('combobox')).toHaveTextContent('Aria');
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+      dialog = await openGive(user);
+      expect(within(dialog).getByRole('combobox')).toHaveTextContent(
+        'Choose a player or NPC'
+      );
+      expect(
+        within(dialog).getByRole('button', { name: 'Give copy' })
+      ).toBeDisabled();
+    });
+
+    it('keeps the title while the dialog closes', () => {
+      const props = {
+        players: [],
+        npcs: [],
+        onGive: vi.fn(),
+        onClose: vi.fn(),
+      };
+      const { rerender } = render(
+        <GiveMagicItemDialog item={potion} {...props} />
+      );
+      expect(
+        screen.getByText('Give a copy of Potion of Healing')
+      ).toBeInTheDocument();
+
+      rerender(<GiveMagicItemDialog item={null} {...props} />);
+
+      // jsdom's Presence unmounts at once, so the exit itself cannot be seen
+      // here; what must never appear is a title with its name missing.
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.queryByText(/^Give a copy of\s*$/)).toBeNull();
+    });
   });
 });

@@ -1,26 +1,11 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { Plus, Search, UserRound } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import {
-  SelectField,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-} from '@/components/ui/forms/select';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Section } from '@/components/ui/layout/section';
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/feedback/dialog';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
 import { useDmStore } from '@/store/dmStore';
@@ -30,6 +15,7 @@ import type { CampaignNPC } from '@/types/encounter';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import type { SendItemTarget } from '../SendItemDialog';
 import { useFocusAfterRemove } from '../NpcLibrary/NpcLibrary.hooks';
+import { GiveMagicItemDialog, type GiveRecipient } from './GiveMagicItemDialog';
 import { MagicItemLibraryDialog } from './MagicItemLibraryDialog';
 import { MagicItemLibraryRow } from './MagicItemLibraryRow';
 import { MagicItemSyncControls } from './MagicItemSyncControls';
@@ -67,9 +53,7 @@ export function MagicItemLibrarySection({
   const [tag, setTag] = useState('all');
   const [editing, setEditing] = useState<CustomMagicItem | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [giving, setGiving] = useState<CustomMagicItem | null>(null);
-  const [recipient, setRecipient] = useState('');
-  const [isGiving, setIsGiving] = useState(false);
+  const [givingItem, setGivingItem] = useState<CustomMagicItem | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const tags = useMemo(
@@ -150,48 +134,41 @@ export function MagicItemLibrarySection({
     setEditing(null);
   };
 
-  const handleGive = async () => {
-    if (!giving || !recipient) return;
+  const handleGive = async (
+    template: CustomMagicItem,
+    recipient: GiveRecipient
+  ) => {
     const {
       campaignCode: _campaignCode,
       tags: _tags,
       group: _group,
       sourceItemId: _source,
       ...magicItem
-    } = giving;
+    } = template;
     void _campaignCode;
     void _tags;
     void _group;
     void _source;
-    setIsGiving(true);
-    if (recipient.startsWith('npc:')) {
-      const npc = npcs.find(entry => entry.id === recipient.slice(4));
-      if (npc) {
-        updateNPC(campaignCode, npc.id, {
-          inventory: [
-            ...(npc.inventory ?? []),
-            {
-              id: `npc-item-${crypto.randomUUID()}`,
-              name: giving.name,
-              quantity: 1,
-              description: giving.description,
-              type: giving.category,
-              category: 'magic item',
-              rarity: giving.rarity,
-              magicItem,
-            },
-          ],
-        });
-      }
+    if (recipient.kind === 'npc') {
+      const { npc } = recipient;
+      updateNPC(campaignCode, npc.id, {
+        inventory: [
+          ...(npc.inventory ?? []),
+          {
+            id: `npc-item-${crypto.randomUUID()}`,
+            name: template.name,
+            quantity: 1,
+            description: template.description,
+            type: template.category,
+            category: 'magic item',
+            rarity: template.rarity,
+            magicItem,
+          },
+        ],
+      });
     } else {
-      const player = players.find(
-        entry => entry.playerId === recipient.slice(7)
-      );
-      if (player) await onGiveToPlayer(magicItem, player);
+      await onGiveToPlayer(magicItem, recipient.target);
     }
-    setIsGiving(false);
-    setGiving(null);
-    setRecipient('');
   };
 
   return (
@@ -281,7 +258,7 @@ export function MagicItemLibrarySection({
                     key={item.id}
                     item={item}
                     giveRef={registerTarget(item.id)}
-                    onGive={() => setGiving(item)}
+                    onGive={() => setGivingItem(item)}
                     onEdit={() => {
                       setEditing(item);
                       setEditorOpen(true);
@@ -313,60 +290,13 @@ export function MagicItemLibrarySection({
         item={editing}
         onSave={handleSave}
       />
-      <Dialog
-        open={!!giving}
-        onOpenChange={open => {
-          if (!open) setGiving(null);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Give {giving?.name}</DialogTitle>
-          </DialogHeader>
-          <DialogBody className="space-y-3">
-            <DialogDescription className="text-muted text-sm">
-              Choose a player or NPC. The library template will remain
-              unchanged.
-            </DialogDescription>
-            <SelectField value={recipient} onValueChange={setRecipient}>
-              <SelectGroup>
-                <SelectLabel>Players</SelectLabel>
-                {players.map(player => (
-                  <SelectItem
-                    key={`player:${player.playerId}`}
-                    value={`player:${player.playerId}`}
-                  >
-                    {player.characterName}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-              {players.length > 0 && npcs.length > 0 && <SelectSeparator />}
-              <SelectGroup>
-                <SelectLabel>NPCs</SelectLabel>
-                {npcs.map(npc => (
-                  <SelectItem key={`npc:${npc.id}`} value={`npc:${npc.id}`}>
-                    {npc.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectField>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setGiving(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              leftIcon={<UserRound size={14} />}
-              disabled={!recipient}
-              loading={isGiving}
-              onClick={handleGive}
-            >
-              Give copy
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <GiveMagicItemDialog
+        item={givingItem}
+        players={players}
+        npcs={npcs}
+        onGive={handleGive}
+        onClose={() => setGivingItem(null)}
+      />
     </>
   );
 }
