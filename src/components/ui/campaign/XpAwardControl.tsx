@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
-import { Switch } from '@/components/ui/forms/switch';
+import { Section } from '@/components/ui/layout/section';
 import { XPTracker } from '@/components/shared/character';
 import type { DmXpAward } from '@/types/sharedState';
 import { projectXpFromAwards } from '@/lib/xpAwardQueue';
@@ -50,7 +49,7 @@ export function XpAwardControl({
   const [mode, setMode] = useState<'add' | 'set'>('add');
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [sent, setSent] = useState(false);
   // Retained on failure so Retry re-sends the ORIGINAL award (same id) — a
   // lost response may still have enqueued it; the player dedupes by id.
@@ -72,7 +71,7 @@ export function XpAwardControl({
 
   const send = async (award: DmXpAward) => {
     setSending(true);
-    setError(null);
+    setError(false);
     setSent(false);
     try {
       await postXpAward(campaignCode, dmId, playerId, award);
@@ -81,9 +80,9 @@ export function XpAwardControl({
       setFailedAward(null);
       setAmount(undefined);
       setSent(true);
-    } catch (err) {
+    } catch {
       setFailedAward(award);
-      setError(err instanceof Error ? err.message : 'Failed to send XP award');
+      setError(true);
     } finally {
       setSending(false);
     }
@@ -99,6 +98,15 @@ export function XpAwardControl({
     });
   };
 
+  const pending = pendingAwardCount;
+  const status =
+    pending === 0
+      ? 'From the last sync'
+      : pending === 1
+        ? 'Includes 1 award not yet received'
+        : `Includes ${pending} awards not yet received`;
+  const locked = sending || failedAward !== null;
+
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)]">
       <XPTracker
@@ -108,84 +116,90 @@ export function XpAwardControl({
         compact
         hideLevelUpAlert
       />
-      <div className="space-y-3 lg:pt-1">
-        <div className="flex items-center justify-between">
-          <span className="text-heading flex items-center gap-1.5 text-sm font-medium">
-            <TrendingUp size={14} />
-            Award XP
-          </span>
-          <span className="text-faint text-right text-xs">
-            {pendingAwardCount > 0
-              ? `Projected · ${pendingAwardCount} pending`
-              : 'Synced XP'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-xs font-medium ${mode === 'add' ? 'text-heading' : 'text-muted'}`}
-          >
-            Add
-          </span>
-          <Switch
-            checked={mode === 'set'}
-            onCheckedChange={checked => setMode(checked ? 'set' : 'add')}
-            size="sm"
-            aria-label="Toggle between add and set XP"
-            disabled={sending || failedAward !== null}
-          />
-          <span
-            className={`text-xs font-medium ${mode === 'set' ? 'text-heading' : 'text-muted'}`}
-          >
-            Set
-          </span>
-          <NumberInput
-            value={amount}
-            onChange={setAmount}
-            min={minAmount}
-            allowEmpty
-            placeholder={mode === 'add' ? 'XP to add...' : 'Total XP...'}
-            aria-label={mode === 'add' ? 'XP to add' : 'Total XP'}
-            className="flex-1"
-            disabled={sending || failedAward !== null}
-          />
-          {failedAward ? (
+      <Section
+        level={3}
+        heading="Award XP"
+        wrapHeading
+        trailing={<p className="type-small text-muted">{status}</p>}
+      >
+        <div className="space-y-3">
+          <div role="group" aria-label="Award XP" className="flex gap-2">
             <Button
-              variant="warning"
               size="sm"
-              onClick={() => send(failedAward)}
-              disabled={sending}
+              selected={mode === 'add'}
+              aria-pressed={mode === 'add'}
+              disabled={locked}
+              onClick={() => setMode('add')}
             >
-              {sending ? 'Sending...' : 'Retry'}
+              Add XP
             </Button>
-          ) : (
             <Button
-              variant="primary"
               size="sm"
-              onClick={handleSend}
-              disabled={!valid || sending}
+              selected={mode === 'set'}
+              aria-pressed={mode === 'set'}
+              disabled={locked}
+              onClick={() => setMode('set')}
             >
-              {sending ? 'Sending...' : 'Send'}
+              Set total
             </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <NumberInput
+              value={amount}
+              onChange={setAmount}
+              aria-label={mode === 'add' ? 'XP to add' : 'Total XP'}
+              placeholder={mode === 'add' ? '300' : '6500'}
+              min={minAmount}
+              allowEmpty
+              disabled={locked}
+              wrapperClassName="min-w-0 flex-1"
+            />
+            {failedAward ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                onClick={() => send(failedAward)}
+                disabled={sending}
+              >
+                {sending ? 'Sending…' : 'Resend'}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                className="shrink-0"
+                onClick={handleSend}
+                disabled={!valid || sending}
+              >
+                {sending ? 'Sending…' : 'Send award'}
+              </Button>
+            )}
+          </div>
+          {failedAward && (
+            <p className="type-small text-muted">
+              Resending gives the same {failedAward.amount.toLocaleString()} XP
+              award. The player gets it once.
+            </p>
+          )}
+          {mode === 'set' && (
+            <p className="type-small text-muted">
+              Replaces the character&apos;s XP total, including changes since
+              the last sync.
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="type-small text-blood-text">
+              The XP award wasn&apos;t sent. Resend to try again.
+            </p>
+          )}
+          {sent && !error && (
+            <p role="status" className="type-small text-verdigris-text">
+              XP award sent
+            </p>
           )}
         </div>
-        {failedAward && (
-          <p className="text-accent-amber-text text-xs">
-            Retry will resend the original{' '}
-            {failedAward.mode === 'add' ? 'add' : 'set'} award of{' '}
-            {failedAward.amount.toLocaleString()} XP with the same delivery ID.
-          </p>
-        )}
-        {mode === 'set' && (
-          <p className="text-faint text-xs">
-            Sets the player&apos;s total XP — overwrites changes they made since
-            the last sync.
-          </p>
-        )}
-        {error && <p className="text-accent-red-text text-xs">{error}</p>}
-        {sent && !error && (
-          <p className="text-accent-emerald-text text-xs">XP award sent.</p>
-        )}
-      </div>
+      </Section>
     </div>
   );
 }
