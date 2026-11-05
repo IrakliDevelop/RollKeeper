@@ -155,7 +155,11 @@ export function MagicItemLibraryDialog({
       <DialogContent className="max-h-[92vh] max-w-4xl min-w-0 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {item ? 'Edit Custom Magic Item' : 'Create Custom Magic Item'}
+            {item
+              ? item.name.trim()
+                ? `Edit ${item.name}`
+                : 'Edit magic item'
+              : 'Create magic item'}
           </DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-5">
@@ -164,10 +168,11 @@ export function MagicItemLibraryDialog({
               label="Group (optional)"
               value={group}
               onChange={event => setGroup(event.target.value)}
-              placeholder="e.g., Feywild rewards"
+              placeholder="Feywild rewards"
             />
             <Input
-              label="Tags (comma separated)"
+              label="Tags"
+              helperText="Separate tags with commas."
               value={tagsText}
               onChange={event => setTagsText(event.target.value)}
               placeholder="quest, utility, level 5"

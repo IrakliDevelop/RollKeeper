@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import { MagicItemLibraryDialog } from '../MagicItemLibraryDialog';
 
 vi.mock('@/hooks/useItemsData', () => ({
@@ -54,5 +55,68 @@ describe('MagicItemLibraryDialog', () => {
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Moonlit Compass' })
     );
+  });
+
+  it('titles the dialog and labels group and tags', () => {
+    const { rerender } = render(
+      <MagicItemLibraryDialog
+        open
+        onOpenChange={() => {}}
+        item={null}
+        onSave={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: 'Create magic item' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Group (optional)' })
+    ).toHaveAttribute('placeholder', 'Feywild rewards');
+    const tags = screen.getByRole('textbox', { name: 'Tags' });
+    expect(tags).toHaveAccessibleDescription('Separate tags with commas.');
+    expect(tags).toHaveAttribute('placeholder', 'quest, utility, level 5');
+    expect(
+      screen.getByRole('textbox', { name: 'Start from any compendium item' })
+    ).toHaveAttribute('placeholder', 'Cloak of elvenkind');
+
+    const stored = (name: string): CustomMagicItem => ({
+      id: 'm1',
+      campaignCode: 'K7QX2M',
+      name,
+      category: 'wondrous',
+      rarity: 'rare',
+      description: '',
+      properties: [],
+      requiresAttunement: false,
+      isAttuned: false,
+      isEquipped: false,
+      tags: [],
+      createdAt: '',
+      updatedAt: '',
+    });
+    rerender(
+      <MagicItemLibraryDialog
+        open
+        onOpenChange={() => {}}
+        item={stored('Moonlit Compass')}
+        onSave={() => {}}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Edit Moonlit Compass' })
+    ).toBeInTheDocument();
+
+    rerender(
+      <MagicItemLibraryDialog
+        open
+        onOpenChange={() => {}}
+        item={stored('')}
+        onSave={() => {}}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Edit magic item' })
+    ).toBeInTheDocument();
   });
 });
