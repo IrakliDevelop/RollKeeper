@@ -15,7 +15,10 @@ Two broad categories:
 | `spells` | Spell data |
 | `magic-items` | Magic item reference data |
 | `campaign` (+ `[code]`, `membership-readiness`, `membership-links`, `membership-invitations`, `guest-sessions`, `guest-session`, `guest-invitations`) | Supabase-backed campaign membership + guest-session flows ([05](05-cloud-backend-supabase.md)) |
-| `campaign/[code]/battlemaps` (+ `[id]/fog-appearance`), `campaign/[code]/battlemap-token` | Battle map + fog state ([07](07-battlemap-fog-fieldnotes.md)) |
+| `campaign/[code]/battlemaps` (+ `[id]`, `[id]/markers`, `[id]/fog-appearance`), `campaign/[code]/battlemap-token` | Battle map + fog state ([07](07-battlemap-fog-fieldnotes.md)); audience reads follow the Table presentation, legacy `POST battlemaps/[id]` is 426 ([15](15-scenes-and-table.md)) |
+| `campaign/[code]/table/*` (`control`, `scenes`, `authority-challenge`, `authority/checkpoint`, `authority/initialize-if-empty`, `display/capability`, `display/status`, `display/descriptor`, `display/ack`) | Table control service, relay authority and TV display ([15](15-scenes-and-table.md)) |
+| `campaign/[code]/shared` | Live shared state; `initiative`, `initiativeRequest` and `battlemap` writes are 426 (Table control owns them) ([15](15-scenes-and-table.md)) |
+| `campaign/[code]/display-key` | Retired map-pinned display key; always 426 ([15](15-scenes-and-table.md)) |
 | `calendar-sync`, `combat-log-sync`, `encounter-sync`, `magic-item-sync`, `npc-sync` | Redis live-session sync endpoints ([04](04-campaign-sync-redis.md)) |
 | `character` (+ `share`) | Character data, including character-sharing links |
 | `npc` (+ `upload`, `delete`) | NPC library CRUD + asset upload |

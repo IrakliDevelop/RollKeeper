@@ -6,7 +6,7 @@ import { AppIcon } from '@/components/ui/icons';
 import { RosterRow } from './RosterRow';
 import { groupRosterEntities } from './rosterGroups';
 
-import type { PointerEvent } from 'react';
+import type { PointerEvent, ReactNode } from 'react';
 import type { EncounterEntity } from '@/types/encounter';
 import type { RosterGroups } from './rosterGroups';
 
@@ -21,6 +21,14 @@ export interface RosterTrayProps {
   onToggleCollapsed: () => void;
   hasLinkedEncounter: boolean;
   onViewPlayer?: (playerCharacterId: string) => void;
+  /** Table scenes: empty-roster copy instead of the linked-encounter prompt. */
+  emptyMessage?: string;
+  /** Table scenes: actions rendered in the tray header (e.g. Add). */
+  headerActions?: ReactNode;
+  /** Table scenes: per-row status line replacing On map / Tap → place. */
+  describeRow?: (entity: EncounterEntity) => string;
+  /** Table scenes: opens a member's details from a sibling row button. */
+  onOpenDetails?: (entity: EncounterEntity) => void;
 }
 
 const GROUP_SECTIONS: { key: keyof RosterGroups; label: string }[] = [
@@ -45,6 +53,10 @@ export function RosterTray({
   onToggleCollapsed,
   hasLinkedEncounter,
   onViewPlayer,
+  emptyMessage,
+  headerActions,
+  describeRow,
+  onOpenDetails,
 }: RosterTrayProps) {
   if (collapsed) {
     return (
@@ -82,8 +94,15 @@ export function RosterTray({
           ▸
         </Button>
       </div>
+      {headerActions && (
+        <div className="border-divider flex shrink-0 flex-wrap gap-2 border-b px-2 py-2">
+          {headerActions}
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {!hasLinkedEncounter ? (
+        {entities.length === 0 && emptyMessage ? (
+          <p className="text-muted px-1 py-2 text-xs">{emptyMessage}</p>
+        ) : !hasLinkedEncounter ? (
           <p className="text-muted px-1 py-2 text-xs">
             Link an encounter in Setup mode
           </p>
@@ -111,6 +130,8 @@ export function RosterTray({
                       onSelectEntity={onSelectEntity}
                       onDragStart={onDragStart}
                       onViewPlayer={onViewPlayer}
+                      description={describeRow?.(entity)}
+                      onOpenDetails={onOpenDetails}
                     />
                   ))}
                 </ul>

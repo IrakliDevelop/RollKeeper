@@ -14,6 +14,11 @@ import {
   type BattleMapFogAppearanceProjection,
 } from '@/lib/fogOfWar';
 import type { ProjectedFogAppearance } from '@/types/battlemap';
+import {
+  authorizeTableResourceAccess,
+  authorizeTableSceneWrite,
+  credentialFromQuery,
+} from '@/lib/tableServer/presentationAccess';
 
 const MAX_BATTLE_MAP_ID_LENGTH = 200;
 
@@ -41,6 +46,15 @@ export async function handleFogAppearanceGet(
       return NextResponse.json({ error: 'Invalid map id' }, { status: 400 });
     }
 
+    // PR04 P5: both path families resolve the same server-side resource
+    // kind; a verified location keeps the existing session check below.
+    const access = await authorizeTableResourceAccess({
+      request,
+      code,
+      id,
+      credential: credentialFromQuery(request),
+    });
+    if (access.status === 'denied') return access.response;
     const redis = getRedis();
     const body = Object.fromEntries(new URL(request.url).searchParams);
     const session = await authorizeBattleMapSession(
@@ -111,16 +125,28 @@ export async function handleFogAppearancePut(
     const appearance: ProjectedFogAppearance = parsed;
 
     const redis = getRedis();
-    const session = await authorizeBattleMapSession(
-      redis,
-      code,
+    // PR04 C4-2: a scene id needs campaign DM mutation authority and a
+    // registered, non-deleted scene; other ids keep the existing check.
+    const sceneWrite = await authorizeTableSceneWrite({
       request,
-      {
-        role: 'dm',
-        dmId: body.dmId,
-      },
-      { mutation: true }
-    );
+      code,
+      id,
+      dmId: body.dmId,
+    });
+    if (sceneWrite.status === 'denied') return sceneWrite.response;
+    const session =
+      sceneWrite.status === 'allowed'
+        ? ({ authorized: true } as const)
+        : await authorizeBattleMapSession(
+            redis,
+            code,
+            request,
+            {
+              role: 'dm',
+              dmId: body.dmId,
+            },
+            { mutation: true }
+          );
     if (!session.authorized) {
       return NextResponse.json(
         { error: session.error },

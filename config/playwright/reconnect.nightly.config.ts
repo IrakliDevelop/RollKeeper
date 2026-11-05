@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+import { withLocalRedis } from './e2eRedis';
+
 export default defineConfig({
   testDir: '../../e2e-nightly',
   testIgnore: '**/auth/**',
@@ -36,10 +38,13 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false npm run dev',
+    command: withLocalRedis(
+      'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false npm run dev',
+      'none'
+    ),
     cwd: '../..',
     url: 'http://localhost:3000/player',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],

@@ -12,7 +12,6 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
-import { sendInitiativePoke } from '@/lib/relayPoke';
 import {
   enqueueXpAward,
   readXpAwards,
@@ -51,6 +50,8 @@ import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecu
 import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 import { campaignSettingsProjectionWriteAllowed } from '@/lib/supabase/campaignSettingsServer';
 import { calendarProjectionWriteAllowed } from '@/lib/supabase/calendarServer';
+import { tableCompatibilityKey } from '@/lib/tableServer/control';
+import { TABLE_V1_SHARED_FEATURES } from '@/lib/tableServer/presentationAccess';
 
 export async function GET(
   request: NextRequest,
@@ -96,7 +97,7 @@ export async function GET(
       campaignSharedKey(code, 'calendar')
     );
     const initiativeRaw = await redis.get<string>(
-      campaignSharedKey(code, 'initiative')
+      tableCompatibilityKey(code, 'initiative')
     );
     let initiative: SharedInitiativeState | null = null;
     if (initiativeRaw) {
@@ -105,9 +106,12 @@ export async function GET(
           ? JSON.parse(initiativeRaw)
           : initiativeRaw;
     }
+    if (initiative?.expiresAt && initiative.expiresAt <= Date.now()) {
+      initiative = null;
+    }
 
     const battleMapRaw = await redis.get<string>(
-      campaignSharedKey(code, 'battlemap')
+      tableCompatibilityKey(code, 'battlemap')
     );
     let battleMap: SharedBattleMapState | null = null;
     if (battleMapRaw) {
@@ -127,7 +131,7 @@ export async function GET(
     }
 
     const initiativeRequestRaw = await redis.get<string>(
-      campaignSharedKey(code, 'initiativeRequest')
+      tableCompatibilityKey(code, 'initiativeRequest')
     );
     let initiativeRequest: InitiativeRollRequest | null = null;
     if (initiativeRequestRaw) {
@@ -249,6 +253,24 @@ export async function POST(
     }
 
     const { feature, data, dmId } = body;
+    if (
+      feature === 'initiative' ||
+      feature === 'initiativeRequest' ||
+      feature === 'battlemap'
+    ) {
+      return NextResponse.json(
+        { error: 'Refresh the page to update the app.' },
+        { status: 426 }
+      );
+    }
+    // PR04 P6: the default branch never stores arbitrary feature keys
+    // (e.g. `battlemap-markers:<id>`, bypassing sanitization).
+    if (!TABLE_V1_SHARED_FEATURES.has(String(feature))) {
+      return NextResponse.json(
+        { error: 'Unknown shared feature' },
+        { status: 400 }
+      );
+    }
     const membership = await authorizeCampaignMembershipRoute(code, true);
     if (membership.mode === 'denied') {
       return NextResponse.json(
@@ -286,11 +308,9 @@ export async function POST(
       }
     }
 
-    // null is a valid payload ONLY for initiativeRequest (it means "clear the
-    // request"); every other feature requires a real object — a null would crash
-    // the feature branches that destructure data. undefined is always missing.
-    const allowsNullData = feature === 'initiativeRequest';
-    if (!feature || data === undefined || (data === null && !allowsNullData)) {
+    // Every accepted feature requires a real object; a null would crash the
+    // feature branches that destructure data. undefined is always missing.
+    if (!feature || data === undefined || data === null) {
       return NextResponse.json(
         { error: 'feature and data are required' },
         { status: 400 }
@@ -482,20 +502,13 @@ export async function POST(
       return NextResponse.json({ success: true });
     }
 
-    // Default: store as shared feature key (calendar, initiative, etc.)
+    // Default: store as shared feature key (calendar, settings, counters)
     await Promise.all([
       redis.set(campaignSharedKey(code, feature), JSON.stringify(data), {
         ex: SLIDING_TTL_SECONDS,
       }),
       refreshCampaignTTL(redis, code),
     ]);
-
-    // Latency shave: nudge connected battle-map clients to refetch now.
-    // Awaited (serverless may drop un-awaited work) but never throws; the
-    // adaptive poll remains the guarantee.
-    if (feature === 'initiative' || feature === 'initiativeRequest') {
-      await sendInitiativePoke(code, redis);
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

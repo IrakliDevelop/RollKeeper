@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import { getSortedEntities } from '@/store/encounterStore';
 
@@ -13,6 +14,12 @@ export interface InitiativeTabProps {
   selectedEntityId: string | null;
   onSelectEntity: (entityId: string) => void;
   encounterHref: string;
+  /** Replaces "No encounter linked yet." (Table scene runs). */
+  emptyContent?: ReactNode;
+  /** Replaces the "Start combat from the encounter page." block. */
+  inactiveContent?: ReactNode;
+  /** Rows whose live HP is unavailable: shown as "HP —", never 0/0. */
+  hpUnknownEntityIds?: ReadonlySet<string>;
 }
 
 /**
@@ -26,14 +33,19 @@ export function InitiativeTab({
   selectedEntityId,
   onSelectEntity,
   encounterHref,
+  emptyContent,
+  inactiveContent,
+  hpUnknownEntityIds,
 }: InitiativeTabProps) {
   if (!encounter) {
+    if (emptyContent !== undefined) return <>{emptyContent}</>;
     return (
       <p className="text-muted px-3 py-4 text-xs">No encounter linked yet.</p>
     );
   }
 
   if (!encounter.isActive) {
+    if (inactiveContent !== undefined) return <>{inactiveContent}</>;
     return (
       <div className="space-y-2 px-3 py-4">
         <p className="text-muted text-xs">
@@ -62,6 +74,7 @@ export function InitiativeTab({
           isActive={index === encounter.currentTurn}
           isSelected={entity.id === selectedEntityId}
           onSelect={onSelectEntity}
+          hpUnknown={hpUnknownEntityIds?.has(entity.id)}
         />
       ))}
     </ul>

@@ -3,7 +3,7 @@
 // (.superpowers/sdd/2026-09-07-vtt-merchants-slice2/task-5-brief.md).
 
 import { useEncounterStore } from '@/store/encounterStore';
-import type { NPCInventoryItem } from '@/types/encounter';
+import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import type { MagicItemRarity } from '@/types/character';
 import type { ShopSaleLogEntry } from '@/types/shop';
 import {
@@ -51,6 +51,82 @@ export function resolveShopEntityIds(
     }
   }
   return entityIds.slice(0, MAX_SHOP_ENTITY_IDS);
+}
+
+/**
+ * `PUT /api/campaign/[code]/shops/[npcId]`: publishes (open) or tears down
+ * (closed) the player-visible shop. Rejects with the route's error text.
+ */
+export async function putShop(options: {
+  dmId: string | null;
+  npc: CampaignNPC;
+  entityIds: string[];
+  open: boolean;
+}): Promise<void> {
+  const { npc } = options;
+  const response = await fetch(
+    `/api/campaign/${encodeURIComponent(npc.campaignCode)}/shops/${encodeURIComponent(npc.id)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dmId: options.dmId,
+        npc,
+        entityIds: options.entityIds,
+      }),
+    }
+  );
+  if (response.ok) return;
+  const body = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  throw new Error(
+    body?.error ??
+      `Failed to ${options.open ? 'publish' : 'close'} the shop (${response.status}).`
+  );
+}
+
+/**
+ * Repair 09 (LL1): `PATCH /api/campaign/[code]/shops/[npcId]` updates only
+ * which tokens open a published shop. It never reseeds stock, so it is safe
+ * while a sale is not yet drained into the DM's copy. Rejects with the
+ * route's error text.
+ */
+export async function patchShopEntityIds(options: {
+  dmId: string;
+  campaignCode: string;
+  npcId: string;
+  entityIds: string[];
+}): Promise<void> {
+  const response = await fetch(
+    `/api/campaign/${encodeURIComponent(options.campaignCode)}/shops/${encodeURIComponent(options.npcId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dmId: options.dmId,
+        entityIds: options.entityIds,
+      }),
+    }
+  );
+  if (response.ok) return;
+  const body = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  throw new Error(
+    body?.error ?? `Failed to update the shop tokens (${response.status}).`
+  );
+}
+
+/** Encounter ids first, then Table ids; each once, capped like the route. */
+export function mergeShopEntityIds(
+  encounterIds: readonly string[],
+  tableIds: readonly string[]
+): string[] {
+  return [...new Set([...encounterIds, ...tableIds])].slice(
+    0,
+    MAX_SHOP_ENTITY_IDS
+  );
 }
 import { formatCurrencyFromCopper } from '@/utils/currency';
 

@@ -106,8 +106,6 @@ function makeHookState(
     hasUnsyncedChanges: false,
     lastSyncedAt: null,
     syncStatus: 'disabled',
-    sharedWithPlayers: false,
-    handleToggleShareWithPlayers: vi.fn(),
     handleReady: vi.fn(),
     handlePickImage: vi.fn(),
     handleClear: vi.fn(),

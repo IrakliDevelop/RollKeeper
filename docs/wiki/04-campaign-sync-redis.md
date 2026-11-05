@@ -33,10 +33,9 @@ new one without checking if an existing one already covers your domain:
 | `usePlayerSync` | A single player's pushed character snapshot |
 | `usePartySync` | Party-wide aggregate state |
 | `useDmEffectsSync` | DM-broadcast effects/notifications |
-| `useDmBattleMapSync` | Battle map state |
 | `useSharedCampaignState` | Generic shared campaign state |
 | `useMaterializeCampaignStackable` | Stackable campaign resources |
-| `useInitiativeSubmissionSync` / `useDmInitiativeSync` | Initiative rolls |
+| `useInitiativeSubmissionSync` / `useDmInitiativeSync` | Initiative rolls; DM initiative publishes through Table control, not `/shared` ([15](15-scenes-and-table.md)) |
 | `useCharacterRosterSync` | Roster-level sync |
 | `useDmSettingsSync` | Campaign settings |
 | `useLocationSync` | Campaign locations |

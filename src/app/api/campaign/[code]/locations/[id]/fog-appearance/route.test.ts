@@ -26,6 +26,16 @@ const LOCATION_ID = 'loc-1';
 const params = { params: Promise.resolve({ code: CODE, id: LOCATION_ID }) };
 const projectionKey = `campaign:${CODE}:fog-appearance:${LOCATION_ID}`;
 
+/** A verified location keeps the route's own player/DM authorization. */
+function seedVerifiedLocation(): void {
+  seedRedis(`campaign:${CODE}:location:${LOCATION_ID}`, {
+    id: LOCATION_ID,
+    name: 'Location',
+    mapImageUrl: 'https://example.test/location.png',
+    updatedAt: '2026-10-03T00:00:00.000Z',
+  });
+}
+
 function getRequest(query: string): NextRequest {
   return new NextRequest(
     `http://localhost/api/campaign/${CODE}/locations/${LOCATION_ID}/fog-appearance?${query}`
@@ -53,6 +63,7 @@ beforeEach(() => {
   authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
   seedRedis(`campaign:${CODE}`, { dmId: 'dm-1', campaignName: 'Fog Loc' });
   seedRedisSet(`campaign:${CODE}:players`, ['player-1']);
+  seedVerifiedLocation();
 });
 
 describe('locations fog-appearance route', () => {

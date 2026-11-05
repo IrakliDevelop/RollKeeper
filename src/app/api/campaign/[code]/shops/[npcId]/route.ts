@@ -26,6 +26,7 @@ import {
   seedShopLedger,
   SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
 } from '@/lib/shopPurchases';
+import { SHOP_ENTITY_IDS_CAS_SCRIPT } from '@/lib/shopRedisScripts';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import type { CampaignNPC } from '@/types/encounter';
 
@@ -310,6 +311,105 @@ export async function PUT(
     console.error('Failed to publish shop:', error);
     return NextResponse.json(
       { error: 'Failed to publish shop' },
+      { status: 500 }
+    );
+  }
+}
+
+const ENTITY_IDS_CAS_ATTEMPTS = 3;
+
+/**
+ * Repair 09 (LL1): the DM updates only which tokens open a published shop
+ * (`entityIds`), for example when a merchant is placed on or removed from a
+ * Table scene. Unlike `PUT`, it never reseeds the ledger, so a sale not yet
+ * drained into the DM's copy can never be undone (no stock restore, no
+ * oversell). Same DM-only auth and the same `entityIds` bounds as `PUT`.
+ *
+ * The projection text is read with the raw client and replaced with a
+ * compare-and-set script, so a concurrent full publish is never overwritten
+ * with stale fields; a lost race reads again (a few times). A shop that is
+ * not live answers 404 and nothing is written.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ code: string; npcId: string }> }
+) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
+
+  const { code, npcId } = await params;
+  try {
+    const body = (await request.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!body || typeof body.dmId !== 'string') {
+      return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
+    }
+    const entityIds = body.entityIds;
+    if (
+      !Array.isArray(entityIds) ||
+      entityIds.length > MAX_ENTITY_IDS ||
+      !entityIds.every(id => typeof id === 'string')
+    ) {
+      return NextResponse.json(
+        { error: 'entityIds must be an array of strings' },
+        { status: 400 }
+      );
+    }
+
+    const redis = getRedis();
+    const dmAuth = await verifyDmAuthority(redis, code, body.dmId);
+    if (dmAuth !== 'ok') {
+      return NextResponse.json(
+        { error: 'dmId is not authorized for this campaign' },
+        { status: 403 }
+      );
+    }
+
+    const shopKey = campaignShopKey(code, npcId);
+    const ledgerKey = campaignShopLedgerKey(code, npcId);
+    const raw = getRawRedis();
+    const notLive = () =>
+      NextResponse.json({ error: 'shop is not published' }, { status: 404 });
+
+    for (let attempt = 0; attempt < ENTITY_IDS_CAS_ATTEMPTS; attempt += 1) {
+      const current = await raw.get<string>(shopKey);
+      if (!current) return notLive();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(current) as unknown;
+      } catch {
+        // NN3: an unreadable projection is no live shop, not a server error.
+        return notLive();
+      }
+      const projection = sanitizePublicShop(parsed);
+      if (!projection) return notLive();
+      const next = { ...projection, entityIds: entityIds as string[] };
+      if (!sanitizePublicShop(next)) {
+        return NextResponse.json(
+          { error: 'entityIds must be an array of strings' },
+          { status: 400 }
+        );
+      }
+      const result = Number(
+        await raw.eval(
+          SHOP_ENTITY_IDS_CAS_SCRIPT,
+          [shopKey, ledgerKey],
+          [current, JSON.stringify(next)]
+        )
+      );
+      if (result === 1) return NextResponse.json({ success: true });
+      if (result === -1) return notLive();
+    }
+    return NextResponse.json(
+      { error: 'The shop changed while updating. Try again.' },
+      { status: 409 }
+    );
+  } catch (error) {
+    console.error('Failed to update shop tokens:', error);
+    return NextResponse.json(
+      { error: 'Failed to update shop tokens' },
       { status: 500 }
     );
   }

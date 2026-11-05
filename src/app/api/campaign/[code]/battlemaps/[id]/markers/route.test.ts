@@ -52,6 +52,17 @@ vi.mock('@/lib/relayPoke', () => ({
   sendBattleMapPoke,
   sendBattleMapPokeToRoom,
 }));
+// The Table presentation decision has its own suites (presentationPrivacy,
+// presentationWrites); here `map-1` resolves as a verified location, so the
+// route's own player/DM authorization and ledger logic run.
+vi.mock('@/lib/tableServer/presentationAccess', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/lib/tableServer/presentationAccess')
+  >()),
+  authorizeTableResourceAccess: vi.fn(async () => ({ status: 'location' })),
+  authorizeTableSceneWrite: vi.fn(async () => ({ status: 'legacy' })),
+  authorizeTableAudienceWrite: vi.fn(async () => ({ status: 'location' })),
+}));
 
 import { GET, POST, PUT } from './route';
 

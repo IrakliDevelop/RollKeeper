@@ -32,8 +32,8 @@ interface UseDmVttScreenOptions {
  * (`useDmVttActions`, mirrors `EncounterView.tsx:177-249`), grid control,
  * and tap/drag placement + canvas-selection mapping. Split across sibling
  * hook files to stay under the 150-line file cap — `useDmVttDragPlacement`
- * gates drag-start on `status === 'live'` (same toast as tap-to-arm) and
- * clears any tap-armed pending placement on drop. `armPlacement` is NOT
+ * clears any tap-armed pending placement on drop (no live gate here: the
+ * original editor has no connection under Table v1). `armPlacement` is NOT
  * gated on drag — the screen must skip it when `wasDrag()` is true (a
  * completed drag-drop fires a trailing synthetic click on the same row).
  */
@@ -116,6 +116,9 @@ export function useDmVttScreen({
     handleSelectionChange,
   } = useDmVttPlacementAndSelection({
     status,
+    // The original editor is private under Table v1: no relay connection,
+    // so placement is local (autosaved) and never waits for 'live'.
+    liveRequired: false,
     linkedEntities,
     getViewport,
     addToast,
@@ -123,6 +126,7 @@ export function useDmVttScreen({
 
   const { drag, startDrag, wasDrag } = useDmVttDragPlacement({
     status,
+    liveRequired: false,
     getViewport,
     getCanvasEl,
     addToast,

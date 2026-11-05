@@ -9,6 +9,7 @@ import {
   LockOpen,
   Trash2,
 } from 'lucide-react';
+import { cn } from '@/utils/cn';
 import type { ElementStyle } from '@fieldnotes/core';
 import {
   useSelectionOps,
@@ -27,6 +28,7 @@ interface SwatchRowProps {
   active: string | undefined;
   mixed: boolean;
   onSelect: (color: string) => void;
+  wrap?: boolean;
 }
 
 /** One row of `COLOR_SWATCHES` as a radiogroup; shared by the stroke/fill controls below. */
@@ -36,10 +38,11 @@ function SwatchRow({
   active,
   mixed,
   onSelect,
+  wrap,
 }: SwatchRowProps) {
   return (
     <div
-      className="flex items-center gap-1"
+      className={cn('flex items-center gap-1', wrap && 'min-w-0 flex-wrap')}
       role="radiogroup"
       aria-label={label}
     >
@@ -52,11 +55,16 @@ function SwatchRow({
             role="radio"
             aria-checked={checked}
             title={mixed ? mixedTitle : color}
+            aria-label={mixed ? `${mixedTitle}: ${color}` : color}
             onClick={() => onSelect(color)}
-            className={`h-11 w-11 rounded-full border-2 transition-transform ${
+            className={`h-11 w-11 rounded-full border-2 ${wrap ? 'transition-colors' : 'transition-transform'} ${
               checked
-                ? 'border-accent-blue-border scale-110'
-                : 'border-divider hover:scale-105'
+                ? wrap
+                  ? 'border-brass-border'
+                  : 'border-accent-blue-border scale-110'
+                : wrap
+                  ? 'border-divider hover:border-input-border'
+                  : 'border-divider hover:scale-105'
             }`}
             style={{
               backgroundColor: color,
@@ -76,7 +84,9 @@ function SwatchRow({
  * field applies to the current selection) plus arrange actions (align,
  * rotate, group, lock, delete). Must render inside ViewportContext.Provider.
  */
-export default function DmSelectionOptions() {
+export default function DmSelectionOptions({
+  wrap = false,
+}: { wrap?: boolean } = {}) {
   const viewport = useViewport();
   const {
     selectedIds,
@@ -104,7 +114,7 @@ export default function DmSelectionOptions() {
 
   return (
     <div
-      className="flex items-center gap-2"
+      className={cn('flex items-center gap-2', wrap && 'min-w-0 flex-wrap')}
       role="group"
       aria-label="Selection options"
     >
@@ -113,6 +123,7 @@ export default function DmSelectionOptions() {
       </span>
       {has('color') && (
         <SwatchRow
+          wrap={wrap}
           label="Stroke color"
           mixedTitle="Mixed stroke colors — click to unify"
           active={details?.common.color}
@@ -122,6 +133,7 @@ export default function DmSelectionOptions() {
       )}
       {has('fillColor') && (
         <SwatchRow
+          wrap={wrap}
           label="Fill color"
           mixedTitle="Mixed fill colors — click to unify"
           active={details?.common.fillColor}
@@ -159,6 +171,7 @@ export default function DmSelectionOptions() {
       <Button
         variant="ghost"
         onClick={rotateCCW}
+        aria-label="Rotate 90° counter-clockwise"
         title="Rotate 90° counter-clockwise"
         className={ARRANGE_BUTTON}
       >
@@ -167,6 +180,7 @@ export default function DmSelectionOptions() {
       <Button
         variant="ghost"
         onClick={rotateCW}
+        aria-label="Rotate 90° clockwise"
         title="Rotate 90° clockwise"
         className={ARRANGE_BUTTON}
       >
@@ -176,6 +190,7 @@ export default function DmSelectionOptions() {
         <Button
           variant="ghost"
           onClick={group}
+          aria-label="Group"
           title="Group"
           className={ARRANGE_BUTTON}
         >
@@ -186,6 +201,7 @@ export default function DmSelectionOptions() {
         <Button
           variant="ghost"
           onClick={ungroup}
+          aria-label="Ungroup"
           title="Ungroup"
           className={ARRANGE_BUTTON}
         >
@@ -195,16 +211,18 @@ export default function DmSelectionOptions() {
       <Button
         variant="ghost"
         onClick={toggleLock}
+        aria-label={isLocked === true ? 'Unlock' : 'Lock'}
         title={isLocked === true ? 'Unlock' : 'Lock'}
         className={ARRANGE_BUTTON}
       >
         {isLocked === true ? <LockOpen size={15} /> : <Lock size={15} />}
       </Button>
       <Button
-        variant="ghost"
+        variant={wrap ? 'danger' : 'ghost'}
         onClick={() => viewport.removeElements(selectedIds)}
+        aria-label="Delete selected"
         title="Delete selected"
-        className={`text-accent-red-text ${ARRANGE_BUTTON}`}
+        className={cn(ARRANGE_BUTTON, !wrap && 'text-accent-red-text')}
       >
         <Trash2 size={15} />
       </Button>

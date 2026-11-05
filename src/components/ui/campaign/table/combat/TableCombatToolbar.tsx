@@ -1,0 +1,137 @@
+'use client';
+
+import Link from 'next/link';
+
+import { Button } from '@/components/ui/forms/button';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Badge } from '@/components/ui/layout/badge';
+import type { TableEncounterRecordV1 } from '@/lib/table/schema';
+
+const NO_RUN = '__none__';
+
+function runLabel(run: TableEncounterRecordV1, activeRunId: string | null) {
+  const label = run.label ?? 'Imported run';
+  if (run.runId === activeRunId) return `${label} · running`;
+  if (run.isActive) return `${label} · imported active`;
+  return label;
+}
+
+/**
+ * Header controls of the Table combat panel: explicit run selection, new
+ * run, history, end, publication status and the visible residuals. Save
+ * notices live in `TableCombatStatus` (panel footer), never here (C1).
+ */
+export function TableCombatToolbar(props: {
+  campaignCode: string;
+  runs: TableEncounterRecordV1[];
+  selectedRun: TableEncounterRecordV1 | null;
+  activeRunId: string | null;
+  running: boolean;
+  loggingPaused: boolean;
+  publicationLabel: string;
+  /** O7-3: a raw reason for the publication label, shown as a tooltip. */
+  publicationDetail?: string;
+  /** The run publication targets (campaign.activeRunId), possibly elsewhere. */
+  publishedRun: { label: string; sameScene: boolean; sceneName: string } | null;
+  canPublish: boolean;
+  /** The players snapshot's last refresh failed (N2). */
+  playersStale: boolean;
+  /** Participants broadcast without HP (N1), one line each. */
+  playerNotices: string[];
+  onSelect: (runId: string) => void;
+  onNewRun: () => void;
+  onHistory: () => void;
+  onEnd: () => void;
+  onPublish: () => void;
+}) {
+  const run = props.selectedRun;
+  return (
+    <div className="border-divider space-y-2 border-b px-3 py-2">
+      <div className="flex min-w-0 flex-wrap items-end gap-2">
+        <SelectField
+          wrapperClassName="min-w-0 flex-1 basis-40"
+          value={run?.runId ?? NO_RUN}
+          onValueChange={value => value !== NO_RUN && props.onSelect(value)}
+          triggerProps={{ 'aria-label': 'Scene run', size: 'sm' }}
+        >
+          <SelectItem value={NO_RUN} disabled>
+            No run selected
+          </SelectItem>
+          {props.runs.map(item => (
+            <SelectItem key={item.runId} value={item.runId}>
+              {runLabel(item, props.activeRunId)}
+            </SelectItem>
+          ))}
+        </SelectField>
+        <Button variant="outline" size="sm" onClick={props.onNewRun}>
+          New run
+        </Button>
+        <Button variant="ghost" size="sm" onClick={props.onHistory}>
+          History
+        </Button>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <Badge variant="neutral" size="sm">
+          Saved on this device
+        </Badge>
+        <p
+          className="text-muted order-first w-full min-w-0 text-xs"
+          role="status"
+          aria-live="polite"
+          data-testid="table-publication-status"
+          title={props.publicationDetail}
+        >
+          {props.publishedRun
+            ? `${props.publicationLabel} · ${props.publishedRun.label}${
+                props.publishedRun.sameScene
+                  ? ''
+                  : ` (scene ${props.publishedRun.sceneName})`
+              }`
+            : props.publicationLabel}
+        </p>
+        {props.canPublish && (
+          <Button variant="outline" size="sm" onClick={props.onPublish}>
+            Share with players
+          </Button>
+        )}
+        {props.running && (
+          <Button variant="danger" size="sm" onClick={props.onEnd}>
+            End combat
+          </Button>
+        )}
+      </div>
+      {run?.sourceEncounterId && (
+        <p className="text-muted text-xs">
+          Copied from a library encounter ·{' '}
+          <Link
+            className="text-lapis-text underline"
+            href={`/dm/campaign/${encodeURIComponent(props.campaignCode)}/encounters/${encodeURIComponent(run.sourceEncounterId)}`}
+          >
+            Open library encounter
+          </Link>
+        </p>
+      )}
+      {props.playersStale && (
+        <p className="text-ember-text text-xs">
+          Player data may be out of date
+        </p>
+      )}
+      {props.playerNotices.map(message => (
+        <p key={message} className="text-ember-text text-xs">
+          {message}
+        </p>
+      ))}
+      {props.loggingPaused && (
+        <p className="text-ember-text text-xs">
+          Combat log paused: history is full
+        </p>
+      )}
+      {run && (
+        <p className="text-faint text-xs">
+          Conditions you set here don&apos;t reach players&apos; character
+          sheets
+        </p>
+      )}
+    </div>
+  );
+}

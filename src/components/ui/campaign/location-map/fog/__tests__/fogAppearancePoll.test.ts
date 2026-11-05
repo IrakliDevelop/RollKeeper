@@ -239,3 +239,28 @@ describe('startFogAppearancePoll', () => {
     stop();
   });
 });
+
+describe('fog appearance poll with request init (PR05 C5-2)', () => {
+  it('sends the display header credentials on every poll and keeps them out of the URL', async () => {
+    const vp = fakeViewport();
+    const init = {
+      headers: {
+        'x-rollkeeper-display-capability': 'capability',
+        'x-rollkeeper-display-session': 'nonce',
+      },
+    };
+    const stop = startFogAppearancePoll({
+      viewport: vp,
+      url: '/api/campaign/C/battlemaps/scene/fog-appearance?role=display',
+      init,
+    });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/campaign/C/battlemaps/scene/fog-appearance?role=display',
+      init
+    );
+    stop();
+    fetchAndApplyFogAppearance(vp, '/plain');
+    expect(vi.mocked(fetch).mock.calls.at(-1)).toEqual(['/plain']);
+  });
+});

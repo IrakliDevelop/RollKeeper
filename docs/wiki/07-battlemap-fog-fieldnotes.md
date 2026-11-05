@@ -30,7 +30,7 @@ Key subfolders:
 
 `fogOfWar.ts`, `fogMaterial.ts`, `fogPreset.ts` (each with a co-located
 `.test.ts`), `battlemapSync.ts`, `battlemapToken.ts`,
-`battlemapPokeListener.ts`, `activeBattleMap.ts`, `battleMapSessionAuth.ts`,
+`battlemapPokeListener.ts`, `battleMapSessionAuth.ts`,
 `relayPoke.ts`, `markerLootClaims.ts`, `sanitizePublicMarkers.ts`,
 `openTvDisplay.ts` (spectator/TV display mode).
 

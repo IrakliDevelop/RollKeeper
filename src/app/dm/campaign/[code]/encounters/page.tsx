@@ -38,14 +38,22 @@ export default function CampaignEncountersPage() {
                 variant="ghost"
                 size="sm"
                 leftIcon={<ArrowLeft size={20} />}
+                className="shrink-0"
               >
-                <Link href={`/dm/campaign/${code}`}>
-                  {campaign?.name ?? 'Campaign'}
+                <Link
+                  href={`/dm/campaign/${code}`}
+                  aria-label={`Back to ${campaign?.name ?? 'Campaign'}`}
+                >
+                  <span className="max-w-48 truncate sm:inline lg:max-w-none">
+                    {campaign?.name ?? 'Campaign'}
+                  </span>
                 </Link>
               </Button>
               <h1 className="type-heading text-heading">Encounters</h1>
             </div>
-            <HeaderTrailing showSystemOption />
+            <div className="shrink-0">
+              <HeaderTrailing showSystemOption />
+            </div>
           </div>
         </div>
       </header>
