@@ -426,6 +426,116 @@ describe('NpcLibrarySection', () => {
     await waitFor(() => expect(viewButton('B')).toHaveFocus());
   });
 
+  it('offers Reorder only with two or more entries', () => {
+    seed([creature('a', 'Anna')]);
+    const { unmount } = render(<NpcLibrarySection campaignCode={CODE} />);
+    expect(screen.queryByRole('button', { name: 'Reorder' })).toBeNull();
+    unmount();
+
+    seed([creature('a', 'Anna'), creature('b', 'Bo')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+    const reorder = screen.getByRole('button', { name: 'Reorder' });
+    expect(reorder).toHaveAttribute('data-variant', 'ghost');
+    expect(reorder).toHaveAttribute('aria-pressed', 'false');
+    const create = screen.getByRole('button', { name: 'Create NPC' });
+    expect(
+      reorder.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(reorder.parentElement).toBe(create.parentElement);
+  });
+
+  it('moves entries with Move up and Move down while Reorder is on', () => {
+    seed([creature('a', 'Anna'), creature('b', 'Bo'), creature('c', 'Cara')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
+
+    const reorder = screen.getByRole('button', { name: 'Reorder' });
+    fireEvent.click(reorder);
+    expect(reorder).toHaveAttribute('aria-pressed', 'true');
+    expect(reorder).toHaveAttribute('data-selected', 'true');
+
+    const downs = screen.getAllByRole('button', { name: 'Move down' });
+    expect(downs).toHaveLength(3);
+    expect(downs[0]).toHaveAccessibleDescription('Anna');
+    expect(
+      screen.getAllByRole('button', { name: 'Move up' })[0]
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Edit Anna' })
+    ).toBeInTheDocument();
+    expect(viewButton('Anna')).toBeInTheDocument();
+
+    fireEvent.click(downs[0]);
+    expect(storedNames()).toEqual(['Bo', 'Anna', 'Cara']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reorder' }));
+    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
+  });
+
+  it('keeps moves inside a group and the filtered list', () => {
+    seed([
+      creature('a', 'Anna', { group: 'Bandits' }),
+      creature('b', 'Bo', { group: 'Bandits' }),
+      creature('c', 'Cara', { group: 'Town guard' }),
+    ]);
+    const { unmount } = render(<NpcLibrarySection campaignCode={CODE} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reorder' }));
+
+    const downOf = (name: string) =>
+      screen
+        .getAllByRole('button', { name: 'Move down' })
+        .find(
+          b =>
+            b.getAttribute('aria-describedby') &&
+            document.getElementById(b.getAttribute('aria-describedby')!)
+              ?.textContent === name
+        )!;
+    const upOf = (name: string) =>
+      screen
+        .getAllByRole('button', { name: 'Move up' })
+        .find(
+          b =>
+            b.getAttribute('aria-describedby') &&
+            document.getElementById(b.getAttribute('aria-describedby')!)
+              ?.textContent === name
+        )!;
+    expect(downOf('Bo')).toBeDisabled();
+    expect(upOf('Cara')).toBeDisabled();
+    expect(downOf('Cara')).toBeDisabled();
+    expect(downOf('Anna')).toBeEnabled();
+    unmount();
+
+    seed([creature('a', 'Anna'), creature('b', 'Bo'), creature('c', 'Cara')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search NPCs' }), {
+      target: { value: 'a' },
+    });
+    expect(levelHeadings(3)).toEqual(['Anna', 'Cara']);
+    fireEvent.click(screen.getByRole('button', { name: 'Reorder' }));
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Move down' })[0]);
+    expect(storedNames()).toEqual(['Cara', 'Bo', 'Anna']);
+  });
+
+  it('hides Reorder and its controls when one entry is left', async () => {
+    seed([creature('a', 'Anna'), creature('b', 'Bo')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reorder' }));
+    expect(screen.getAllByRole('button', { name: 'Move up' })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Bo' }));
+    await clickConfirmDialogButton('Delete NPC');
+    await waitFor(() => expect(storedNames()).toEqual(['Anna']));
+    expect(screen.queryByRole('button', { name: 'Reorder' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create NPC' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
+    const reorder = screen.getByRole('button', { name: 'Reorder' });
+    expect(reorder).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
+  });
+
   it('keeps the sync controls and the magic item library as siblings after the monster section', () => {
     vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
     seed([creature('m', 'Dire Wolf', { kind: 'monster' })], {

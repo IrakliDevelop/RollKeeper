@@ -77,6 +77,7 @@ export function NpcLibrarySection({
   const [editingNpc, setEditingNpc] = useState<CampaignNPC | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Read live from the store so edits made in the dialog show at once.
@@ -107,6 +108,8 @@ export function NpcLibrarySection({
 
   const copy = LIBRARY_COPY[kind];
   const n = npcs.length;
+  // Fewer than two entries have nothing to reorder, so Reorder turns itself off.
+  if (n < 2 && reordering) setReordering(false);
   const openKey = kind === 'monster' ? 'monsterSectionOpen' : 'npcSectionOpen';
   const groupKey =
     kind === 'monster'
@@ -235,14 +238,27 @@ export function NpcLibrarySection({
         }
         trailing={
           n ? (
-            <Button
-              size="sm"
-              ref={fallbackRef}
-              leftIcon={<Plus size={16} aria-hidden="true" />}
-              onClick={handleCreate}
-            >
-              {copy.createLabel}
-            </Button>
+            <>
+              {n >= 2 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  selected={reordering}
+                  aria-pressed={reordering}
+                  onClick={() => setReordering(on => !on)}
+                >
+                  Reorder
+                </Button>
+              )}
+              <Button
+                size="sm"
+                ref={fallbackRef}
+                leftIcon={<Plus size={16} aria-hidden="true" />}
+                onClick={handleCreate}
+              >
+                {copy.createLabel}
+              </Button>
+            </>
           ) : undefined
         }
       >
@@ -287,7 +303,7 @@ export function NpcLibrarySection({
                 groups={groups}
                 collapsedGroups={collapsedGroups}
                 onGroupCollapsedChange={handleGroupCollapsedChange}
-                reordering={false}
+                reordering={reordering}
                 onReorder={handleReorder}
                 rowProps={rowProps}
               />

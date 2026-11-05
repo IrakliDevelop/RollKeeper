@@ -24,34 +24,41 @@ export function NpcLibraryList({
   groups,
   collapsedGroups,
   onGroupCollapsedChange,
+  reordering,
   onReorder,
   rowProps,
 }: NpcLibraryListProps) {
-  const renderList = (npcs: CampaignNPC[], headingLevel: 3 | 4) => (
-    <DragDropList
-      as="ul"
-      itemAs="li"
-      items={npcs}
-      keyExtractor={npc => npc.id}
-      onReorder={(from, to) =>
-        onReorder(
-          npcs.map(n => n.id),
-          from,
-          to
-        )
-      }
-      className="divide-divider divide-y"
-      itemClassName="group py-4 pointer-coarse:min-h-11"
-      dragHandlePosition="right"
-      renderItem={npc => (
-        <NpcLibraryRow
-          npc={npc}
-          headingLevel={headingLevel}
-          {...rowProps(npc)}
-        />
-      )}
-    />
-  );
+  const renderList = (npcs: CampaignNPC[], headingLevel: 3 | 4) => {
+    const subsetIds = npcs.map(npc => npc.id);
+    return (
+      <DragDropList
+        as="ul"
+        itemAs="li"
+        items={npcs}
+        keyExtractor={npc => npc.id}
+        onReorder={(from, to) => onReorder(subsetIds, from, to)}
+        className="divide-divider divide-y"
+        itemClassName="group py-4 pointer-coarse:min-h-11"
+        dragHandlePosition="right"
+        renderItem={(npc, index) => (
+          <NpcLibraryRow
+            npc={npc}
+            headingLevel={headingLevel}
+            {...rowProps(npc)}
+            reorder={
+              reordering
+                ? {
+                    index,
+                    count: subsetIds.length,
+                    onMove: to => onReorder(subsetIds, index, to),
+                  }
+                : undefined
+            }
+          />
+        )}
+      />
+    );
+  };
 
   if (!groups) return renderList(flat, 3);
 
