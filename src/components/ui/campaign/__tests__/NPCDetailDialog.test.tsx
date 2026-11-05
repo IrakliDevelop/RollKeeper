@@ -1,16 +1,20 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   render,
   screen,
   fireEvent,
+  waitFor,
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useState } from 'react';
+
 import { useNPCStore } from '@/store/npcStore';
-import type { CampaignNPC } from '@/types/encounter';
+import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import {
   queryConfirmDialog,
   renderConfirmDialogHost,
@@ -100,6 +104,7 @@ describe('NPCDetailDialog — tabs', () => {
   });
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('puts Shop last and names the tab list after the kind', () => {
@@ -166,6 +171,7 @@ describe('NPCDetailDialog — header', () => {
   });
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('shows a neutral "Shop open" badge only when the shop is open', () => {
@@ -182,8 +188,15 @@ describe('NPCDetailDialog — header', () => {
     );
   });
 
-  it('has no Edit or Delete buttons in the header', () => {
+  it('has one Edit and one Delete button, both in the footer', () => {
     setup(makeNpc(), { onEdit: vi.fn(), onDelete: vi.fn() });
+    expect(
+      screen.getAllByRole('button', { name: /^(Edit|Delete) NPC$/ })
+    ).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Edit NPC' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Delete NPC' })).toHaveLength(
+      1
+    );
     const header = screen.getByRole('heading', { name: 'Merchant Mo' })
       .parentElement as HTMLElement;
     expect(header.querySelector('button')).toBeNull();
@@ -237,6 +250,7 @@ describe('NPCDetailDialog — Stat block tab', () => {
   });
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('reads HP through HpReadout: heading while healthy, ember while bloodied', () => {
@@ -344,6 +358,7 @@ describe('NPCDetailDialog — Lore tab', () => {
   });
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('offers "Add lore" when the lore is empty; it edits and closes', () => {
@@ -369,6 +384,7 @@ describe('NPCDetailDialog — footer', () => {
   });
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('names Edit and Delete by kind (kind undefined reads as NPC)', () => {
@@ -443,23 +459,350 @@ describe('NPCDetailDialog — footer', () => {
   });
 });
 
+const ROPE: NPCInventoryItem = {
+  id: 'rope',
+  name: 'Rope',
+  quantity: 2,
+  rarity: 'rare',
+  type: 'wondrous',
+  weight: 2,
+  value: 500,
+  equipped: true,
+};
+const LAMP: NPCInventoryItem = { id: 'lamp', name: 'Lamp', quantity: 1 };
+const KEY: NPCInventoryItem = { id: 'key', name: 'Key', quantity: 1 };
+
+function itemRow(name: string): HTMLElement {
+  return screen.getByRole('button', { name }).closest('li') as HTMLElement;
+}
+
+/** Applies inventory updates to the NPC it renders, as the store would. */
+function InventoryHarness({ initial }: { initial: CampaignNPC }) {
+  const [npc, setNpc] = useState(initial);
+  return (
+    <NPCDetailDialog
+      npc={npc}
+      open={true}
+      onOpenChange={() => {}}
+      initialTab="inventory"
+      onUpdateInventory={(_id, inventory) =>
+        setNpc(prev => ({ ...prev, inventory }))
+      }
+    />
+  );
+}
+
 describe('NPCDetailDialog — Inventory tab', () => {
   beforeEach(() => {
     useNPCStore.setState({ npcsByCampaign: {} });
   });
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('opens the shared inventory form from an NPC inventory', () => {
     setup(makeNpc(), { onUpdateInventory: () => {}, initialTab: 'inventory' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
 
-    expect(
-      screen.getByRole('dialog', { name: 'Add item' })
-    ).toBeInTheDocument();
+    const form = screen.getByRole('dialog', { name: 'Add item' });
+    expect(form).toBeInTheDocument();
     expect(screen.getByText('Basic information')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add item' })).toBeDisabled();
+    expect(
+      within(form).getByRole('button', { name: 'Add item' })
+    ).toBeDisabled();
+  });
+
+  it('lists items as rows inside the Items section', () => {
+    setup(makeNpc({ inventory: [ROPE, LAMP] }), { initialTab: 'inventory' });
+    const section = screen.getByRole('region', { name: 'Items' });
+    expect(within(section).getAllByRole('listitem')).toHaveLength(2);
+    const name = within(section).getByRole('button', { name: 'Rope' });
+    expect(name).toHaveAttribute('aria-haspopup', 'dialog');
+  });
+
+  it('prints Equipped as a neutral badge and the meta line without a none rarity', () => {
+    setup(
+      makeNpc({
+        inventory: [
+          ROPE,
+          {
+            id: 'sword',
+            name: 'Sword',
+            quantity: 1,
+            rarity: 'none',
+            type: 'weapon',
+          },
+        ],
+      }),
+      { initialTab: 'inventory' }
+    );
+    const rope = itemRow('Rope');
+    expect(within(rope).getByText('Equipped')).toHaveAttribute(
+      'data-variant',
+      'neutral'
+    );
+    expect(rope).toHaveTextContent('Rare · Wondrous · 2 lb · 5 gp');
+    const sword = itemRow('Sword');
+    expect(within(sword).queryByText('Equipped')).toBeNull();
+    expect(within(sword).getByText('Weapon')).toBeInTheDocument();
+  });
+
+  it('names every row control after the item', () => {
+    setup(makeNpc({ inventory: [ROPE] }), {
+      initialTab: 'inventory',
+      onUpdateInventory: vi.fn(),
+      onSendItemToPlayer: vi.fn(),
+    });
+    for (const name of [
+      'Decrease quantity: Rope',
+      'Increase quantity: Rope',
+      'Send Rope to a player',
+      'Edit Rope',
+      'Remove Rope',
+    ]) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('offers Send only with a send handler', () => {
+    setup(makeNpc({ inventory: [ROPE] }), {
+      initialTab: 'inventory',
+      onUpdateInventory: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: /^Send / })).toBeNull();
+  });
+
+  it('changes the quantity at once and disables Decrease at 0', () => {
+    const onUpdateInventory = vi.fn();
+    setup(makeNpc({ inventory: [ROPE] }), {
+      initialTab: 'inventory',
+      onUpdateInventory,
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Increase quantity: Rope' })
+    );
+    expect(onUpdateInventory).toHaveBeenCalledWith('npc-1', [
+      { ...ROPE, quantity: 3 },
+    ]);
+    cleanup();
+    setup(makeNpc({ inventory: [{ ...ROPE, quantity: 0 }] }), {
+      initialTab: 'inventory',
+      onUpdateInventory,
+    });
+    expect(
+      screen.getByRole('button', { name: 'Decrease quantity: Rope' })
+    ).toBeDisabled();
+  });
+
+  it('shows no controls when read-only, and ×n only above 1', () => {
+    setup(makeNpc({ inventory: [{ ...ROPE, quantity: 3 }, LAMP] }), {
+      initialTab: 'inventory',
+      readOnly: true,
+      onUpdateInventory: vi.fn(),
+      onSendItemToPlayer: vi.fn(),
+    });
+    expect(
+      screen.queryByRole('button', {
+        name: /^(Decrease|Increase|Send|Edit|Remove)/,
+      })
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add item' })).toBeNull();
+    expect(itemRow('Rope')).toHaveTextContent('×3');
+    expect(itemRow('Lamp')).not.toHaveTextContent('×');
+  });
+
+  it('puts Add item in the Items heading row once there are items', () => {
+    setup(makeNpc({ inventory: [LAMP] }), {
+      initialTab: 'inventory',
+      onUpdateInventory: vi.fn(),
+    });
+    const section = screen.getByRole('region', { name: 'Items' });
+    expect(
+      within(section).getAllByRole('button', { name: 'Add item' })
+    ).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Add item' })).toHaveLength(1);
+  });
+
+  it('shows the empty state with one Add item, and the heading only when read-only', () => {
+    setup(makeNpc(), { initialTab: 'inventory', onUpdateInventory: vi.fn() });
+    expect(
+      screen.getByText('Merchant Mo carries nothing yet')
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Add item' })).toHaveLength(1);
+    cleanup();
+    setup(makeNpc(), {
+      initialTab: 'inventory',
+      onUpdateInventory: vi.fn(),
+      readOnly: true,
+    });
+    expect(
+      screen.getByText('Merchant Mo carries nothing yet')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add item' })).toBeNull();
+  });
+
+  describe('removing', () => {
+    beforeEach(() => {
+      renderConfirmDialogHost();
+    });
+
+    it('asks first, keeps the item on Cancel and removes it on Remove item', async () => {
+      const onUpdateInventory = vi.fn();
+      setup(makeNpc({ inventory: [ROPE, LAMP] }), {
+        initialTab: 'inventory',
+        onUpdateInventory,
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Rope' }));
+      const alert = await screen.findByRole('alertdialog', {
+        name: 'Remove Rope?',
+      });
+      expect(alert).toHaveTextContent('Merchant Mo no longer carries it.');
+      expect(onUpdateInventory).not.toHaveBeenCalled();
+      fireEvent.click(within(alert).getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+      expect(onUpdateInventory).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Rope' }));
+      const again = await screen.findByRole('alertdialog');
+      fireEvent.click(
+        within(again).getByRole('button', { name: 'Remove item' })
+      );
+      await waitFor(() =>
+        expect(onUpdateInventory).toHaveBeenCalledWith('npc-1', [LAMP])
+      );
+    });
+
+    it('moves focus to the next row, then the previous, then Add item', async () => {
+      vi.useFakeTimers();
+      const npc = makeNpc({ inventory: [ROPE, LAMP, KEY] });
+      seedNpc(npc);
+      render(<InventoryHarness initial={npc} />);
+
+      const remove = async (name: string) => {
+        fireEvent.click(screen.getByRole('button', { name: `Remove ${name}` }));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        const alert = screen.getByRole('alertdialog');
+        fireEvent.click(
+          within(alert).getByRole('button', { name: 'Remove item' })
+        );
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(250);
+        });
+      };
+
+      await remove('Lamp');
+      expect(screen.getByRole('button', { name: 'Key' })).toHaveFocus();
+      await remove('Key');
+      expect(screen.getByRole('button', { name: 'Rope' })).toHaveFocus();
+      await remove('Rope');
+      expect(screen.getByRole('button', { name: 'Add item' })).toHaveFocus();
+    });
+  });
+
+  describe('item view', () => {
+    const THREE: NPCInventoryItem = {
+      ...ROPE,
+      quantity: 3,
+      category: 'treasure',
+      description: '<p>Never frays.</p>',
+    };
+
+    it('opens from the name, titled with the item, described by rarity, type and Equipped', () => {
+      setup(makeNpc({ inventory: [THREE] }), { initialTab: 'inventory' });
+      fireEvent.click(screen.getByRole('button', { name: 'Rope' }));
+      const view = screen.getByRole('dialog', { name: 'Rope' });
+      const described = document.getElementById(
+        view.getAttribute('aria-describedby') ?? ''
+      );
+      expect(described).toHaveTextContent('Rare · Wondrous · Equipped');
+      expect(within(view).getByText('Never frays.')).toBeInTheDocument();
+      expect(
+        within(view).getByRole('heading', { level: 3, name: 'Description' })
+      ).toBeInTheDocument();
+    });
+
+    it('lists the facts with each and total figures', () => {
+      setup(makeNpc({ inventory: [THREE] }), { initialTab: 'inventory' });
+      fireEvent.click(screen.getByRole('button', { name: 'Rope' }));
+      const view = screen.getByRole('dialog', { name: 'Rope' });
+      expect(
+        within(view).getByText('Category').nextElementSibling
+      ).toHaveTextContent('Treasure');
+      expect(
+        within(view).getByText('Quantity').nextElementSibling
+      ).toHaveTextContent('3');
+      const weight = within(view).getByText('Weight').nextElementSibling;
+      expect(weight).toHaveTextContent('2 lb each');
+      expect(weight).toHaveTextContent('(6 lb total)');
+      const value = within(view).getByText('Value').nextElementSibling;
+      expect(value).toHaveTextContent('5 gp each');
+      expect(value).toHaveTextContent('(15 gp total)');
+    });
+
+    it('omits the total for a single item and the description when nothing is set', () => {
+      setup(makeNpc({ inventory: [KEY] }), { initialTab: 'inventory' });
+      fireEvent.click(screen.getByRole('button', { name: 'Key' }));
+      const view = screen.getByRole('dialog', { name: 'Key' });
+      expect(view).not.toHaveAttribute('aria-describedby');
+      expect(within(view).queryByText(/total/)).toBeNull();
+      expect(
+        within(view).queryByRole('heading', { name: 'Description' })
+      ).toBeNull();
+    });
+
+    it('has Edit item (secondary) only with an update handler, and Close (outline)', () => {
+      setup(makeNpc({ inventory: [THREE] }), {
+        initialTab: 'inventory',
+        onUpdateInventory: vi.fn(),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Rope' }));
+      const view = screen.getByRole('dialog', { name: 'Rope' });
+      expect(
+        within(view).getByRole('button', { name: 'Edit item' })
+      ).toHaveAttribute('data-variant', 'secondary');
+      const closes = within(view).getAllByRole('button', { name: 'Close' });
+      expect(
+        closes.some(b => b.getAttribute('data-variant') === 'outline')
+      ).toBe(true);
+      cleanup();
+      setup(makeNpc({ inventory: [THREE] }), { initialTab: 'inventory' });
+      fireEvent.click(screen.getByRole('button', { name: 'Rope' }));
+      expect(screen.queryByRole('button', { name: 'Edit item' })).toBeNull();
+    });
+
+    it('Edit item swaps to the item form', () => {
+      setup(makeNpc({ inventory: [THREE] }), {
+        initialTab: 'inventory',
+        onUpdateInventory: vi.fn(),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Rope' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Edit item' }));
+      expect(
+        screen.getByRole('dialog', { name: 'Edit item' })
+      ).toBeInTheDocument();
+    });
+
+    it('Escape closes only the item view', async () => {
+      const { onOpenChange } = setup(makeNpc({ inventory: [THREE] }), {
+        initialTab: 'inventory',
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Rope' }));
+      expect(screen.getByRole('dialog', { name: 'Rope' })).toBeInTheDocument();
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: 'Escape',
+      });
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Rope' })).toBeNull()
+      );
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('dialog', { name: 'Merchant Mo' })
+      ).toBeInTheDocument();
+    });
   });
 });
