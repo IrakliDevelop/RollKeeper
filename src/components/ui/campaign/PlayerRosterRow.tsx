@@ -1,14 +1,13 @@
 'use client';
 
-import { useId, useState } from 'react';
-import Image from 'next/image';
+import { useId } from 'react';
 import { UserX } from 'lucide-react';
-import { ImageLightbox } from '@/components/ui/feedback/ImageLightbox';
 import { Button } from '@/components/ui/forms/button';
 import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import { Badge } from '@/components/ui/layout/badge';
 import { CounterStepper } from './CounterStepper';
 import { HpReadout } from './HpReadout';
+import { RowAvatar } from './RowAvatar';
 import {
   calculateCharacterArmorClass,
   calculatePassiveInsight,
@@ -47,40 +46,6 @@ function syncFreshness(lastSynced: string, now = Date.now()) {
         ? `Last synced ${Math.floor(s / 60)} min ago`
         : `Last synced ${Math.floor(s / 3600)} h ago`;
   return { text, stale: s >= 120 };
-}
-
-function RowAvatar({ src, name }: { src?: string; name: string }) {
-  const [open, setOpen] = useState(false);
-  if (!src) {
-    return (
-      <span
-        aria-hidden="true"
-        className="hidden size-10 shrink-0 sm:block pointer-coarse:size-11"
-      />
-    );
-  }
-  return (
-    <>
-      <button
-        type="button"
-        aria-label={`View ${name} image full size`}
-        onClick={() => setOpen(true)}
-        className="border-divider relative size-10 shrink-0 overflow-hidden rounded-md border pointer-coarse:size-11"
-      >
-        <Image
-          src={src}
-          alt=""
-          fill
-          sizes="44px"
-          className="object-cover"
-          unoptimized={src.startsWith('data:')}
-        />
-      </button>
-      {open && (
-        <ImageLightbox src={src} alt={name} onClose={() => setOpen(false)} />
-      )}
-    </>
-  );
 }
 
 function StatusChips({

@@ -2,10 +2,16 @@
 
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/forms/input';
+import {
+  RadioGroupField,
+  RadioGroupItem,
+} from '@/components/ui/forms/radio-group';
 import { Switch } from '@/components/ui/forms/switch';
 import { Section } from '@/components/ui/layout/section';
 import { MAX_BANNER_SIZE_MB } from '@/utils/constants';
 import { BannerImageControls } from './BannerImageControls';
+
+export type NpcSpellSlotMode = 'inline' | 'tracker';
 
 export interface CampaignSettingsSectionProps {
   campaignCode: string;
@@ -17,6 +23,8 @@ export interface CampaignSettingsSectionProps {
   onStackableInspirationChange: (enabled: boolean) => void;
   customCounterLabel?: string;
   onCustomCounterLabelChange: (label: string | undefined) => void;
+  npcSpellSlotMode: NpcSpellSlotMode;
+  onNpcSpellSlotModeChange: (mode: NpcSpellSlotMode) => void;
 }
 
 /** The player counter label, kept as a local draft and committed on blur/Enter. */
@@ -88,6 +96,8 @@ export function CampaignSettingsSection({
   onStackableInspirationChange,
   customCounterLabel,
   onCustomCounterLabelChange,
+  npcSpellSlotMode,
+  onNpcSpellSlotModeChange,
 }: CampaignSettingsSectionProps) {
   return (
     <Section
@@ -118,11 +128,25 @@ export function CampaignSettingsSection({
             onCheckedChange={onStackableInspirationChange}
           />
         </div>
-        <div className="pt-4">
+        <div className="py-4">
           <CounterLabelField
             value={customCounterLabel ?? ''}
             onCommit={onCustomCounterLabelChange}
           />
+        </div>
+        <div className="pt-4">
+          <RadioGroupField
+            label="NPC spell slots"
+            value={npcSpellSlotMode}
+            onValueChange={value => {
+              if (value === 'inline' || value === 'tracker') {
+                onNpcSpellSlotModeChange(value);
+              }
+            }}
+          >
+            <RadioGroupItem value="inline" label="Beside each spell level" />
+            <RadioGroupItem value="tracker" label="In a separate tracker" />
+          </RadioGroupField>
         </div>
       </div>
     </Section>

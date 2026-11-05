@@ -7,7 +7,10 @@ import { CopyCodeButton } from '@/components/ui/campaign/CopyCodeButton';
 import { CampaignNav } from '@/components/ui/campaign/CampaignNav';
 import { CampaignBanner } from '@/components/ui/campaign/CampaignBanner';
 import { CampaignPlayersSection } from '@/components/ui/campaign/CampaignPlayersSection';
-import { CampaignSettingsSection } from '@/components/ui/campaign/CampaignSettingsSection';
+import {
+  CampaignSettingsSection,
+  type NpcSpellSlotMode,
+} from '@/components/ui/campaign/CampaignSettingsSection';
 import { playerDisplayName } from '@/components/ui/campaign/PlayerRosterRow';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
@@ -70,6 +73,13 @@ export default function CampaignViewPage() {
     localCampaign?.dmDashboardUi?.playersSectionOpen ?? true;
   const houseRulesSectionOpen =
     localCampaign?.dmDashboardUi?.houseRulesSectionOpen ?? false;
+
+  // Same rule as NPCSpellTab: only this exact flag pair means the tracker.
+  const npcSpellSlotMode: NpcSpellSlotMode =
+    localCampaign?.dmDashboardUi?.npcInlineSpellSlots === false &&
+    localCampaign?.dmDashboardUi?.npcSeparateSpellSlotTracker === true
+      ? 'tracker'
+      : 'inline';
 
   const customCounterLabel = localCampaign?.customCounterLabel;
   const stackableInspiration = localCampaign?.stackableInspiration ?? false;
@@ -218,7 +228,6 @@ export default function CampaignViewPage() {
               <NPCSection
                 campaignCode={code}
                 kind="monster"
-                showSpellSlotSettings={false}
                 players={itemSends.sendTargets}
                 onGiveMagicItemToPlayer={itemSends.giveLibraryMagicItem}
                 onSendItemToPlayer={itemSends.openNpcItemSend}
@@ -243,6 +252,21 @@ export default function CampaignViewPage() {
               customCounterLabel={customCounterLabel}
               onCustomCounterLabelChange={label =>
                 setCustomCounterLabel(code, label)
+              }
+              npcSpellSlotMode={npcSpellSlotMode}
+              onNpcSpellSlotModeChange={mode =>
+                setDmDashboardUi(
+                  code,
+                  mode === 'tracker'
+                    ? {
+                        npcInlineSpellSlots: false,
+                        npcSeparateSpellSlotTracker: true,
+                      }
+                    : {
+                        npcInlineSpellSlots: true,
+                        npcSeparateSpellSlotTracker: false,
+                      }
+                )
               }
             />
           </div>

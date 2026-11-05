@@ -28,6 +28,8 @@ const meta: Meta<typeof CampaignSettingsSection> = {
     onStackableInspirationChange: fn(),
     customCounterLabel: 'Desperation',
     onCustomCounterLabelChange: fn(),
+    npcSpellSlotMode: 'inline',
+    onNpcSpellSlotModeChange: fn(),
   },
 };
 
@@ -46,6 +48,9 @@ export const Open: Story = {
     await expect(
       canvas.getByRole('textbox', { name: 'Player counter' })
     ).toHaveValue('Desperation');
+    await expect(
+      canvas.getByRole('radio', { name: 'Beside each spell level' })
+    ).toBeChecked();
   },
 };
 

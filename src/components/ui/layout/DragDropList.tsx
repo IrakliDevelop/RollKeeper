@@ -14,6 +14,10 @@ interface DragDropListProps<T> {
   showDragHandle?: boolean;
   dragHandlePosition?: 'left' | 'right';
   keyExtractor: (item: T, index: number) => string | number;
+  /** Root element; `'ul'` for a list of rows. */
+  as?: 'div' | 'ul';
+  /** Element around each item; `'li'` inside a `'ul'` root. */
+  itemAs?: 'div' | 'li';
 }
 
 function useHasHover() {
@@ -37,6 +41,8 @@ export default function DragDropList<T>({
   showDragHandle = true,
   dragHandlePosition = 'left',
   keyExtractor,
+  as,
+  itemAs,
 }: DragDropListProps<T>) {
   const hasHover = useHasHover();
   const canDrag = !disabled && hasHover;
@@ -55,8 +61,11 @@ export default function DragDropList<T>({
     return null;
   }
 
+  const Root = as ?? 'div';
+  const Item = itemAs ?? 'div';
+
   return (
-    <div className={className}>
+    <Root className={className}>
       {items.map((item, index) => {
         const key = keyExtractor(item, index);
         const dragOverStyles = getDragOverStyles(index);
@@ -64,7 +73,7 @@ export default function DragDropList<T>({
         const isDragging = draggedStyles.includes('opacity-50');
 
         return (
-          <div
+          <Item
             key={key}
             className={` ${itemClassName} ${dragOverStyles} ${draggedStyles} transition-all duration-200`}
             draggable={canDrag}
@@ -90,9 +99,9 @@ export default function DragDropList<T>({
             ) : (
               renderItem(item, index, isDragging)
             )}
-          </div>
+          </Item>
         );
       })}
-    </div>
+    </Root>
   );
 }
