@@ -110,7 +110,8 @@ const FOCUS_RECHECK_MS = 250;
 
 /**
  * Moves focus to the next row's target (or the previous one, or the fallback)
- * once a removed entry has left `presentIds`.
+ * once a removed entry has left `presentIds`, and to a new entry's target once
+ * it has arrived.
  */
 export function useFocusAfterRemove(presentIds: readonly string[]): {
   /** Put on the Create button that is rendered. */
@@ -122,6 +123,8 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
     visibleIds: readonly string[],
     remove: () => void
   ) => void;
+  /** Focus the entry's target once it is in `presentIds`, e.g. a new entry. */
+  focusWhenPresent: (id: string) => void;
 } {
   const fallbackRef = useRef<HTMLButtonElement | null>(null);
   const targets = useRef(new Map<string, HTMLButtonElement>());
@@ -133,6 +136,7 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
     removedId: string;
     nextId: string | null;
   } | null>(null);
+  const [arrivedId, setArrivedId] = useState<string | null>(null);
 
   const registerTarget = useCallback((id: string) => {
     let callback = callbacks.current.get(id);
@@ -159,6 +163,34 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
     []
   );
 
+  const focusWhenPresent = useCallback((id: string) => setArrivedId(id), []);
+
+  // `resolve` runs again at the re-check: a row may have remounted since.
+  const focusWithRecheck = useCallback(
+    (resolve: () => HTMLElement | null | undefined) => {
+      resolve()?.focus();
+      window.clearTimeout(recheckTimer.current);
+      recheckTimer.current = window.setTimeout(() => {
+        recheckTimer.current = undefined;
+        const active = document.activeElement;
+        const dropped =
+          !active || active === document.body || !active.isConnected;
+        const target = resolve();
+        if (target?.isConnected && dropped) target.focus();
+      }, FOCUS_RECHECK_MS);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!arrivedId) return;
+    // The creation ran in the same batch as this render, so the row is here
+    // now or it never will be.
+    setArrivedId(null);
+    if (!presentIds.includes(arrivedId)) return;
+    focusWithRecheck(() => targets.current.get(arrivedId));
+  }, [presentIds, arrivedId, focusWithRecheck]);
+
   useEffect(() => {
     if (!pending) return;
     if (presentIds.includes(pending.removedId)) {
@@ -171,19 +203,10 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
     const next = pending.nextId ? targets.current.get(pending.nextId) : null;
     const target = next?.isConnected ? next : fallbackRef.current;
     setPending(null);
-    if (!target) return;
-    target.focus();
-    window.clearTimeout(recheckTimer.current);
-    recheckTimer.current = window.setTimeout(() => {
-      recheckTimer.current = undefined;
-      const active = document.activeElement;
-      const dropped =
-        !active || active === document.body || !active.isConnected;
-      if (target.isConnected && dropped) target.focus();
-    }, FOCUS_RECHECK_MS);
-  }, [presentIds, pending]);
+    if (target) focusWithRecheck(() => target);
+  }, [presentIds, pending, focusWithRecheck]);
 
   useEffect(() => () => window.clearTimeout(recheckTimer.current), []);
 
-  return { fallbackRef, registerTarget, removeThenFocus };
+  return { fallbackRef, registerTarget, removeThenFocus, focusWhenPresent };
 }

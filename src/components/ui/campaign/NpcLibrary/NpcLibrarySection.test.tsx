@@ -173,6 +173,71 @@ describe('NpcLibrarySection', () => {
     ).toBeInTheDocument();
   });
 
+  it('focuses the first new entry once the form dialog has closed', () => {
+    vi.useFakeTimers();
+    try {
+      render(<NpcLibrarySection campaignCode={CODE} />);
+
+      const create = screen.getByRole('button', { name: 'Create NPC' });
+      create.focus();
+      fireEvent.click(create);
+      fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
+      // The dialog's close auto-focus finds no Create button and drops to body.
+      (document.activeElement as HTMLElement | null)?.blur();
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+
+      expect(viewButton('Wren')).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('focuses the first new custom monster the same way', () => {
+    vi.useFakeTimers();
+    try {
+      render(<NpcLibrarySection campaignCode={CODE} kind="monster" />);
+
+      const create = screen.getByRole('button', {
+        name: 'Create custom monster',
+      });
+      create.focus();
+      fireEvent.click(create);
+      fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
+      (document.activeElement as HTMLElement | null)?.blur();
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+
+      expect(viewButton('Wren')).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves focus alone when a new entry joins a library that has some', () => {
+    vi.useFakeTimers();
+    try {
+      seed([creature('a', 'A')]);
+      render(<NpcLibrarySection campaignCode={CODE} />);
+
+      const create = screen.getByRole('button', { name: 'Create NPC' });
+      create.focus();
+      fireEvent.click(create);
+      fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+
+      expect(storedNames()).toEqual(['A', 'Wren']);
+      expect(create).toHaveFocus();
+      expect(viewButton('Wren')).not.toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('heads an empty custom monster library with its own copy', () => {
     render(<NpcLibrarySection campaignCode={CODE} kind="monster" />);
 

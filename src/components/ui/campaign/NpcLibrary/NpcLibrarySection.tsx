@@ -108,7 +108,7 @@ export function NpcLibrarySection({
   if (npcs.length === 0 && (searchQuery || activeTags.size > 0)) {
     clearFilters();
   }
-  const { fallbackRef, registerTarget, removeThenFocus } =
+  const { fallbackRef, registerTarget, removeThenFocus, focusWhenPresent } =
     useFocusAfterRemove(npcIds);
 
   const copy = LIBRARY_COPY[kind];
@@ -159,10 +159,14 @@ export function NpcLibrarySection({
       updateNPC(campaignCode, editingNpc.id, { ...data, kind });
       return;
     }
-    createNPC(campaignCode, { ...data, kind });
+    const id = createNPC(campaignCode, { ...data, kind });
+    if (n > 0) return;
+    // The empty state's Create button unmounts with the first entry, so the
+    // form dialog has nothing to return focus to.
+    focusWhenPresent(id);
     // An empty library ignores its saved collapse, so open it for the first
     // entry instead of hiding what the DM just made.
-    if (n === 0 && campaign?.dmDashboardUi?.[openKey] === false) {
+    if (campaign?.dmDashboardUi?.[openKey] === false) {
       setDmDashboardUi(campaignCode, { [openKey]: true });
     }
   };
