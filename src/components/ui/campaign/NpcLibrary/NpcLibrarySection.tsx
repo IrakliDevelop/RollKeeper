@@ -1,15 +1,15 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
 import { Section } from '@/components/ui/layout/section';
 import { MagicItemLibrarySection } from '../MagicItemLibrary/MagicItemLibrarySection';
 import { NPCDetailDialog } from '../NPCDetailDialog';
 import { NPCFormDialog } from '../NPCFormDialog';
 import { NpcSyncControls } from '../NpcSyncControls';
+import { NpcLibraryFilters } from './NpcLibraryFilters';
 import { NpcLibraryList, type NpcLibraryListProps } from './NpcLibraryList';
 import { useFocusAfterRemove, useNpcLibraryFilters } from './NpcLibrary.hooks';
 import { useDmStore } from '@/store/dmStore';
@@ -258,45 +258,17 @@ export function NpcLibrarySection({
           </div>
         ) : (
           <div className="space-y-4">
-            <Input
-              ref={searchRef}
-              size="sm"
-              aria-label={copy.searchLabel}
-              placeholder={copy.searchPlaceholder}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              leftIcon={<Search size={16} aria-hidden="true" />}
-              clearable
-              onClear={() => setSearchQuery('')}
+            <NpcLibraryFilters
+              searchRef={searchRef}
+              searchLabel={copy.searchLabel}
+              searchPlaceholder={copy.searchPlaceholder}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              allTags={allTags}
+              activeTags={activeTags}
+              onToggleTag={toggleTag}
+              onClearTags={clearTags}
             />
-            {allTags.length > 0 && (
-              <div
-                role="group"
-                aria-label="Filter by tag"
-                className="flex flex-wrap items-center gap-1.5"
-              >
-                {allTags.map(tag => {
-                  const on = activeTags.has(tag);
-                  return (
-                    <Button
-                      key={tag}
-                      variant="ghost"
-                      size="xs"
-                      selected={on}
-                      aria-pressed={on}
-                      onClick={() => toggleTag(tag)}
-                    >
-                      {tag}
-                    </Button>
-                  );
-                })}
-                {activeTags.size > 0 && (
-                  <Button variant="ghost" size="xs" onClick={clearTags}>
-                    Clear tags
-                  </Button>
-                )}
-              </div>
-            )}
             {filteredNpcs.length === 0 ? (
               <div className="py-8 text-center">
                 <p className="type-body text-muted">{copy.noMatch}</p>
