@@ -264,6 +264,25 @@ describe('MagicItemLibrarySection', () => {
     }
   });
 
+  it('names wondrous, other and artifact categories as a table would', () => {
+    seed([
+      item('cloak', 'Cloak of Elvenkind', {
+        category: 'wondrous',
+        rarity: 'uncommon',
+      }),
+      item('rope', 'Silk Rope', { category: 'other', rarity: 'common' }),
+      item('orb', 'Orb of Dragonkind', {
+        category: 'artifact',
+        rarity: 'artifact',
+      }),
+    ]);
+    renderSection();
+
+    expect(screen.getByText('Uncommon wondrous item')).toBeInTheDocument();
+    expect(screen.getByText('Common item')).toBeInTheDocument();
+    expect(screen.getByText('Artifact')).toBeInTheDocument();
+  });
+
   it('shows rarity, category and group as text', () => {
     seed([potion, item('ring', 'Ring of Warmth', { category: 'ring' })]);
     renderSection();

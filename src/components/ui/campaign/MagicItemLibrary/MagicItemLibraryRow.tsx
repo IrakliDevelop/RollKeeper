@@ -16,6 +16,18 @@ export interface MagicItemLibraryRowProps {
   giveRef?: (el: HTMLButtonElement | null) => void;
 }
 
+const CATEGORY_LABELS: Partial<Record<CustomMagicItem['category'], string>> = {
+  wondrous: 'wondrous item',
+  other: 'item',
+};
+
+/** "Rare wondrous item", "Common item"; an artifact artifact reads "Artifact". */
+function rarityAndCategory(item: CustomMagicItem): string {
+  const rarity = formatRarity(item.rarity);
+  if (item.rarity === 'artifact' && item.category === 'artifact') return rarity;
+  return `${rarity} ${CATEGORY_LABELS[item.category] ?? item.category}`;
+}
+
 /** One magic item template, as an `li`. */
 export function MagicItemLibraryRow({
   item,
@@ -26,7 +38,7 @@ export function MagicItemLibraryRow({
   giveRef,
 }: MagicItemLibraryRowProps) {
   const headingId = useId();
-  const meta = `${formatRarity(item.rarity)} ${item.category}${
+  const meta = `${rarityAndCategory(item)}${
     item.group ? ` · ${item.group}` : ''
   }`;
 

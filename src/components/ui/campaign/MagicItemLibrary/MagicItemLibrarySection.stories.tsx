@@ -140,7 +140,9 @@ export const List: Story = {
   globals: { viewport: { value: 'landscape', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Very rare wondrous')).toBeInTheDocument();
+    await expect(
+      canvas.getByText('Very rare wondrous item')
+    ).toBeInTheDocument();
     await expect(
       canvasElement.querySelectorAll('[data-variant="primary"]')
     ).toHaveLength(0);
