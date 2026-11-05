@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +17,7 @@ const onOpenChange = vi.fn();
 const onBannerChange = vi.fn();
 const onStackableInspirationChange = vi.fn();
 const onCustomCounterLabelChange = vi.fn();
+const onNpcSpellSlotModeChange = vi.fn();
 
 function props(
   overrides: Partial<CampaignSettingsSectionProps> = {}
@@ -23,6 +30,8 @@ function props(
     stackableInspiration: false,
     onStackableInspirationChange,
     onCustomCounterLabelChange,
+    npcSpellSlotMode: 'inline',
+    onNpcSpellSlotModeChange,
     ...overrides,
   };
 }
@@ -160,5 +169,34 @@ describe('CampaignSettingsSection', () => {
       <CampaignSettingsSection {...props({ customCounterLabel: 'Doom' })} />
     );
     expect(field()).toHaveValue('Fear');
+  });
+
+  it('offers the NPC spell slot setting as the last row', () => {
+    renderSettings();
+    const group = screen.getByRole('radiogroup', { name: 'NPC spell slots' });
+    expect(
+      within(group).getByRole('radio', { name: 'Beside each spell level' })
+    ).toBeChecked();
+    expect(
+      within(group).getByRole('radio', { name: 'In a separate tracker' })
+    ).not.toBeChecked();
+    const rows = group.closest('.divide-y')!.children;
+    expect(rows[rows.length - 1]).toContainElement(group);
+    expect(rows[rows.length - 2]).toHaveClass('py-4');
+  });
+
+  it('reports the chosen NPC spell slot mode', async () => {
+    const { rerender } = renderSettings();
+    await user.click(
+      screen.getByRole('radio', { name: 'In a separate tracker' })
+    );
+    expect(onNpcSpellSlotModeChange).toHaveBeenLastCalledWith('tracker');
+    rerender(
+      <CampaignSettingsSection {...props({ npcSpellSlotMode: 'tracker' })} />
+    );
+    await user.click(
+      screen.getByRole('radio', { name: 'Beside each spell level' })
+    );
+    expect(onNpcSpellSlotModeChange).toHaveBeenLastCalledWith('inline');
   });
 });

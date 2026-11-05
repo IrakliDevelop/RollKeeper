@@ -352,6 +352,60 @@ it('turns on stackable heroic inspiration', () => {
   ).toBe(true);
 });
 
+it('writes the NPC spell slot setting as the same two flags', () => {
+  render(<CampaignViewPage />);
+  open('Campaign settings');
+  const ui = () => useDmStore.getState().getCampaign('K7QX2M')?.dmDashboardUi;
+  fireEvent.click(screen.getByRole('radio', { name: 'In a separate tracker' }));
+  expect(ui()).toMatchObject({
+    npcInlineSpellSlots: false,
+    npcSeparateSpellSlotTracker: true,
+  });
+  fireEvent.click(
+    screen.getByRole('radio', { name: 'Beside each spell level' })
+  );
+  expect(ui()).toMatchObject({
+    npcInlineSpellSlots: true,
+    npcSeparateSpellSlotTracker: false,
+  });
+});
+
+it('reads saved NPC spell slot flags with the spell tab rule', () => {
+  const checked = () => ({
+    inline: screen
+      .getByRole('radio', { name: 'Beside each spell level' })
+      .getAttribute('aria-checked'),
+    tracker: screen
+      .getByRole('radio', { name: 'In a separate tracker' })
+      .getAttribute('aria-checked'),
+  });
+  seedCampaign({
+    dmDashboardUi: {
+      houseRulesSectionOpen: true,
+      npcInlineSpellSlots: false,
+      npcSeparateSpellSlotTracker: false,
+    },
+  });
+  const { unmount } = render(<CampaignViewPage />);
+  expect(checked()).toEqual({ inline: 'true', tracker: 'false' });
+  unmount();
+
+  seedCampaign({
+    dmDashboardUi: {
+      houseRulesSectionOpen: true,
+      npcInlineSpellSlots: false,
+      npcSeparateSpellSlotTracker: true,
+    },
+  });
+  const second = render(<CampaignViewPage />);
+  expect(checked()).toEqual({ inline: 'false', tracker: 'true' });
+  second.unmount();
+
+  seedCampaign({ dmDashboardUi: { houseRulesSectionOpen: true } });
+  render(<CampaignViewPage />);
+  expect(checked()).toEqual({ inline: 'true', tracker: 'false' });
+});
+
 it('announces a player who joins', async () => {
   mockSync({ players: [p1] });
   const { rerender } = render(<CampaignViewPage />);
