@@ -38,8 +38,8 @@ export interface ConfirmDialogViewProps {
 }
 
 /**
- * The one dialog behind confirmDialog, alertDialog, promptDialog and
- * ConfirmationModal. Tapping outside never dismisses it; Escape cancels.
+ * The one dialog behind confirmDialog, alertDialog and promptDialog. Tapping
+ * outside never dismisses it; Escape cancels.
  * The confirm button (or the prompt's field) takes focus on open, so Enter
  * confirms, as it did with the native dialogs.
  */

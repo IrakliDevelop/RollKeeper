@@ -1,17 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import {
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Edit3,
-  Gift,
-  Plus,
-  Search,
-  Trash2,
-  UserRound,
-} from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Plus, Search, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import {
@@ -21,9 +11,7 @@ import {
   SelectLabel,
   SelectSeparator,
 } from '@/components/ui/forms/select';
-import { Badge } from '@/components/ui/layout/badge';
-import { AppIcon } from '@/components/ui/icons';
-import { Card, CardContent } from '@/components/ui/layout/card';
+import { Section } from '@/components/ui/layout/section';
 import {
   Dialog,
   DialogBody,
@@ -33,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/feedback/dialog';
-import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
 import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
@@ -41,7 +29,9 @@ import type { MagicItem } from '@/types/character';
 import type { CampaignNPC } from '@/types/encounter';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import type { SendItemTarget } from '../SendItemDialog';
+import { useFocusAfterRemove } from '../NpcLibrary/NpcLibrary.hooks';
 import { MagicItemLibraryDialog } from './MagicItemLibraryDialog';
+import { MagicItemLibraryRow } from './MagicItemLibraryRow';
 import { MagicItemSyncControls } from './MagicItemSyncControls';
 
 const EMPTY_MAGIC_ITEMS: CustomMagicItem[] = [];
@@ -59,8 +49,10 @@ export function MagicItemLibrarySection({
   const items = useMagicItemLibraryStore(
     state => state.itemsByCampaign[campaignCode] ?? EMPTY_MAGIC_ITEMS
   );
-  const { createItem, updateItem, deleteItem, duplicateItem } =
-    useMagicItemLibraryStore();
+  const createItem = useMagicItemLibraryStore(state => state.createItem);
+  const updateItem = useMagicItemLibraryStore(state => state.updateItem);
+  const deleteItem = useMagicItemLibraryStore(state => state.deleteItem);
+  const duplicateItem = useMagicItemLibraryStore(state => state.duplicateItem);
   const npcs = useNPCStore(
     state => state.npcsByCampaign[campaignCode] ?? EMPTY_NPCS
   );
@@ -77,8 +69,8 @@ export function MagicItemLibrarySection({
   const [editorOpen, setEditorOpen] = useState(false);
   const [giving, setGiving] = useState<CustomMagicItem | null>(null);
   const [recipient, setRecipient] = useState('');
-  const [deleting, setDeleting] = useState<CustomMagicItem | null>(null);
   const [isGiving, setIsGiving] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const tags = useMemo(
     () => [...new Set(items.flatMap(item => item.tags))].sort(),
@@ -97,6 +89,42 @@ export function MagicItemLibrarySection({
             .includes(needle))
     );
   }, [items, query, tag]);
+  const itemIds = useMemo(() => items.map(item => item.id), [items]);
+  const filteredIds = useMemo(() => filtered.map(item => item.id), [filtered]);
+  const { fallbackRef, registerTarget, removeThenFocus, focusWhenPresent } =
+    useFocusAfterRemove(itemIds);
+  const n = items.length;
+  // An empty library hides its filters, so a stale search must not hide the
+  // first template the DM adds.
+  if (n === 0 && (query || tag !== 'all')) {
+    setQuery('');
+    setTag('all');
+  }
+
+  const handleCreate = () => {
+    setEditing(null);
+    setEditorOpen(true);
+  };
+
+  const handleDelete = async (item: CustomMagicItem) => {
+    const confirmed = await confirmDialog({
+      title: `Delete ${item.name}?`,
+      message:
+        'The template is removed from your library. Copies you already gave out stay with their owners.',
+      confirmLabel: 'Delete magic item',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    removeThenFocus(item.id, filteredIds, () =>
+      deleteItem(campaignCode, item.id)
+    );
+  };
+
+  const handleClearFilters = () => {
+    setQuery('');
+    setTag('all');
+    searchRef.current?.focus();
+  };
 
   const handleSave = (
     data: Omit<
@@ -105,7 +133,19 @@ export function MagicItemLibrarySection({
     >
   ) => {
     if (editing) updateItem(campaignCode, editing.id, data);
-    else createItem(campaignCode, data);
+    else {
+      const id = createItem(campaignCode, data);
+      if (n === 0) {
+        // The empty state's Create button unmounts with the first entry, so
+        // the editor dialog has nothing to return focus to.
+        focusWhenPresent(id);
+        // An empty library ignores its saved collapse, so open it for the
+        // first template instead of hiding what the DM just made.
+        if (campaign?.dmDashboardUi?.magicItemLibrarySectionOpen === false) {
+          setDmDashboardUi(campaignCode, { magicItemLibrarySectionOpen: true });
+        }
+      }
+    }
     setEditorOpen(false);
     setEditing(null);
   };
@@ -155,73 +195,63 @@ export function MagicItemLibrarySection({
   };
 
   return (
-    <section
-      className="border-divider mt-8 border-t pt-6"
-      aria-labelledby="magic-item-library-heading"
-    >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              setDmDashboardUi(campaignCode, {
-                magicItemLibrarySectionOpen: !sectionOpen,
-              })
-            }
-            className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
-            aria-expanded={sectionOpen}
-            aria-controls="dm-campaign-magic-item-library-section"
-            title={
-              sectionOpen
-                ? 'Collapse magic item library'
-                : 'Expand magic item library'
-            }
-          >
-            {sectionOpen ? (
-              <ChevronDown size={20} />
-            ) : (
-              <ChevronRight size={20} />
-            )}
-          </button>
-          <div>
-            <h3
-              id="magic-item-library-heading"
-              className="text-heading flex items-center gap-2 text-lg font-semibold"
+    <>
+      <Section
+        level={2}
+        wrapHeading
+        heading={n ? `Magic items (${n})` : 'Magic items'}
+        collapsed={n ? !sectionOpen : undefined}
+        onCollapsedChange={
+          n
+            ? collapsed =>
+                setDmDashboardUi(campaignCode, {
+                  magicItemLibrarySectionOpen: !collapsed,
+                })
+            : undefined
+        }
+        trailing={
+          n ? (
+            <Button
+              size="sm"
+              ref={fallbackRef}
+              leftIcon={<Plus size={16} aria-hidden="true" />}
+              onClick={handleCreate}
             >
-              <AppIcon name="magicItem" size={20} className="text-muted" />{' '}
-              Magic Item Library ({items.length})
-            </h3>
-            <p className="text-muted text-sm">
-              Reusable campaign templates stay here after you give out a copy.
+              Create magic item
+            </Button>
+          ) : undefined
+        }
+      >
+        {n === 0 ? (
+          <div className="py-12 text-center">
+            <h3 className="type-subheading text-heading">No magic items yet</h3>
+            <p className="type-body text-muted mt-2">
+              Start from a compendium item or a blank form. Players and NPCs get
+              a copy and the template stays here.
             </p>
+            <Button className="mt-4" ref={fallbackRef} onClick={handleCreate}>
+              Create magic item
+            </Button>
           </div>
-        </div>
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<Plus size={16} />}
-          onClick={() => {
-            setEditing(null);
-            setEditorOpen(true);
-          }}
-        >
-          Create Magic Item
-        </Button>
-      </div>
-
-      {sectionOpen && (
-        <div id="dm-campaign-magic-item-library-section">
-          {items.length > 0 && (
-            <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_200px]">
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
               <Input
+                ref={searchRef}
+                size="sm"
+                aria-label="Search magic items"
+                placeholder="Cloak of protection"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
-                placeholder="Search name, group, rarity, or tag…"
-                leftIcon={<Search size={15} />}
+                leftIcon={<Search size={16} aria-hidden="true" />}
                 clearable
                 onClear={() => setQuery('')}
               />
-              <SelectField value={tag} onValueChange={setTag}>
+              <SelectField
+                value={tag}
+                onValueChange={setTag}
+                triggerProps={{ 'aria-label': 'Filter by tag', size: 'sm' }}
+              >
                 <SelectItem value="all">All tags</SelectItem>
                 {tags.map(value => (
                   <SelectItem key={value} value={value}>
@@ -230,98 +260,46 @@ export function MagicItemLibrarySection({
                 ))}
               </SelectField>
             </div>
-          )}
-
-          {items.length === 0 ? (
-            <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
-              <AppIcon
-                name="magicItem"
-                size={36}
-                className="text-faint mx-auto mb-2"
-              />
-              <p className="text-muted text-sm">
-                No custom magic items yet. Start from any compendium item or a
-                blank form.
-              </p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-muted py-8 text-center text-sm">
-              No items match these filters.
-            </p>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {filtered.map(item => (
-                <Card key={item.id}>
-                  <CardContent className="space-y-3 p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="text-heading font-semibold">
-                          {item.name}
-                        </h4>
-                        <p className="text-muted text-xs">
-                          {item.group || 'Ungrouped'}
-                        </p>
-                      </div>
-                      <Badge variant="primary" size="sm">
-                        {item.rarity}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {item.tags.map(value => (
-                        <Badge key={value} variant="neutral" size="sm">
-                          {value}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        variant="secondary"
-                        size="xs"
-                        leftIcon={<Gift size={13} />}
-                        onClick={() => setGiving(item)}
-                      >
-                        Give copy
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        aria-label={`Edit ${item.name}`}
-                        onClick={() => {
-                          setEditing(item);
-                          setEditorOpen(true);
-                        }}
-                      >
-                        <Edit3 size={14} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        aria-label={`Duplicate ${item.name}`}
-                        onClick={() => duplicateItem(campaignCode, item.id)}
-                      >
-                        <Copy size={14} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        aria-label={`Delete ${item.name}`}
-                        onClick={() => setDeleting(item)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+            {filtered.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="type-body text-muted">
+                  No magic items match these filters.
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={handleClearFilters}
+                >
+                  Clear filters
+                </Button>
+              </div>
+            ) : (
+              <ul className="divide-divider divide-y">
+                {filtered.map(item => (
+                  <MagicItemLibraryRow
+                    key={item.id}
+                    item={item}
+                    giveRef={registerTarget(item.id)}
+                    onGive={() => setGiving(item)}
+                    onEdit={() => {
+                      setEditing(item);
+                      setEditorOpen(true);
+                    }}
+                    onDuplicate={() => duplicateItem(campaignCode, item.id)}
+                    onDelete={() => handleDelete(item)}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </Section>
 
       {/*
-        The sync controls own the autosave effect, and "Create Magic Item" stays
-        in the always-visible header, so they must mount even while the
-        persisted collapse preference hides the list. The card renders nothing
+        The sync controls own the autosave effect. Create stays reachable (the
+        heading's trailing, or the empty state, which never collapses), so the
+        controls must mount outside the collapsible. The card renders nothing
         while the client flag is off.
       */}
       {campaign && <MagicItemSyncControls campaign={campaign} />}
@@ -389,16 +367,6 @@ export function MagicItemLibrarySection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <ConfirmationModal
-        isOpen={!!deleting}
-        onClose={() => setDeleting(null)}
-        onConfirm={() => {
-          if (deleting) deleteItem(campaignCode, deleting.id);
-        }}
-        title="Delete magic item template?"
-        message={`Delete ${deleting?.name ?? 'this item'} from the DM library? Copies already given to players or NPCs will not be affected.`}
-        confirmText="Delete template"
-      />
-    </section>
+    </>
   );
 }

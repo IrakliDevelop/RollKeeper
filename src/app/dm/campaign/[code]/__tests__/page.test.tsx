@@ -166,9 +166,11 @@ it('links the four campaign pages from the rail', () => {
     within(navs[1]).getByRole('link', { name: 'Battle maps' })
   ).toHaveAttribute('href', '/dm/campaign/K7QX2M/battlemaps');
   expect(document.querySelectorAll('a[class*="accent-"]')).toHaveLength(0);
-  // V156 for b1's pieces only: NPCSection (MagicItemLibrarySection's "Create
-  // Magic Item", the library "Turn on cloud sync") and CampaignSettingsSyncControls
-  // ("Turn on cloud sync") are mocked above; their primaries are a follow-up.
+  // V156/V164: no primary in the overview body. NPCSection is mocked above, so
+  // this assertion can't see the libraries; MagicItemLibrarySection.test pins
+  // their secondary Create. The cloud sync cards ('Turn on cloud sync') keep
+  // their primary while their flags are on, and CampaignSettingsSyncControls is
+  // mocked (cloud controls, launch Q4).
   expect(
     document.querySelectorAll(
       'main button[data-variant="primary"], main a[data-variant="primary"]'

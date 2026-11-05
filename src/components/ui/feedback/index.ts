@@ -1,5 +1,4 @@
 // Feedback & Dialog Components
-export { ConfirmationModal } from './ConfirmationModal';
 export {
   confirmDialog,
   alertDialog,
