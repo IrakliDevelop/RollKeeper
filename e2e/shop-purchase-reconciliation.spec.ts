@@ -402,7 +402,7 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
       .click();
     const dmDialog1 = merchantDialog(dmAdminPage);
     await expect(dmDialog1).toBeVisible({ timeout: 10_000 });
-    await dmDialog1.getByRole('button', { name: 'Shop' }).click();
+    await dmDialog1.getByRole('tab', { name: 'Shop' }).click();
 
     const priceGpField = dmDialog1.getByRole('textbox', {
       name: `${ITEM_NAME} price (gp)`,
@@ -566,7 +566,7 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
       .click();
     const dmDialog2 = merchantDialog(dmAdminPage);
     await expect(dmDialog2).toBeVisible({ timeout: 10_000 });
-    await dmDialog2.getByRole('button', { name: 'Shop' }).click();
+    await dmDialog2.getByRole('tab', { name: 'Shop' }).click();
 
     // Stock decremented by the reconciled sale (1 -> 0) — Playwright's
     // `toHaveValue` retries until the drain's store update lands.
