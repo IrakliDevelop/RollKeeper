@@ -6,7 +6,7 @@ import {
   within,
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CampaignNPC } from '@/types/encounter';
+import type { CampaignNPC, MonsterStatBlock } from '@/types/encounter';
 
 import { NpcLibraryRow, type NpcLibraryRowProps } from './NpcLibraryRow';
 
@@ -29,13 +29,21 @@ const brenn: CampaignNPC = {
   tempAc: '2 (shield)',
   maxHp: 44,
   speed: '30 ft.',
-  monsterStatBlock: { size: 'Medium', type: 'humanoid', cr: '2' },
-  spellcasting: { casterLevel: 5 },
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  monsterStatBlock: {
+    size: 'Medium',
+    type: 'humanoid',
+    cr: '2',
+  } as unknown as MonsterStatBlock,
+  spellcasting: {
+    casterLevel: 5,
+  } as unknown as CampaignNPC['spellcasting'],
   passivePerception: 14,
   passiveInsight: 12,
   passiveInvestigation: 11,
   tags: ['merchant', 'quest'],
-} as unknown as CampaignNPC;
+};
 
 const handlers = () => ({
   onView: vi.fn(),
@@ -123,7 +131,7 @@ describe('NpcLibraryRow', () => {
   });
 
   it('prints nothing dangling when optional parts are missing', () => {
-    renderRow({
+    const { container } = renderRow({
       ...brenn,
       monsterStatBlock: undefined,
       description: undefined,
@@ -139,6 +147,7 @@ describe('NpcLibraryRow', () => {
     expect(screen.queryByText(/·\s*$/)).toBeNull();
     expect(screen.queryByText(/^Passive/)).toBeNull();
     expect(screen.queryByText('Runs the Rusty Anchor.')).toBeNull();
+    expect(container.querySelector('p.text-muted')).toBeNull();
     expect(screen.getAllByRole('button')).toHaveLength(5);
   });
 
@@ -194,6 +203,36 @@ describe('NpcLibraryRow', () => {
       fireEvent.click(screen.getByRole('button', { name }));
       expect(fn).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('lists a repeated tag once', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderRow({ ...brenn, tags: ['merchant', 'quest', 'merchant'] });
+    const items = within(
+      screen.getByRole('list', { name: 'Tags' })
+    ).getAllByRole('listitem');
+    expect(items.map(item => item.textContent)).toEqual(['merchant', 'quest']);
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('hands the View button to viewRef', () => {
+    const viewRef = vi.fn();
+    const { unmount } = renderRow(brenn, { viewRef });
+    expect(viewRef.mock.calls[0]?.[0]).toBe(
+      screen.getByRole('button', { name: 'View' })
+    );
+    unmount();
+    expect(viewRef.mock.lastCall?.[0]).toBeNull();
+  });
+
+  it('keeps a blank portrait out of the row', () => {
+    const { container } = renderRow({ ...brenn, avatarUrl: '   ' });
+    expect(container.querySelector('img')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /image full size/ })
+    ).toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(5);
   });
 
   it('opens the portrait full size from the row', () => {

@@ -151,7 +151,8 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
       const i = visibleIds.indexOf(id);
       setPending({
         removedId: id,
-        nextId: visibleIds[i + 1] ?? visibleIds[i - 1] ?? null,
+        // Not among the visible rows (hidden by a filter): no neighbour to pick.
+        nextId: i < 0 ? null : (visibleIds[i + 1] ?? visibleIds[i - 1] ?? null),
       });
       remove();
     },
@@ -159,7 +160,14 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
   );
 
   useEffect(() => {
-    if (!pending || presentIds.includes(pending.removedId)) return;
+    if (!pending) return;
+    if (presentIds.includes(pending.removedId)) {
+      // The removal ran in the same batch as this render, so an entry that is
+      // still here was not removed. Forget it, or a later removal elsewhere
+      // would pull focus.
+      setPending(null);
+      return;
+    }
     const next = pending.nextId ? targets.current.get(pending.nextId) : null;
     const target = next?.isConnected ? next : fallbackRef.current;
     setPending(null);

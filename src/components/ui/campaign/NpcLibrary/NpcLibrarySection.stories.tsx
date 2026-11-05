@@ -3,7 +3,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
 import type { CampaignInfo } from '@/types/campaign';
-import type { CampaignNPC } from '@/types/encounter';
+import type { CampaignNPC, MonsterStatBlock } from '@/types/encounter';
 import { NpcLibrarySection } from './NpcLibrarySection';
 
 const CODE = 'K7QX2M';
@@ -43,13 +43,19 @@ const BRENN = creature('npc-1', 'Brenn Ironhand', {
   tempAc: '2 (shield)',
   maxHp: 44,
   avatarUrl: PORTRAIT,
-  monsterStatBlock: { size: 'Medium', type: 'humanoid', cr: '2' },
-  spellcasting: { casterLevel: 5 },
+  monsterStatBlock: {
+    size: 'Medium',
+    type: 'humanoid',
+    cr: '2',
+  } as unknown as MonsterStatBlock,
+  spellcasting: {
+    casterLevel: 5,
+  } as unknown as CampaignNPC['spellcasting'],
   passivePerception: 14,
   passiveInsight: 12,
   passiveInvestigation: 11,
   tags: ['merchant', 'quest'],
-} as unknown as Partial<CampaignNPC>);
+});
 
 const MIRA = creature('npc-2', 'Mira Stonehollow', {
   description: 'Keeps the lighthouse.',
@@ -58,7 +64,8 @@ const MIRA = creature('npc-2', 'Mira Stonehollow', {
 });
 
 // One unbroken word on purpose: the Phone story catches a name that stops wrapping.
-const BARTHOLOMEW = creature('npc-3', 'Bartholomewunderhillgreenbottle', {
+const BARTHOLOMEW_NAME = 'Bartholomewunderhillgreenbottleofthemistyhollow';
+const BARTHOLOMEW = creature('npc-3', BARTHOLOMEW_NAME, {
   armorClass: '16 (natural armor)',
   maxHp: 27,
   passiveInsight: 13,
@@ -272,6 +279,11 @@ export const Phone: Story = {
       .getByRole('heading', { level: 2, name: 'NPCs (3)' })
       .closest('section')!;
     await expect(section.scrollWidth).toBeLessThanOrEqual(section.clientWidth);
+    const name = canvas.getByRole('heading', {
+      level: 3,
+      name: BARTHOLOMEW_NAME,
+    });
+    await expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
     for (const button of canvas.getAllByRole('button')) {
       await expect(button.getBoundingClientRect().right).toBeLessThanOrEqual(
         window.innerWidth

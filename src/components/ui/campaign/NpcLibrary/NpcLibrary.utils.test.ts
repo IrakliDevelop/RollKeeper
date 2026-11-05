@@ -74,6 +74,11 @@ describe('creatureVitals', () => {
       creatureVitals(makeNpc({ tempAc: '2 (shield)', speed: '' }))
     ).toEqual(['AC 15 (+2)', '44 HP']);
   });
+
+  it('prints a negative temp AC with its sign and a zero not at all', () => {
+    expect(creatureVitals(makeNpc({ tempAc: '-2' }))[0]).toBe('AC 15 (-2)');
+    expect(creatureVitals(makeNpc({ tempAc: '0' }))[0]).toBe('AC 15');
+  });
 });
 
 describe('creaturePassives', () => {
@@ -87,6 +92,15 @@ describe('creaturePassives', () => {
       { label: 'Investigation', value: 11 },
     ]);
     expect(creaturePassives(makeNpc())).toEqual([]);
+  });
+
+  it('keeps a passive of 0 and a lone Insight', () => {
+    expect(creaturePassives(makeNpc({ passivePerception: 0 }))).toEqual([
+      { label: 'Perception', value: 0 },
+    ]);
+    expect(creaturePassives(makeNpc({ passiveInsight: 12 }))).toEqual([
+      { label: 'Insight', value: 12 },
+    ]);
   });
 });
 

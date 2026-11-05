@@ -103,6 +103,11 @@ export function NpcLibrarySection({
     filteredNpcs,
     groups,
   } = useNpcLibraryFilters(npcs);
+  // An empty library hides its filters, so a stale search must not hide the
+  // first entry the DM adds.
+  if (npcs.length === 0 && (searchQuery || activeTags.size > 0)) {
+    clearFilters();
+  }
   const { fallbackRef, registerTarget, removeThenFocus } =
     useFocusAfterRemove(npcIds);
 
@@ -167,10 +172,13 @@ export function NpcLibrarySection({
   };
 
   const handleMove = (npc: CampaignNPC) => {
-    updateNPC(campaignCode, npc.id, {
-      kind: kind === 'monster' ? 'npc' : 'monster',
-    });
     setSelectedId(null);
+    // The row leaves this library, so focus goes where a delete would send it.
+    removeThenFocus(npc.id, visibleIds, () =>
+      updateNPC(campaignCode, npc.id, {
+        kind: kind === 'monster' ? 'npc' : 'monster',
+      })
+    );
   };
 
   const handleDelete = async (npc: CampaignNPC) => {

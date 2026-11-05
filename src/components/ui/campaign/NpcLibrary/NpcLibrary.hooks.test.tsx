@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFocusAfterRemove } from './NpcLibrary.hooks';
 
-function Harness() {
+function Harness({ visible }: { visible?: string[] }) {
   const [ids, setIds] = useState(['a', 'b']);
   const { fallbackRef, registerTarget, removeThenFocus } =
     useFocusAfterRemove(ids);
@@ -24,12 +24,20 @@ function Harness() {
       <button ref={fallbackRef}>Create</button>
       <button
         onClick={() =>
-          removeThenFocus('a', ids, () =>
+          removeThenFocus('a', visible ?? ids, () =>
             setIds(current => current.filter(id => id !== 'a'))
           )
         }
       >
         Remove a
+      </button>
+      <button onClick={() => removeThenFocus('a', ids, () => {})}>
+        Remove nothing
+      </button>
+      <button
+        onClick={() => setIds(current => current.filter(id => id !== 'a'))}
+      >
+        Drop a elsewhere
       </button>
       <button>Elsewhere</button>
     </>
@@ -74,6 +82,27 @@ describe('useFocusAfterRemove', () => {
     act(() => {
       vi.advanceTimersByTime(250);
     });
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('focuses Create when the removed entry was not among the visible ones', () => {
+    render(<Harness visible={['b']} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove a' }));
+
+    expect(screen.queryByRole('button', { name: 'a' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Create' })).toHaveFocus();
+  });
+
+  it('forgets a removal that did not remove the entry', () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove nothing' }));
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    elsewhere.focus();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Drop a elsewhere' }));
+    expect(screen.queryByRole('button', { name: 'a' })).toBeNull();
     expect(elsewhere).toHaveFocus();
   });
 });

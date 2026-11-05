@@ -48,6 +48,8 @@ export function NpcLibraryRow({
   const meta = creatureMetaLine(npc);
   const description = npc.description?.trim();
   const passives = creaturePassives(npc);
+  // A repeated tag would print twice, so show each once.
+  const tags = [...new Set(npc.tags)];
 
   return (
     <>
@@ -135,9 +137,9 @@ export function NpcLibraryRow({
               )}
             </p>
           )}
-          {npc.tags && npc.tags.length > 0 && (
+          {tags.length > 0 && (
             <ul aria-label="Tags" className="flex flex-wrap gap-1">
-              {npc.tags.map(tag => (
+              {tags.map(tag => (
                 <li key={tag}>
                   <Badge variant="neutral" size="sm">
                     {tag}

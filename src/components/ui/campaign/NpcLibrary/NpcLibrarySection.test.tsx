@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -411,6 +412,74 @@ describe('NpcLibrarySection', () => {
     ).toBeInTheDocument();
   });
 
+  it('moves focus after Move like it does after a delete', () => {
+    seed([creature('a', 'A'), creature('b', 'B'), creature('c', 'C')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Move B to custom monsters' })
+    );
+    expect(storedNames()).toEqual(['A', 'B', 'C']);
+    expect(
+      useNPCStore.getState().npcsByCampaign[CODE].find(n => n.id === 'b')?.kind
+    ).toBe('monster');
+    expect(viewButton('C')).toHaveFocus();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Move C to custom monsters' })
+    );
+    expect(viewButton('A')).toHaveFocus();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Move A to custom monsters' })
+    );
+    expect(screen.getByRole('button', { name: 'Create NPC' })).toHaveFocus();
+  });
+
+  it('closes the open detail dialog when the entry changes kind elsewhere', () => {
+    seed([creature('a', 'A'), creature('b', 'B')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    fireEvent.click(viewButton('A'));
+    expect(screen.getByRole('dialog', { name: 'A' })).toBeInTheDocument();
+
+    act(() => {
+      useNPCStore.getState().updateNPC(CODE, 'a', { kind: 'monster' });
+    });
+
+    expect(screen.queryByRole('dialog', { name: 'A' })).toBeNull();
+    expect(levelHeadings(3)).toEqual(['B']);
+  });
+
+  it('shows the first new entry after the last one is deleted under a search', async () => {
+    seed([creature('a', 'Brenn Ironhand')]);
+    render(<NpcLibrarySection campaignCode={CODE} />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search NPCs' }), {
+      target: { value: 'Brenn' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete Brenn Ironhand' })
+    );
+    await clickConfirmDialogButton('Delete NPC');
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'No NPCs yet' })
+      ).toBeInTheDocument()
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create NPC' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
+
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Wren' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('No NPCs match these filters.')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Search NPCs' })).toHaveValue(
+      ''
+    );
+  });
+
   it('deletes from the detail dialog through the same confirm', async () => {
     seed([creature('a', 'A'), creature('b', 'B')]);
     render(<NpcLibrarySection campaignCode={CODE} />);
@@ -465,8 +534,16 @@ describe('NpcLibrarySection', () => {
     ).toBeInTheDocument();
     expect(viewButton('Anna')).toBeInTheDocument();
 
+    expect(downs[2]).toBeDisabled();
+
     fireEvent.click(downs[0]);
     expect(storedNames()).toEqual(['Bo', 'Anna', 'Cara']);
+    expect(downs[0]).toHaveFocus();
+
+    fireEvent.click(downs[0]);
+    expect(storedNames()).toEqual(['Bo', 'Cara', 'Anna']);
+    expect(downs[0]).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Move up' })[2]).toHaveFocus();
 
     fireEvent.click(screen.getByRole('button', { name: 'Reorder' }));
     expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
