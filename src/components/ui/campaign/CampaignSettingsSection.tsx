@@ -9,6 +9,10 @@ import {
 import { Switch } from '@/components/ui/forms/switch';
 import { Section } from '@/components/ui/layout/section';
 import { MAX_BANNER_SIZE_MB } from '@/utils/constants';
+import {
+  isCampaignPageLayout,
+  type CampaignPageLayout,
+} from '@/types/campaign';
 import { BannerImageControls } from './BannerImageControls';
 
 export type NpcSpellSlotMode = 'inline' | 'tracker';
@@ -19,6 +23,8 @@ export interface CampaignSettingsSectionProps {
   onOpenChange: (open: boolean) => void;
   bannerUrl?: string;
   onBannerChange: (url: string | undefined) => void;
+  pageLayout: CampaignPageLayout;
+  onPageLayoutChange: (layout: CampaignPageLayout) => void;
   stackableInspiration: boolean;
   onStackableInspirationChange: (enabled: boolean) => void;
   customCounterLabel?: string;
@@ -92,6 +98,8 @@ export function CampaignSettingsSection({
   onOpenChange,
   bannerUrl,
   onBannerChange,
+  pageLayout,
+  onPageLayoutChange,
   stackableInspiration,
   onStackableInspirationChange,
   customCounterLabel,
@@ -119,6 +127,31 @@ export function CampaignSettingsSection({
             campaignCode={campaignCode}
             onBannerChange={onBannerChange}
           />
+        </div>
+        <div className="py-4">
+          <RadioGroupField
+            label="Page layout"
+            value={pageLayout}
+            onValueChange={value => {
+              if (isCampaignPageLayout(value)) onPageLayoutChange(value);
+            }}
+          >
+            <RadioGroupItem
+              value="standard"
+              label="Standard"
+              description="The page links in the side column."
+            />
+            <RadioGroupItem
+              value="banner"
+              label="Banner"
+              description="The banner across the top, between the page links."
+            />
+            <RadioGroupItem
+              value="classic"
+              label="Classic"
+              description="The layout from before the redesign, with coloured page tiles."
+            />
+          </RadioGroupField>
         </div>
         <div className="py-4">
           <Switch

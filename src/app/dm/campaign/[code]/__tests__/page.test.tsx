@@ -211,6 +211,132 @@ it('drops the rail banner when it is removed', async () => {
   ).toBeUndefined();
 });
 
+it('moves the banner and page links above the page in the banner layout', () => {
+  seedCampaign({
+    bannerUrl: '/landing/battle-map.webp',
+    dmDashboardUi: { pageLayout: 'banner' },
+  });
+  render(<CampaignViewPage />);
+  const navs = screen.getAllByRole('navigation', { name: 'Campaign pages' });
+  expect(navs).toHaveLength(1);
+  const nav = navs[0];
+  expect(nav.closest('main')).toBeNull();
+  expect(
+    nav.compareDocumentPosition(screen.getByRole('main')) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(within(nav).getAllByRole('link')).toHaveLength(4);
+  expect(nav.querySelector('img')).toHaveAttribute('alt', '');
+  expect(document.querySelector('main img')).toBeNull();
+});
+
+it('switches the page layout from campaign settings', async () => {
+  seedCampaign({ dmDashboardUi: { houseRulesSectionOpen: true } });
+  const user = userEvent.setup();
+  render(<CampaignViewPage />);
+  await user.click(screen.getByRole('radio', { name: 'Banner' }));
+  expect(
+    useDmStore.getState().getCampaign('K7QX2M')?.dmDashboardUi?.pageLayout
+  ).toBe('banner');
+  const nav = screen.getByRole('navigation', { name: 'Campaign pages' });
+  expect(nav.closest('main')).toBeNull();
+  expect(
+    within(nav).getByRole('button', { name: 'Add image' })
+  ).toBeInTheDocument();
+});
+
+it('shows the classic header in the classic layout', () => {
+  seedCampaign({ dmDashboardUi: { pageLayout: 'classic' } });
+  render(<CampaignViewPage />);
+  expect(screen.getByText('Auto-refreshing every 10s')).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Refresh Now' })
+  ).toBeInTheDocument();
+  const nav = screen.getByRole('navigation', { name: 'Campaign pages' });
+  expect(nav.closest('main')).toBeNull();
+  expect(
+    within(nav).getByRole('button', { name: 'Add a campaign banner image' })
+  ).toBeInTheDocument();
+  expect(
+    within(nav)
+      .getAllByRole('link')
+      .map(link => link.getAttribute('href'))
+  ).toEqual([
+    '/dm/campaign/K7QX2M/locations',
+    '/dm/campaign/K7QX2M/battlemaps',
+    '/dm/campaign/K7QX2M/calendar',
+    '/dm/campaign/K7QX2M/encounters',
+  ]);
+  // Below lg the classic header carries the page links.
+  expect(
+    within(screen.getByRole('banner')).getAllByRole('link', {
+      name: /Locations|Calendar|Encounters|Battle Maps/,
+    })
+  ).toHaveLength(4);
+});
+
+it('keeps the settings heading top right and spans the page below it while closed', () => {
+  seedCampaign({ dmDashboardUi: { pageLayout: 'banner' } });
+  render(<CampaignViewPage />);
+  const settingsColumn = () =>
+    screen
+      .getByRole('button', { name: 'Campaign settings' })
+      .closest('div[style]');
+  const contentColumn = () =>
+    screen
+      .getByRole('heading', { level: 2, name: 'Players (2)' })
+      .closest('div[style]');
+  // Closed: the heading holds the right column, the page spans below it.
+  expect(settingsColumn()).toHaveClass('lg:col-start-2', 'lg:row-start-1');
+  expect(contentColumn()).toHaveClass('lg:col-span-2', 'lg:row-start-2');
+  fireEvent.click(screen.getByRole('button', { name: 'Campaign settings' }));
+  // Open: the heading stays put and the page moves up beside the settings.
+  expect(settingsColumn()).toHaveClass('lg:col-start-2', 'lg:row-start-1');
+  expect(contentColumn()).toHaveClass('lg:col-start-1', 'lg:row-start-1');
+  expect(contentColumn()).not.toHaveClass('lg:col-span-2');
+  expect(
+    useDmStore.getState().getCampaign('K7QX2M')?.dmDashboardUi
+      ?.houseRulesSectionOpen
+  ).toBe(true);
+});
+
+it('animates the settings opening with a view transition when available', () => {
+  const startViewTransition = vi.fn((update: () => void) => update());
+  Object.defineProperty(document, 'startViewTransition', {
+    configurable: true,
+    value: startViewTransition,
+  });
+  try {
+    seedCampaign({ dmDashboardUi: { pageLayout: 'classic' } });
+    render(<CampaignViewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Campaign settings' }));
+    expect(startViewTransition).toHaveBeenCalledTimes(1);
+    expect(
+      screen
+        .getByRole('heading', { level: 2, name: 'Players (2)' })
+        .closest('div[style]')
+    ).toHaveClass('lg:col-start-1', 'lg:row-start-1');
+  } finally {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+  }
+});
+
+it('keeps the standard rail and settings column while the settings are closed', () => {
+  render(<CampaignViewPage />);
+  expect(screen.getByRole('main')).toHaveClass(
+    'lg:grid-cols-[minmax(0,1fr)_17rem]'
+  );
+});
+
+it('falls back to the standard layout for an unknown saved layout', () => {
+  seedCampaign({
+    dmDashboardUi: { pageLayout: 'mosaic' as unknown as 'standard' },
+  });
+  render(<CampaignViewPage />);
+  const nav = screen.getAllByRole('navigation', { name: 'Campaign pages' })[0];
+  expect(nav.closest('main')).not.toBeNull();
+});
+
 it('keeps the rail first and the settings last in reading order', () => {
   render(<CampaignViewPage />);
   const nav = screen.getAllByRole('navigation', { name: 'Campaign pages' })[0];

@@ -24,6 +24,8 @@ const meta: Meta<typeof CampaignSettingsSection> = {
     open: true,
     onOpenChange: fn(),
     onBannerChange: fn(),
+    pageLayout: 'standard',
+    onPageLayoutChange: fn(),
     stackableInspiration: true,
     onStackableInspirationChange: fn(),
     customCounterLabel: 'Desperation',

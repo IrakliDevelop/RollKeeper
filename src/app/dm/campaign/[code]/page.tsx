@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { useParams } from 'next/navigation';
 import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { CopyCodeButton } from '@/components/ui/campaign/CopyCodeButton';
 import { CampaignNav } from '@/components/ui/campaign/CampaignNav';
 import { CampaignBanner } from '@/components/ui/campaign/CampaignBanner';
+import { CampaignBannerHero } from '@/components/ui/campaign/CampaignBannerHero';
+import {
+  LegacyCampaignHeaderLinks,
+  LegacyCampaignHero,
+} from '@/components/ui/campaign/legacy/LegacyCampaignHero';
 import { CampaignPlayersSection } from '@/components/ui/campaign/CampaignPlayersSection';
 import {
   CampaignSettingsSection,
@@ -25,7 +31,9 @@ import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
-import { CampaignPlayerData } from '@/types/campaign';
+import { cn } from '@/utils/cn';
+import { withViewTransition } from '@/utils/viewTransition';
+import { CampaignPlayerData, isCampaignPageLayout } from '@/types/campaign';
 
 export default function CampaignViewPage() {
   const params = useParams();
@@ -163,11 +171,75 @@ export default function CampaignViewPage() {
   }
 
   const bannerUrl = localCampaign?.bannerUrl;
+  const storedLayout = localCampaign?.dmDashboardUi?.pageLayout;
+  const pageLayout = isCampaignPageLayout(storedLayout)
+    ? storedLayout
+    : 'standard';
+  const showRail = pageLayout === 'standard';
+  const handleBannerChange = (url: string | undefined) =>
+    updateCampaign(code, { bannerUrl: url });
+
+  // Banner and classic layouts have no rail: the settings heading stays top
+  // right, and the page spans the width below it while the settings are closed.
+  const settingsBeside = !showRail && houseRulesSectionOpen;
+  const handleSettingsOpenChange = (open: boolean) => {
+    const apply = () => setDmDashboardUi(code, { houseRulesSectionOpen: open });
+    if (showRail) return apply();
+    withViewTransition(() => flushSync(apply));
+  };
+
+  // No settings for a campaign this device doesn't know.
+  const settingsColumn = localCampaign ? (
+    <div
+      className={cn(
+        showRail && 'lg:col-start-2 lg:row-start-2',
+        !showRail && 'lg:col-start-2 lg:row-start-1'
+      )}
+      style={showRail ? undefined : { viewTransitionName: 'campaign-settings' }}
+    >
+      <CampaignSettingsSection
+        campaignCode={code}
+        open={houseRulesSectionOpen}
+        onOpenChange={handleSettingsOpenChange}
+        bannerUrl={bannerUrl}
+        onBannerChange={handleBannerChange}
+        pageLayout={pageLayout}
+        onPageLayoutChange={layout =>
+          setDmDashboardUi(code, { pageLayout: layout })
+        }
+        stackableInspiration={stackableInspiration}
+        onStackableInspirationChange={handleToggleStackableInspiration}
+        customCounterLabel={customCounterLabel}
+        onCustomCounterLabelChange={label => setCustomCounterLabel(code, label)}
+        npcSpellSlotMode={npcSpellSlotMode}
+        onNpcSpellSlotModeChange={mode =>
+          setDmDashboardUi(
+            code,
+            mode === 'tracker'
+              ? {
+                  npcInlineSpellSlots: false,
+                  npcSeparateSpellSlotTracker: true,
+                }
+              : {
+                  npcInlineSpellSlots: true,
+                  npcSeparateSpellSlotTracker: false,
+                }
+          )
+        }
+      />
+    </div>
+  ) : null;
 
   return (
     <div className="bg-surface min-h-screen">
       <CampaignHeader
         crumb={{ href: '/dm', label: 'Campaigns' }}
+        wrapControls={pageLayout === 'classic'}
+        actions={
+          pageLayout === 'classic' ? (
+            <LegacyCampaignHeaderLinks code={code} />
+          ) : undefined
+        }
         title={
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="type-heading text-heading truncate">
@@ -178,20 +250,56 @@ export default function CampaignViewPage() {
         }
       />
 
-      <main className="mx-auto grid max-w-7xl gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:grid-rows-[auto_1fr] lg:px-8">
-        {/* Rail: a div, not <aside> inside <main>. */}
-        <div className="space-y-4 lg:col-start-2 lg:row-start-1">
-          {bannerUrl && (
-            <CampaignBanner
-              src={bannerUrl}
-              className="aspect-[16/7] max-h-48 lg:aspect-video"
-            />
-          )}
-          <CampaignNav code={code} className="lg:hidden" />
-          <CampaignNav code={code} vertical className="hidden lg:block" />
+      {pageLayout === 'banner' && (
+        <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+          <CampaignBannerHero
+            code={code}
+            bannerUrl={bannerUrl}
+            onBannerChange={handleBannerChange}
+          />
         </div>
+      )}
+      {pageLayout === 'classic' && (
+        <LegacyCampaignHero
+          code={code}
+          bannerUrl={bannerUrl}
+          onBannerChange={handleBannerChange}
+          lastFetched={lastFetched}
+          onRefresh={refresh}
+        />
+      )}
 
-        <div className="min-w-0 space-y-8 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+      <main
+        className={cn(
+          'mx-auto grid max-w-7xl gap-8 px-4 py-6 sm:px-6 lg:px-8',
+          'lg:grid-cols-[minmax(0,1fr)_17rem]',
+          showRail && 'lg:grid-rows-[auto_1fr]'
+        )}
+      >
+        {!showRail && settingsColumn}
+        {/* Rail: a div, not <aside> inside <main>. */}
+        {showRail && (
+          <div className="space-y-4 lg:col-start-2 lg:row-start-1">
+            {bannerUrl && (
+              <CampaignBanner
+                src={bannerUrl}
+                className="aspect-[16/7] max-h-48 lg:aspect-video"
+              />
+            )}
+            <CampaignNav code={code} className="lg:hidden" />
+            <CampaignNav code={code} vertical className="hidden lg:block" />
+          </div>
+        )}
+
+        <div
+          className={cn(
+            'min-w-0 space-y-8',
+            showRail && 'lg:col-start-1 lg:row-span-2 lg:row-start-1',
+            settingsBeside && 'lg:col-start-1 lg:row-start-1',
+            !showRail && !settingsBeside && 'lg:col-span-2 lg:row-start-2'
+          )}
+          style={showRail ? undefined : { viewTransitionName: 'campaign-main' }}
+        >
           {localCampaign && (
             <CampaignSettingsSyncControls campaign={localCampaign} />
           )}
@@ -236,41 +344,7 @@ export default function CampaignViewPage() {
           )}
         </div>
 
-        {/* No settings for a campaign this device doesn't know. */}
-        {localCampaign && (
-          <div className="lg:col-start-2 lg:row-start-2">
-            <CampaignSettingsSection
-              campaignCode={code}
-              open={houseRulesSectionOpen}
-              onOpenChange={open =>
-                setDmDashboardUi(code, { houseRulesSectionOpen: open })
-              }
-              bannerUrl={bannerUrl}
-              onBannerChange={url => updateCampaign(code, { bannerUrl: url })}
-              stackableInspiration={stackableInspiration}
-              onStackableInspirationChange={handleToggleStackableInspiration}
-              customCounterLabel={customCounterLabel}
-              onCustomCounterLabelChange={label =>
-                setCustomCounterLabel(code, label)
-              }
-              npcSpellSlotMode={npcSpellSlotMode}
-              onNpcSpellSlotModeChange={mode =>
-                setDmDashboardUi(
-                  code,
-                  mode === 'tracker'
-                    ? {
-                        npcInlineSpellSlots: false,
-                        npcSeparateSpellSlotTracker: true,
-                      }
-                    : {
-                        npcInlineSpellSlots: true,
-                        npcSeparateSpellSlotTracker: false,
-                      }
-                )
-              }
-            />
-          </div>
-        )}
+        {showRail && settingsColumn}
       </main>
 
       {/* Player Detail Dialog */}

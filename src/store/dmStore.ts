@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
-import { CampaignInfo } from '@/types/campaign';
+import { CampaignInfo, type CampaignPageLayout } from '@/types/campaign';
 import { createCampaignSettingsAwareDmStorage } from '@/lib/durableDm/campaignSettingsAwareStorage';
 import { FOG_PRESET_LIMITS, parseFogPreset } from '@/lib/fogPreset';
 import type { FogPresetV1 } from '@/types/fogMaterial';
@@ -41,6 +41,7 @@ interface DmStoreState {
       monsterCollapsedGroupNames: string[];
       npcInlineSpellSlots: boolean;
       npcSeparateSpellSlotTracker: boolean;
+      pageLayout: CampaignPageLayout;
     }>
   ) => void;
   /**
