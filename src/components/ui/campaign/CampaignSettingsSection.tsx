@@ -149,7 +149,7 @@ export function CampaignSettingsSection({
             <RadioGroupItem
               value="classic"
               label="Classic"
-              description="The layout from before the redesign, with coloured page tiles."
+              description="The original layout, with coloured page tiles."
             />
           </RadioGroupField>
         </div>

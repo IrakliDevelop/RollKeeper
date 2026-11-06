@@ -96,7 +96,7 @@ describe('CampaignSettingsSection', () => {
     expect(
       within(group).getByRole('radio', { name: 'Classic' })
     ).toHaveAccessibleDescription(
-      'The layout from before the redesign, with coloured page tiles.'
+      'The original layout, with coloured page tiles.'
     );
   });
 

@@ -129,38 +129,33 @@ export function LegacyCampaignHero({
   );
 }
 
-/** The classic header's page links, shown below lg where the tiles hide. */
+const HEADER_LINKS = [
+  { label: 'Locations', segment: 'locations', Icon: MapPinned },
+  { label: 'Calendar', segment: 'calendar', Icon: CalendarDays },
+  { label: 'Encounters', segment: 'encounters', Icon: Swords },
+  { label: 'Battle Maps', segment: 'battlemaps', Icon: Map },
+];
+
+/**
+ * The classic header's page links, shown below lg where the tiles hide. The
+ * old page nested a Button in a Link (two tab stops); asChild keeps the look
+ * with one link.
+ */
 export function LegacyCampaignHeaderLinks({ code }: { code: string }) {
   return (
     <>
-      <Link href={`/dm/campaign/${code}/locations`} className="lg:hidden">
+      {HEADER_LINKS.map(({ label, segment, Icon }) => (
         <Button
+          key={segment}
+          asChild
           variant="secondary"
           size="sm"
-          leftIcon={<MapPinned size={16} />}
+          className="lg:hidden"
+          leftIcon={<Icon size={16} />}
         >
-          Locations
+          <Link href={`/dm/campaign/${code}/${segment}`}>{label}</Link>
         </Button>
-      </Link>
-      <Link href={`/dm/campaign/${code}/calendar`} className="lg:hidden">
-        <Button
-          variant="secondary"
-          size="sm"
-          leftIcon={<CalendarDays size={16} />}
-        >
-          Calendar
-        </Button>
-      </Link>
-      <Link href={`/dm/campaign/${code}/encounters`} className="lg:hidden">
-        <Button variant="secondary" size="sm" leftIcon={<Swords size={16} />}>
-          Encounters
-        </Button>
-      </Link>
-      <Link href={`/dm/campaign/${code}/battlemaps`} className="lg:hidden">
-        <Button variant="secondary" size="sm" leftIcon={<Map size={16} />}>
-          Battle Maps
-        </Button>
-      </Link>
+      ))}
     </>
   );
 }

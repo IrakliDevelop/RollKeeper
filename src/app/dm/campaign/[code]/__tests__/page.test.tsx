@@ -321,11 +321,33 @@ it('animates the settings opening with a view transition when available', () => 
   }
 });
 
-it('keeps the standard rail and settings column while the settings are closed', () => {
+it('toggles the standard settings without a view transition', () => {
+  const startViewTransition = vi.fn((update: () => void) => update());
+  Object.defineProperty(document, 'startViewTransition', {
+    configurable: true,
+    value: startViewTransition,
+  });
+  try {
+    render(<CampaignViewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Campaign settings' }));
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(
+      useDmStore.getState().getCampaign('K7QX2M')?.dmDashboardUi
+        ?.houseRulesSectionOpen
+    ).toBe(true);
+  } finally {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+  }
+});
+
+it('keeps focus on the layout choice when switching to and from standard', async () => {
+  seedCampaign({ dmDashboardUi: { houseRulesSectionOpen: true } });
+  const user = userEvent.setup();
   render(<CampaignViewPage />);
-  expect(screen.getByRole('main')).toHaveClass(
-    'lg:grid-cols-[minmax(0,1fr)_17rem]'
-  );
+  await user.click(screen.getByRole('radio', { name: 'Classic' }));
+  expect(screen.getByRole('radio', { name: 'Classic' })).toHaveFocus();
+  await user.click(screen.getByRole('radio', { name: 'Standard' }));
+  expect(screen.getByRole('radio', { name: 'Standard' })).toHaveFocus();
 });
 
 it('falls back to the standard layout for an unknown saved layout', () => {

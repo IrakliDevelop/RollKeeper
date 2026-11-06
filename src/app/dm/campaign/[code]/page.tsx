@@ -181,6 +181,8 @@ export default function CampaignViewPage() {
 
   // Banner and classic layouts have no rail: the settings heading stays top
   // right, and the page spans the width below it while the settings are closed.
+  // The settings keep one DOM slot in every layout (placed by the grid), so
+  // switching layout never remounts them.
   const settingsBeside = !showRail && houseRulesSectionOpen;
   const handleSettingsOpenChange = (open: boolean) => {
     const apply = () => setDmDashboardUi(code, { houseRulesSectionOpen: open });
@@ -276,7 +278,6 @@ export default function CampaignViewPage() {
           showRail && 'lg:grid-rows-[auto_1fr]'
         )}
       >
-        {!showRail && settingsColumn}
         {/* Rail: a div, not <aside> inside <main>. */}
         {showRail && (
           <div className="space-y-4 lg:col-start-2 lg:row-start-1">
@@ -344,7 +345,7 @@ export default function CampaignViewPage() {
           )}
         </div>
 
-        {showRail && settingsColumn}
+        {settingsColumn}
       </main>
 
       {/* Player Detail Dialog */}
