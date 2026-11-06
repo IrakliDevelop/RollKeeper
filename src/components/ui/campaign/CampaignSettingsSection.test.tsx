@@ -15,6 +15,7 @@ import {
 
 const onOpenChange = vi.fn();
 const onBannerChange = vi.fn();
+const onPageLayoutChange = vi.fn();
 const onStackableInspirationChange = vi.fn();
 const onCustomCounterLabelChange = vi.fn();
 const onNpcSpellSlotModeChange = vi.fn();
@@ -27,6 +28,8 @@ function props(
     open: true,
     onOpenChange,
     onBannerChange,
+    pageLayout: 'standard',
+    onPageLayoutChange,
     stackableInspiration: false,
     onStackableInspirationChange,
     onCustomCounterLabelChange,
@@ -78,6 +81,29 @@ describe('CampaignSettingsSection', () => {
       'lg:flex-col',
       'lg:items-stretch'
     );
+  });
+
+  it('offers the three page layouts with the saved one chosen', () => {
+    renderSettings({ pageLayout: 'banner' });
+    const group = screen.getByRole('radiogroup', { name: 'Page layout' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map(radio => radio.getAttribute('value'))).toEqual([
+      'standard',
+      'banner',
+      'classic',
+    ]);
+    expect(within(group).getByRole('radio', { name: 'Banner' })).toBeChecked();
+    expect(
+      within(group).getByRole('radio', { name: 'Classic' })
+    ).toHaveAccessibleDescription(
+      'The original layout, with coloured page tiles.'
+    );
+  });
+
+  it('reports the chosen page layout', async () => {
+    renderSettings();
+    await user.click(screen.getByRole('radio', { name: 'Classic' }));
+    expect(onPageLayoutChange).toHaveBeenCalledWith('classic');
   });
 
   it('describes and toggles stackable heroic inspiration', () => {

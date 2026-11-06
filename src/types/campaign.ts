@@ -20,6 +20,20 @@ export interface CampaignPlayerData {
   pendingXpAwardCount?: number;
 }
 
+/**
+ * DM campaign page layouts: 'standard' (links in the side column), 'banner'
+ * (banner across the top between the links) and 'classic' (the page header
+ * from before the Felt and Brass redesign).
+ */
+export const CAMPAIGN_PAGE_LAYOUTS = ['standard', 'banner', 'classic'] as const;
+export type CampaignPageLayout = (typeof CAMPAIGN_PAGE_LAYOUTS)[number];
+
+export function isCampaignPageLayout(
+  value: unknown
+): value is CampaignPageLayout {
+  return (CAMPAIGN_PAGE_LAYOUTS as readonly unknown[]).includes(value);
+}
+
 export interface CampaignInfo {
   code: string;
   name: string;
@@ -48,5 +62,7 @@ export interface CampaignInfo {
     npcInlineSpellSlots?: boolean;
     /** Show the separate spell slot tracker block in NPC spell tab. */
     npcSeparateSpellSlotTracker?: boolean;
+    /** Campaign page layout. Missing or unknown means 'standard'. */
+    pageLayout?: CampaignPageLayout;
   };
 }

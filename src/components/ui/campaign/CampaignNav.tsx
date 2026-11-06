@@ -3,12 +3,14 @@ import { CalendarDays, Map as MapIcon, MapPin, Swords } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { cn } from '@/utils/cn';
 
-const PAGES = [
+export const CAMPAIGN_PAGES = [
   { label: 'Encounters', segment: 'encounters', Icon: Swords },
   { label: 'Battle maps', segment: 'battlemaps', Icon: MapIcon },
   { label: 'Locations', segment: 'locations', Icon: MapPin },
   { label: 'Calendar', segment: 'calendar', Icon: CalendarDays },
-];
+] as const;
+
+export type CampaignPage = (typeof CAMPAIGN_PAGES)[number];
 
 /** Links to the campaign's sub-pages: a wrapping row, or a stacked list. */
 export function CampaignNav({
@@ -23,7 +25,7 @@ export function CampaignNav({
   return (
     <nav aria-label="Campaign pages" className={className}>
       <ul className={cn('flex gap-2', vertical ? 'flex-col' : 'flex-wrap')}>
-        {PAGES.map(({ label, segment, Icon }) => (
+        {CAMPAIGN_PAGES.map(({ label, segment, Icon }) => (
           <li key={segment}>
             <Button
               asChild
