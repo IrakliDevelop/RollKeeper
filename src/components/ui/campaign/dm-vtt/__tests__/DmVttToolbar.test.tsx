@@ -72,6 +72,7 @@ describe('DmVttToolbar', () => {
   beforeEach(() => {
     sdk.activeTool = 'select';
     sdk.setTool.mockClear();
+    vi.mocked(DmLocationToolOptions).mockClear();
   });
   afterEach(() => cleanup());
 
@@ -102,6 +103,7 @@ describe('DmVttToolbar', () => {
     expect(sdk.setTool).not.toHaveBeenCalled();
   });
   it('threads the shared fog controller into the button and options bar', () => {
+    sdk.activeTool = 'fog';
     const requestActivate = vi.fn();
     const fogControls = {
       initialized: false,
@@ -304,6 +306,7 @@ describe('DmVttToolbar', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Select options' }));
     const lastProps = vi.mocked(DmLocationToolOptions).mock.calls.at(-1)?.[0];
     expect(lastProps).toEqual(
       expect.objectContaining({ mode: 'battlemap', selectionControls: true })
@@ -334,6 +337,7 @@ describe('DmVttToolbar', () => {
   });
 
   it('threads markerControls through to the shared tool options bar', () => {
+    sdk.activeTool = 'marker';
     const markerControls = {
       kind: 'trap' as const,
       color: 'red' as const,
