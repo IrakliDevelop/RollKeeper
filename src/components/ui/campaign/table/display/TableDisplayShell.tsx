@@ -20,28 +20,17 @@ import {
   DISPLAY_STORAGE_BLOCKED,
   DISPLAY_WAITING,
 } from './displayMessages';
-import { TableDisplayCalibration } from './TableDisplayCalibration';
 import {
   TableDisplayController,
-  UNCALIBRATED_VIEW,
   type TableDisplayDeps,
   type TableDisplayView,
 } from './tableDisplayController';
 import { defaultTableDisplayDeps } from './tableDisplayDeps';
 import {
-  useCalibrationMonitor,
-  useCalibrationState,
   useCameraAttributes,
-  useCameraInputPolicy,
   useFitMapVisibility,
   useFullscreenKey,
 } from './TableDisplayShell.hooks';
-import { cameraInputMode } from './calibration/cameraInputGuard';
-import {
-  browserEnvironmentHost,
-  readEnvironment,
-} from './calibration/environment';
-import { getCalibrationStore } from './calibration/session';
 
 const SHELL_STYLE = {
   position: 'fixed',
@@ -74,7 +63,6 @@ const INITIAL_VIEW: TableDisplayView = {
   cover: DISPLAY_WAITING,
   canvas: null,
   showing: false,
-  calibration: UNCALIBRATED_VIEW,
 };
 
 /**
@@ -112,11 +100,6 @@ export function TableDisplayShell({
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const controllerRef = useRef<TableDisplayController | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const readCurrentEnvironment = useCallback(
-    () => readEnvironment(browserEnvironmentHost(), rootRef.current),
-    []
-  );
   const resolvedDeps = useMemo(() => deps ?? defaultTableDisplayDeps(), [deps]);
   const credential = boot?.status === 'ready' ? boot.credential : null;
 
@@ -135,10 +118,6 @@ export function TableDisplayShell({
       onView: setView,
       onCredentialDenied: () => clearDisplayCredential(code),
       mapPinned: mapId === undefined ? undefined : { mapId },
-      calibration: {
-        store: getCalibrationStore(code),
-        readEnvironment: readCurrentEnvironment,
-      },
     });
     controllerRef.current = controller;
     controller.start();
@@ -147,16 +126,12 @@ export function TableDisplayShell({
       if (controllerRef.current === controller) controllerRef.current = null;
       setView(INITIAL_VIEW);
     };
-  }, [code, credential, resolvedDeps, mapId, readCurrentEnvironment]);
+  }, [code, credential, resolvedDeps, mapId]);
 
   // Markers paint on the TV; it never opens a marker panel (gesture null).
   useMarkerRegistration({ viewport, gesture: null });
   useFullscreenKey();
   const fitVisible = useFitMapVisibility();
-  const calibration = useCalibrationState(code);
-  useCalibrationMonitor(calibration.store, rootRef);
-  const inputMode = cameraInputMode(view.calibration.report);
-  useCameraInputPolicy(canvasContainerRef, viewport, inputMode);
   useCameraAttributes(rootRef, viewport);
   const tools = useMemo(() => [new HandTool()], []);
   const canvasKey = view.canvas?.key ?? null;
@@ -189,17 +164,8 @@ export function TableDisplayShell({
           ? DISPLAY_EXPIRED
           : view.cover;
   return (
-    <div
-      ref={rootRef}
-      data-testid="table-display"
-      data-calibration-state={view.calibration.report}
-      style={SHELL_STYLE}
-    >
-      <div
-        ref={canvasContainerRef}
-        data-testid="table-display-canvas"
-        style={CANVAS_CONTAINER_STYLE}
-      >
+    <div ref={rootRef} data-testid="table-display" style={SHELL_STYLE}>
+      <div data-testid="table-display-canvas" style={CANVAS_CONTAINER_STYLE}>
         {view.canvas && canvasOptions && (
           <FieldNotesCanvas
             key={view.canvas.key}
@@ -224,28 +190,16 @@ export function TableDisplayShell({
           {DISPLAY_STORAGE_BLOCKED}
         </p>
       )}
-      {cover === null &&
-        view.showing &&
-        fitVisible &&
-        inputMode !== 'frozen' && (
-          <div className="fixed right-4 bottom-4 z-[110]">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => controllerRef.current?.fitMap()}
-            >
-              {inputMode === 'pan-only' ? 'Centre map' : 'Fit map'}
-            </Button>
-          </div>
-        )}
-      {boot?.status === 'ready' && (
-        <TableDisplayCalibration
-          store={calibration.store}
-          state={calibration.state}
-          view={view.calibration}
-          pointerActive={fitVisible}
-          readEnvironment={readCurrentEnvironment}
-        />
+      {cover === null && view.showing && fitVisible && (
+        <div className="fixed right-4 bottom-4 z-[110]">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => controllerRef.current?.fitMap()}
+          >
+            Fit map
+          </Button>
+        </div>
       )}
     </div>
   );

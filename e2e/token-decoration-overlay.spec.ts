@@ -198,7 +198,9 @@ test('desktop drag moves the decoration and compact hover reveals its chip', asy
 
     // full -> compact; the chip disappears until the real pointer hover hits
     // the moved token through Viewport.getElementAt.
+    await page.getByRole('button', { name: 'Map controls' }).click();
     await page.getByRole('button', { name: 'Token info: full' }).click();
+    await page.getByRole('button', { name: 'Map controls' }).click();
     await expect(tokenDecoration.getByText(TOKEN_NAME)).toBeHidden();
 
     const moved = await hpBar.boundingBox();
@@ -222,7 +224,9 @@ test('iPad touch tap reveals a compact token chip', async ({ browser }) => {
 
   try {
     const tokenDecoration = page.getByTestId(`token-decoration-${ENTITY_ID}`);
+    await page.getByRole('button', { name: 'Map controls' }).click();
     await page.getByRole('button', { name: 'Token info: full' }).click();
+    await page.getByRole('button', { name: 'Map controls' }).click();
     await expect(tokenDecoration.getByText(TOKEN_NAME)).toBeHidden();
 
     const hpBar = page.locator('[role="progressbar"]');

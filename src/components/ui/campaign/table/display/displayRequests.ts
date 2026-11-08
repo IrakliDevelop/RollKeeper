@@ -12,19 +12,6 @@ export interface DisplayCredential {
   nonce: string;
 }
 
-/**
- * PR07 M1: the display's self-report of its S5 scale state (optional ACK
- * key; absent = unknown). Device-reported, grants nothing.
- */
-export const DISPLAY_CALIBRATION_REPORTS = [
-  'uncalibrated',
-  'verified',
-  'verify-required',
-  'unsupported',
-] as const;
-export type DisplayCalibrationReport =
-  (typeof DISPLAY_CALIBRATION_REPORTS)[number];
-
 export interface DisplayAck {
   displayGeneration: number;
   epoch: string;
@@ -32,7 +19,6 @@ export interface DisplayAck {
   sceneId: string | null;
   blanked: boolean;
   phase: 'loaded' | 'blank';
-  calibration?: DisplayCalibrationReport;
 }
 
 export interface DisplayDescriptor {
@@ -54,8 +40,6 @@ export interface DisplayStatus {
   state: DisplayStatusState;
   sceneId: string | null;
   ageMs: number | null;
-  /** Fresh matching loaded/blank/waiting records only (PR07 M1). */
-  calibration?: DisplayCalibrationReport;
 }
 
 const displayBase = (code: string) =>

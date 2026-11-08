@@ -15,10 +15,10 @@
     "type-check": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@fieldnotes/core": "0.102.0",
-    "@fieldnotes/sync": "0.30.1",
+    "@fieldnotes/core": "0.106.1",
+    "@fieldnotes/sync": "0.30.2",
     "@fieldnotes/sync-redis": "0.15.1",
-    "@fieldnotes/sync-server": "0.30.1",
+    "@fieldnotes/sync-server": "0.30.2",
     "@fieldnotes/vtt": "0.17.1",
     "redis": "^4.7.0"
   },

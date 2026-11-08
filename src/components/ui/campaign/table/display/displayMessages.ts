@@ -21,21 +21,3 @@ export const DISPLAY_NOT_CONFIGURED =
   "The TV view isn't set up on this server.";
 export const DISPLAY_STORAGE_BLOCKED =
   "This browser won't remember this link. If you reload, use Open display again.";
-
-// ---- PR07 calibrated minis (P3, P4, P6) -----------------------------------
-export const CALIBRATION_REQUIREMENTS =
-  "Mini scale works on a second monitor or TV, in full screen, at 100% browser zoom. Check the scale again if you move the window to another screen, change zoom or display settings, or leave full screen. The browser can't spot every change.";
-export const CALIBRATION_NEEDS_VERIFY = 'Check the scale';
-export const CALIBRATION_VERIFIED = 'Scale checked';
-export const CALIBRATION_UNSUPPORTED_RANGE =
-  "This scene's grid can't be matched to minis.";
-export const CALIBRATION_RULER_FIRST =
-  'Hold a real ruler against the outlined square on this screen.';
-export const CALIBRATION_REPOSITION =
-  'The map may move when you confirm. Move your minis back if needed.';
-export const CALIBRATION_STORAGE_BLOCKED =
-  "This browser can't save your ruler setting, so it lasts until you close this page.";
-export const calibrationInstruction = (squareMm: string) =>
-  `Hold a ruler against the square. Adjust until each side measures ${squareMm} mm on this screen, then Confirm.`;
-export const calibrationSavedNote = (date: string) =>
-  `Last ruler setting from ${date}. Check it with your ruler.`;

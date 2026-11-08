@@ -99,6 +99,7 @@ async function enableFog(page: Page): Promise<void> {
     .getByRole('alertdialog', { name: 'Enable fog of war' })
     .getByRole('button', { name: 'Enable covered fog' })
     .click();
+  await page.getByRole('button', { name: 'Fog settings' }).click();
 }
 
 function storedAppearance(page: Page) {
@@ -191,6 +192,7 @@ test('DM creates, applies, edits, and deletes a preset; the map keeps its snapsh
   // Reload keeps the snapshot; legacy Solid still selectable.
   await page.reload({ waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Fog of war' }).click();
+  await page.getByRole('button', { name: 'Fog settings' }).click();
   await expect(select).toHaveValue('custom');
   await select.selectOption('solid');
   await expect.poll(() => storedAppearance(page)).toBe('solid');

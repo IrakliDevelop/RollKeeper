@@ -16,7 +16,6 @@ vi.mock('../presentation', () => ({
 import type { TableAuthorityState } from './useTableWorkspaceAuthority';
 import { fieldLabels } from './TableHeaderBanners';
 import { TableWorkspaceHeader, WORKSPACE_LABEL } from './TableWorkspaceHeader';
-import { calibrationNotice } from '../presentation/TablePresentationControls.utils';
 import type { SaveMessageTone } from './saveMessages';
 
 /**
@@ -327,22 +326,6 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
   ])('never collapses the %s authority text', (_name, state, text) => {
     renderHeader({ state });
     expect(collapsing(screen.getByText(text))).toBeNull();
-  });
-
-  it('never collapses the PR07 verify-required notice', () => {
-    const notice = calibrationNotice({
-      state: 'loaded',
-      sceneId: 'scene-a',
-      ageMs: 100,
-      calibration: 'verify-required',
-    });
-    expect(notice).not.toBeNull();
-    renderHeader({ notices: [notice!] });
-    const text = screen.getByText(
-      'TV says the scale needs checking. Use Check scale on the TV.'
-    );
-    expect(text).toHaveAttribute('role', 'alert');
-    expect(collapsing(text)).toBeNull();
   });
 
   it('renders the prepare-encounter flow in the banners zone, never in Details (HR-8)', () => {

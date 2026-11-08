@@ -1,7 +1,7 @@
 # Scenes and Table
 
 The DM's Table workspace: private scene preparation, live presentation to
-players and a TV, and Table-owned combat runs. It is built on the battle map
+players, with an optional TV display, and Table-owned combat runs. It is built on the battle map
 VTT ([07](07-battlemap-fog-fieldnotes.md)) but has its own local storage,
 server control service and relay authority. This page describes the code as
 of the Scenes and Table release; when in doubt, read the cited file.
@@ -17,8 +17,7 @@ The top dock distinguishes the DM's selected scene from the server-acknowledged
 Details sit on the left on wide screens; audience actions sit on the right.
 They stack on smaller screens. Show is the primary action when preparing a
 different scene; revealing an already shown, blanked scene remains available
-as a secondary action. TV status, mini-scale reports and Open display share
-a separate row. Alerts, save failures and conflicts remain visible below.
+as a secondary action. TV status and Open display share a separate row. Alerts, save failures and conflicts remain visible below.
 
 Scenes opens a private, content-sized flyout below the measured dock. Short
 lists leave the canvas visible below; long lists scroll within the available
@@ -27,7 +26,7 @@ stays mounted but hidden while the flyout is open; the combat panel does the
 same below `lg`, preserving its queue and control state. Before a canvas exists,
 the workspace shell measures its own header for the same flyout position.
 These layout rules do not change control leases, presentation commands,
-checkpoint recovery or calibration eligibility.
+checkpoint recovery.
 
 The DM's map tools sit below the session controls. Select/Pan, movement and
 measurement, Fog, Drawing, and Laser/Ping form separate groups. Drawing opens
@@ -138,16 +137,6 @@ scene rooms, player views and the TV cannot connect.
   session when the app sends it (`relay/src/authority-lua.ts`), and the app
   forwards the tab's own fence so a takeover between the read and the write
   is refused. Scene-room seeding sends the same lease.
-- **Mini scale is square-grid only, silently.** On a scene whose live grid
-  is not square (hex, none or invalid), the TV shows no calibration UI at
-  all (no Calibrate minis, Check scale or Setup tips, no grid message) and
-  uses the normal view; it reports `uncalibrated`, so the DM sees no
-  mini-scale warning (and no scale line at all for a scene whose record has
-  no square grid). Nothing scale-related shows while a scene is still
-  attaching, before its grid is known. A calibrated TV keeps its saved scale and returns to it
-  on the next square scene (`calibration/session.ts`,
-  `tableDisplayController.ts`). `unsupported` now means only a square grid
-  whose scale is out of range.
 - A TV tab that is not visible while attaching shows "Keep this screen
   visible to show the map." and attaches as soon as it is visible again,
   instead of retrying every 15 s. The DM status does not name this case (the
@@ -328,12 +317,6 @@ scene rooms, player views and the TV cannot connect.
   the key is consumed and scrubbed like a capability and fails verification
   (`src/components/ui/campaign/table/display/displayCredentialStore.ts`). Use
   "Open display" to get a new link.
-- Display ACK `calibration` is an enum (`uncalibrated`, `verified`,
-  `verify-required`, `unsupported`; `src/lib/tableServer/displayScripts.ts`,
-  `displayCapability.ts`). An ACK carrying a value the deployed server does
-  not know is a 400, so during a deploy-skew window between display and app
-  builds the TV's ACKs can be refused until both run the same release. An ACK
-  without `calibration` is accepted.
 
 ## Turn movement
 

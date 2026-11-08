@@ -246,6 +246,8 @@ test('iPad: touch move drags a token along a path and commits on tap-last', asyn
     devices['iPad Pro 11']
   );
   try {
+    // The expanded combat panel covers the destination on this viewport.
+    await page.getByRole('button', { name: 'Collapse combat panel' }).click();
     await page.getByRole('button', { name: 'Move' }).click();
     const canvas = page.locator('canvas').first();
     const box = (await canvas.boundingBox())!;

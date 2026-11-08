@@ -110,6 +110,34 @@ describe('Table players snapshot refresh (C3-6)', () => {
 });
 
 describe('W4 workspace players snapshot cache', () => {
+  it('updates the combat reader when the roster refreshes after a player joins', async () => {
+    const cache = createTablePlayersCache();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <TablePlayersCacheProvider value={cache}>
+        {children}
+      </TablePlayersCacheProvider>
+    );
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ players: [] }));
+    const { result } = renderHook(
+      () => ({
+        roster: useTablePlayersSnapshot('CAMP'),
+        combat: useTablePlayersSnapshot('CAMP'),
+      }),
+      { wrapper }
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.combat.snapshot).toMatchObject({
+      status: 'ready',
+      players: [],
+    });
+    act(() => result.current.roster.refresh());
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.combat.snapshot).toMatchObject({
+      status: 'ready',
+      players: [expect.objectContaining({ name: 'Aria' })],
+    });
+  });
+
   it('reuses a fresh cached snapshot on remount instead of refetching', async () => {
     const cache = createTablePlayersCache();
     const wrapper = ({ children }: { children: ReactNode }) => (

@@ -52,7 +52,6 @@ function focusables(root: HTMLElement | null): HTMLElement[] {
 }
 const LIVE_EDIT =
   "You're editing the scene players see. Changes show right away.";
-const SCALE_HINT = 'If you change the grid, check the scale on the TV again.';
 
 /**
  * W10 "Edit map" tool group (A4 subset): set/replace the map image, grid
@@ -66,8 +65,6 @@ export function TableEditMapControl(props: {
   viewport: Viewport | null;
   /** The selected scene is the shown, unblanked one (PR04 wording). */
   presentedHere: boolean;
-  /** PR07 P9: the table reports a verified scale for this (shown) scene. */
-  scaleVerifiedHere?: boolean;
   upload?: SceneImageUploader;
   decode?: SceneImageDecoder;
   /** Loads the uploaded image the way the canvas will (F6). */
@@ -325,9 +322,6 @@ export function TableEditMapControl(props: {
               <p className="text-ember-text text-xs" role="status">
                 {LIVE_EDIT}
               </p>
-            )}
-            {props.scaleVerifiedHere && (
-              <p className="text-muted text-xs">{SCALE_HINT}</p>
             )}
             <input
               ref={fileRef}

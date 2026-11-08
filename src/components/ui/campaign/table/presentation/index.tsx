@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 
@@ -8,7 +8,6 @@ import { OpenDisplayButton } from '../display/OpenDisplayButton';
 import { useTablePresentation } from './TablePresentationControls.hooks';
 import type { TablePresentationControlsProps } from './TablePresentationControls.types';
 import {
-  displayCalibrationLine,
   displayStatusLine,
   LIVE_CONTROL_REQUIRED,
   presentationActions,
@@ -51,16 +50,7 @@ export function useTablePresentationPanel(
   useEffect(() => {
     if (committedCount > 0) refresh();
   }, [committedCount, refresh]);
-  // O7-A5: whether the table reported `verified` during this page session.
-  const [verifiedSeen, setVerifiedSeen] = useState(false);
-  const reported =
-    display.status && display.status !== 'error'
-      ? display.status.calibration
-      : undefined;
-  useEffect(() => {
-    if (reported === 'verified') setVerifiedSeen(true);
-  }, [reported]);
-  return { presentation, display, verifiedSeen };
+  return { presentation, display };
 }
 
 export type TablePresentationPanel = ReturnType<
@@ -109,11 +99,6 @@ export function TablePresentationView(
         labels,
       })
     : null;
-  const calibrationLine = displayCalibrationLine(
-    display.status,
-    props.panel.verifiedSeen,
-    props.isSquareScene
-  );
   // O7-2 H5 / HR-7: why a presentation button is disabled, as visible text
   // referenced by aria-describedby (LIVE_CONTROL_REQUIRED stays one node).
   const liveReasonId = useId();
@@ -232,11 +217,6 @@ export function TablePresentationView(
               className={`${DISPLAY_TONE[displayLine.tone]} min-w-0 break-words`}
             >
               {displayLine.text}
-            </p>
-          )}
-          {calibrationLine && (
-            <p className="text-muted min-w-0 break-words">
-              {calibrationLine.text}
             </p>
           )}
         </div>

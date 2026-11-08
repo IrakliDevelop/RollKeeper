@@ -183,52 +183,6 @@ export function failureMessage(
 }
 
 /**
- * PR07 P9 (R3-4): the display's scale self-report as an inline muted line
- * (verified / unsupported). Verify-required is a workspace notice instead.
- */
-export function displayCalibrationLine(
-  status: DisplayStatusRead | null,
-  /** O7-A5: `verified` was reported earlier in this DM page session. */
-  verifiedSeen = false,
-  /**
-   * O8-2 (review U3): whether a scene has a square grid. No mini-scale line
-   * at all while the TV shows a scene without one.
-   */
-  isSquareScene?: (sceneId: string) => boolean
-): { text: string; tone: 'muted' } | null {
-  if (!status || status === 'error') return null;
-  if (status.sceneId && isSquareScene && !isSquareScene(status.sceneId))
-    return null;
-  if (status.calibration === 'uncalibrated' && verifiedSeen)
-    return { text: "TV says it's back to normal view", tone: 'muted' };
-  if (status.calibration === 'verified')
-    return { text: 'TV says the scale is checked', tone: 'muted' };
-  if (status.calibration === 'unsupported')
-    return {
-      // O8-2: only a square scene reports this (its scale is out of range).
-      text: "TV says this scene's grid can't be matched to minis",
-      tone: 'muted',
-    };
-  return null;
-}
-
-/** PR07 P9 (FC-1): the never-collapsing DM notice for verify-required. */
-export function calibrationNotice(status: DisplayStatusRead | null): {
-  id: string;
-  text: string;
-  tone: 'alert';
-} | null {
-  if (!status || status === 'error') return null;
-  return status.calibration === 'verify-required'
-    ? {
-        id: 'table-scale',
-        text: 'TV says the scale needs checking. Use Check scale on the TV.',
-        tone: 'alert',
-      }
-    : null;
-}
-
-/**
  * E13: the table display line, from the server-computed DM display status
  * only (never from Published or relay state). `loaded` is a device report,
  * not optical proof; stale/unknown never take success styling.

@@ -165,7 +165,7 @@ export function DmVttToolContext(props: DmVttToolContextProps) {
               {props.fogControls.diagnostic}
             </p>
           )}
-          {!desktop && hasOptions && (
+          {(!desktop || activeTool === 'select') && hasOptions && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -203,7 +203,7 @@ export function DmVttToolContext(props: DmVttToolContextProps) {
           )}
         </div>
       )}
-      {desktop && hasOptions && (
+      {desktop && activeTool !== 'select' && hasOptions && (
         <div
           className="border-divider max-h-[min(18rem,40dvh)] min-w-0 overflow-y-auto border-t"
           role="region"

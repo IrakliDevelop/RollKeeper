@@ -15,11 +15,7 @@ import type {
 import type { TableAuthorityState } from '../workspace/useTableWorkspaceAuthority';
 
 import { TablePresentationControls } from '.';
-import {
-  calibrationNotice,
-  displayCalibrationLine,
-  displayStatusLine,
-} from './TablePresentationControls.utils';
+import { displayStatusLine } from './TablePresentationControls.utils';
 
 const HOLDER = 'table-session-1';
 const descriptor = (
@@ -375,115 +371,5 @@ describe('Open display launcher (E12)', () => {
         /\b(?:text|bg|border)-(?:white|black|gray|slate|zinc|red|green|blue|amber|emerald)-\d+\b/u
       );
     }
-  });
-});
-
-describe('PR07 P9 table scale reports (R3-4 wording)', () => {
-  const status = (calibration?: string) =>
-    ({
-      state: 'loaded',
-      sceneId: 'scene-tavern',
-      ageMs: 900,
-      ...(calibration ? { calibration } : {}),
-    }) as never;
-
-  it('O8-2 (review U3): no mini-scale line while the shown scene is not square', () => {
-    // Tavern has a square grid; the hex scene does not.
-    const isSquare = (sceneId: string) => sceneId === 'scene-tavern';
-    const square = () => true;
-    // A calibrated TV on a hex scene reports uncalibrated after `verified`.
-    expect(
-      displayCalibrationLine(status('uncalibrated'), true, isSquare)
-    ).toEqual({ text: "TV says it's back to normal view", tone: 'muted' });
-    const hex = {
-      ...(status('uncalibrated') as object),
-      sceneId: 'scene-hex',
-    } as never;
-    expect(displayCalibrationLine(hex, true, isSquare)).toBeNull();
-    for (const report of ['verified', 'unsupported'])
-      expect(
-        displayCalibrationLine(
-          { ...(status(report) as object), sceneId: 'scene-hex' } as never,
-          true,
-          isSquare
-        )
-      ).toBeNull();
-    expect(displayCalibrationLine(hex, true, square)).toEqual({
-      text: "TV says it's back to normal view",
-      tone: 'muted',
-    });
-  });
-
-  it('words verified/unsupported as inline device reports and verify-required as a notice only', () => {
-    expect(displayCalibrationLine(status('verified'))).toEqual({
-      text: 'TV says the scale is checked',
-      tone: 'muted',
-    });
-    expect(displayCalibrationLine(status('unsupported'))).toEqual({
-      text: "TV says this scene's grid can't be matched to minis",
-      tone: 'muted',
-    });
-    for (const quiet of ['verify-required', 'uncalibrated', undefined])
-      expect(displayCalibrationLine(status(quiet))).toBeNull();
-    expect(displayCalibrationLine('error')).toBeNull();
-    expect(calibrationNotice(status('verify-required'))).toEqual({
-      id: 'table-scale',
-      text: 'TV says the scale needs checking. Use Check scale on the TV.',
-      tone: 'alert',
-    });
-    for (const quiet of ['verified', 'unsupported', 'uncalibrated', undefined])
-      expect(calibrationNotice(status(quiet))).toBeNull();
-    expect(calibrationNotice('error')).toBeNull();
-    expect(calibrationNotice(null)).toBeNull();
-  });
-
-  it('keeps a valid calibration enum from the status read and shows the inline line', async () => {
-    displayReply = () =>
-      Response.json({
-        state: 'loaded',
-        sceneId: 'scene-tavern',
-        ageMs: 1_000,
-        calibration: 'verified',
-      });
-    render(controls({}).element);
-    await settle();
-    expect(displayStatusRegion()).toHaveTextContent(
-      'TV says the scale is checked'
-    );
-    displayReply = () =>
-      Response.json({
-        state: 'loaded',
-        sceneId: 'scene-tavern',
-        ageMs: 1_000,
-        calibration: 'bogus',
-      });
-    await settle(5_000);
-    expect(screen.queryByText(/TV says the scale/u)).toBeNull();
-  });
-});
-
-describe('O7-A5 uncalibrated after verified', () => {
-  it('shows "TV says it is back to normal view" only after verified was seen in this DM page session', async () => {
-    const report = (calibration: string) => () =>
-      Response.json({
-        state: 'loaded',
-        sceneId: 'scene-tavern',
-        ageMs: 1_000,
-        calibration,
-      });
-    displayReply = report('uncalibrated');
-    render(controls({}).element);
-    await settle();
-    expect(screen.queryByText("TV says it's back to normal view")).toBeNull();
-    displayReply = report('verified');
-    await settle(5_000);
-    expect(displayStatusRegion()).toHaveTextContent(
-      'TV says the scale is checked'
-    );
-    displayReply = report('uncalibrated');
-    await settle(5_000);
-    const line = screen.getByText("TV says it's back to normal view");
-    expect(line.className).toContain('text-muted');
-    expect(screen.queryByText(/TV says the scale needs checking/u)).toBeNull();
   });
 });

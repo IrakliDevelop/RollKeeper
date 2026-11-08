@@ -38,6 +38,10 @@ type ReadySnapshot = Extract<TablePlayersSnapshot, { status: 'ready' }>;
 export interface TablePlayersCache {
   get(campaignCode: string): ReadySnapshot | null;
   set(campaignCode: string, snapshot: ReadySnapshot): void;
+  subscribe(
+    campaignCode: string,
+    listener: (snapshot: ReadySnapshot) => void
+  ): () => void;
   /**
    * Acceptance A4: one shared read per campaign at a time; concurrent
    * consumers (scene roster, combat panel, StrictMode re-runs) share it.
@@ -52,15 +56,29 @@ export interface TablePlayersCache {
 export function createTablePlayersCache(): TablePlayersCache {
   const entries = new Map<string, ReadySnapshot>();
   const inFlight = new Map<string, Promise<ReadySnapshot>>();
+  const listeners = new Map<string, Set<(snapshot: ReadySnapshot) => void>>();
+  const publish = (campaignCode: string, snapshot: ReadySnapshot) => {
+    entries.set(campaignCode, snapshot);
+    listeners.get(campaignCode)?.forEach(listener => listener(snapshot));
+  };
   return {
     get: campaignCode => entries.get(campaignCode) ?? null,
-    set: (campaignCode, snapshot) => entries.set(campaignCode, snapshot),
+    set: publish,
+    subscribe: (campaignCode, listener) => {
+      const subscribers = listeners.get(campaignCode) ?? new Set();
+      subscribers.add(listener);
+      listeners.set(campaignCode, subscribers);
+      return () => {
+        subscribers.delete(listener);
+        if (subscribers.size === 0) listeners.delete(campaignCode);
+      };
+    },
     load: (campaignCode, read) => {
       const pending = inFlight.get(campaignCode);
       if (pending) return pending;
       const promise = read()
         .then(ready => {
-          entries.set(campaignCode, ready);
+          publish(campaignCode, ready);
           return ready;
         })
         .finally(() => inFlight.delete(campaignCode));
@@ -198,6 +216,13 @@ export function useTablePlayersSnapshot(
   const inFlight = useRef<AbortController | null>(null);
   const pollMs = options.pollMs ?? null;
   const refreshKey = options.refreshKey;
+
+  // Roster and combat panels share one cache. A player joining while both are
+  // open must update every consumer, including combat's inactive snapshot.
+  useEffect(
+    () => cache?.subscribe(campaignCode, setSnapshot),
+    [cache, campaignCode]
+  );
 
   const markFailed = useCallback(
     () =>

@@ -121,11 +121,9 @@ function Controls({
         state: 'loaded',
         sceneId: shown.sceneId,
         ageMs: 1000,
-        calibration: 'verified',
       },
       refresh: noop,
     },
-    verifiedSeen: true,
   };
   return (
     <main className="bg-surface-inset relative min-h-screen">
@@ -164,7 +162,7 @@ function Controls({
                   {
                     id: 'scale',
                     tone: 'alert',
-                    text: 'TV says the scale needs checking. Use Check scale on the TV.',
+                    text: 'The display connection needs attention.',
                   },
                 ]
               : []

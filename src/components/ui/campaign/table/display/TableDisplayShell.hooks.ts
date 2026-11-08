@@ -1,24 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import type { Viewport } from '@fieldnotes/core';
-
-import {
-  attachCameraInputGuard,
-  CAMERA_ZOOM_SHORTCUTS,
-  type CameraInputMode,
-} from './calibration/cameraInputGuard';
-import {
-  browserEnvironmentHost,
-  readEnvironment,
-  startEnvironmentMonitor,
-} from './calibration/environment';
-import {
-  getCalibrationStore,
-  type CalibrationPageState,
-  type CalibrationSession,
-  type CalibrationStore,
-} from './calibration/session';
 
 const FIT_HIDE_MS = 3_000;
 
@@ -35,8 +18,6 @@ export function useFitMapVisibility(): boolean {
         setVisible(false);
       }, FIT_HIDE_MS);
     };
-    // Capture phase on window: it runs before the PR07 canvas guard, which
-    // stops camera input at the canvas container (hover must still reveal).
     window.addEventListener('pointermove', handleMove, true);
     return () => {
       window.removeEventListener('pointermove', handleMove, true);
@@ -58,87 +39,6 @@ export function useFullscreenKey(): void {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, []);
-}
-
-/** PR07 P1: the per-page calibration store and its state (client-only). */
-export function useCalibrationState(code: string): {
-  store: CalibrationStore | null;
-  state: CalibrationPageState | null;
-} {
-  const [value, setValue] = useState<{
-    store: CalibrationStore | null;
-    state: CalibrationPageState | null;
-  }>({ store: null, state: null });
-  useEffect(() => {
-    // localStorage is read here (an effect), never during render/hydration.
-    const store = getCalibrationStore(code);
-    const sync = () => setValue({ store, state: store.getState() });
-    sync();
-    return store.subscribe(sync);
-  }, [code]);
-  return value;
-}
-
-/**
- * PR07 P5 / R3-1 / C7-3: while the session verification flag is held, the
- * physical-setup signals are watched for the page lifetime (whatever is
- * shown); the origin target is the always-mounted shell root. Any mismatch
- * clears the session. Re-registration re-compares at once.
- */
-export function useCalibrationMonitor(
-  store: CalibrationStore | null,
-  rootRef: RefObject<HTMLElement | null>
-): void {
-  useEffect(() => {
-    if (!store) return;
-    let stopMonitor: (() => void) | null = null;
-    let watched: CalibrationSession | null = null;
-    const sync = () => {
-      const session = store.getState().session;
-      if (session === watched) return;
-      stopMonitor?.();
-      stopMonitor = null;
-      watched = session;
-      if (!session) return;
-      const host = browserEnvironmentHost();
-      stopMonitor = startEnvironmentMonitor({
-        host,
-        readSnapshot: () => readEnvironment(host, rootRef.current),
-        baseline: session.environment,
-        onMismatch: () => store.invalidate(),
-      });
-    };
-    const unsubscribe = store.subscribe(sync);
-    sync();
-    return () => {
-      unsubscribe();
-      stopMonitor?.();
-    };
-  }, [store, rootRef]);
-}
-
-/** PR07 P7 / R3-2: capture-phase guard plus keyboard zoom shortcuts. */
-export function useCameraInputPolicy(
-  containerRef: RefObject<HTMLElement | null>,
-  viewport: Viewport | null,
-  mode: CameraInputMode
-): void {
-  const modeRef = useRef(mode);
-  useEffect(() => {
-    modeRef.current = mode;
-  }, [mode]);
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    return attachCameraInputGuard(container, () => modeRef.current);
-  }, [containerRef]);
-  useEffect(() => {
-    const shortcuts = viewport?.shortcuts;
-    if (!shortcuts) return;
-    for (const action of CAMERA_ZOOM_SHORTCUTS)
-      if (mode === 'free') shortcuts.reset(action);
-      else shortcuts.disable(action);
-  }, [viewport, mode]);
 }
 
 const CAMERA_ATTRIBUTES = [
