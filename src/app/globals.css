@@ -335,6 +335,13 @@
   --type-num-xl-size: 2.125rem;
   --type-num-lg-size: 1.625rem;
   --type-num-md-size: 1.25rem;
+  --type-display-size: 1.875rem;
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --type-display-size: 2.25rem;
+  }
 }
 
 /* ============================================================
@@ -536,6 +543,14 @@
 /* Type scale: one class sets family, size, line height and weight. The
    num-* steps go through Tailwind's numeric variables, so adding
    tabular-nums or slashed-zero next to them composes instead of fighting. */
+/* Landing headline only. */
+@utility type-display {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-display-size);
+  line-height: 1.15;
+  font-weight: 700;
+}
+
 @utility type-title {
   font-family: var(--font-heading-family);
   font-size: var(--type-title-size);

@@ -148,6 +148,7 @@ weight together:
 
 | Utility | Size / line height | Use |
 |---|---|---|
+| `type-display` | 36 / 1.15 (30 on phones), Vollkorn 700 | Landing headline only |
 | `type-title` | 28 / 1.2, Vollkorn 700 | Page titles |
 | `type-heading` | 22 / 1.25, Vollkorn 700 | Section headings |
 | `type-subheading` | 18 / 1.3, Vollkorn 600 | Sub-sections, entity names |

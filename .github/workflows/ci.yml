@@ -35,6 +35,9 @@ jobs:
       - name: Design contrast
         run: npm run design:contrast
 
+      - name: Static launcher is up to date
+        run: npm run launcher:check
+
       - name: Type check
         run: npm run type-check
 

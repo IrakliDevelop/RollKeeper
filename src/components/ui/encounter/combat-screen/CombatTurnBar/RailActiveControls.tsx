@@ -65,23 +65,27 @@ export function RailActiveControls({
             </span>
           </div>
         )}
-        <Button
-          variant="ghost"
-          selected={hidePlayerHp}
-          size="sm"
-          onClick={onToggleHidePlayerHp}
-          leftIcon={hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />}
-        >
-          {hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onEndCombat}
-          leftIcon={<Square size={14} />}
-        >
-          End combat
-        </Button>
+        {onToggleHidePlayerHp && (
+          <Button
+            variant="ghost"
+            selected={hidePlayerHp}
+            size="sm"
+            onClick={onToggleHidePlayerHp}
+            leftIcon={hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />}
+          >
+            {hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
+          </Button>
+        )}
+        {onEndCombat && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onEndCombat}
+            leftIcon={<Square size={14} />}
+          >
+            End combat
+          </Button>
+        )}
       </div>
     </>
   );

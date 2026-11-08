@@ -118,6 +118,30 @@ describe('CombatTurnBar — active combat (rail)', () => {
     expect(screen.getByText('Thorin')).toBeInTheDocument();
   });
 
+  it.each(['rail', 'focus'] as const)(
+    'leaves out the HP toggle and End combat without their handlers (%s)',
+    layout => {
+      render(
+        <CombatTurnBar
+          {...baseProps}
+          layout={layout}
+          encounter={activeEncounter}
+          onToggleHidePlayerHp={undefined}
+          onEndCombat={undefined}
+        />
+      );
+      expect(
+        screen.queryByRole('button', { name: /player hp/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /end combat/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /next turn/i })
+      ).toBeInTheDocument();
+    }
+  );
+
   it('calls onNextTurn when Next Turn clicked', () => {
     const onNextTurn = vi.fn();
     render(

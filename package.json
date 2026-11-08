@@ -88,7 +88,9 @@
     "prepare": "husky",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "copy:changed": "node scripts/changed-copy.mjs"
+    "copy:changed": "node scripts/changed-copy.mjs",
+    "launcher:build": "node scripts/build-launcher.mjs",
+    "launcher:check": "node scripts/build-launcher.mjs --check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.922.0",
