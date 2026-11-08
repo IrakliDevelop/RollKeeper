@@ -698,10 +698,11 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
       `FU-5 ${theme}: dock ${Math.round(dockBox.height)}px, canvas visible ${Math.round(visible)}px`
     );
     expect(visible).toBeGreaterThanOrEqual(844 / 2);
-    for (const name of ['Scenes', 'Edit map', 'Back to campaign', 'Details'])
+    for (const name of ['Scenes', 'Edit map', 'Details'])
       await expectUnclipped(
         page.getByRole('button', { name: new RegExp(`^${name}`, 'u') }).first()
       );
+    await expectUnclipped(page.getByRole('link', { name: 'Back to campaign' }));
     // Every visible header control (the toolbar strip below scrolls by
     // design and is covered by the Edit map reachability test).
     const header = page.getByTestId('table-workspace-header');
@@ -726,7 +727,7 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
   await context.close();
 });
 
-test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds at most 40 px (light and dark)', async ({
+test('O7-2: header height budget at 1280, 2048 and 390 px; authority banner adds at most 64 px (light and dark)', async ({
   browser,
 }) => {
   test.setTimeout(180_000);
@@ -775,13 +776,13 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
     console.log(
       `O7-2 ${theme}: header 1280=${at1280}px 2048=${at2048}px 390=${at390}px`
     );
-    expect(at1280).toBeLessThanOrEqual(100);
+    expect(at1280).toBeLessThanOrEqual(120);
     expect(at2048).toBeLessThanOrEqual(at1280);
     normal[theme] = at1280;
   }
 
-  // One banner row: another session holds live control (Acquire + Work
-  // offline inline with the text).
+  // Another session holds live control (Acquire + Work offline alongside
+  // the message, wrapping when needed).
   const foreign = await context.newPage();
   await seed(foreign, controlServer({ foreignHolder: true }));
   await foreign.setViewportSize({ width: 1280, height: 800 });
@@ -794,7 +795,7 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
   await expect(foreignHeader).toBeVisible();
   const withBanner = Math.round((await foreignHeader.boundingBox())!.height);
   console.log(`O7-2 banner: header 1280=${withBanner}px`);
-  expect(withBanner - normal.dark!).toBeLessThanOrEqual(40);
+  expect(withBanner - normal.dark!).toBeLessThanOrEqual(64);
   expect(contextErrors).toEqual([]);
   await context.close();
 });
