@@ -1439,6 +1439,13 @@ run('two relay authority transport', () => {
       order: 500,
       opacity: 1,
     });
+    const layerAdded =
+      ready &&
+      (await reach(
+        'player layer added',
+        async () => (await redis.hGet(keys.layers, band)) !== null,
+        15_000
+      ));
     const token = {
       ...createShape({
         position: { x: 0, y: 0 },
@@ -1450,12 +1457,13 @@ run('two relay authority transport', () => {
       tokenKind: 'player',
       characterId: playerId,
     };
-    playerStore.add(token as never);
+    if (layerAdded) playerStore.add(token as never);
     const tokenAdded =
-      ready &&
+      layerAdded &&
       (await reach(
         'player token added',
-        () => elementX('journal-player-token', playerObserver) === 0
+        () => elementX('journal-player-token', playerObserver) === 0,
+        15_000
       ));
     let lastWriteAt = Date.now();
     const paced = async (write: () => void) => {
