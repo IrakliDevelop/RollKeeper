@@ -308,7 +308,7 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
   await expect(
     page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
   ).toBeVisible();
-  const status = page.getByRole('status', { name: 'What players see' });
+  const status = page.getByRole('status', { name: 'Table display' });
   await expect(status).toContainText('No TV connected');
 
   const popupPromise = context.waitForEvent('page');
