@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import type { Viewport } from '@fieldnotes/core';
+import type { SelectDragObserver, Viewport } from '@fieldnotes/core';
 import { useBattleMapStore } from '@/store/battleMapStore';
 
 /**
@@ -327,6 +327,89 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
         canvasState: '{"elements":[{"id":"moved"}]}',
       })
     );
+  });
+
+  it('saves a combatant token drag once on release, not on every pointer frame', () => {
+    const updateBattleMap = vi.fn();
+    stage = {
+      ...stage,
+      tableSceneAdapter: makeTableSceneAdapter({ updateBattleMap }),
+    };
+    const vp = makeVp();
+    let observer: SelectDragObserver | undefined;
+    const unsubscribe = vi.fn();
+    const selectTool = {
+      addDragObserver: (next: SelectDragObserver) => {
+        observer = next;
+        return unsubscribe;
+      },
+    };
+    vi.mocked(vp.toolManager.getTool).mockImplementation(
+      (name: string) =>
+        (name === 'select'
+          ? selectTool
+          : name === 'path'
+            ? makeFakeMovementTool()
+            : undefined) as never
+    );
+    vi.mocked(vp.store.getById).mockImplementation(
+      id =>
+        ({
+          id,
+          tokenKind: 'combatant',
+          entityId: `${id}-entity`,
+        }) as never
+    );
+    const listeners = new Map<
+      string,
+      Array<(data: unknown, meta?: { origin?: string }) => void>
+    >();
+    vi.mocked(vp.store.on).mockImplementation((event, listener) => {
+      const key = String(event);
+      listeners.set(key, [...(listeners.get(key) ?? []), listener as never]);
+      return vi.fn();
+    });
+    vi.mocked(vp.exportJSON).mockReturnValue('{"elements":[{"id":"unicorn"}]}');
+    const { result, unmount } = renderHook(() =>
+      useDmBattleMapCanvas(stageProps())
+    );
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    expect(options.selectTool).toBe(selectTool);
+    updateBattleMap.mockClear();
+    const info = { ids: ['unicorn', 'horse'] } as never;
+    act(() => {
+      observer?.onDragStart?.(info, {} as never);
+      listeners
+        .get('update')
+        ?.forEach(listener =>
+          listener({ current: { id: 'horse' } }, { origin: 'local' })
+        );
+      listeners
+        .get('update')
+        ?.forEach(listener =>
+          listener({ current: { id: 'unicorn' } }, { origin: 'local' })
+        );
+    });
+    expect(updateBattleMap).not.toHaveBeenCalled();
+    act(() => observer?.onDragEnd?.(info, {} as never));
+    expect(updateBattleMap).toHaveBeenCalledTimes(1);
+    expect(updateBattleMap).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canvasState: '{"elements":[{"id":"unicorn"}]}',
+      })
+    );
+    act(() => {
+      listeners
+        .get('update')
+        ?.forEach(listener =>
+          listener({ current: { id: 'horse' } }, { origin: 'local' })
+        );
+    });
+    expect(updateBattleMap).toHaveBeenCalledTimes(2);
+    unmount();
+    expect(unsubscribe).toHaveBeenCalled();
   });
 
   it('keeps the offline version in the scene slot and then points to Details (GG3)', async () => {

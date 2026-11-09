@@ -21,6 +21,7 @@ import {
 } from '@fieldnotes/sync';
 import { createFogAuthorityClientExtension } from '@fieldnotes/vtt/sync';
 import type { FogManager } from '@fieldnotes/vtt';
+import { movableTokenIdentity } from '@/components/ui/campaign/location-map/tokenIdentity';
 import { authorityElementVersion } from './authorityElementVersion';
 
 import type {
@@ -418,10 +419,10 @@ export function createManagedBattleMapAuthorityConnection(
       },
     });
   };
-  // SelectTool updates the store on every pointer move. For a controlled
-  // player token these are previews: the authority accepts at most ten
-  // upserts/second and each intermediate SDK version would make later moves
-  // invalid. Commit the final position against the confirmed version.
+  // SelectTool updates the store on every pointer move. Those positions are
+  // previews for both roles: echoing an older room snapshot over a live DM
+  // drag makes the token jump backwards, and submitting every frame can
+  // outrun the authority's rate/version limits. Commit once on release.
   const dragging = new Set<string>();
   const pendingDrags = new Map<
     string,
@@ -449,40 +450,42 @@ export function createManagedBattleMapAuthorityConnection(
       version: confirmed.version + 1,
     });
   };
-  const unsubscribeDrag =
-    options.tokenRequest.role === 'player'
-      ? options.selectTool?.addDragObserver({
-          onDragStart: info => {
-            for (const id of info.ids) {
-              const element = options.store.getById(id);
-              const control = element as
-                | (CanvasElement & {
-                    tokenKind?: string;
-                    characterId?: string;
-                  })
-                | undefined;
-              if (
-                control?.tokenKind === 'player' &&
-                control.characterId === options.clientId
-              )
-                dragging.add(id);
-            }
-          },
-          onDragEnd: info => {
-            for (const id of info.ids) {
-              if (!dragging.delete(id)) continue;
-              const element = options.store.getById(id);
-              if (!element) continue;
-              const pending = pendingDrags.get(id);
-              if (pending) pending.desired = element.position;
-              else submitDrag(id, element.position);
-            }
-          },
-          onDragCancel: info => {
-            for (const id of info.ids) dragging.delete(id);
-          },
-        })
-      : undefined;
+  const unsubscribeDrag = options.selectTool?.addDragObserver({
+    onDragStart: info => {
+      for (const id of info.ids) {
+        if (options.tokenRequest.role === 'dm') {
+          const token = options.store.getById(id);
+          if (token && movableTokenIdentity(token)) dragging.add(id);
+          continue;
+        }
+        const element = options.store.getById(id);
+        const control = element as
+          | (CanvasElement & {
+              tokenKind?: string;
+              characterId?: string;
+            })
+          | undefined;
+        if (
+          control?.tokenKind === 'player' &&
+          control.characterId === options.clientId
+        )
+          dragging.add(id);
+      }
+    },
+    onDragEnd: info => {
+      for (const id of info.ids) {
+        if (!dragging.delete(id)) continue;
+        const element = options.store.getById(id);
+        if (!element) continue;
+        const pending = pendingDrags.get(id);
+        if (pending) pending.desired = element.position;
+        else submitDrag(id, element.position);
+      }
+    },
+    onDragCancel: info => {
+      for (const id of info.ids) dragging.delete(id);
+    },
+  });
   const unsubscribers = [
     options.store.on('add', (element, meta) => {
       if (

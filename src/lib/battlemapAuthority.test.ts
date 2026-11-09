@@ -454,6 +454,77 @@ describe('player token drag sync', () => {
   });
 });
 
+describe('DM combatant drag sync', () => {
+  beforeEach(() => authority.reset());
+
+  it('holds the local position through older snapshots and submits only the drop', () => {
+    const store = new ElementStore();
+    let observer: SelectDragObserver | undefined;
+    const selectTool = {
+      addDragObserver: (next: SelectDragObserver) => {
+        observer = next;
+        return () => {
+          observer = undefined;
+        };
+      },
+    } as SelectTool;
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.test',
+      campaignCode: 'CODE',
+      battleMapId: 'map-a',
+      clientId: 'dm-a',
+      store,
+      selectTool,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', dmId: 'dm-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+    });
+    const base = {
+      ...createShape({ position: { x: 10, y: 10 }, size: { w: 40, h: 40 } }),
+      id: 'unicorn',
+      version: 7,
+      tokenKind: 'combatant',
+      entityId: 'unicorn-entity',
+    };
+    const document = (elements: unknown[]) => ({
+      elements,
+      layers: [],
+      extensions: {},
+    });
+    authority.install(document([base]));
+    authority.submit.mockClear();
+    const info = {
+      ids: ['unicorn'],
+      origins: new Map([['unicorn', base.position]]),
+      pointer: base.position,
+      pointerType: 'mouse',
+    } as never;
+    observer?.onDragStart?.(info, {} as never);
+    store.update('unicorn', { position: { x: 20, y: 20 } });
+    authority.install(document([base]));
+    expect(store.getById('unicorn')?.position).toEqual({ x: 20, y: 20 });
+    store.update('unicorn', { position: { x: 40, y: 40 } });
+    expect(authority.submit).not.toHaveBeenCalled();
+    observer?.onDragEnd?.(info, {} as never);
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    expect(authority.submit).toHaveBeenCalledWith({
+      kind: 'upsert',
+      element: expect.objectContaining({
+        id: 'unicorn',
+        position: { x: 40, y: 40 },
+        version: 8,
+      }),
+    });
+    authority.install(document([base]));
+    expect(store.getById('unicorn')?.position).toEqual({ x: 40, y: 40 });
+    authority.install(
+      document([{ ...base, position: { x: 40, y: 40 }, version: 8 }])
+    );
+    expect(store.getById('unicorn')?.position).toEqual({ x: 40, y: 40 });
+    connection.stop();
+    expect(observer).toBeUndefined();
+  });
+});
+
 /**
  * PR07 acceptance A1: the SDK journal admits a proposal only if its frame
  * serializes as bounded JSON; an own `undefined` property (the wrapped

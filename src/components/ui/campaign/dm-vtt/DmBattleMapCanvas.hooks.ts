@@ -85,7 +85,10 @@ import {
   resolveDmMovement,
   logDmMovement,
 } from '@/components/ui/campaign/location-map/movementLogging';
-import type { MovableTokenIdentity } from '@/components/ui/campaign/location-map/tokenIdentity';
+import {
+  movableTokenIdentity,
+  type MovableTokenIdentity,
+} from '@/components/ui/campaign/location-map/tokenIdentity';
 import {
   DmMarkerTool,
   type PlaceMarkerRequest,
@@ -317,6 +320,7 @@ export function useDmBattleMapCanvas({
   const markerRemovalTrackUnsubRef = useRef<(() => void) | null>(null);
   const selectionUnsubRef = useRef<(() => void) | null>(null);
   const fogPersistenceCleanupRef = useRef<(() => void) | null>(null);
+  const dragPersistenceCleanupRef = useRef<(() => void) | null>(null);
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
   const hiddenPlacementActiveRef = useRef(false);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
@@ -980,6 +984,7 @@ export function useDmBattleMapCanvas({
       // FR4-3: a Table stage edit saved before its connection was first
       // live never reached the room (the SDK refuses it until then).
       editsBeforeLiveRef.current = { armed: false, liveSeen: false };
+      const draggingTokens = new Set<string>();
       const noteLocalEdit = () => {
         const tracking = editsBeforeLiveRef.current;
         if (tableSceneAdapter && tracking.armed && !tracking.liveSeen)
@@ -987,12 +992,49 @@ export function useDmBattleMapCanvas({
       };
       const saveOnLocalOps = (_data: unknown, meta?: { origin?: string }) => {
         if (meta?.origin !== undefined && meta.origin !== 'local') return;
+        if (
+          tableSceneAdapter &&
+          _data &&
+          typeof _data === 'object' &&
+          'current' in _data &&
+          (_data.current as CanvasElement | undefined)?.id &&
+          draggingTokens.has((_data.current as CanvasElement).id)
+        )
+          return;
         noteLocalEdit();
         updateBattleMap({
           canvasState: vp.exportJSON(),
           updatedAt: new Date().toISOString(),
         });
       };
+      const selectTool = vp.toolManager.getTool<SelectTool>('select');
+      const stopDragPersistence = tableSceneAdapter
+        ? selectTool?.addDragObserver({
+            onDragStart: info => {
+              for (const id of info.ids) {
+                const element = vp.store.getById(id);
+                if (element && movableTokenIdentity(element))
+                  draggingTokens.add(id);
+              }
+            },
+            onDragEnd: info => {
+              let movedToken = false;
+              for (const id of info.ids)
+                movedToken = draggingTokens.delete(id) || movedToken;
+              if (!movedToken) return;
+              noteLocalEdit();
+              updateBattleMap({
+                canvasState: vp.exportJSON(),
+                updatedAt: new Date().toISOString(),
+              });
+            },
+            onDragCancel: info => {
+              for (const id of info.ids) draggingTokens.delete(id);
+            },
+          })
+        : undefined;
+      dragPersistenceCleanupRef.current?.();
+      dragPersistenceCleanupRef.current = stopDragPersistence ?? null;
       vp.store.on('add', saveOnLocalOps);
       vp.store.on('remove', saveOnLocalOps);
       vp.store.on('update', saveOnLocalOps);
@@ -1160,6 +1202,7 @@ export function useDmBattleMapCanvas({
           campaignCode,
           battleMapId: tableSceneAdapter?.sourceMapId ?? battleMapId,
           store: vp.store,
+          selectTool,
           clientId: dmId,
           tokenRequest: {
             role: 'dm',
@@ -1373,6 +1416,7 @@ export function useDmBattleMapCanvas({
       // Stop local fog persistence before the live connection: no teardown
       // frame may schedule a stale Zustand write while the socket closes.
       fogPersistenceCleanupRef.current?.();
+      dragPersistenceCleanupRef.current?.();
       connectionRef.current?.stop();
       onConnectionReady?.(null);
       pinUnsubRef.current?.();
