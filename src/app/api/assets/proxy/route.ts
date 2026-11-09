@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 
 const MAX_PROXY_SIZE = 50 * 1024 * 1024; // 50 MB
+// A large JPEG can be tiny on the wire but occupy hundreds of MB once the
+// canvas and its ImageBitmap have decoded it. Preserve the element's world
+// size; only the raster used to paint it is bounded.
+const MAX_RENDER_PIXELS = 8_000_000;
 
 function configuredS3Hostname(): string | null {
   const bucket = process.env.AWS_S3_BUCKET_NAME;
@@ -69,9 +74,34 @@ export async function GET(request: NextRequest) {
 
     const contentType =
       upstream.headers.get('content-type') || 'application/octet-stream';
-    const body = await upstream.arrayBuffer();
+    const body = Buffer.from(await upstream.arrayBuffer());
+    let rendered = body;
+    if (
+      request.nextUrl.searchParams.get('v') === '2' &&
+      ['image/jpeg', 'image/png', 'image/webp'].includes(contentType)
+    ) {
+      const image = sharp(body, { failOn: 'none' });
+      const metadata = await image.metadata();
+      if (
+        metadata.width &&
+        metadata.height &&
+        metadata.width * metadata.height > MAX_RENDER_PIXELS
+      ) {
+        const scale = Math.sqrt(
+          MAX_RENDER_PIXELS / (metadata.width * metadata.height)
+        );
+        rendered = await image
+          .resize({
+            width: Math.max(1, Math.floor(metadata.width * scale)),
+            height: Math.max(1, Math.floor(metadata.height * scale)),
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .toBuffer();
+      }
+    }
 
-    return new NextResponse(body, {
+    return new NextResponse(new Uint8Array(rendered), {
       status: 200,
       headers: {
         'Content-Type': contentType,

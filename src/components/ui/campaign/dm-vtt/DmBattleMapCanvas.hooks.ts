@@ -138,6 +138,7 @@ import type {
   MarkerPortalTargetV1,
 } from '@/types/battlemap';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
+import { assetProxyUrl } from '@/utils/assetProxyUrl';
 import {
   markerDetailsUrl,
   markerPublishRequest,
@@ -945,6 +946,15 @@ export function useDmBattleMapCanvas({
         } catch {
           // Corrupt state — start with an empty canvas.
         }
+      }
+
+      // Existing local drafts may still point at the long-cached original
+      // proxy response. Keep element geometry and token coordinates intact.
+      for (const element of vp.store.getAll()) {
+        if (element.type !== 'image') continue;
+        const src = assetProxyUrl(element.src);
+        if (src !== element.src)
+          vp.store.update(element.id, { src }, { origin: 'remote' });
       }
 
       // Canonical bands + one-shot migration. Runs before the save listeners

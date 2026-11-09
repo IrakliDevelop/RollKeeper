@@ -65,7 +65,7 @@ describe('R3-F3 ensure map image (real ElementStore)', () => {
       size: { w: 1200, h: 800 },
     });
     expect(assetProxyUrl(S3)).toBe(
-      `/api/assets/proxy?url=${encodeURIComponent(S3)}`
+      `/api/assets/proxy?url=${encodeURIComponent(S3)}&v=2`
     );
   });
 

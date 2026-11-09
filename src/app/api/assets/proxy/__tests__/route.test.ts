@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import sharp from 'sharp';
 
 import { GET } from '../route';
 
@@ -32,6 +33,42 @@ describe('GET /api/assets/proxy', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/png');
     expect(fetchMock).toHaveBeenCalledWith(assetUrl);
+  });
+
+  it('bounds the decoded map raster while preserving its image format', async () => {
+    const original = await sharp({
+      create: {
+        width: 3640,
+        height: 4760,
+        channels: 3,
+        background: '#513b2d',
+      },
+    })
+      .jpeg()
+      .toBuffer();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(new Uint8Array(original), {
+          headers: { 'content-type': 'image/jpeg' },
+        })
+      )
+    );
+    const assetUrl =
+      'https://rollkeeper-test.s3.us-west-2.amazonaws.com/notes-assets/map.jpg';
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/api/assets/proxy?url=${encodeURIComponent(assetUrl)}&v=2`
+      )
+    );
+    const metadata = await sharp(
+      Buffer.from(await response.arrayBuffer())
+    ).metadata();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/jpeg');
+    expect(metadata.format).toBe('jpeg');
+    expect(metadata.width! * metadata.height!).toBeLessThanOrEqual(8_000_000);
   });
 
   it('rejects a URL from a different region', async () => {

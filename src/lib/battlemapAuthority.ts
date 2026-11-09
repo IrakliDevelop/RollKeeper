@@ -22,6 +22,7 @@ import {
 import { createFogAuthorityClientExtension } from '@fieldnotes/vtt/sync';
 import type { FogManager } from '@fieldnotes/vtt';
 import { authorityElementVersion } from './authorityElementVersion';
+import { assetProxyUrl } from '../utils/assetProxyUrl';
 
 import type {
   BattleMapConnection,
@@ -115,6 +116,8 @@ export function withoutUndefined<T>(value: T): T {
 
 function canvasElement(element: Record<string, unknown>): CanvasElement {
   const canvas = { ...element };
+  if (canvas.type === 'image' && typeof canvas.src === 'string')
+    canvas.src = assetProxyUrl(canvas.src);
   delete canvas.audience;
   delete canvas.ownerId;
   return canvas as unknown as CanvasElement;
