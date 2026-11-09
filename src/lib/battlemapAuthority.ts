@@ -21,7 +21,6 @@ import {
 } from '@fieldnotes/sync';
 import { createFogAuthorityClientExtension } from '@fieldnotes/vtt/sync';
 import type { FogManager } from '@fieldnotes/vtt';
-import { movableTokenIdentity } from '@/components/ui/campaign/location-map/tokenIdentity';
 import { authorityElementVersion } from './authorityElementVersion';
 
 import type {
@@ -454,8 +453,20 @@ export function createManagedBattleMapAuthorityConnection(
     onDragStart: info => {
       for (const id of info.ids) {
         if (options.tokenRequest.role === 'dm') {
-          const token = options.store.getById(id);
-          if (token && movableTokenIdentity(token)) dragging.add(id);
+          const token = options.store.getById(id) as
+            | (CanvasElement & {
+                tokenKind?: string;
+                characterId?: string;
+                entityId?: string;
+              })
+            | undefined;
+          if (
+            (token?.tokenKind === 'combatant' &&
+              typeof token.entityId === 'string') ||
+            (token?.tokenKind === 'player' &&
+              typeof token.characterId === 'string')
+          )
+            dragging.add(id);
           continue;
         }
         const element = options.store.getById(id);
