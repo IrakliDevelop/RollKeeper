@@ -152,6 +152,7 @@ function makeVp(): Viewport {
   return {
     store: {
       on: vi.fn(),
+      getAll: vi.fn(() => []),
       getById: vi.fn(() => undefined),
       snapshot: vi.fn(() => []),
     },
