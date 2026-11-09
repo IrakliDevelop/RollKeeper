@@ -544,7 +544,7 @@ test('create scene: uploaded image placed once; refusals create no scene', async
   await expect(items()).toHaveCount(1);
   await expect
     .poll(async () => (await canvasCensus(page)).mapImages)
-    .toEqual([`/api/assets/proxy?url=${encodeURIComponent(S3_URL)}`]);
+    .toEqual([`/api/assets/proxy?url=${encodeURIComponent(S3_URL)}&v=2`]);
   // Creating and selecting never presented anything.
   expect(
     server.commands.filter(command =>
