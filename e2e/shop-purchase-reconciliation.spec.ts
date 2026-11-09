@@ -470,7 +470,9 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
 
     await tapElement(player1Page, TOKEN_ID);
     const shopDialog1 = merchantDialog(player1Page);
-    await expect(shopDialog1).toBeVisible({ timeout: 10_000 });
+    // The tap performs two sequential player-readable API requests. Next dev
+    // can compile both under CI load; the dialog may appear just after 10 s.
+    await expect(shopDialog1).toBeVisible({ timeout: 30_000 });
     await expect(shopDialog1.getByText(ITEM_NAME, { exact: true })).toBeVisible(
       {
         timeout: 10_000,
