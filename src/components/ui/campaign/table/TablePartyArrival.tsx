@@ -83,7 +83,20 @@ export function TableArrivalPicker(props: {
         if (event.key === 'Escape') props.onCancel();
       }}
       onClick={event => {
-        const rect = props.viewport.domLayer.getBoundingClientRect();
+        // Fieldnotes applies the camera transform to domLayer itself. Its
+        // bounding rect is therefore in world space, not the pointer space
+        // used by camera.screenToWorld. The untransformed wrapper receives
+        // canvas pointer events and is the correct coordinate origin.
+        const wrapper = props.viewport.domLayer.parentElement;
+        if (!wrapper) return;
+        const rect = wrapper.getBoundingClientRect();
+        if (
+          event.clientX < rect.left ||
+          event.clientX > rect.right ||
+          event.clientY < rect.top ||
+          event.clientY > rect.bottom
+        )
+          return;
         props.onPick(
           props.viewport.camera.screenToWorld({
             x: event.clientX - rect.left,
@@ -101,13 +114,16 @@ export function TableArrivalPicker(props: {
 
 /** DM-only overlay marker (never a canvas element, never synced). */
 export function TableArrivalMarker(props: {
-  viewport: Pick<Viewport, 'camera'>;
+  viewport: Pick<Viewport, 'camera' | 'domLayer'>;
   point: { x: number; y: number } | null;
 }) {
   const [, rerender] = useReducer((value: number) => value + 1, 0);
   const { camera } = props.viewport;
   useEffect(() => camera.onChange(() => rerender()), [camera]);
   if (!props.point) return null;
+  const wrapper = props.viewport.domLayer.parentElement;
+  if (!wrapper) return null;
+  const rect = wrapper.getBoundingClientRect();
   const screen = camera.worldToScreen(props.point);
   // FU-10: a labelled pin whose tip sits on the point. DM-only DOM overlay,
   // never a canvas element (players never receive it).
@@ -117,7 +133,7 @@ export function TableArrivalMarker(props: {
       aria-label="Party arrival point"
       title="Party arrival point"
       className="pointer-events-none fixed z-10 flex -translate-x-1/2 -translate-y-full flex-col items-center"
-      style={{ left: screen.x, top: screen.y }}
+      style={{ left: rect.left + screen.x, top: rect.top + screen.y }}
     >
       <span className="border-verdigris-border bg-verdigris-bg text-verdigris-text rounded border px-1 text-[10px] leading-4 font-semibold whitespace-nowrap shadow-sm">
         Arrival
