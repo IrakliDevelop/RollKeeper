@@ -20,6 +20,8 @@ export interface SceneMapImageWrites {
   writeSize(size: Size): void;
   /** F6: the image could not be loaded; nothing was added. */
   onUnavailable?(): void;
+  /** Called once the map image is present in this viewport. */
+  onAvailable?(): void;
 }
 
 interface Target {
@@ -251,6 +253,14 @@ export function useEnsureSceneMapImage(options: {
         if (phase === 'local' && relayConfigured)
           localImage.current = { viewport: owner, id };
       }
-    ).catch(() => undefined);
+    )
+      .then(result => {
+        if (
+          mounted.current === owner &&
+          (result === 'present' || result === 'added')
+        )
+          current.writes.onAvailable?.();
+      })
+      .catch(() => undefined);
   }, [phase, relayConfigured, url, viewport]);
 }

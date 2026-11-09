@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Viewport } from '@fieldnotes/core';
+import { applyCameraView, type Viewport } from '@fieldnotes/core';
 
 import { DmBattleMapCanvas } from '@/components/ui/campaign/dm-vtt/DmBattleMapCanvas';
 import type { DmTokenConfig } from '@/components/ui/campaign/dm-vtt/combatantToken';
@@ -33,6 +33,7 @@ import {
 } from './saveMessages';
 import { useEnsureSceneMapImage } from './sceneMapImage';
 import { TableEditMapControl } from './TableEditMapControl';
+import { resolveMapImageBounds } from '@/components/ui/campaign/location-map/fog';
 
 const TOKEN_INFO = { mode: null, onCycle: () => {} };
 /** Read at render (not module load) so tests and env changes are honoured. */
@@ -118,8 +119,28 @@ export function TableSceneStage(props: {
           SAVE_MESSAGES.mapImageFailed.text,
           SAVE_MESSAGES.mapImageFailed.tone
         ),
+      onAvailable: () => {
+        // A new scene starts with Field Notes' identity camera. On a large
+        // portrait map that leaves most of the scene offscreen. Fit only this
+        // untouched camera, preserving a DM's saved pan and zoom on revisit.
+        if (!viewport) return;
+        const { position, zoom } = viewport.camera;
+        if (position.x !== 0 || position.y !== 0 || zoom !== 1) return;
+        try {
+          const bounds = resolveMapImageBounds(
+            viewport.store,
+            adapter.getBattleMap()?.mapImageSize ?? { w: 0, h: 0 }
+          );
+          const size = viewport.getCanvasSize();
+          applyCameraView(viewport.camera, bounds, size.w, size.h);
+          viewport.requestRender();
+          adapter.updateBattleMap({ canvasState: viewport.exportJSON() });
+        } catch {
+          // A temporarily zero-sized canvas can be fitted with Edit map later.
+        }
+      },
     }),
-    [adapter, onMessage]
+    [adapter, onMessage, viewport]
   );
   useEnsureSceneMapImage({
     viewport,

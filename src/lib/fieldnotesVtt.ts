@@ -88,7 +88,36 @@ export function createRollKeeperFogPlugin(
 ): FogPlugin {
   const plugin = createFogPlugin(options);
   fogPlugins.set(plugin.manager, plugin);
-  return plugin;
+  // Field Notes core treats a missing required fog render hook as a privacy
+  // failure and paints an opaque black stratum over the entire canvas. The
+  // VTT plugin disables that hook while fog is off, which makes every new
+  // scene look black despite its map and drawings being rendered underneath.
+  // Keep the hook registered as active; its renderer already does nothing
+  // when fog has no state or its view mode is off. A throwing hook still gets
+  // quarantined by core and retains the fail-closed behaviour.
+  return {
+    ...plugin,
+    configure(context) {
+      plugin.configure?.(
+        new Proxy(context, {
+          get(target, property, receiver) {
+            if (property !== 'registerViewportHooks')
+              return Reflect.get(target, property, receiver);
+            return (
+              hooks: Parameters<typeof target.registerViewportHooks>[0],
+              registration: Parameters<typeof target.registerViewportHooks>[1]
+            ) =>
+              target.registerViewportHooks(
+                hooks,
+                registration?.satisfies?.includes('vtt:fog')
+                  ? { ...registration, enabled: () => true }
+                  : registration
+              );
+          },
+        })
+      );
+    },
+  };
 }
 
 export function getViewportFogManager(viewport: Viewport): FogManager {
