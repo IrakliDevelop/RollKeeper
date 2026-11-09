@@ -12,6 +12,8 @@ interface ActiveEffectChipProps {
   cond: EncounterCondition;
   entityId: string;
   actions: Pick<EntityActions, 'onSetConditionRounds' | 'onRemoveCondition'>;
+  /** Table scene runs: display only, no round or remove buttons. */
+  readOnly?: boolean;
 }
 
 function kindDotClass(kind: EncounterCondition['kind']): string {
@@ -30,6 +32,7 @@ export function ActiveEffectChip({
   cond,
   entityId,
   actions,
+  readOnly = false,
 }: ActiveEffectChipProps) {
   const hasRounds = cond.rounds != null;
 
@@ -71,49 +74,59 @@ export function ActiveEffectChip({
       {cond.sourceSpell && (
         <span className="text-muted text-xs">From {cond.sourceSpell}</span>
       )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        onClick={handleDecrease}
-        disabled={!hasRounds}
-        aria-label={`Decrease ${cond.name} rounds`}
-        className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-      >
-        <Minus size={12} aria-hidden="true" />
-      </Button>
-      <span className="text-muted min-w-[1rem] text-center text-xs tabular-nums">
-        {hasRounds ? (
-          cond.rounds
-        ) : (
-          <InfinityIcon
-            size={12}
-            className="inline"
-            role="img"
-            aria-label="No round limit"
-          />
-        )}
-      </span>
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        onClick={handleIncrease}
-        aria-label={`Increase ${cond.name} rounds`}
-        className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-      >
-        <Plus size={12} aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        onClick={() => actions.onRemoveCondition(entityId, cond.id)}
-        aria-label={`Remove ${cond.name}`}
-        className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-      >
-        <X size={12} aria-hidden="true" />
-      </Button>
+      {readOnly ? (
+        hasRounds && (
+          <span className="text-muted min-w-[1rem] text-center text-xs tabular-nums">
+            {cond.rounds}
+          </span>
+        )
+      ) : (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={handleDecrease}
+            disabled={!hasRounds}
+            aria-label={`Decrease ${cond.name} rounds`}
+            className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+          >
+            <Minus size={12} aria-hidden="true" />
+          </Button>
+          <span className="text-muted min-w-[1rem] text-center text-xs tabular-nums">
+            {hasRounds ? (
+              cond.rounds
+            ) : (
+              <InfinityIcon
+                size={12}
+                className="inline"
+                role="img"
+                aria-label="No round limit"
+              />
+            )}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={handleIncrease}
+            aria-label={`Increase ${cond.name} rounds`}
+            className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+          >
+            <Plus size={12} aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() => actions.onRemoveCondition(entityId, cond.id)}
+            aria-label={`Remove ${cond.name}`}
+            className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+          >
+            <X size={12} aria-hidden="true" />
+          </Button>
+        </>
+      )}
     </div>
   );
 }

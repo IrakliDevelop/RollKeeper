@@ -1,0 +1,260 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { BattleMapConnection } from '@/lib/battlemapSync';
+import type { TableControlSession } from '@/lib/table/authorityLifecycle';
+import {
+  restoreAuthorityFork,
+  saveSceneCheckpoint,
+} from '@/lib/table/checkpoint';
+import type { TableRepository } from '@/lib/table/repository';
+import {
+  createTableSceneAdapter,
+  type TableSceneAdapter,
+} from '@/lib/table/sceneAdapter';
+import type {
+  TableCanvasCheckpointV1,
+  TableOfflineForkV1,
+} from '@/lib/table/schema';
+
+import {
+  checkpointNotSaved,
+  restoreMessages,
+  SAVE_MESSAGES,
+  type RestoreKind,
+  type SaveMessage,
+  type SaveMessageTone,
+} from './saveMessages';
+
+/**
+ * Checkpoint, restore and pending-conflict actions of the selected scene
+ * (moved unchanged from the PR01 to PR05 Table page; per scene, so the status
+ * line resets when another scene is mounted).
+ */
+export function useSceneCheckpointActions(options: {
+  repository: TableRepository | null;
+  adapter: TableSceneAdapter | null;
+  connection: BattleMapConnection | null;
+  campaignCode: string;
+  dmId: string;
+  sceneId: string | null;
+  /** The page's live-control session; null when this tab is not live. */
+  controlSession: TableControlSession | null;
+}) {
+  const {
+    repository,
+    adapter,
+    connection,
+    campaignCode,
+    dmId,
+    sceneId,
+    controlSession,
+  } = options;
+  /** PR08 desktop B1: only the tab holding live control may restore. */
+  const live = controlSession !== null && !controlSession.isLost();
+  const [save, setSave] = useState<SaveMessage>(SAVE_MESSAGES.loading);
+  /** O7-2 HN-1 / O7-3 W8R-7: the tone is fixed where the message is produced. */
+  const setSaveMessage = useCallback(
+    (text: string, tone: SaveMessageTone, detail?: string) =>
+      setSave({ text, tone, detail }),
+    []
+  );
+  const post = useCallback(
+    (message: SaveMessage) =>
+      setSaveMessage(message.text, message.tone, message.detail),
+    [setSaveMessage]
+  );
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  /**
+   * Counts successful restores. A restore provisions a fresh room
+   * generation, so the relay withdraws the canvas's admitted socket; the
+   * workspace remounts the canvas on each increment so it re-mints a token
+   * for the new generation (PR08 desktop A1).
+   */
+  const [restoredCount, setRestoredCount] = useState(0);
+  /** The scene mounted now: a restore that outlives it is ignored (S4). */
+  const mountedSceneRef = useRef(sceneId);
+  useEffect(() => {
+    mountedSceneRef.current = sceneId;
+  }, [sceneId]);
+  const [saveBusy, setSaveBusy] = useState(false);
+
+  useEffect(() => {
+    if (!adapter) return;
+    post(adapter.getBattleMap() ? SAVE_MESSAGES.ready : SAVE_MESSAGES.notFound);
+  }, [adapter, post]);
+
+  async function saveCheckpoint() {
+    setSaveBusy(true);
+    try {
+      await runSaveCheckpoint();
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  async function runSaveCheckpoint() {
+    if (!repository || !adapter || !connection || !sceneId) {
+      post(SAVE_MESSAGES.notConnected);
+      return;
+    }
+    await adapter.flush();
+    const current = await repository.reload();
+    if (current.status !== 'ready') {
+      post(SAVE_MESSAGES.storageUnavailable);
+      return;
+    }
+    const startGeneration = adapter.getLocalEditGeneration();
+    post(SAVE_MESSAGES.saving);
+    const result = await saveSceneCheckpoint({
+      repository,
+      connection,
+      sceneId,
+      expectedRevision: current.snapshot.campaign?.revision ?? 0,
+      operationId: `checkpoint:${sceneId}:${crypto.randomUUID()}`,
+      hasNewLocalEditsSinceBarrier: () =>
+        adapter.getLocalEditGeneration() > startGeneration,
+    });
+    post(
+      result.status === 'committed'
+        ? result.pending
+          ? SAVE_MESSAGES.savedWithNewerEdit
+          : SAVE_MESSAGES.saved
+        : result.status === 'not-saved'
+          ? checkpointNotSaved('changes-kept', result.reason)
+          : checkpointNotSaved('last-kept', result.status)
+    );
+  }
+
+  async function restore(
+    checkpoint: TableCanvasCheckpointV1 | null | undefined,
+    kind: RestoreKind
+  ): Promise<void> {
+    await runRestore(checkpoint, kind);
+  }
+
+  /** Resolves true only when the live room took the restored version. */
+  async function runRestore(
+    checkpoint: TableCanvasCheckpointV1 | null | undefined,
+    kind: RestoreKind
+  ): Promise<boolean> {
+    if (!checkpoint || !sceneId) return false;
+    const messages = restoreMessages(kind);
+    if (!controlSession || controlSession.isLost()) {
+      post(messages.notLive);
+      return false;
+    }
+    setRecoveryBusy(true);
+    post(messages.busy);
+    const result = await restoreAuthorityFork({
+      campaignCode,
+      dmId,
+      sceneId,
+      checkpoint,
+      lease: {
+        holderSessionId: controlSession.holderSessionId,
+        expectedFence: controlSession.current().writerFence,
+      },
+    });
+    setRecoveryBusy(false);
+    // Another scene was mounted meanwhile: never remount its canvas or show
+    // this scene's result on it.
+    const restored = result.status === 'restored';
+    // HH4 (a): the room was restored even if another scene is now mounted;
+    // the caller still learns it.
+    if (mountedSceneRef.current !== sceneId) return restored;
+    if (restored) setRestoredCount(value => value + 1);
+    post(
+      result.status === 'restored'
+        ? messages.restored
+        : result.status === 'conflict'
+          ? messages.conflict
+          : messages.failed(result.reason)
+    );
+    return restored;
+  }
+
+  /**
+   * GG3: sends the offline version through the same live-tab restore, then
+   * empties the slot. A restore that did not happen keeps the slot.
+   */
+  async function reapplyOfflineFork(fork: TableOfflineForkV1) {
+    const restoredScene = sceneId;
+    const sceneAdapter = adapter;
+    if (!(await runRestore(fork.draft, 'offline')) || !restoredScene) return;
+    if (mountedSceneRef.current === restoredScene) {
+      await sceneAdapter?.clearOfflineFork(fork.savedAt);
+      return;
+    }
+    // HH4 (a): that scene's adapter went with the switch; clear through a
+    // short-lived one so the restored slot does not linger.
+    if (!repository) return;
+    const other = createTableSceneAdapter({
+      repository,
+      sceneId: restoredScene,
+      campaignCode,
+    });
+    try {
+      await other.clearOfflineFork(fork.savedAt);
+    } finally {
+      other.dispose();
+    }
+  }
+
+  /** GG3: drops the offline version; the live room is not touched. */
+  async function discardOfflineFork(fork: TableOfflineForkV1) {
+    const outcome = (await adapter?.clearOfflineFork(fork.savedAt)) ?? 'failed';
+    post(
+      outcome === 'cleared'
+        ? SAVE_MESSAGES.offlineDiscarded
+        : outcome === 'gone'
+          ? SAVE_MESSAGES.offlineAlreadyGone
+          : SAVE_MESSAGES.offlineDiscardFailed
+    );
+  }
+
+  async function reconcilePendingEdit(action: 'refresh' | 'retry' | 'discard') {
+    if (!adapter) return;
+    if (action === 'discard') {
+      adapter.discardPendingConflict();
+      post(SAVE_MESSAGES.conflictDiscarded);
+      return;
+    }
+    if (action === 'refresh') {
+      const refreshed = await adapter.refreshPendingConflict();
+      post(
+        refreshed
+          ? SAVE_MESSAGES.conflictRefreshed
+          : SAVE_MESSAGES.conflictRefreshFailed
+      );
+      return;
+    }
+    const result = await adapter.retryPendingConflict();
+    post(
+      result === 'committed'
+        ? SAVE_MESSAGES.conflictApplied
+        : result === 'conflict'
+          ? SAVE_MESSAGES.conflictChangedAgain
+          : result === 'none'
+            ? SAVE_MESSAGES.conflictNone
+            : SAVE_MESSAGES.conflictApplyFailed
+    );
+  }
+
+  return {
+    saveMessage: save.text,
+    saveTone: save.tone,
+    saveDetail: save.detail,
+    setSaveMessage,
+    recoveryBusy,
+    restoredCount,
+    live,
+    saveBusy,
+    saveCheckpoint,
+    restore,
+    reapplyOfflineFork,
+    discardOfflineFork,
+    reconcilePendingEdit,
+  };
+}

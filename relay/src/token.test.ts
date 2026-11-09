@@ -35,4 +35,37 @@ describe('relay token verify', () => {
       payload
     );
   });
+
+  it('freezes the exact v1 claim schema and role-specific claims', () => {
+    const v1: BattleMapTokenPayload = {
+      v: 1,
+      userId: 'display-ABC123',
+      role: 'display',
+      room: '123e4567-e89b-42d3-a456-426614174000',
+      exp: payload.exp,
+      campaign: 'ABC123',
+      resourceKind: 'scene',
+      sceneId: 'scene-1',
+      epoch: '123e4567-e89b-42d3-a456-426614174001',
+      roomGeneration: '123e4567-e89b-42d3-a456-426614174002',
+      displayGeneration: 2,
+    };
+    expect(
+      verifyBattleMapToken(
+        signBattleMapToken(v1, SECRET),
+        SECRET,
+        payload.exp - 1
+      )
+    ).toEqual(v1);
+    expect(
+      verifyBattleMapToken(
+        signBattleMapToken(
+          { ...v1, displayGeneration: undefined } as never,
+          SECRET
+        ),
+        SECRET,
+        payload.exp - 1
+      )
+    ).toBeNull();
+  });
 });

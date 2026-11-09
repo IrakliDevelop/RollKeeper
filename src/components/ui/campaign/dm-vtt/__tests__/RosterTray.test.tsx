@@ -221,3 +221,37 @@ describe('RosterRow player eye button', () => {
     expect(onArmPlacement).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('RosterTray Table-backed props (PR02)', () => {
+  afterEach(cleanup);
+
+  it('renders a custom empty message, header actions, row descriptions and a details button', () => {
+    const onOpenDetails = vi.fn();
+    const { rerender } = render(
+      <RosterTray
+        {...baseProps({
+          entities: [],
+          emptyMessage: 'Add party members or creatures to this scene',
+          headerActions: <button type="button">Add</button>,
+        })}
+      />
+    );
+    expect(
+      screen.getByText('Add party members or creatures to this scene')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+    rerender(
+      <RosterTray
+        {...baseProps({
+          describeRow: entity =>
+            entity.id === 'p1' ? 'Player-controlled' : 'DM',
+          onOpenDetails,
+        })}
+      />
+    );
+    expect(screen.getByText('Player-controlled')).toBeInTheDocument();
+    expect(screen.queryByText('Tap → place')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Details for Aria' }));
+    expect(onOpenDetails).toHaveBeenCalledWith(player);
+  });
+});

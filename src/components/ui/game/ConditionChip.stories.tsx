@@ -173,7 +173,7 @@ export const RemovableOnTouch: Story = {
       const after = getComputedStyle(button, '::after');
       await expect(after.width).toBe('44px');
       await expect(after.height).toBe('44px');
-      await expect(button.getBoundingClientRect().width).toBe(16);
+      await expect(button.getBoundingClientRect().width).toBeGreaterThanOrEqual(44);
     }
     const hitArea = (button: HTMLElement) => {
       const box = button.getBoundingClientRect();

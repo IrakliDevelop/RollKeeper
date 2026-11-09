@@ -17,6 +17,9 @@ process.env.ROLLBACK_PROFILE_DIR = profileDir;
 
 const BASE_ENV = {
   ...process.env,
+  // Never a remote Redis from a developer's .env (PR08 repair 07 CC2).
+  UPSTASH_REDIS_REST_URL: '',
+  UPSTASH_REDIS_REST_TOKEN: '',
   NEXT_PUBLIC_SUPABASE_AUTH_ENABLED: 'true',
   NEXT_PUBLIC_SUPABASE_URL: config.apiUrl,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.publishableKey,

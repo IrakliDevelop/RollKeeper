@@ -15,6 +15,7 @@ import { BattleMapMovement } from '../BattleMapMovement';
 import { getMovementTracker } from '../movementTracking';
 import { getVttGridController } from '@/lib/fieldnotesVtt';
 import { PLAYER_TOKEN_KIND } from '../PlayerTokenTool';
+import { createMockCharacterState, createMockPlayerData } from '@/test/helpers';
 import type { SharedInitiativeState } from '@/types/sharedState';
 
 function stubCanvas(): void {
@@ -299,4 +300,129 @@ it('shares live movement only when enabled and clears immediately when hidden or
     cleared: true,
   });
   broadcast.dispose();
+});
+
+it('tracks a Table party token from its scene adapter without legacy encounter state', () => {
+  const listeners = new Set<() => void>();
+  let epoch: string | null = 'run-table:1:1:public-member';
+  const adapter = {
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    getMovementTurn: () =>
+      epoch ? { epoch, entityIds: ['public-member'], playerIds: ['pc'] } : null,
+    getBattleMap: () => ({ dmOnlyElements: { [id]: true } }),
+    resolveMovement: () => ({
+      name: 'Synthetic party',
+      walkFeet: 45,
+      entityId: 'public-member',
+    }),
+  } as unknown as import('@/lib/table/sceneAdapter').TableSceneAdapter;
+  const view = render(
+    <BattleMapMovement
+      viewport={vp}
+      campaignCode="TEST"
+      battleMapId="table-scene"
+      sceneAdapter={adapter}
+      dash={false}
+    />
+  );
+  gesture(25, 105);
+  expect(getMovementTracker(vp).getMovement(id)).toEqual({
+    feet: 10,
+    remaining: 35,
+  });
+  const record = vp.store.getById(movementRecordId(id)) as unknown as {
+    data: { epoch: string; visibility: string };
+  };
+  expect(record.data).toMatchObject({ epoch, visibility: 'dm' });
+  act(() => {
+    epoch = 'run-table:2:1:public-member';
+    listeners.forEach(listener => listener());
+  });
+  expect(getMovementTracker(vp).getMovement(id)).toEqual({
+    feet: 0,
+    remaining: 45,
+  });
+  act(() => {
+    epoch = null;
+    listeners.forEach(listener => listener());
+  });
+  expect(getMovementTracker(vp).isTracked(id)).toBe(false);
+  expect(
+    screen.queryByRole('button', { name: 'Teleport' })
+  ).not.toBeInTheDocument();
+  view.unmount();
+  expect(listeners.size).toBe(0);
+});
+
+it('uses the same generation-aware public epoch for a Table player and resets on restart', () => {
+  const view = render(controls({ ...initiative, combatGeneration: 1 }));
+  gesture(25, 105);
+  expect(
+    (
+      vp.store.getById(movementRecordId(id)) as unknown as {
+        data: { epoch: string };
+      }
+    ).data.epoch
+  ).toBe('enc:1:1:entity');
+  view.rerender(controls({ ...initiative, combatGeneration: 2 }));
+  expect(getMovementTracker(vp).getMovement(id)).toEqual({
+    feet: 0,
+    remaining: 30,
+  });
+});
+
+it('uses authorized live player walking speed and active buffs for a Table turn', () => {
+  const adapter = {
+    subscribe: () => () => {},
+    getMovementTurn: () => ({
+      epoch: 'run:1:1:member',
+      entityIds: ['member'],
+      playerIds: ['pc'],
+    }),
+    getBattleMap: () => ({ dmOnlyElements: {} }),
+    resolveMovement: () => ({
+      name: 'Cached',
+      walkFeet: 20,
+      entityId: 'member',
+    }),
+  } as unknown as import('@/lib/table/sceneAdapter').TableSceneAdapter;
+  const player = createMockPlayerData({
+    playerId: 'pc',
+    characterId: 'pc',
+    characterData: createMockCharacterState({
+      speed: 35,
+      temporaryBuffs: [
+        {
+          id: 'speed-buff',
+          name: 'Speed',
+          effects: [
+            { id: 'speed-effect', targetStat: 'speed', mode: 'add', value: 10 },
+          ],
+          isActive: true,
+          createdAt: '2026-11-01',
+          updatedAt: '2026-11-01',
+        },
+      ],
+    }),
+  });
+  render(
+    <BattleMapMovement
+      viewport={vp}
+      campaignCode="TEST"
+      battleMapId="scene"
+      sceneAdapter={adapter}
+      tablePlayers={[player]}
+      dash={false}
+    />
+  );
+  gesture(25, 105);
+  expect(getMovementTracker(vp).getMovement(id)).toEqual({
+    feet: 10,
+    remaining: 35,
+  });
 });

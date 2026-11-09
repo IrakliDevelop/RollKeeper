@@ -363,7 +363,14 @@ describe('markers over the real sync connection: the DM audience reaches the wir
       battleMapId: MAP_ID,
       store,
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: MAP_ID, dmId: 'dm-1' },
+      // The legacy room client (still used for location rooms) is the wire
+      // under test here.
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: MAP_ID,
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       seedLocal: true,
       resolveAudience: el =>
         useBattleMapStore.getState().battleMaps[CODE]?.[MAP_ID]?.dmOnlyElements[

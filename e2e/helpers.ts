@@ -38,7 +38,10 @@ export async function createCharacter(
     url =>
       /\/player\/characters\/[^/]+$/.test(url.pathname) &&
       !url.pathname.endsWith('/new'),
-    { timeout: 15_000 }
+    // Next dev can compile the sheet route on this second character creation
+    // while other CI browser jobs are active. The captured failure already
+    // showed the created sheet immediately after the old 15 s deadline.
+    { timeout: 30_000 }
   );
   await waitForStoresReady(page);
   const url = page.url();

@@ -54,4 +54,57 @@ describe('battlemapToken', () => {
     const token = signBattleMapToken(bad, SECRET);
     expect(verifyBattleMapToken(token, SECRET, payload.exp - 1000)).toBeNull();
   });
+
+  it('round-trips an exact v1 authority token', () => {
+    const authorityPayload: BattleMapTokenPayload = {
+      v: 1,
+      userId: 'dm-abc123',
+      role: 'dm',
+      room: '123e4567-e89b-42d3-a456-426614174000',
+      exp: payload.exp,
+      campaign: 'ABC123',
+      resourceKind: 'scene',
+      sceneId: 'scene-1',
+      epoch: '123e4567-e89b-42d3-a456-426614174001',
+      roomGeneration: '123e4567-e89b-42d3-a456-426614174002',
+      writerFence: 7,
+    };
+    expect(
+      verifyBattleMapToken(
+        signBattleMapToken(authorityPayload, SECRET),
+        SECRET,
+        payload.exp - 1
+      )
+    ).toEqual(authorityPayload);
+  });
+
+  it('rejects malformed role-specific v1 claims and extra auth context', () => {
+    const base = {
+      v: 1 as const,
+      userId: 'player-1',
+      role: 'player' as const,
+      room: '123e4567-e89b-42d3-a456-426614174000',
+      exp: payload.exp,
+      campaign: 'ABC123',
+      resourceKind: 'scene' as const,
+      sceneId: 'scene-1',
+      epoch: '123e4567-e89b-42d3-a456-426614174001',
+      roomGeneration: '123e4567-e89b-42d3-a456-426614174002',
+      playerPrincipal: 'player-1',
+    };
+    for (const bad of [
+      { ...base, playerPrincipal: 'player-2' },
+      { ...base, writerFence: 1 },
+      { ...base, room: 'ABC123_map-1' },
+      { ...base, unexpected: true },
+    ]) {
+      expect(
+        verifyBattleMapToken(
+          signBattleMapToken(bad as BattleMapTokenPayload, SECRET),
+          SECRET,
+          payload.exp - 1
+        )
+      ).toBeNull();
+    }
+  });
 });

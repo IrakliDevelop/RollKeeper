@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, cleanup } from '@testing-library/react';
 
 import { useDmVttPlayersRefresh } from '../useDmVttPlayersRefresh';
 import { applyPlayersToEncounter } from '@/utils/encounterSync';
@@ -279,4 +279,17 @@ describe('useDmVttPlayersRefresh', () => {
     );
     expect(result.current.players).toEqual([]);
   });
+});
+
+// CI leak guard: no rendered root may outlive its test. This project has no
+// vitest globals, so RTL's auto-cleanup never runs: flush pending React work
+// and unmount explicitly, or a scheduled commit fires after this file's jsdom
+// environment is torn down (CI "instanceof" crash in getActiveElementDeep).
+afterEach(async () => {
+  await act(async () => {});
+  cleanup();
+  expect(
+    document.body.childElementCount,
+    'rendered roots left mounted after the test'
+  ).toBe(0);
 });

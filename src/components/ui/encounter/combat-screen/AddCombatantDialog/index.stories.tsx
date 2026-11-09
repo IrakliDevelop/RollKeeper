@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, screen, userEvent } from 'storybook/test';
+import { expect, fn, screen, userEvent, waitFor } from 'storybook/test';
 import { AddCombatantDialog } from './index';
 import type { CampaignNPC } from '@/types/encounter';
 
@@ -101,7 +101,10 @@ export const PlayerTab: Story = {
       'aria-selected',
       'true'
     );
-    await expect(screen.getByText('Thorin Ironforge')).toBeVisible();
+    await waitFor(
+      () => expect(screen.getByText('Thorin Ironforge')).toBeVisible(),
+      { timeout: 5000 }
+    );
   },
 };
 

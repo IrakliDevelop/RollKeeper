@@ -7,10 +7,18 @@ import { Input } from '@/components/ui/forms/input';
 import { Switch } from '@/components/ui/forms/switch';
 import type { DetailSectionProps } from './DetailHeader';
 
-export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
+export function ConcentrationReaction({
+  entity,
+  actions,
+  capabilities,
+}: DetailSectionProps) {
   const concentrationRef = useRef<HTMLInputElement>(null);
   if (entity.type === 'lair') return null;
   const isPlayer = entity.type === 'player';
+  // Scene runs: concentration is display-only; reaction per capability.
+  const readOnlyConcentration = capabilities ? true : isPlayer;
+  const readOnlyReaction = capabilities ? !capabilities.reaction : isPlayer;
+  const syncedNote = capabilities ? null : '(synced)';
 
   return (
     <>
@@ -22,7 +30,7 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
           aria-hidden="true"
         />
         <span className="text-body text-xs">Concentration:</span>
-        {isPlayer ? (
+        {readOnlyConcentration ? (
           <span className="text-body text-xs">
             {entity.concentrationSpell ? (
               <span className="text-lapis-text font-medium">
@@ -31,7 +39,9 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
             ) : (
               <span className="text-muted">None</span>
             )}
-            <span className="text-muted ml-1">(synced)</span>
+            {syncedNote && (
+              <span className="text-muted ml-1">{syncedNote}</span>
+            )}
           </span>
         ) : (
           <>
@@ -72,15 +82,19 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
           className="text-muted shrink-0"
           aria-hidden="true"
         />
-        {isPlayer && <span className="text-body text-xs">Reaction:</span>}
-        {isPlayer ? (
+        {readOnlyReaction && (
+          <span className="text-body text-xs">Reaction:</span>
+        )}
+        {readOnlyReaction ? (
           <span className="text-body text-xs">
             {entity.hasUsedReaction ? (
               <span className="text-muted font-medium">Used</span>
             ) : (
               <span className="text-heading font-medium">Available</span>
             )}
-            <span className="text-muted ml-1">(synced)</span>
+            {(syncedNote || isPlayer) && (
+              <span className="text-muted ml-1">(synced)</span>
+            )}
           </span>
         ) : (
           <Switch

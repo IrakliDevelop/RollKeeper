@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
 
+import { withLocalRedis, withLocalRelayRedis } from './e2eRedis';
+
 /**
  * The relay (`relay/`) and the Next app must mint/verify tokens with the
  * SAME `BATTLEMAP_RELAY_SECRET`. The app reads it from `.env.local`
@@ -70,17 +72,24 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} REDIS_URL=redis://localhost:6379 npm run dev`,
+      command: withLocalRelayRedis(
+        `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} npm run dev`
+      ),
       cwd: '../../relay',
       url: 'http://localhost:8787/healthz',
-      reuseExistingServer: !process.env.CI,
+      // DD3: never reuse a relay that may run on a remote Redis.
+      reuseExistingServer: false,
       timeout: 60_000,
     },
     {
-      command: `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false UPSTASH_REDIS_REST_URL=http://localhost:8079 UPSTASH_REDIS_REST_TOKEN=local_dev_token BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=ws://localhost:8787 ${DEV_COMMAND}`,
+      command: withLocalRedis(
+        `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=ws://localhost:8787 ${DEV_COMMAND}`,
+        'local'
+      ),
       cwd: '../..',
       url: 'http://localhost:3000/player',
-      reuseExistingServer: !process.env.CI,
+      // CC2: never reuse a dev server that may read a remote Redis from .env.
+      reuseExistingServer: false,
       timeout: 120_000,
     },
   ],

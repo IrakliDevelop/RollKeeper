@@ -59,6 +59,106 @@ describe('useSharedCampaignState', () => {
   // Initial fetch
   // -----------------------------------------------------------------------
 
+  it('clears a v1 initiative at its deadline even while polling is paused', async () => {
+    const expiresAt = Date.now() + 5000;
+    mockFetchResponse(
+      200,
+      makeSharedState({
+        initiative: {
+          encounterId: 'run-one',
+          isActive: true,
+          round: 1,
+          currentEntityId: null,
+          turnOrder: [],
+          enemyHpMode: 'off',
+          enemyConditionsMode: 'off',
+          updatedAt: 'synthetic',
+          expiresAt,
+        },
+      })
+    );
+    const { result } = renderHook(() =>
+      useSharedCampaignState('CAMP01', 'player-1')
+    );
+    await waitFor(() =>
+      expect(result.current.sharedState?.initiative?.isActive).toBe(true)
+    );
+    Object.defineProperty(document, 'hidden', { value: true, writable: true });
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    act(() => vi.advanceTimersByTime(5001));
+    expect(result.current.sharedState?.initiative).toBeNull();
+  });
+
+  it('discards an older poll that arrives after a newer lease deadline', async () => {
+    let firstResolve!: (response: Response) => void;
+    const first = new Promise<Response>(resolve => {
+      firstResolve = resolve;
+    });
+    const laterExpiry = Date.now() + 30_000;
+    const olderExpiry = Date.now() + 5000;
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockReturnValueOnce(first)
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify(
+              makeSharedState({
+                initiative: {
+                  encounterId: 'run-one',
+                  isActive: true,
+                  round: 1,
+                  currentEntityId: null,
+                  turnOrder: [],
+                  enemyHpMode: 'off',
+                  enemyConditionsMode: 'off',
+                  updatedAt: 'synthetic',
+                  expiresAt: laterExpiry,
+                },
+              })
+            ),
+            { status: 200 }
+          )
+        )
+    );
+    const { result } = renderHook(() =>
+      useSharedCampaignState('CAMP01', 'player-1')
+    );
+    act(() => result.current.refetchNow());
+    await waitFor(() =>
+      expect(result.current.sharedState?.initiative?.expiresAt).toBe(
+        laterExpiry
+      )
+    );
+    await act(async () => {
+      firstResolve(
+        new Response(
+          JSON.stringify(
+            makeSharedState({
+              initiative: {
+                encounterId: 'run-one',
+                isActive: true,
+                round: 1,
+                currentEntityId: null,
+                turnOrder: [],
+                enemyHpMode: 'off',
+                enemyConditionsMode: 'off',
+                updatedAt: 'synthetic',
+                expiresAt: olderExpiry,
+              },
+            })
+          ),
+          { status: 200 }
+        )
+      );
+      await Promise.resolve();
+    });
+    expect(result.current.sharedState?.initiative?.expiresAt).toBe(laterExpiry);
+    act(() => vi.advanceTimersByTime(5001));
+    expect(result.current.sharedState?.initiative?.expiresAt).toBe(laterExpiry);
+  });
+
   it('returns loading=true immediately after mount when campaignCode is provided', () => {
     mockFetchResponse(200, makeSharedState());
     const { result } = renderHook(() =>

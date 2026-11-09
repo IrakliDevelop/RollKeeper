@@ -54,6 +54,40 @@ vi.mock('../BattleMapExportControl', () => ({
   BattleMapExportControl: () => null,
 }));
 
+// Table protocol v1: player side channels (marker details, loot, shop) are
+// addressed by the server-resolved scene. This suite covers that surface, so
+// the (stubbed) live connection resolves this route's own map as the
+// presented scene, as the token route does when the original map is shown.
+vi.mock('@/lib/battlemapSync', () => ({
+  createManagedBattleMapConnection: vi.fn(
+    (options: {
+      battleMapId: string;
+      onSceneResolved?: (sceneId: string) => void;
+    }) => {
+      options.onSceneResolved?.(options.battleMapId);
+      return new Proxy(
+        {},
+        {
+          get: (_target, key) =>
+            key === 'then' ? undefined : () => () => undefined,
+        }
+      );
+    }
+  ),
+}));
+vi.mock('../fog/fogAppearancePoll', () => ({
+  applyFogAppearanceMetadata: vi.fn(),
+  fetchAndApplyFogAppearance: vi.fn(),
+  getAppliedFogAppearance: vi.fn(() => 'solid'),
+  startFogAppearancePoll: vi.fn(() => () => {}),
+}));
+beforeEach(() => {
+  vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.test');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 /** jsdom has no canvas 2D context — stub it so constructing a real `Viewport`
  * doesn't throw. Duplicated (not imported) from `selectionEvents.integration
  * .test.tsx`: stub the browser API, never an @fieldnotes module. */
@@ -171,6 +205,9 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
     stubCanvas();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { unmount } = renderPlayer();
+    // The side channel opens once the live connection resolves the scene.
+    const vp = makeViewport();
+    fireReady(vp);
 
     await vi.waitFor(() => {
       expect(warn).toHaveBeenCalledWith(
@@ -180,6 +217,7 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
     });
 
     unmount();
+    vp.destroy();
   });
 
   it('has no marker tool: the functional tool list omits MARKER_TOOL_NAME (select is present, ruling out an empty list), and the toolbar button list is exhaustively the eight non-marker tools', () => {

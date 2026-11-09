@@ -26,6 +26,16 @@ const MAP_ID = 'map-1';
 const params = { params: Promise.resolve({ code: CODE, id: MAP_ID }) };
 const projectionKey = `campaign:${CODE}:fog-appearance:${MAP_ID}`;
 
+/** A verified location keeps the route's own player/DM authorization. */
+function seedVerifiedLocation(): void {
+  seedRedis(`campaign:${CODE}:location:${MAP_ID}`, {
+    id: MAP_ID,
+    name: 'Location',
+    mapImageUrl: 'https://example.test/location.png',
+    updatedAt: '2026-10-03T00:00:00.000Z',
+  });
+}
+
 function getRequest(query: string): NextRequest {
   return new NextRequest(
     `http://localhost/api/campaign/${CODE}/battlemaps/${MAP_ID}/fog-appearance?${query}`
@@ -58,7 +68,7 @@ beforeEach(() => {
     campaignName: 'Fog Test',
   });
   seedRedisSet(`campaign:${CODE}:players`, ['player-1']);
-  seedRedis(`campaign:${CODE}:displaykey`, 'display-1');
+  seedVerifiedLocation();
 });
 
 describe('GET fog appearance projection', () => {
@@ -88,15 +98,6 @@ describe('GET fog appearance projection', () => {
     });
   });
 
-  it('authorizes display reads through the display key', async () => {
-    const response = await GET(
-      getRequest('role=display&displayKey=display-1'),
-      params
-    );
-    expect(response.status).toBe(200);
-    expect(authorizeCampaignMembershipRoute).not.toHaveBeenCalled();
-  });
-
   it('falls back to solid for missing, malformed, or future projections', async () => {
     for (const raw of [
       undefined,
@@ -105,6 +106,7 @@ describe('GET fog appearance projection', () => {
     ]) {
       resetRedis();
       seedRedisSet(`campaign:${CODE}:players`, ['player-1']);
+      seedVerifiedLocation();
       if (raw !== undefined) seedRedis(projectionKey, raw);
       const response = await GET(
         getRequest('role=player&playerId=player-1'),

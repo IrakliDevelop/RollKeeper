@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTableControl } from '@/hooks/useTableControl';
 import type {
   InitiativeRollRequest,
   SharedInitiativeState,
@@ -9,39 +10,46 @@ interface UseDmInitiativeSyncOptions {
   dmId: string;
 }
 
+/**
+ * DM initiative publication. Table protocol v1 is the only path: initiative
+ * and roll requests publish through the Table control session (the legacy
+ * shared-state writer answers 426).
+ */
 export function useDmInitiativeSync({
   campaignCode,
   dmId,
 }: UseDmInitiativeSyncOptions) {
+  const control = useTableControl(campaignCode, dmId);
+  const { status, error, publish } = control;
+
   const pushInitiative = useCallback(
     async (state: SharedInitiativeState) => {
-      try {
-        await fetch(`/api/campaign/${campaignCode}/shared`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feature: 'initiative', data: state, dmId }),
-        });
-      } catch (err) {
-        console.warn('Failed to sync initiative state:', err);
-      }
+      if (status === 'checking') throw new Error('Checking live control');
+      if (status !== 'controlling' && status !== 'broadcasting')
+        throw new Error(error ?? 'Not shared with players');
+      return publish(
+        state.isActive ? 'publishInitiative' : 'endInitiative',
+        state.isActive
+          ? { initiative: state, runId: state.encounterId }
+          : undefined
+      );
     },
-    [campaignCode, dmId]
+    [status, error, publish]
   );
 
   const pushInitiativeRequest = useCallback(
     async (data: InitiativeRollRequest | null) => {
-      try {
-        await fetch(`/api/campaign/${campaignCode}/shared`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feature: 'initiativeRequest', data, dmId }),
-        });
-      } catch (err) {
-        console.warn('Failed to push initiative request:', err);
-      }
+      if (status === 'checking') throw new Error('Checking live control');
+      if (status !== 'controlling' && status !== 'broadcasting')
+        throw new Error(error ?? 'Not shared with players');
+      return publish('publishInitiativeRequest', { request: data });
     },
-    [campaignCode, dmId]
+    [status, error, publish]
   );
 
-  return { pushInitiative, pushInitiativeRequest };
+  return {
+    pushInitiative,
+    pushInitiativeRequest,
+    control,
+  };
 }

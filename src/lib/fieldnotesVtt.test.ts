@@ -99,6 +99,29 @@ describe('RollKeeper Field Notes VTT boundary', () => {
     expect(fieldnotesElementRegistry.getAdapter('vtt:template')).toBeDefined();
   });
 
+  it('keeps the required fog hook active when a new map has no fog', () => {
+    const plugin = createRollKeeperFogPlugin();
+    const viewport = new Viewport(container, {
+      plugins: [plugin],
+      requiredCapabilities: ['vtt:fog'],
+    });
+    const hooks = (
+      viewport as unknown as {
+        _renderHooks: {
+          viewport: {
+            getMissingCapabilities(): string[];
+            isFailClosed(): boolean;
+          };
+        };
+      }
+    )._renderHooks.viewport;
+
+    expect(plugin.manager.getState()).toBeNull();
+    expect(hooks.getMissingCapabilities()).toEqual([]);
+    expect(hooks.isFailClosed()).toBe(false);
+    viewport.destroy();
+  });
+
   it('loads a production-shaped v3 map and exports canonical v6 state', () => {
     const legacyManager = new FogManager({
       idFactory: () => 'legacy-generation',

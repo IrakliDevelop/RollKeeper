@@ -13,7 +13,11 @@ import { DeathSaves } from './DeathSaves';
 import { ConcentrationReaction } from './ConcentrationReaction';
 import { canSpendHitDie, showDeathSaves, spendHitDie } from './hitDie';
 
-export function DetailVitals({ entity, actions }: DetailSectionProps) {
+export function DetailVitals({
+  entity,
+  actions,
+  capabilities,
+}: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);
   const [maxInput, setMaxInput] = useState('');
   const cancelMax = useRef(false);
@@ -21,8 +25,31 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
 
   if (entity.type === 'lair') return null;
 
+  if (capabilities?.hpUnknown) {
+    return (
+      <div className="border-divider space-y-3 border-t p-4">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-muted text-3xl font-bold">—</span>
+          <span className="text-ember-text text-xs font-medium">
+            Waiting for player data
+          </span>
+        </div>
+        <ConcentrationReaction
+          entity={entity}
+          actions={actions}
+          capabilities={capabilities}
+        />
+      </div>
+    );
+  }
+
   const isPlayer = entity.type === 'player';
   const isNonPlayerNonSummon = !isPlayer && !entity.summonId;
+  // Legacy: players are synced read-only. Scene runs: per-capability.
+  const readOnlyMax = capabilities ? !capabilities.maxHp : isPlayer;
+  const readOnlyTemp = capabilities ? !capabilities.tempHp : isPlayer;
+  const readOnlyAc = capabilities ? !capabilities.armorClass : isPlayer;
+  const showDamage = capabilities ? capabilities.hp : isNonPlayerNonSummon;
 
   const commitMaxHp = (raw: string) => {
     const val = parseInt(raw, 10);
@@ -43,7 +70,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
             {entity.currentHp}
           </span>
           <span className="text-muted text-sm font-medium">/</span>
-          {isPlayer ? (
+          {readOnlyMax ? (
             <span className="text-muted text-sm tabular-nums">
               {entity.maxHp}
             </span>
@@ -90,9 +117,9 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
 
           {/* Temp HP pill */}
           {entity.tempHp > 0 &&
-            (isPlayer ? (
+            (readOnlyTemp ? (
               <span className="text-muted ml-1 text-xs">
-                +{entity.tempHp} temp HP · synced
+                +{entity.tempHp} temp HP{capabilities ? '' : ' · synced'}
               </span>
             ) : (
               <span className="text-frost-text ml-1 inline-flex items-center gap-1 text-xs font-medium">
@@ -117,13 +144,26 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
         {/* AC */}
         <div className="flex items-center gap-1.5">
           <Shield size={14} className="text-muted shrink-0" />
-          {isPlayer ? (
+          {readOnlyAc ? (
             <div className="text-right">
               <span className="text-heading font-bold tabular-nums">
                 {entity.armorClass}
               </span>
-              <p className="text-muted text-xs">synced</p>
+              <p className="text-muted text-xs">
+                {capabilities ? 'read-only' : 'synced'}
+              </p>
             </div>
+          ) : capabilities ? (
+            <NumberField
+              value={entity.armorClass}
+              onChange={v =>
+                actions.onUpdate(entity.id, { armorClass: v ?? 0 })
+              }
+              min={0}
+              className="bg-surface border-divider text-heading w-12 rounded-sm border px-1 py-1 text-center text-base font-bold pointer-coarse:min-h-11"
+              aria-label="Armor class"
+              title="Armor class"
+            />
           ) : (
             <div className="flex items-center gap-1">
               <NumberField
@@ -172,7 +212,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
       />
 
       {/* Damage/heal/temp controls */}
-      {isNonPlayerNonSummon && (
+      {showDamage && (
         <DamageControls
           entityId={entity.id}
           onDamage={actions.onDamage}
@@ -181,15 +221,19 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
         />
       )}
 
-      <ConcentrationReaction entity={entity} actions={actions} />
+      <ConcentrationReaction
+        entity={entity}
+        actions={actions}
+        capabilities={capabilities}
+      />
 
       {/* Death saves (players read-only, NPCs interactive) */}
-      {showDeathSaves(entity) && (
+      {showDeathSaves(entity) && (!capabilities || isPlayer) && (
         <DeathSaves entity={entity} actions={actions} />
       )}
 
       {/* Spend hit die */}
-      {canSpendHitDie(entity) && (
+      {!capabilities && canSpendHitDie(entity) && (
         <Button
           type="button"
           variant="secondary"

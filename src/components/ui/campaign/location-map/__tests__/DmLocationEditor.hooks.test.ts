@@ -295,12 +295,16 @@ describe('useDmLocationEditor — handleOpenTvDisplay popup-blocker survival', (
     vi.clearAllMocks();
   });
 
-  it('opens the tab synchronously, before the display-key fetch resolves (survives transient-activation loss)', async () => {
-    const fakeWin = { location: { href: '' } } as unknown as Window;
+  it('opens the tab synchronously, before the capability fetch resolves (survives transient-activation loss)', async () => {
+    const fakeWin = {
+      opener: window,
+      location: { href: '', replace: vi.fn() },
+      close: vi.fn(),
+    } as unknown as Window;
     openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeWin);
 
     let resolveFetch!: (value: unknown) => void;
-    const fetchMock = vi.fn(
+    const fetchMock = vi.fn<(input: RequestInfo | URL) => Promise<unknown>>(
       () =>
         new Promise(resolve => {
           resolveFetch = resolve;
@@ -315,41 +319,43 @@ describe('useDmLocationEditor — handleOpenTvDisplay popup-blocker survival', (
     // window.open must have fired already, synchronously, before the fetch
     // (still pending) resolves — otherwise Safari drops the user gesture.
     expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith('', '_blank');
-    expect(fakeWin.location.href).toBe('');
+    expect(openSpy).toHaveBeenCalledWith('about:blank', '_blank');
 
-    resolveFetch({
-      ok: true,
-      json: async () => ({ displayKey: 'dk-123' }),
-    });
+    resolveFetch(
+      new Response(
+        JSON.stringify({
+          capability: 'Cap5Synthetic_display-capability_0123456789',
+          displayGeneration: 3,
+        })
+      )
+    );
     await act(async () => {
       await displayPromise;
     });
 
-    expect(fakeWin.location.href).toContain('dk=dk-123');
+    expect(fakeWin.location.replace).toHaveBeenCalledWith(
+      '/table-display/TEST01#k=Cap5Synthetic_display-capability_0123456789'
+    );
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      '/api/campaign/TEST01/table/display/capability'
+    );
     expect(openSpy).toHaveBeenCalledTimes(1); // no second window.open call
   });
 
-  it('falls back to window.open(url) when the popup was blocked', async () => {
+  it('reports a blocked popup without requesting a capability', async () => {
     openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ displayKey: 'dk-9' }),
-      }))
-    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     const { result } = await setup('location');
+    let outcome: unknown;
     await act(async () => {
-      await result.current.handleOpenTvDisplay();
+      outcome = await result.current.handleOpenTvDisplay();
     });
 
-    expect(openSpy).toHaveBeenCalledTimes(2);
-    expect(openSpy).toHaveBeenLastCalledWith(
-      expect.stringContaining('dk=dk-9'),
-      '_blank'
-    );
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ ok: false, reason: 'popup-blocked' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

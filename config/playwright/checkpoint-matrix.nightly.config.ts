@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+import { withLocalRedis } from './e2eRedis';
+
 export default defineConfig({
   testDir: '../../e2e-nightly',
   outputDir: '../../test-results/nightly-checkpoint',
@@ -36,8 +38,10 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command:
+    command: withLocalRedis(
       'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_INDEXEDDB_MIGRATION_ENABLED=false NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED=true npm run dev -- --port 3110',
+      'none'
+    ),
     cwd: '../..',
     url: 'http://localhost:3110/player',
     reuseExistingServer: false,

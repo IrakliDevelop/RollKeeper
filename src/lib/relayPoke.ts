@@ -1,7 +1,7 @@
 import { signBattleMapToken } from '@/lib/battlemapToken';
 import { battleMapRelayRoom } from '@/lib/battlemapRoom';
 import { listLiveMapRooms, MAX_LIVE_MAP_ROOMS } from '@/lib/liveMapRooms';
-import { campaignSharedKey } from '@/lib/redis';
+import { tableCompatibilityKey } from '@/lib/tableServer/control';
 
 import type { LiveMapRoomsReader } from '@/lib/liveMapRooms';
 import type { SharedBattleMapState } from '@/types/sharedState';
@@ -90,7 +90,7 @@ async function readActiveBattleMapId(
 ): Promise<string | null> {
   try {
     const raw = await redis.get<string | SharedBattleMapState>(
-      campaignSharedKey(code, 'battlemap')
+      tableCompatibilityKey(code, 'battlemap')
     );
     if (!raw) return null;
     const battleMap: SharedBattleMapState =

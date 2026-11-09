@@ -14,6 +14,7 @@ import {
   joinCampaign,
   coordsForElement,
   waitForElementSynced,
+  openTableSceneLive,
 } from './helpers/battlemapRelay';
 import { CURRENCY_VALUES, purseToCopper } from '../src/utils/currency';
 
@@ -68,7 +69,6 @@ const STOCK = 1;
 const BUYER_STARTING_GOLD = 100;
 const BUYER_STARTING_COPPER = BUYER_STARTING_GOLD * CURRENCY_VALUES.gold; // 10000
 
-const mapUrl = (code: string) => `/dm/campaign/${code}/battlemaps/${MAP_ID}`;
 const dashboardUrl = (code: string) => `/dm/campaign/${code}`;
 
 /**
@@ -362,9 +362,13 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
       '/dm',
       '/dm/campaign/warm',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
       '/player/characters/new',
     ]) {
-      await dmMapPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmMapPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const p of [player1Page, player2Page]) {
       for (const path of [
@@ -372,26 +376,34 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
         '/player/characters/new',
         '/player/campaign/warm/battlemap/warm',
       ]) {
-        await p.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+        await p
+          .goto(path, { waitUntil: 'load', timeout: 60_000 })
+          .catch(() => {});
       }
     }
 
     // ---- DM: create the real campaign + seed the shop scenario ----
     await seedDm(dmMapPage, DM_ID);
     const code = await createCampaign(dmMapPage, DM_ID, CAMPAIGN_NAME);
+    // The first shop-index GET can spend the entire 10 s publish assertion
+    // compiling this API route in Next dev. Compile it before the UI flow;
+    // production serves the same endpoint from its prebuilt route bundle.
+    await expect
+      .poll(
+        async () =>
+          (
+            await dmAdminPage.request.get(`/api/campaign/${code}/shops`, {
+              timeout: 60_000,
+            })
+          ).status(),
+        { timeout: 60_000 }
+      )
+      .toBe(200);
     await seedShopScenario(dmMapPage, code);
 
     // ---- DM: connect to the battle map (pushes the seeded token onto the
     //          live relay room) and leave this tab parked here ----
-    await dmMapPage.goto(mapUrl(code), { waitUntil: 'networkidle' });
-    await dmMapPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      { timeout: 15_000 }
-    );
-    await expect(dmMapPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    await openTableSceneLive(dmMapPage, code, 'Shop E2E Map');
     await waitForElementSynced(dmMapPage, TOKEN_ID);
 
     // ---- DM (admin tab): price the item, list it for sale, open the shop —
@@ -458,7 +470,9 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
 
     await tapElement(player1Page, TOKEN_ID);
     const shopDialog1 = merchantDialog(player1Page);
-    await expect(shopDialog1).toBeVisible({ timeout: 10_000 });
+    // The tap performs two sequential player-readable API requests. Next dev
+    // can compile both under CI load; the dialog may appear just after 10 s.
+    await expect(shopDialog1).toBeVisible({ timeout: 30_000 });
     await expect(shopDialog1.getByText(ITEM_NAME, { exact: true })).toBeVisible(
       {
         timeout: 10_000,

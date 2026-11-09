@@ -160,6 +160,8 @@ export interface SharedTurnEntry {
 // Initiative/turn state pushed by the DM, read by players
 export interface SharedInitiativeState {
   encounterId: string;
+  /** Table run restart identity; omitted by legacy encounter publishers. */
+  combatGeneration?: number;
   isActive: boolean;
   round: number;
   currentEntityId: string | null;
@@ -170,6 +172,8 @@ export interface SharedInitiativeState {
   // Whether non-player conditions/concentration are being shared.
   enemyConditionsMode: EnemyConditionsDisplay;
   updatedAt: string; // ISO timestamp
+  /** Server lease deadline in Table v1. Readers clear an expired projection. */
+  expiresAt?: number;
 }
 
 // Player → DM request to advance past their own turn

@@ -1,6 +1,13 @@
-import { getDefaultElementRegistry, type Viewport } from '@fieldnotes/core';
+import {
+  generateKeyBetween,
+  getDefaultElementRegistry,
+  type CanvasElement,
+  type Viewport,
+} from '@fieldnotes/core';
 import {
   createFogPlugin,
+  createGrid,
+  gridElementTypeDefinition,
   FogManager,
   FogManagerKey,
   GridController,
@@ -27,6 +34,52 @@ if (!hasGridAdapter && !hasTemplateAdapter) {
 if (!registry.getAdapter('vtt:movement'))
   registry.register(movementRecordTypeDefinition);
 
+/**
+ * Default grid fields for a new grid (Edit map, location editor and
+ * adoption). Mirrors the location editor's initial state.
+ */
+export const VTT_GRID_DEFAULTS = {
+  cellSize: 50,
+  strokeColor: '#94a3b8',
+  strokeWidth: 1,
+  opacity: 0.5,
+} as const;
+
+/**
+ * The `vtt:grid` envelope that `GridController.add` followed by
+ * `pinGridToMapLayer` leaves in a store: the same `createGrid` element,
+ * wrapped by the registered grid definition, on the map layer and locked.
+ * For code that builds canvas state without a viewport (Table adoption).
+ * Returns the JSON form the canvas state stores.
+ */
+export function createPinnedVttGridElement(
+  settings: {
+    gridType: 'square' | 'hex';
+    hexOrientation?: 'pointy' | 'flat';
+    cellSize: number;
+    strokeColor: string;
+    strokeWidth: number;
+    opacity: number;
+  },
+  mapLayerId: string
+): CanvasElement {
+  // JSON-clean, as the store persists it on the UI path (`exportJSON` /
+  // JSON.stringify drop the wrapper's undefined `groupId`/`rotation`); an
+  // undefined key is not a JSON value and fails scene validation.
+  return JSON.parse(
+    JSON.stringify(
+      gridElementTypeDefinition.wrap(
+        createGrid({
+          ...settings,
+          index: generateKeyBetween(null, null),
+          layerId: mapLayerId,
+          locked: true,
+        })
+      )
+    )
+  ) as CanvasElement;
+}
+
 const fogPlugins = new WeakMap<FogManager, FogPlugin>();
 const gridControllers = new WeakMap<Viewport, GridController>();
 
@@ -35,7 +88,36 @@ export function createRollKeeperFogPlugin(
 ): FogPlugin {
   const plugin = createFogPlugin(options);
   fogPlugins.set(plugin.manager, plugin);
-  return plugin;
+  // Field Notes core treats a missing required fog render hook as a privacy
+  // failure and paints an opaque black stratum over the entire canvas. The
+  // VTT plugin disables that hook while fog is off, which makes every new
+  // scene look black despite its map and drawings being rendered underneath.
+  // Keep the hook registered as active; its renderer already does nothing
+  // when fog has no state or its view mode is off. A throwing hook still gets
+  // quarantined by core and retains the fail-closed behaviour.
+  return {
+    ...plugin,
+    configure(context) {
+      plugin.configure?.(
+        new Proxy(context, {
+          get(target, property, receiver) {
+            if (property !== 'registerViewportHooks')
+              return Reflect.get(target, property, receiver);
+            return (
+              hooks: Parameters<typeof target.registerViewportHooks>[0],
+              registration: Parameters<typeof target.registerViewportHooks>[1]
+            ) =>
+              target.registerViewportHooks(
+                hooks,
+                registration?.satisfies?.includes('vtt:fog')
+                  ? { ...registration, enabled: () => true }
+                  : registration
+              );
+          },
+        })
+      );
+    },
+  };
 }
 
 export function getViewportFogManager(viewport: Viewport): FogManager {

@@ -88,7 +88,6 @@ export function DmVttScreen({
           battleMapId={battleMapId}
           dmId={dmId}
           mapName={vtt.battleMap?.name ?? 'Battle Map'}
-          status={vtt.status}
           gridMode={gridMode}
           onSetGridMode={vtt.setGridMode}
           mode={mode}

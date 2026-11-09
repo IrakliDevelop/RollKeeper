@@ -231,7 +231,7 @@ export const EditModeOnTouch: Story = {
       const after = getComputedStyle(button, '::after');
       await expect(after.width).toBe('44px');
       await expect(after.height).toBe('44px');
-      await expect(button.getBoundingClientRect().width).toBe(14);
+      await expect(button.getBoundingClientRect().width).toBeGreaterThanOrEqual(44);
       const row = button.parentElement!.getBoundingClientRect();
       await expect(row.height).toBeGreaterThanOrEqual(44);
     }

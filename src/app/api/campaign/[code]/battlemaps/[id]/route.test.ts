@@ -22,12 +22,32 @@ beforeEach(() => {
 });
 
 describe('DELETE /api/campaign/[code]/battlemaps/[id]', () => {
-  it('deletes the viewer fog projection with the map', async () => {
+  it('preserves the source when a delete lacks DM mutation authority (PR04)', async () => {
     const request = new NextRequest(
       `http://localhost/api/campaign/${CODE}/battlemaps/${MAP_ID}`,
       {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dmId: 'dm-1' }),
+      }
+    );
+    const response = await DELETE(request, params);
+    expect(response.status).toBe(403);
+    expect(getRedisStore().has(`campaign:${CODE}:battlemap:${MAP_ID}`)).toBe(
+      true
+    );
+  });
+
+  it('deletes the viewer fog projection with the map', async () => {
+    const request = new NextRequest(
+      `http://localhost/api/campaign/${CODE}/battlemaps/${MAP_ID}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Origin: 'http://localhost',
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({ dmId: 'dm-1' }),
       }
     );

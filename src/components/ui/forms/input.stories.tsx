@@ -297,7 +297,7 @@ export const StatesDark: Story = {
 
 /**
  * Fields as a touch device sees them: small text grows to 16px so iOS
- * Safari doesn't zoom on focus, large numbers keep their size, and inputs
+ * Safari doesn't zoom on focus, explicitly sized large numbers keep their size, and inputs
  * reach 44px. The play function copies the coarse-pointer rules in, since
  * the test browser has a fine pointer.
  */
@@ -339,7 +339,7 @@ export const CoarsePointer: Story = {
       await expect(size('Bonus')).toBe('16px');
       await expect(size('Ability score')).toBe('24px');
       await expect(size('Inherits small')).toBe('16px');
-      await expect(size('Inherits large')).toBe('24px');
+      await expect(size('Inherits large')).toBe('16px');
       await expect(
         getComputedStyle(canvas.getByLabelText('Small field')).minHeight
       ).toBe('44px');

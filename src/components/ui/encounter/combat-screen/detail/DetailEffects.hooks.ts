@@ -28,20 +28,26 @@ export function useConditionLibrary(): CustomCondition[] {
   );
 }
 
-/** Conditions any combatant in this entity's encounter can inflict. */
+/**
+ * Conditions any combatant in this entity's encounter can inflict. An
+ * `override` (Table scene runs) is used as-is and legacy encounters are
+ * never searched for the entity.
+ */
 export function useCreatureConditions(
   entityId: string,
-  library: CustomCondition[]
+  library: CustomCondition[],
+  override?: CreatureCondition[]
 ): CreatureCondition[] {
   const entities = useEncounterStore(state => {
+    if (override) return EMPTY_ENTITIES;
     const owner = state.encounters.find(encounter =>
       encounter.entities.some(e => e.id === entityId)
     );
     return owner ? owner.entities : EMPTY_ENTITIES;
   });
   return useMemo(
-    () => collectInflictableConditions(entities, library),
-    [entities, library]
+    () => override ?? collectInflictableConditions(entities, library),
+    [entities, library, override]
   );
 }
 

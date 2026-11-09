@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye } from 'lucide-react';
+import { Eye, SlidersHorizontal } from 'lucide-react';
 
 import { dispositionColor } from './combatantToken';
 
@@ -17,6 +17,10 @@ export interface RosterRowProps {
   onSelectEntity: (entityId: string) => void;
   onDragStart: (entity: EncounterEntity, e: PointerEvent) => void;
   onViewPlayer?: (playerCharacterId: string) => void;
+  /** Table scenes: status line replacing On map / Tap → place. */
+  description?: string;
+  /** Table scenes: sibling details button (never nested in the row button). */
+  onOpenDetails?: (entity: EncounterEntity) => void;
 }
 
 /**
@@ -35,6 +39,8 @@ export function RosterRow({
   onSelectEntity,
   onDragStart,
   onViewPlayer,
+  description,
+  onOpenDetails,
 }: RosterRowProps) {
   const color = dispositionColor(entity);
   const firstName = entity.name.split(' ')[0];
@@ -88,7 +94,7 @@ export function RosterRow({
             {firstName}
           </span>
           <span className="text-faint block text-[10px]">
-            {placed ? 'On map' : 'Tap → place'}
+            {description ?? (placed ? 'On map' : 'Tap → place')}
           </span>
         </span>
       </button>
@@ -101,6 +107,17 @@ export function RosterRow({
           className="text-muted hover:text-heading hover:bg-surface-secondary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
         >
           <Eye size={14} aria-hidden="true" />
+        </button>
+      )}
+      {onOpenDetails && (
+        <button
+          type="button"
+          onClick={() => onOpenDetails(entity)}
+          aria-label={`Details for ${firstName}`}
+          title="Member details"
+          className="text-muted hover:text-heading hover:bg-surface-secondary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        >
+          <SlidersHorizontal size={14} aria-hidden="true" />
         </button>
       )}
     </li>

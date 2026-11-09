@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
@@ -14,49 +15,69 @@ export function BattleMapMovement(props: BattleMapMovementProps) {
   if (!epoch || !token) return null;
   return (
     <div
-      className={`${OVERLAY_SURFACE} type-small pointer-events-auto flex flex-wrap items-center gap-2 p-2`}
+      className={`${OVERLAY_SURFACE} pointer-events-auto inline-flex w-fit max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-x-2 gap-y-1 p-1.5 text-xs`}
       aria-label="Turn movement"
     >
-      <span className="text-body">
-        {movement?.feet ?? 0} ft moved · {movement?.remaining ?? 0} ft remaining
-      </span>
-      <Button variant="ghost" onClick={() => tracker.reset(token.id)}>
-        Reset movement
-      </Button>
-      <NumberInput
-        aria-label="Teleport range in feet"
-        min="0"
-        value={range}
-        onChange={setRange}
-        allowEmpty
-        className="w-20"
-      />
-      <Button
-        variant="outline"
-        disabled={range === undefined || !Number.isFinite(range) || range < 0}
-        onClick={() =>
-          setPlacing(
-            tracker.startPlacement(
-              token.id,
-              {
-                id: 'teleport',
-                label: 'Teleport',
-                counts: false,
-                maxFeet: Number(range),
-              },
-              { hint: 'Choose teleport destination · Escape cancels' }
-            )
-          )
-        }
-      >
-        Teleport
-      </Button>
-      {placing && (
-        <Button variant="ghost" onClick={() => tracker.cancelPlacement()}>
-          Cancel teleport
+      <div className="flex items-center gap-1 whitespace-nowrap">
+        <span className="text-body" title="Drag to move · F adds a waypoint">
+          {movement?.feet ?? 0} ft moved · {movement?.remaining ?? 0} ft
+          remaining
+        </span>
+        <Button
+          variant="ghost"
+          size="xs"
+          className="size-8 p-0"
+          aria-label="Reset movement"
+          title="Reset movement"
+          onClick={() => tracker.reset(token.id)}
+        >
+          <RotateCcw className="size-3.5" aria-hidden="true" />
         </Button>
-      )}
-      <span className="text-muted">Drag to move · F adds a waypoint</span>
+      </div>
+      <div className="flex items-center gap-1 whitespace-nowrap">
+        <NumberInput
+          aria-label="Teleport range in feet"
+          min="0"
+          value={range}
+          onChange={setRange}
+          allowEmpty
+          size="sm"
+          wrapperClassName="w-14 shrink-0"
+          className="px-1.5 text-center"
+        />
+        <span className="text-muted">ft</span>
+        <Button
+          variant="outline"
+          size="xs"
+          disabled={range === undefined || !Number.isFinite(range) || range < 0}
+          onClick={() =>
+            setPlacing(
+              tracker.startPlacement(
+                token.id,
+                {
+                  id: 'teleport',
+                  label: 'Teleport',
+                  counts: false,
+                  maxFeet: Number(range),
+                },
+                { hint: 'Choose teleport destination · Escape cancels' }
+              )
+            )
+          }
+        >
+          Teleport
+        </Button>
+        {placing && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => tracker.cancelPlacement()}
+          >
+            Cancel teleport
+          </Button>
+        )}
+      </div>
+      <span className="sr-only">Drag to move · F adds a waypoint</span>
     </div>
   );
 }

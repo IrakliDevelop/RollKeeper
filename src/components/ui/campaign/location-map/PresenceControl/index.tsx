@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useMapControlsDock } from '../MapControlsVisibility';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { ChevronDown, Users } from 'lucide-react';
 import type { PeerRoster } from '@fieldnotes/core';
 
@@ -39,6 +41,7 @@ export function PresenceControl({
   showPlayerCursors,
   onShowPlayerCursorsChange,
 }: PresenceControlProps) {
+  const dock = useMapControlsDock();
   const peers = useAwarenessPeers(roster);
   const { directory, ensureKnown } = usePlayerDirectory(campaignCode, true);
   const rows = useMemo(
@@ -54,7 +57,8 @@ export function PresenceControl({
   return (
     <div ref={rootRef} className="relative">
       <Button
-        variant={open ? 'primary' : 'ghost'}
+        variant={dock ? 'ghost' : open ? 'primary' : 'ghost'}
+        selected={dock && open}
         onClick={toggleOpen}
         aria-expanded={open}
         className="flex h-11 items-center gap-1.5 px-3 text-xs"
@@ -68,8 +72,17 @@ export function PresenceControl({
           <div
             ref={popoverRef}
             data-testid="presence-popover"
-            className="bg-surface-raised border-divider fixed z-50 w-72 rounded-xl border p-3 shadow-xl"
-            style={position}
+            className={
+              dock
+                ? `${OVERLAY_SURFACE} fixed z-50 w-72 max-w-[calc(100vw-1rem)] overflow-y-auto p-3`
+                : 'bg-surface-raised border-divider fixed z-50 w-72 rounded-xl border p-3 shadow-xl'
+            }
+            style={{
+              ...position,
+              maxHeight: dock
+                ? `calc(100dvh - ${position.top}px - 8px)`
+                : undefined,
+            }}
           >
             {rows.length === 0 ? (
               <p className="text-muted px-1 text-sm">

@@ -3,13 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Map } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { DmVttScreen } from '@/components/ui/campaign/dm-vtt/DmVttScreen';
+import { DmVttTopBar } from '@/components/ui/campaign/dm-vtt/DmVttTopBar';
 import { VttErrorFallback } from '@/components/ui/campaign/dm-vtt/VttErrorFallback';
 import { useBattleMapMode } from '@/components/ui/campaign/dm-vtt/useBattleMapMode';
 import { useBattleMapStore } from '@/store/battleMapStore';
@@ -92,47 +93,17 @@ export default function BattleMapEditorPage() {
       {campaign && (
         <CampaignSettingsSyncControls campaign={campaign} headless />
       )}
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}/battlemaps`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Battle Maps
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">
-                  {battleMap.name}
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="border-divider bg-surface-raised flex items-center gap-0.5 rounded-lg border p-0.5">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={() => handleModeChange('setup')}
-                >
-                  Setup
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  onClick={() => handleModeChange('play')}
-                >
-                  Play
-                </Button>
-              </div>
-              <HeaderTrailing showSystemOption />
-            </div>
-          </div>
-        </div>
+      <header className="border-divider bg-surface-secondary border-b">
+        <DmVttTopBar
+          campaignCode={code}
+          battleMapId={id}
+          dmId={dmId}
+          mapName={battleMap.name}
+          mode="setup"
+          onModeChange={handleModeChange}
+          showDisplay={false}
+          trailing={<HeaderTrailing showSystemOption />}
+        />
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
