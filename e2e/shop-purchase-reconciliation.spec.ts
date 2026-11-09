@@ -385,6 +385,20 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     // ---- DM: create the real campaign + seed the shop scenario ----
     await seedDm(dmMapPage, DM_ID);
     const code = await createCampaign(dmMapPage, DM_ID, CAMPAIGN_NAME);
+    // The first shop-index GET can spend the entire 10 s publish assertion
+    // compiling this API route in Next dev. Compile it before the UI flow;
+    // production serves the same endpoint from its prebuilt route bundle.
+    await expect
+      .poll(
+        async () =>
+          (
+            await dmAdminPage.request.get(`/api/campaign/${code}/shops`, {
+              timeout: 60_000,
+            })
+          ).status(),
+        { timeout: 60_000 }
+      )
+      .toBe(200);
     await seedShopScenario(dmMapPage, code);
 
     // ---- DM: connect to the battle map (pushes the seeded token onto the
