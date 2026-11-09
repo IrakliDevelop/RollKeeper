@@ -93,9 +93,22 @@ export function useTableCombatPublication(options: {
     };
   }, [enabled]);
 
-  // Every (re)acquire wipes the public initiative: hold until explicit.
+  // Acquiring control clears the public initiative. Restore an already
+  // running combat immediately so a player who joined before (or during) a
+  // controller change still sees the turn order and can use turn movement.
+  // The publisher waits for player data when it is not loaded yet.
   useEffect(() => {
-    publisher.current?.hold();
+    const instance = publisher.current;
+    instance?.hold();
+    const current = latest.current.repository?.getCurrent();
+    if (
+      options.controlSession &&
+      !options.controlSession.isLost() &&
+      current?.status === 'ready' &&
+      publicationRunState(current.snapshot).active
+    ) {
+      void instance?.publishCurrentState();
+    }
   }, [options.controlEpoch, options.controlSession]);
 
   // Repository (any tab) or live player data changed.

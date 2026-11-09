@@ -107,8 +107,8 @@ export function TableAuthorityBanner(props: {
       )}
       {cleared && (
         <p className="text-ember-text text-xs" role="status">
-          You&apos;re live again. Players&apos; initiative list was cleared. Use
-          Share with players in the combat panel to send it again.
+          You&apos;re live again. Check the combat panel to confirm players can
+          see initiative.
         </p>
       )}
       {canAcquire && (
