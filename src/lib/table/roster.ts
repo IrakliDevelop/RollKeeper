@@ -32,6 +32,8 @@ export interface TableCampaignPlayer {
   playerId: string;
   characterId: string;
   name: string;
+  /** Portrait from the private campaign player snapshot; never stored in the scene. */
+  avatarUrl?: string;
 }
 
 export type TablePlayerVerification =
@@ -427,7 +429,11 @@ export function deriveSceneRoster(options: {
       sourceEntityId: adopted?.entityId ?? null,
       name: nameOf(actor, verifiedLegacyPlayerId, players),
       category: categoryOf(actor, adopted),
-      avatarUrl: actor?.profile?.avatarUrl ?? null,
+      avatarUrl:
+        actor?.profile?.avatarUrl ??
+        players?.find(player => player.playerId === verifiedLegacyPlayerId)
+          ?.avatarUrl ??
+        null,
       tokenCells: actor?.profile?.tokenCells ?? 1,
       walkFeet: actor?.profile?.walkFeet ?? null,
       adoptedPc: adoptedPc !== null,

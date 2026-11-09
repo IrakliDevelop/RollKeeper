@@ -4,6 +4,8 @@ import {
   ElementStore,
   ElementRegistry,
   type CanvasElement,
+  type SelectDragObserver,
+  type SelectTool,
 } from '@fieldnotes/core';
 import type { AuthorityClientStatus } from '@fieldnotes/sync';
 import { FogManager, movementRecordTypeDefinition } from '@fieldnotes/vtt';
@@ -371,6 +373,84 @@ describe('rejected player edits', () => {
     expect(
       (store.getById('party-a') as unknown as { size: unknown }).size
     ).toEqual({ w: 400, h: 400 });
+  });
+});
+
+describe('player token drag sync', () => {
+  beforeEach(() => authority.reset());
+
+  it('keeps a local drag steady across snapshots and submits only its final position at the confirmed version', () => {
+    const store = new ElementStore();
+    let observer: SelectDragObserver | undefined;
+    const selectTool = {
+      addDragObserver: (next: SelectDragObserver) => {
+        observer = next;
+        return () => {
+          observer = undefined;
+        };
+      },
+    } as SelectTool;
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-a',
+      clientId: 'player-a',
+      store,
+      selectTool,
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'player-a',
+      },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+    });
+    const base = {
+      ...createShape({ position: { x: 10, y: 10 }, size: { w: 40, h: 40 } }),
+      id: 'token-a',
+      version: 7,
+      layerId: 'player-player-a',
+      tokenKind: 'player',
+      characterId: 'player-a',
+      sceneMemberId: 'member-a',
+    };
+    const document = (elements: unknown[]) => ({
+      elements,
+      layers: [],
+      extensions: {},
+    });
+    authority.install(document([base]));
+    authority.submit.mockClear();
+    const info = {
+      ids: ['token-a'],
+      origins: new Map([['token-a', base.position]]),
+      pointer: base.position,
+      pointerType: 'mouse',
+    } as never;
+    observer?.onDragStart?.(info, {} as never);
+    store.update('token-a', { position: { x: 20, y: 20 } });
+    store.update('token-a', { position: { x: 30, y: 30 } });
+    authority.install(document([base]));
+    expect(store.getById('token-a')?.position).toEqual({ x: 30, y: 30 });
+    store.update('token-a', { position: { x: 40, y: 40 } });
+    expect(authority.submit).not.toHaveBeenCalled();
+    observer?.onDragEnd?.(info, {} as never);
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    expect(authority.submit).toHaveBeenCalledWith({
+      kind: 'upsert',
+      element: expect.objectContaining({
+        id: 'token-a',
+        position: { x: 40, y: 40 },
+        version: 8,
+      }),
+    });
+    authority.install(document([base]));
+    expect(store.getById('token-a')?.position).toEqual({ x: 40, y: 40 });
+    authority.install(
+      document([{ ...base, position: { x: 40, y: 40 }, version: 8 }])
+    );
+    expect(store.getById('token-a')?.position).toEqual({ x: 40, y: 40 });
+    connection.stop();
+    expect(observer).toBeUndefined();
   });
 });
 

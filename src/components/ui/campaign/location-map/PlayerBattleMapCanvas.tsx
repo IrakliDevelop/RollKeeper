@@ -827,6 +827,9 @@ export function PlayerBattleMapCanvas({
       campaignCode,
       battleMapId,
       store: vp.store,
+      selectTool: tools.find(
+        (tool): tool is SelectTool => tool instanceof SelectTool
+      ),
       clientId: characterId,
       tokenRequest: { role: 'player', battleMapId, playerId: characterId },
       fog: { manager: fogManager },

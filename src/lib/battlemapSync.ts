@@ -10,7 +10,12 @@ import {
   type RemoteLayerUpdate,
   type ResolveLocalOnly,
 } from '@fieldnotes/sync';
-import type { ElementStore, CanvasElement, Layer } from '@fieldnotes/core';
+import type {
+  ElementStore,
+  CanvasElement,
+  Layer,
+  SelectTool,
+} from '@fieldnotes/core';
 import type { FogManager } from '@fieldnotes/vtt';
 import { createFogClientPlugin } from '@fieldnotes/vtt/sync';
 import { battleMapRelayRoom } from '@/lib/battlemapRoom';
@@ -171,6 +176,8 @@ export interface ManagedConnectionOptions {
   campaignCode: string;
   battleMapId: string;
   store: ElementStore;
+  /** The player's select tool, used to commit token moves once per drag. */
+  selectTool?: SelectTool;
   /** MUST equal the userId the token route returns for this role. */
   clientId: string;
   tokenRequest: BattleMapTokenRequest;

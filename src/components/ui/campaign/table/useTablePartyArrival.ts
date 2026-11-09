@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
-import { dispositionColor } from '@/components/ui/campaign/dm-vtt/combatantToken';
+import {
+  buildCircularTokenUrl,
+  tokenAvatarUrl,
+  tokenColorForId,
+} from '@/components/ui/campaign/location-map/PlayerTokenTool';
 import type { TableRepository } from '@/lib/table/repository';
 import {
   deriveSceneRoster,
@@ -192,13 +196,22 @@ export function useTablePartyArrival(options: {
           }
         }
         canvas.ensurePlayerBand(entry.control.legacyPlayerId, entry.name);
+        const avatar = tokenAvatarUrl(entry.avatarUrl ?? undefined);
+        const color = tokenColorForId(entry.control.legacyPlayerId);
+        const portrait = avatar
+          ? ((await buildCircularTokenUrl(
+              avatar,
+              color,
+              entry.control.legacyPlayerId
+            )) ?? avatar)
+          : undefined;
         const placed = canvas.stampAt(
           {
             tokenId,
             sceneMemberId: entry.sceneMemberId,
             name: entry.name,
-            ...(entry.avatarUrl ? { avatarUrl: entry.avatarUrl } : {}),
-            color: dispositionColor({ type: 'player' }),
+            ...(portrait ? { avatarUrl: portrait } : {}),
+            color,
             tokenCells: entry.tokenCells,
             fields: {
               ...partyTokenFields(

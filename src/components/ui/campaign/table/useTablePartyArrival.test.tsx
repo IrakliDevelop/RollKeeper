@@ -107,7 +107,11 @@ async function addMember(player: TableCampaignPlayer) {
   });
 }
 
-function mount(canvas: TableRosterCanvas | null, live = true) {
+function mount(
+  canvas: TableRosterCanvas | null,
+  live = true,
+  players = PLAYERS
+) {
   return renderHook(
     ({ live: isLive }: { live: boolean }) =>
       useTablePartyArrival({
@@ -117,7 +121,7 @@ function mount(canvas: TableRosterCanvas | null, live = true) {
         dmId: 'dm-1',
         canvas,
         live: isLive,
-        players: PLAYERS,
+        players,
       }),
     { initialProps: { live } }
   );
@@ -137,6 +141,36 @@ async function setArrival() {
 }
 
 describe('W11 party arrival', () => {
+  it('uses the campaign character portrait when bringing a player', async () => {
+    const originalImage = window.Image;
+    class FailedImage {
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        queueMicrotask(() => this.onerror?.());
+      }
+    }
+    window.Image = FailedImage as unknown as typeof Image;
+    try {
+      await setArrival();
+      const { canvas } = fakeCanvas();
+      const players = [
+        { ...PLAYERS[0]!, avatarUrl: 'https://example.com/aria.png' },
+      ];
+      const { result } = mount(canvas, true, players);
+      await act(async () => result.current.bringParty());
+      expect(canvas.stampAt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Aria',
+          avatarUrl: 'https://example.com/aria.png',
+        }),
+        { x: 300, y: 200 },
+        0
+      );
+    } finally {
+      window.Image = originalImage;
+    }
+  });
+
   it('is disabled with a reason until an arrival point exists and the scene is live', async () => {
     const { canvas } = fakeCanvas();
     const { result, rerender } = mount(canvas, false);

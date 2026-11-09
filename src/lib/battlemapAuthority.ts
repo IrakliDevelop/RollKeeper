@@ -1,4 +1,10 @@
-import type { CanvasElement, ElementStore, Layer } from '@fieldnotes/core';
+import type {
+  CanvasElement,
+  ElementStore,
+  Layer,
+  Point,
+  SelectTool,
+} from '@fieldnotes/core';
 import {
   bearerSubprotocols,
   createManagedAuthorityConnection,
@@ -28,6 +34,7 @@ interface AuthorityOptions {
   campaignCode: string;
   battleMapId: string;
   store: ElementStore;
+  selectTool?: SelectTool;
   clientId: string;
   tokenRequest: BattleMapTokenRequest;
   resolveAudience?: (element: CanvasElement) => string | undefined;
@@ -411,6 +418,71 @@ export function createManagedBattleMapAuthorityConnection(
       },
     });
   };
+  // SelectTool updates the store on every pointer move. For a controlled
+  // player token these are previews: the authority accepts at most ten
+  // upserts/second and each intermediate SDK version would make later moves
+  // invalid. Commit the final position against the confirmed version.
+  const dragging = new Set<string>();
+  const pendingDrags = new Map<
+    string,
+    {
+      desired: Point;
+      submitted: Point;
+    }
+  >();
+  const confirmedElement = (id: string): CanvasElement | null => {
+    const element = connection
+      .getState()
+      .document?.elements.find(item => item.id === id);
+    return element
+      ? canvasElement(element as unknown as Record<string, unknown>)
+      : null;
+  };
+  const samePoint = (a: Point, b: Point): boolean => a.x === b.x && a.y === b.y;
+  const submitDrag = (id: string, desired: Point): void => {
+    const confirmed = confirmedElement(id);
+    if (!confirmed || samePoint(confirmed.position, desired)) return;
+    pendingDrags.set(id, { desired, submitted: desired });
+    submitElement({
+      ...confirmed,
+      position: desired,
+      version: confirmed.version + 1,
+    });
+  };
+  const unsubscribeDrag =
+    options.tokenRequest.role === 'player'
+      ? options.selectTool?.addDragObserver({
+          onDragStart: info => {
+            for (const id of info.ids) {
+              const element = options.store.getById(id);
+              const control = element as
+                | (CanvasElement & {
+                    tokenKind?: string;
+                    characterId?: string;
+                  })
+                | undefined;
+              if (
+                control?.tokenKind === 'player' &&
+                control.characterId === options.clientId
+              )
+                dragging.add(id);
+            }
+          },
+          onDragEnd: info => {
+            for (const id of info.ids) {
+              if (!dragging.delete(id)) continue;
+              const element = options.store.getById(id);
+              if (!element) continue;
+              const pending = pendingDrags.get(id);
+              if (pending) pending.desired = element.position;
+              else submitDrag(id, element.position);
+            }
+          },
+          onDragCancel: info => {
+            for (const id of info.ids) dragging.delete(id);
+          },
+        })
+      : undefined;
   const unsubscribers = [
     options.store.on('add', (element, meta) => {
       if (
@@ -420,6 +492,7 @@ export function createManagedBattleMapAuthorityConnection(
         submitElement(element);
     }),
     options.store.on('update', (event, meta) => {
+      if (dragging.has(event.current.id)) return;
       if (
         !applyingRemote &&
         (meta.origin === undefined || meta.origin === 'local')
@@ -674,6 +747,15 @@ export function createManagedBattleMapAuthorityConnection(
       firstLiveSeen = true;
     }
     options.onStatus?.(state.status);
+    // A rejected final move must reveal the confirmed position again.
+    for (const operation of state.operations) {
+      if (
+        operation.status !== 'rejected' ||
+        operation.proposal.mutation.kind !== 'upsert'
+      )
+        continue;
+      pendingDrags.delete(operation.proposal.mutation.element.id);
+    }
     restoreRejectedEdits(state);
     const document = state.document;
     if (!document || document === lastDocument) {
@@ -684,12 +766,23 @@ export function createManagedBattleMapAuthorityConnection(
     lastDocument = document;
     applyingRemote = true;
     try {
+      const previews = new Map<string, Point>();
+      for (const id of dragging) {
+        const local = options.store.getById(id);
+        if (local) previews.set(id, local.position);
+      }
+      for (const [id, pending] of pendingDrags)
+        previews.set(id, pending.desired);
       options.store.loadSnapshot(
         document.elements.map(element =>
           canvasElement(element as unknown as Record<string, unknown>)
         ),
         { origin: 'remote' }
       );
+      for (const [id, position] of previews) {
+        if (options.store.getById(id))
+          options.store.update(id, { position }, { origin: 'remote' });
+      }
       // Held local edits are not in the snapshot yet; keep them visible.
       reapplyHeld();
       for (const record of document.layers) {
@@ -747,6 +840,16 @@ export function createManagedBattleMapAuthorityConnection(
     // superseded offline work (J1, FF1), then admit held edits.
     releaseSettled(inner);
     flushHeld();
+    for (const [id, pending] of pendingDrags) {
+      const confirmed = confirmedElement(id);
+      if (!confirmed) {
+        pendingDrags.delete(id);
+      } else if (samePoint(confirmed.position, pending.submitted)) {
+        pendingDrags.delete(id);
+        if (!samePoint(confirmed.position, pending.desired))
+          submitDrag(id, pending.desired);
+      }
+    }
   };
   let unsubscribeAuthority = connection.subscribe(() =>
     onAuthorityChange(connection)
@@ -782,6 +885,8 @@ export function createManagedBattleMapAuthorityConnection(
     unsubscribeAuthority();
     connection.stop();
     binding = next;
+    dragging.clear();
+    pendingDrags.clear();
     everLive = false;
     lastDocument = null;
     restoredRejections.clear();
@@ -831,6 +936,7 @@ export function createManagedBattleMapAuthorityConnection(
       held = [];
       unsubscribeAuthority();
       unsubscribers.forEach(unsubscribe => unsubscribe());
+      unsubscribeDrag?.();
       connection.stop();
     },
     publishLayerUpsert(definition: Layer) {

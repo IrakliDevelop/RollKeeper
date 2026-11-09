@@ -52,8 +52,6 @@ export function createBattleMapPokeListener(
   let connecting = false;
   let generation = 0;
 
-  const room = battleMapRelayRoom(opts.campaignCode, opts.battleMapId);
-
   const clearRetryTimer = (): void => {
     if (retryTimer) {
       clearTimeout(retryTimer);
@@ -131,6 +129,8 @@ export function createBattleMapPokeListener(
         scheduleRetry(() => void connect());
         return;
       }
+      const room =
+        result.room ?? battleMapRelayRoom(opts.campaignCode, opts.battleMapId);
       const url = `${relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(result.token)}`;
       openSocket(url);
     } finally {

@@ -15,7 +15,10 @@ const body = {
       playerName: 'Sam',
       characterId: 'char-aria',
       characterName: 'Aria',
-      characterData: { hitPoints: { current: 12, max: 20 } },
+      characterData: {
+        avatar: 'https://example.com/aria.png',
+        hitPoints: { current: 12, max: 20 },
+      },
       lastSynced: '2026-10-07T00:00:00.000Z',
     },
   ],
@@ -48,6 +51,11 @@ describe('Table players snapshot refresh (C3-6)', () => {
       data: [
         expect.objectContaining({
           characterData: body.players[0]!.characterData,
+        }),
+      ],
+      players: [
+        expect.objectContaining({
+          avatarUrl: 'https://example.com/aria.png',
         }),
       ],
     });
@@ -203,7 +211,12 @@ describe('acceptance A1: reload() returns a fresh snapshot', () => {
     });
     expect(vi.mocked(fetch).mock.calls.length).toBe(before + 1);
     await expect(first).resolves.toEqual([
-      { playerId: 'legacy-aria', characterId: 'char-aria', name: 'Aria' },
+      {
+        playerId: 'legacy-aria',
+        characterId: 'char-aria',
+        name: 'Aria',
+        avatarUrl: 'https://example.com/aria.png',
+      },
     ]);
     await expect(second).resolves.toEqual(await first);
     expect(cache.get('CAMP')?.players).toHaveLength(1);

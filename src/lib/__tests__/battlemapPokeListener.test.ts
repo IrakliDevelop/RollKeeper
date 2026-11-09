@@ -111,6 +111,20 @@ describe('createBattleMapPokeListener', () => {
     stop();
   });
 
+  it('uses the server-resolved Table room for an authority token', async () => {
+    mockMint.mockResolvedValue({
+      token: 'table-token',
+      authority: 1,
+      room: 'scene-uuid',
+    });
+    const stop = createBattleMapPokeListener(baseOpts());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeWebSocket.instances[0].url).toBe(
+      'wss://relay.example?room=scene-uuid&token=table-token'
+    );
+    stop();
+  });
+
   it('2. never calls socket.send', async () => {
     const opts = baseOpts();
     const stop = createBattleMapPokeListener(opts);

@@ -172,6 +172,9 @@ async function readOnce(
       playerId: row.playerId,
       characterId: row.characterId,
       name: row.characterName || row.playerName || row.playerId,
+      ...(row.characterData?.avatar
+        ? { avatarUrl: row.characterData.avatar }
+        : {}),
     })),
     campaignPlayers: rows.map(row => ({
       id: row.playerId,
