@@ -375,8 +375,8 @@ describe('NPCFormDialog field wiring', () => {
 });
 
 describe('V195: editing an NPC without a stat block', () => {
-  // Red on the old component (the edit effect wipes these fields). Task 3 flips
-  // each it.fails back to it once the split fixes V195.
+  // V195: an NPC without a stat block keeps its resources, hit dice,
+  // proficiency bonus and passives on save.
   it('keeps resources, hit dice, proficiency and passives when it has ability scores', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog(QUICK_NPC_WITH_SCORES);

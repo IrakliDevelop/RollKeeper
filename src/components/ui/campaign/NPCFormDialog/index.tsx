@@ -28,10 +28,7 @@ import { NumberInput, NumberField } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { Badge } from '@/components/ui/layout/badge';
-import { Switch } from '@/components/ui/forms/switch';
-import { CampaignNPC, NPCSpellcastingAbility } from '@/types/encounter';
-import { FULL_CASTER_SPELL_SLOTS } from '@/utils/constants';
-import { getNPCSpellcastingAbilityScore } from '@/utils/npcSpellcasting';
+import { CampaignNPC } from '@/types/encounter';
 import { ProcessedMonster, CREATURE_TYPES, SIZES } from '@/types/bestiary';
 import { ProcessedItem } from '@/types/items';
 import { ItemAutocomplete } from '@/components/ui/forms/ItemAutocomplete';
@@ -44,16 +41,8 @@ import {
 } from '@/components/ui/game/inventory/ItemForm';
 import type { InventoryFormData } from '@/components/ui/game/inventory/ItemForm';
 import { npcInventoryItemToFormData } from '@/utils/npcInventoryItemForm';
-import { NPCSpellListEditor } from '../NPCSpellListEditor';
-import { AbilityListEditor } from '../AbilityListEditor';
-import { NpcResourcesEditor } from '../NpcResourcesEditor';
-import { NpcInflictsEditor } from '../NpcInflictsEditor';
-import type { CustomCondition } from '@/types/encounter';
-import { useEncounterStore } from '@/store/encounterStore';
-import { useOfficialConditions } from '@/hooks/useOfficialConditions';
-import { EMPTY_CUSTOM_CONDITIONS } from '@/utils/customConditions';
-import { abilityMod, DIE_TYPES, withPassiveOverride } from './npcFormDraft';
-import type { AbilityKey, NpcFormDraft } from './npcFormDraft';
+import { StatBlockTab } from './StatBlockTab';
+import { SpellsTab } from './SpellsTab';
 import { useNpcFormState } from './useNpcFormState';
 
 interface NPCFormDialogProps {
@@ -112,8 +101,6 @@ export function NPCFormDialog({
   // Item database for inventory autocomplete
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
   const { items: dbMagicItems } = useMagicItemsData();
-  const { conditions: officialConditions, loading: officialConditionsLoading } =
-    useOfficialConditions();
 
   // Active form tab
   const [activeFormTab, setActiveFormTab] = useState<FormTab>('basic');
@@ -131,12 +118,6 @@ export function NPCFormDialog({
 
   // Tags
   const [tagInput, setTagInput] = useState('');
-
-  // Condition library
-  const conditionLibrary = useEncounterStore(
-    state => state.combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
-  );
-  const setCombatConfig = useEncounterStore(state => state.setCombatConfig);
 
   // Inventory edit form
   const [inventoryEditFormOpen, setInventoryEditFormOpen] = useState(false);
@@ -209,10 +190,6 @@ export function NPCFormDialog({
     form.importMonster(monster);
     setBestiaryQuery('');
     setBestiaryResults([]);
-  };
-
-  const handleCreateConditionInLibrary = (condition: CustomCondition) => {
-    setCombatConfig({ customConditions: [...conditionLibrary, condition] });
   };
 
   // ---------- Portrait Upload ----------
@@ -616,259 +593,12 @@ export function NPCFormDialog({
               )}
 
               {activeFormTab === 'statblock' && (
-                <>
-                  {/* ===== Ability Scores ===== */}
-                  <div>
-                    <label className="text-heading mb-1.5 block text-sm font-medium">
-                      Ability Scores
-                    </label>
-                    <div className="grid grid-cols-6 gap-2">
-                      {(
-                        [
-                          ['STR', 'str'],
-                          ['DEX', 'dex'],
-                          ['CON', 'con'],
-                          ['INT', 'int'],
-                          ['WIS', 'wis'],
-                          ['CHA', 'cha'],
-                        ] as const satisfies ReadonlyArray<
-                          readonly [string, AbilityKey]
-                        >
-                      ).map(([label, key]) => (
-                        <div key={label} className="text-center">
-                          <span className="text-muted block text-[10px] font-medium uppercase">
-                            {label}
-                          </span>
-                          <NumberField
-                            value={draft[key]}
-                            onChange={v =>
-                              update({ [key]: v ?? 0 } as Pick<
-                                NpcFormDraft,
-                                AbilityKey
-                              >)
-                            }
-                            min={1}
-                            max={30}
-                            className="bg-surface border-divider text-heading w-full rounded border px-1 py-1 text-center text-sm"
-                          />
-                          <span className="text-muted text-[10px]">
-                            {abilityMod(draft[key])}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ===== Details ===== */}
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        value={draft.saves}
-                        onChange={e => update({ saves: e.target.value })}
-                        label="Saving Throws"
-                        placeholder="Dex +4, Wis +2"
-                      />
-                      <Input
-                        value={draft.skills}
-                        onChange={e => update({ skills: e.target.value })}
-                        label="Skills"
-                        placeholder="Perception +4, Stealth +6"
-                      />
-                      <Input
-                        value={draft.resistances}
-                        onChange={e => update({ resistances: e.target.value })}
-                        label="Resistances"
-                        placeholder="fire, cold"
-                      />
-                      <Input
-                        value={draft.immunities}
-                        onChange={e => update({ immunities: e.target.value })}
-                        label="Immunities"
-                        placeholder="poison"
-                      />
-                      <Input
-                        value={draft.vulnerabilities}
-                        onChange={e =>
-                          update({ vulnerabilities: e.target.value })
-                        }
-                        label="Vulnerabilities"
-                        placeholder="radiant"
-                      />
-                      <Input
-                        value={draft.conditionImmunities}
-                        onChange={e =>
-                          update({ conditionImmunities: e.target.value })
-                        }
-                        label="Condition Immunities"
-                        placeholder="poisoned, charmed"
-                      />
-                      <Input
-                        value={draft.senses}
-                        onChange={e => update({ senses: e.target.value })}
-                        label="Senses"
-                        placeholder="Darkvision 60 ft."
-                      />
-                      <Input
-                        value={draft.languages}
-                        onChange={e => update({ languages: e.target.value })}
-                        label="Languages"
-                        placeholder="Common, Sylvan"
-                      />
-                    </div>
-
-                    {/* ===== Inflicted conditions ===== */}
-                    <NpcInflictsEditor
-                      conditions={draft.inflictableConditions}
-                      library={conditionLibrary}
-                      officialConditions={officialConditions}
-                      officialConditionsLoading={officialConditionsLoading}
-                      onChange={inflictableConditions =>
-                        update({ inflictableConditions })
-                      }
-                      onCreateInLibrary={handleCreateConditionInLibrary}
-                    />
-
-                    {/* CR & Proficiency Bonus */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="w-full">
-                        <Input
-                          value={draft.cr}
-                          onChange={e => update({ cr: e.target.value })}
-                          label="CR"
-                          placeholder="0"
-                        />
-                      </div>
-                      <NumberInput
-                        value={derived.proficiencyBonus}
-                        onChange={v => update({ proficiencyOverride: v ?? 2 })}
-                        label="Prof Bonus"
-                        min={2}
-                        max={9}
-                        title="Proficiency bonus (auto-calculated from CR, overridable)"
-                      />
-                    </div>
-
-                    {/* Hit Dice */}
-                    <div>
-                      <label className="text-heading mb-1.5 block text-sm font-medium">
-                        Hit Dice
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <NumberInput
-                          value={draft.hitDiceMax}
-                          onChange={v => update({ hitDiceMax: v ?? 0 })}
-                          label="Max"
-                          min={0}
-                          placeholder="8"
-                        />
-                        <SelectField
-                          label="Die Type"
-                          value={draft.hitDieType}
-                          onValueChange={v => update({ hitDieType: v })}
-                        >
-                          {DIE_TYPES.map(d => (
-                            <SelectItem key={d} value={d}>
-                              {d}
-                            </SelectItem>
-                          ))}
-                        </SelectField>
-                        <NumberInput
-                          value={draft.hitDieCurrent}
-                          onChange={v => update({ hitDieCurrent: v ?? 0 })}
-                          label="Current"
-                          min={0}
-                          placeholder="8"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Passive Abilities */}
-                    <div>
-                      <label className="text-heading mb-1.5 block text-sm font-medium">
-                        Passive Abilities
-                        <span className="text-faint ml-1 text-xs font-normal">
-                          (auto-calculated, overridable)
-                        </span>
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <NumberInput
-                          value={derived.passivePerception}
-                          onChange={v =>
-                            update(d =>
-                              withPassiveOverride(d, 'perception', v ?? 0)
-                            )
-                          }
-                          label="Passive Perception"
-                          min={1}
-                        />
-                        <NumberInput
-                          value={derived.passiveInsight}
-                          onChange={v =>
-                            update(d =>
-                              withPassiveOverride(d, 'insight', v ?? 0)
-                            )
-                          }
-                          label="Passive Insight"
-                          min={1}
-                        />
-                        <NumberInput
-                          value={derived.passiveInvestigation}
-                          onChange={v =>
-                            update(d =>
-                              withPassiveOverride(d, 'investigation', v ?? 0)
-                            )
-                          }
-                          label="Passive Investigation"
-                          min={1}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ===== Class Resources ===== */}
-                  <NpcResourcesEditor
-                    resources={draft.resources}
-                    onChange={resources => update({ resources })}
-                    onDeleteResource={form.deleteResource}
-                  />
-
-                  {/* ===== Traits / Actions / Reactions ===== */}
-                  <AbilityListEditor
-                    label="Traits"
-                    items={draft.traits}
-                    onChange={traits => update({ traits })}
-                    resources={draft.resources}
-                    inventoryItems={draft.inventoryItems}
-                  />
-                  <AbilityListEditor
-                    label="Actions"
-                    items={draft.actions}
-                    onChange={actions => update({ actions })}
-                    resources={draft.resources}
-                    inventoryItems={draft.inventoryItems}
-                  />
-                  <AbilityListEditor
-                    label="Bonus Actions"
-                    items={draft.bonusActions}
-                    onChange={bonusActions => update({ bonusActions })}
-                    resources={draft.resources}
-                    inventoryItems={draft.inventoryItems}
-                  />
-                  <AbilityListEditor
-                    label="Reactions"
-                    items={draft.reactions}
-                    onChange={reactions => update({ reactions })}
-                    resources={draft.resources}
-                    inventoryItems={draft.inventoryItems}
-                  />
-                  <AbilityListEditor
-                    label="Lair Actions"
-                    items={draft.lairActions}
-                    onChange={lairActions => update({ lairActions })}
-                    resources={draft.resources}
-                    inventoryItems={draft.inventoryItems}
-                  />
-                </>
+                <StatBlockTab
+                  draft={draft}
+                  update={update}
+                  derived={derived}
+                  onDeleteResource={form.deleteResource}
+                />
               )}
 
               {activeFormTab === 'inventory' && (
@@ -1036,198 +766,11 @@ export function NPCFormDialog({
               )}
 
               {activeFormTab === 'spellcasting' && (
-                <>
-                  {/* ===== Spellcasting ===== */}
-                  <div className="space-y-3">
-                    {/* Enable toggle */}
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={draft.spellcastingEnabled}
-                        onCheckedChange={v =>
-                          update({ spellcastingEnabled: v })
-                        }
-                        id="spellcasting-enabled"
-                      />
-                      <label
-                        htmlFor="spellcasting-enabled"
-                        className="text-body text-sm font-medium"
-                      >
-                        Enable Spellcasting
-                      </label>
-                    </div>
-
-                    {draft.spellcastingEnabled && (
-                      <div className="space-y-3">
-                        {/* Caster Level + Ability */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-muted mb-1 block text-xs font-medium">
-                              Caster Level
-                            </label>
-                            <NumberInput
-                              min={1}
-                              max={20}
-                              value={draft.casterLevel}
-                              onChange={v => update({ casterLevel: v ?? 1 })}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-muted mb-1 block text-xs font-medium">
-                              Spellcasting Ability
-                            </label>
-                            <SelectField
-                              value={draft.spellcastingAbility}
-                              onValueChange={v =>
-                                update({
-                                  spellcastingAbility:
-                                    v as NPCSpellcastingAbility,
-                                })
-                              }
-                            >
-                              <SelectItem value="intelligence">
-                                Intelligence
-                              </SelectItem>
-                              <SelectItem value="wisdom">Wisdom</SelectItem>
-                              <SelectItem value="charisma">Charisma</SelectItem>
-                            </SelectField>
-                          </div>
-                        </div>
-
-                        {/* Auto-calculated display */}
-                        {(() => {
-                          const abilityScore = getNPCSpellcastingAbilityScore(
-                            draft.spellcastingAbility,
-                            {
-                              str: draft.str,
-                              dex: draft.dex,
-                              con: draft.con,
-                              int: draft.int,
-                              wis: draft.wis,
-                              cha: draft.cha,
-                            }
-                          );
-                          const prof = derived.proficiencyBonus;
-                          const autoAttack =
-                            Math.floor((abilityScore - 10) / 2) + prof;
-                          const autoDC =
-                            8 + Math.floor((abilityScore - 10) / 2) + prof;
-                          return (
-                            <p className="text-muted text-xs">
-                              Auto: Spell Attack{' '}
-                              <span className="font-semibold">
-                                {autoAttack >= 0
-                                  ? `+${autoAttack}`
-                                  : autoAttack}
-                              </span>
-                              , Save DC{' '}
-                              <span className="font-semibold">{autoDC}</span> (
-                              {draft.spellcastingAbility
-                                .charAt(0)
-                                .toUpperCase() +
-                                draft.spellcastingAbility.slice(1)}{' '}
-                              {abilityScore}, Prof +{prof})
-                            </p>
-                          );
-                        })()}
-
-                        {/* Override fields */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-muted mb-1 block text-xs font-medium">
-                              Spell Attack Override
-                            </label>
-                            <NumberInput
-                              placeholder="Auto"
-                              value={draft.spellAttackOverride}
-                              onChange={v => update({ spellAttackOverride: v })}
-                              allowEmpty
-                            />
-                          </div>
-                          <div>
-                            <label className="text-muted mb-1 block text-xs font-medium">
-                              Save DC Override
-                            </label>
-                            <NumberInput
-                              placeholder="Auto"
-                              value={draft.spellDCOverride}
-                              onChange={v => update({ spellDCOverride: v })}
-                              allowEmpty
-                            />
-                          </div>
-                        </div>
-
-                        {/* Spell Slot Overrides */}
-                        <div>
-                          <label className="text-muted mb-1 block text-xs font-medium">
-                            Spell Slots (by Caster Level {draft.casterLevel})
-                          </label>
-                          <div className="bg-surface-secondary border-divider rounded-md border p-2">
-                            <div className="space-y-1">
-                              {(() => {
-                                const baseSlots =
-                                  FULL_CASTER_SPELL_SLOTS[draft.casterLevel] ??
-                                  {};
-                                const levels = Array.from(
-                                  { length: 9 },
-                                  (_, i) => i + 1
-                                );
-                                const activeLevels = levels.filter(
-                                  lvl =>
-                                    (baseSlots[lvl] ?? 0) > 0 ||
-                                    draft.spellSlotOverrides[lvl] !== undefined
-                                );
-                                if (activeLevels.length === 0) {
-                                  return (
-                                    <p className="text-muted text-xs italic">
-                                      No spell slots at this caster level.
-                                    </p>
-                                  );
-                                }
-                                return activeLevels.map(lvl => (
-                                  <div
-                                    key={lvl}
-                                    className="flex items-center gap-2"
-                                  >
-                                    <span className="text-body w-20 text-xs font-medium">
-                                      Level {lvl}: {baseSlots[lvl] ?? 0}
-                                    </span>
-                                    <NumberInput
-                                      min={0}
-                                      placeholder={String(baseSlots[lvl] ?? 0)}
-                                      value={draft.spellSlotOverrides[lvl]}
-                                      onChange={v => {
-                                        update(d => ({
-                                          spellSlotOverrides: {
-                                            ...d.spellSlotOverrides,
-                                            [lvl]: v,
-                                          },
-                                        }));
-                                      }}
-                                      allowEmpty
-                                      className="h-7 w-20 text-xs"
-                                    />
-                                    <span className="text-muted text-xs">
-                                      override
-                                    </span>
-                                  </div>
-                                ));
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-muted mb-1 block text-xs font-medium">
-                            Spell List
-                          </label>
-                          <NPCSpellListEditor
-                            spells={draft.spells}
-                            onChange={spells => update({ spells })}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
+                <SpellsTab
+                  draft={draft}
+                  update={update}
+                  proficiencyBonus={derived.proficiencyBonus}
+                />
               )}
 
               {activeFormTab === 'lore' && (
