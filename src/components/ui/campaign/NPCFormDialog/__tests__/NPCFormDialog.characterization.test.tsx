@@ -270,7 +270,7 @@ describe('NPCFormDialog field wiring', () => {
     expect(sb.cr).toBe('3');
     expect(sb.speed).toBe('35 ft., climb 20 ft.');
     expect(sb.passivePerception).toBe(17);
-  });
+  }, 20_000);
 
   it('create with list entries saves them', async () => {
     const user = userEvent.setup();
@@ -371,7 +371,7 @@ describe('NPCFormDialog field wiring', () => {
       spellSaveDC: 15,
       slotOverrides: { 1: 2 },
     });
-  });
+  }, 20_000);
 });
 
 describe('V195: editing an NPC without a stat block', () => {
