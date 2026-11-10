@@ -1,5 +1,179 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`NPCFormDialog field wiring > create with every field filled saves each value in its own key 1`] = `
+{
+  "armorClass": "17 (chain mail)",
+  "avatarUrl": undefined,
+  "bestiarySourceId": undefined,
+  "description": "Gruff caravan guard",
+  "group": "Caravan Guard",
+  "hitDice": {
+    "current": 4,
+    "dieType": "d10",
+    "max": 6,
+  },
+  "initiativeModifier": 7,
+  "inventory": undefined,
+  "loreHtml": undefined,
+  "maxHp": 41,
+  "monsterStatBlock": {
+    "actions": [],
+    "alignment": "Chaotic Neutral",
+    "bonusActions": [],
+    "cha": 16,
+    "con": 13,
+    "conditionImmunities": [
+      "poisoned",
+      "charmed",
+    ],
+    "cr": "3",
+    "dex": 12,
+    "hpFormula": "5d8+10",
+    "immunities": "poison",
+    "int": 14,
+    "lairActions": [],
+    "languages": "Common, Sylvan",
+    "passivePerception": 17,
+    "reactions": [],
+    "resistances": "fire, cold",
+    "saves": "Dex +4, Wis +2",
+    "senses": "Darkvision 60 ft.",
+    "size": "Large",
+    "skills": "Perception +4",
+    "speed": "35 ft., climb 20 ft.",
+    "str": 11,
+    "traits": [],
+    "type": "Beast",
+    "vulnerabilities": "radiant",
+    "wis": 15,
+  },
+  "name": "Brenn Voss",
+  "passiveInsight": 18,
+  "passiveInvestigation": 19,
+  "passivePerception": 17,
+  "proficiencyBonus": 5,
+  "resources": undefined,
+  "speed": "35 ft., climb 20 ft.",
+  "spellcasting": undefined,
+  "tags": [
+    "ally",
+  ],
+  "tempAc": "2 (shield)",
+  "tempHp": 6,
+  "xp": 450,
+}
+`;
+
+exports[`NPCFormDialog field wiring > create with list entries saves them 1`] = `
+{
+  "armorClass": "10",
+  "avatarUrl": undefined,
+  "bestiarySourceId": undefined,
+  "description": undefined,
+  "group": undefined,
+  "hitDice": undefined,
+  "initiativeModifier": 0,
+  "inventory": [
+    {
+      "equipped": true,
+      "id": "inv-0",
+      "name": "Hemp rope",
+      "quantity": 5,
+    },
+  ],
+  "loreHtml": undefined,
+  "maxHp": 10,
+  "monsterStatBlock": {
+    "actions": [
+      {
+        "name": "Mace Strike",
+        "text": "",
+        "uses": 3,
+      },
+    ],
+    "alignment": "",
+    "bonusActions": [
+      {
+        "name": "Healing Word",
+        "text": "",
+      },
+    ],
+    "cha": 10,
+    "con": 10,
+    "conditionImmunities": [],
+    "cr": "0",
+    "dex": 10,
+    "hpFormula": "",
+    "immunities": "",
+    "int": 10,
+    "lairActions": [
+      {
+        "name": "Tremor",
+        "text": "",
+      },
+    ],
+    "languages": "",
+    "passivePerception": 10,
+    "reactions": [
+      {
+        "name": "Parry",
+        "text": "",
+      },
+    ],
+    "resistances": "",
+    "saves": "",
+    "senses": "",
+    "size": "Medium",
+    "skills": "",
+    "speed": "30 ft.",
+    "str": 10,
+    "traits": [
+      {
+        "name": "Keen Smell",
+        "text": "",
+        "uses": 2,
+      },
+    ],
+    "type": "Humanoid",
+    "vulnerabilities": "",
+    "wis": 10,
+  },
+  "name": "Sister Vale",
+  "passiveInsight": 10,
+  "passiveInvestigation": 10,
+  "passivePerception": 10,
+  "proficiencyBonus": 2,
+  "resources": [
+    {
+      "color": "purple",
+      "displayStyle": "pips",
+      "icon": "sparkles",
+      "id": "res-0",
+      "maxUses": 2,
+      "name": "Channel Divinity",
+      "shortRestReset": 0,
+      "usesExpended": 0,
+    },
+  ],
+  "speed": "30 ft.",
+  "spellcasting": {
+    "ability": "wisdom",
+    "casterLevel": 5,
+    "slotOverrides": {
+      "1": 2,
+    },
+    "slotsUsed": {},
+    "spellAttackBonus": 9,
+    "spellSaveDC": 15,
+    "spells": [],
+  },
+  "tags": undefined,
+  "tempAc": undefined,
+  "tempHp": undefined,
+  "xp": undefined,
+}
+`;
+
 exports[`NPCFormDialog payloads > bestiary import saves the imported stat block 1`] = `
 {
   "armorClass": "15",

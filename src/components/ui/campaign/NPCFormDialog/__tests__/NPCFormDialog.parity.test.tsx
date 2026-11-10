@@ -61,12 +61,15 @@ function describeControl(el: Element): string {
     el.getAttribute('type'),
     el.getAttribute('role'),
     el.getAttribute('aria-label'),
+    el.getAttribute('title'),
     collapse(field.labels?.[0]?.textContent),
     el.getAttribute('placeholder'),
     'value' in field ? field.value : '',
     isToggle && field.checked ? 'checked' : '',
     field.disabled ? 'disabled' : '',
     el.getAttribute('aria-selected'),
+    el.getAttribute('aria-checked'),
+    el.getAttribute('aria-expanded'),
   ];
   return parts.filter(part => part).join('|');
 }
