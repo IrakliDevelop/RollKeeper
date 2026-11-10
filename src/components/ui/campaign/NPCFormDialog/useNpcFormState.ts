@@ -66,7 +66,10 @@ export function useNpcFormState({
   }, []);
 
   const derived = useMemo(() => deriveAutoFields(draft), [draft]);
-  const isDirty = !draftsEqual(draft, baseline);
+  const isDirty = useMemo(
+    () => !draftsEqual(draft, baseline),
+    [draft, baseline]
+  );
   const canSubmit = canSubmitDraft(draft);
 
   const submit = () => {

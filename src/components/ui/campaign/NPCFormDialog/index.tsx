@@ -29,20 +29,11 @@ import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
-import {
-  CampaignNPC,
-  MonsterStatBlock,
-  NPCInventoryItem,
-  NPCSpellcastingAbility,
-} from '@/types/encounter';
+import { CampaignNPC, NPCSpellcastingAbility } from '@/types/encounter';
 import { FULL_CASTER_SPELL_SLOTS } from '@/utils/constants';
 import { getNPCSpellcastingAbilityScore } from '@/utils/npcSpellcasting';
 import { ProcessedMonster, CREATURE_TYPES, SIZES } from '@/types/bestiary';
 import { ProcessedItem } from '@/types/items';
-import {
-  buildMonsterStatBlock,
-  parseRechargeFromName,
-} from '@/utils/encounterConverter';
 import { ItemAutocomplete } from '@/components/ui/forms/ItemAutocomplete';
 import { useItemsData } from '@/hooks/useItemsData';
 import { useMagicItemsData } from '@/hooks/useMagicItemsData';
@@ -52,27 +43,18 @@ import {
   initialInventoryFormData,
 } from '@/components/ui/game/inventory/ItemForm';
 import type { InventoryFormData } from '@/components/ui/game/inventory/ItemForm';
-import {
-  npcInventoryItemToFormData,
-  formDataToNpcInventoryPatch,
-} from '@/utils/npcInventoryItemForm';
-import { NPCSpellListEditor } from './NPCSpellListEditor';
-import { AbilityListEditor } from './AbilityListEditor';
-import { NpcResourcesEditor } from './NpcResourcesEditor';
-import { NpcInflictsEditor } from './NpcInflictsEditor';
-import type { Spell } from '@/types/character';
-import type { CustomCondition, StatBlockEntry } from '@/types/encounter';
+import { npcInventoryItemToFormData } from '@/utils/npcInventoryItemForm';
+import { NPCSpellListEditor } from '../NPCSpellListEditor';
+import { AbilityListEditor } from '../AbilityListEditor';
+import { NpcResourcesEditor } from '../NpcResourcesEditor';
+import { NpcInflictsEditor } from '../NpcInflictsEditor';
+import type { CustomCondition } from '@/types/encounter';
 import { useEncounterStore } from '@/store/encounterStore';
 import { useOfficialConditions } from '@/hooks/useOfficialConditions';
 import { EMPTY_CUSTOM_CONDITIONS } from '@/utils/customConditions';
-import {
-  finalizeResourceDrafts,
-  isResourceDraftValid,
-  isResourceCostValid,
-  sanitizeEntryResourceCosts,
-  stripDanglingResourceCosts,
-  type NpcResourceDraft,
-} from '@/utils/npcResources';
+import { abilityMod, DIE_TYPES, withPassiveOverride } from './npcFormDraft';
+import type { AbilityKey, NpcFormDraft } from './npcFormDraft';
+import { useNpcFormState } from './useNpcFormState';
 
 interface NPCFormDialogProps {
   open: boolean;
@@ -84,10 +66,6 @@ interface NPCFormDialogProps {
   existingGroups?: string[];
   entityLabel?: 'NPC' | 'Custom Monster';
 }
-
-const DEFAULT_ABILITY = 10;
-
-const DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 
 type FormTab = 'basic' | 'statblock' | 'inventory' | 'spellcasting' | 'lore';
 
@@ -120,100 +98,6 @@ const FORM_TABS: Array<{ key: FormTab; label: string; icon: React.ReactNode }> =
     },
   ];
 
-function abilityMod(score: number): string {
-  const mod = Math.floor((score - 10) / 2);
-  return mod >= 0 ? `+${mod}` : `${mod}`;
-}
-
-function abilityModNum(score: number): number {
-  return Math.floor((score - 10) / 2);
-}
-
-function crToProficiencyBonus(crStr: string): number {
-  const cr = parseFloat(crStr);
-  if (isNaN(cr)) return 2;
-  if (cr <= 4) return 2;
-  if (cr <= 8) return 3;
-  if (cr <= 12) return 4;
-  if (cr <= 16) return 5;
-  if (cr <= 20) return 6;
-  if (cr <= 24) return 7;
-  if (cr <= 28) return 8;
-  return 9;
-}
-
-function parseHpFormula(
-  formula: string
-): { max: number; dieType: string } | null {
-  const match = formula.match(/(\d+)d(\d+)/);
-  if (!match) return null;
-  return { max: parseInt(match[1], 10), dieType: `d${match[2]}` };
-}
-
-function hasSkillProficiency(skillsStr: string, skillName: string): boolean {
-  return skillsStr.toLowerCase().includes(skillName.toLowerCase());
-}
-
-function hasSubstantiveStatBlock(
-  scores: {
-    str: number;
-    dex: number;
-    con: number;
-    int: number;
-    wis: number;
-    cha: number;
-  },
-  details: {
-    saves: string;
-    skills: string;
-    resistances: string;
-    immunities: string;
-    vulnerabilities: string;
-    conditionImmunities: string;
-    senses: string;
-    languages: string;
-    cr: string;
-  },
-  core: {
-    size: string;
-    creatureType: string;
-    alignment: string;
-    hpFormula: string;
-    speed: string;
-  },
-  traits: StatBlockEntry[],
-  actions: StatBlockEntry[],
-  bonusActions: StatBlockEntry[],
-  reactions: StatBlockEntry[],
-  lairActions: StatBlockEntry[],
-  bestiarySourceId: string | null
-): boolean {
-  const nonDefaultScore = Object.values(scores).some(
-    v => v !== DEFAULT_ABILITY
-  );
-  const hasDetail = Object.values(details).some(v => v.trim() !== '');
-  const hasCoreOverrides =
-    core.size !== 'Medium' ||
-    core.creatureType !== 'Humanoid' ||
-    core.alignment.trim() !== '' ||
-    core.hpFormula.trim() !== '' ||
-    (core.speed.trim() !== '' && core.speed.trim() !== '30 ft.');
-  const hasAbilities = [
-    ...traits,
-    ...actions,
-    ...bonusActions,
-    ...reactions,
-    ...lairActions,
-  ].some(t => t.name.trim());
-  return (
-    nonDefaultScore ||
-    hasDetail ||
-    hasCoreOverrides ||
-    hasAbilities ||
-    !!bestiarySourceId
-  );
-}
-
 export function NPCFormDialog({
   open,
   onOpenChange,
@@ -222,6 +106,9 @@ export function NPCFormDialog({
   existingGroups = [],
   entityLabel = 'NPC',
 }: NPCFormDialogProps) {
+  const form = useNpcFormState({ open, editingNpc, onSave, onOpenChange });
+  const { draft, derived, update } = form;
+
   // Item database for inventory autocomplete
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
   const { items: dbMagicItems } = useMagicItemsData();
@@ -237,408 +124,56 @@ export function NPCFormDialog({
     []
   );
   const [bestiaryLoading, setBestiaryLoading] = useState(false);
-  const [bestiarySourceId, setBestiarySourceId] = useState<string | null>(null);
-  const [bestiarySourceName, setBestiarySourceName] = useState('');
 
   // Portrait
-  const [avatarUrl, setAvatarUrl] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Name & description
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-
-  // Group & Tags
-  const [group, setGroup] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  // Tags
   const [tagInput, setTagInput] = useState('');
 
-  // Core stats
-  const [size, setSize] = useState('Medium');
-  const [creatureType, setCreatureType] = useState('Humanoid');
-  const [alignment, setAlignment] = useState('');
-  const [ac, setAc] = useState('10');
-  const [hp, setHp] = useState(10);
-  const [tempHp, setTempHp] = useState(0);
-  const [tempAc, setTempAc] = useState('');
-  const [xp, setXp] = useState(0);
-  const [hpFormula, setHpFormula] = useState('');
-  const [speed, setSpeed] = useState('30 ft.');
-
-  // Initiative modifier (manual override)
-  const [initiativeModifier, setInitiativeModifier] = useState(0);
-  const [initiativeOverridden, setInitiativeOverridden] = useState(false);
-
-  // Ability scores
-  const [str, setStr] = useState(DEFAULT_ABILITY);
-  const [dex, setDex] = useState(DEFAULT_ABILITY);
-  const [con, setCon] = useState(DEFAULT_ABILITY);
-  const [int, setInt] = useState(DEFAULT_ABILITY);
-  const [wis, setWis] = useState(DEFAULT_ABILITY);
-  const [cha, setCha] = useState(DEFAULT_ABILITY);
-
-  // Details
-  const [saves, setSaves] = useState('');
-  const [skills, setSkills] = useState('');
-  const [resistances, setResistances] = useState('');
-  const [immunities, setImmunities] = useState('');
-  const [vulnerabilities, setVulnerabilities] = useState('');
-  const [conditionImmunities, setConditionImmunities] = useState('');
-  const [inflictableConditions, setInflictableConditions] = useState<
-    CustomCondition[]
-  >([]);
+  // Condition library
   const conditionLibrary = useEncounterStore(
     state => state.combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
   );
   const setCombatConfig = useEncounterStore(state => state.setCombatConfig);
-  const [senses, setSenses] = useState('');
-  const [languages, setLanguages] = useState('');
-  const [cr, setCr] = useState('');
 
-  // Hit dice
-  const [hitDiceMax, setHitDiceMax] = useState(0);
-  const [hitDieCurrent, setHitDieCurrent] = useState(0);
-  const [hitDieType, setHitDieType] = useState('d8');
-
-  // Proficiency bonus (manual override)
-  const [proficiencyBonus, setProficiencyBonus] = useState(2);
-  const [proficiencyOverridden, setProficiencyOverridden] = useState(false);
-
-  // Passive abilities (manual override)
-  const [passivePerception, setPassivePerception] = useState(10);
-  const [passiveInsight, setPassiveInsight] = useState(10);
-  const [passiveInvestigation, setPassiveInvestigation] = useState(10);
-  const [passivesOverridden, setPassivesOverridden] = useState(false);
-
-  // Traits / Actions / Bonus Actions / Reactions / Lair Actions
-  const [traits, setTraits] = useState<StatBlockEntry[]>([]);
-  const [actions, setActions] = useState<StatBlockEntry[]>([]);
-  const [bonusActions, setBonusActions] = useState<StatBlockEntry[]>([]);
-  const [reactions, setReactions] = useState<StatBlockEntry[]>([]);
-  const [lairActions, setLairActions] = useState<StatBlockEntry[]>([]);
-
-  // Class resources
-  const [resources, setResources] = useState<NpcResourceDraft[]>([]);
-
-  // Inventory
-  const [inventoryItems, setInventoryItems] = useState<NPCInventoryItem[]>([]);
+  // Inventory edit form
   const [inventoryEditFormOpen, setInventoryEditFormOpen] = useState(false);
   const [editingInventoryItemId, setEditingInventoryItemId] = useState<
     string | null
   >(null);
 
-  // Lore
-  const [loreHtml, setLoreHtml] = useState('');
-
-  // Spellcasting
-  const [spellcastingEnabled, setSpellcastingEnabled] = useState(false);
-  const [casterLevel, setCasterLevel] = useState(1);
-  const [spellcastingAbility, setSpellcastingAbility] =
-    useState<NPCSpellcastingAbility>('intelligence');
-  const [spellAttackOverride, setSpellAttackOverride] = useState<
-    number | undefined
-  >(undefined);
-  const [spellDCOverride, setSpellDCOverride] = useState<number | undefined>(
-    undefined
-  );
-  const [spellSlotOverrides, setSpellSlotOverrides] = useState<
-    Record<number, number | undefined>
-  >({});
-  const [spells, setSpells] = useState<Spell[]>([]);
-
-  // ---------- Auto-calc initiative from DEX ----------
-
-  useEffect(() => {
-    if (!initiativeOverridden) {
-      setInitiativeModifier(abilityModNum(dex));
-    }
-  }, [dex, initiativeOverridden]);
-
-  // ---------- Auto-calc proficiency from CR ----------
-
-  useEffect(() => {
-    if (!proficiencyOverridden) {
-      setProficiencyBonus(crToProficiencyBonus(cr));
-    }
-  }, [cr, proficiencyOverridden]);
-
-  // ---------- Auto-calc passives from ability scores ----------
-
-  useEffect(() => {
-    if (!passivesOverridden) {
-      const wisM = abilityModNum(wis);
-      const intM = abilityModNum(int);
-      const hasPerception = hasSkillProficiency(skills, 'perception');
-      setPassivePerception(10 + wisM + (hasPerception ? proficiencyBonus : 0));
-      setPassiveInsight(10 + wisM);
-      setPassiveInvestigation(10 + intM);
-    }
-  }, [wis, int, skills, proficiencyBonus, passivesOverridden]);
-
-  // ---------- Reset / Populate from editingNpc ----------
+  // ---------- Reset on open / editingNpc change ----------
 
   useEffect(() => {
     if (!open) return;
-
-    if (editingNpc) {
-      setName(editingNpc.name);
-      setDescription(editingNpc.description ?? '');
-      setAc(String(editingNpc.armorClass ?? '10'));
-      setHp(editingNpc.maxHp);
-      setTempHp(editingNpc.tempHp ?? 0);
-      setTempAc(editingNpc.tempAc != null ? String(editingNpc.tempAc) : '');
-      setXp(editingNpc.xp ?? 0);
-      setSpeed(editingNpc.speed);
-      setAvatarUrl(editingNpc.avatarUrl ?? '');
-      setBestiarySourceId(editingNpc.bestiarySourceId ?? null);
-      setBestiarySourceName(editingNpc.bestiarySourceId ? editingNpc.name : '');
-      setLoreHtml(editingNpc.loreHtml ?? '');
-      setInventoryItems(editingNpc.inventory ?? []);
-      setResources(editingNpc.resources?.map(r => ({ ...r })) ?? []);
-      setActiveFormTab('basic');
-
-      // Spellcasting
-      if (editingNpc?.spellcasting) {
-        setSpellcastingEnabled(true);
-        setCasterLevel(editingNpc.spellcasting.casterLevel);
-        setSpellcastingAbility(editingNpc.spellcasting.ability);
-        setSpellAttackOverride(editingNpc.spellcasting.spellAttackBonus);
-        setSpellDCOverride(editingNpc.spellcasting.spellSaveDC);
-        const overrides: Record<number, number | undefined> = {};
-        if (editingNpc.spellcasting.slotOverrides) {
-          for (const [lvl, count] of Object.entries(
-            editingNpc.spellcasting.slotOverrides
-          )) {
-            overrides[Number(lvl)] = Number(count);
-          }
-        }
-        setSpellSlotOverrides(overrides);
-        setSpells(editingNpc.spellcasting.spells ?? []);
-      } else {
-        setSpellcastingEnabled(false);
-        setCasterLevel(1);
-        setSpellcastingAbility('intelligence');
-        setSpellAttackOverride(undefined);
-        setSpellDCOverride(undefined);
-        setSpellSlotOverrides({});
-        setSpells([]);
-      }
-
-      // Group & tags
-      setGroup(editingNpc.group ?? '');
-      setTags(editingNpc.tags ?? []);
-      setTagInput('');
-
-      // Initiative modifier
-      if (editingNpc.initiativeModifier !== undefined) {
-        setInitiativeModifier(editingNpc.initiativeModifier);
-        setInitiativeOverridden(true);
-      } else {
-        setInitiativeOverridden(false);
-      }
-
-      // Proficiency bonus
-      if (editingNpc.proficiencyBonus !== undefined) {
-        setProficiencyBonus(editingNpc.proficiencyBonus);
-        setProficiencyOverridden(true);
-      } else {
-        setProficiencyOverridden(false);
-      }
-
-      // Passive abilities
-      if (
-        editingNpc.passivePerception !== undefined ||
-        editingNpc.passiveInsight !== undefined ||
-        editingNpc.passiveInvestigation !== undefined
-      ) {
-        setPassivePerception(editingNpc.passivePerception ?? 10);
-        setPassiveInsight(editingNpc.passiveInsight ?? 10);
-        setPassiveInvestigation(editingNpc.passiveInvestigation ?? 10);
-        setPassivesOverridden(true);
-      } else {
-        setPassivesOverridden(false);
-      }
-
-      // Hit dice
-      if (editingNpc.hitDice) {
-        setHitDiceMax(editingNpc.hitDice.max);
-        setHitDieCurrent(editingNpc.hitDice.current);
-        setHitDieType(editingNpc.hitDice.dieType);
-      } else {
-        setHitDiceMax(0);
-        setHitDieCurrent(0);
-        setHitDieType('d8');
-      }
-
-      const sb = editingNpc.monsterStatBlock;
-      if (sb) {
-        setStr(sb.str);
-        setDex(sb.dex);
-        setCon(sb.con);
-        setInt(sb.int);
-        setWis(sb.wis);
-        setCha(sb.cha);
-        setSize(sb.size || 'Medium');
-        setCreatureType(sb.type || 'Humanoid');
-        setAlignment(sb.alignment || '');
-        setHpFormula(sb.hpFormula || '');
-        setSaves(sb.saves || '');
-        setSkills(sb.skills || '');
-        setResistances(sb.resistances || '');
-        setImmunities(sb.immunities || '');
-        setVulnerabilities(sb.vulnerabilities || '');
-        setConditionImmunities(
-          Array.isArray(sb.conditionImmunities)
-            ? sb.conditionImmunities.join(', ')
-            : ''
-        );
-        // Stat-block loops must guard `?? []`: older records lack the field.
-        setInflictableConditions(
-          (sb.inflictableConditions ?? []).map(c => ({ ...c }))
-        );
-        setSenses(sb.senses || '');
-        setLanguages(sb.languages || '');
-        setCr(sb.cr || '');
-        setTraits(
-          sanitizeEntryResourceCosts(sb.traits?.map(t => ({ ...t })) ?? [])
-        );
-        setActions(
-          sanitizeEntryResourceCosts(sb.actions?.map(a => ({ ...a })) ?? [])
-        );
-        setBonusActions(
-          sanitizeEntryResourceCosts(
-            sb.bonusActions?.map(b => ({ ...b })) ?? []
-          )
-        );
-        setReactions(
-          sanitizeEntryResourceCosts(sb.reactions?.map(r => ({ ...r })) ?? [])
-        );
-        setLairActions(
-          sanitizeEntryResourceCosts(sb.lairActions?.map(l => ({ ...l })) ?? [])
-        );
-      } else if (editingNpc.abilityScores) {
-        setStr(editingNpc.abilityScores.str);
-        setDex(editingNpc.abilityScores.dex);
-        setCon(editingNpc.abilityScores.con);
-        setInt(editingNpc.abilityScores.int);
-        setWis(editingNpc.abilityScores.wis);
-        setCha(editingNpc.abilityScores.cha);
-        setSize('Medium');
-        setCreatureType('Humanoid');
-        setAlignment('');
-        setHpFormula('');
-        resetDetailFields();
-      } else {
-        resetAbilityScores();
-        setSize('Medium');
-        setCreatureType('Humanoid');
-        setAlignment('');
-        setHpFormula('');
-        resetDetailFields();
-      }
-    } else {
-      resetAll();
+    setActiveFormTab('basic');
+    setTagInput('');
+    if (!editingNpc) {
+      setBestiaryQuery('');
+      setBestiaryResults([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingNpc, open]);
 
-  function resetAbilityScores() {
-    setStr(DEFAULT_ABILITY);
-    setDex(DEFAULT_ABILITY);
-    setCon(DEFAULT_ABILITY);
-    setInt(DEFAULT_ABILITY);
-    setWis(DEFAULT_ABILITY);
-    setCha(DEFAULT_ABILITY);
-  }
-
-  function resetDetailFields() {
-    setSaves('');
-    setSkills('');
-    setResistances('');
-    setImmunities('');
-    setVulnerabilities('');
-    setConditionImmunities('');
-    setInflictableConditions([]);
-    setSenses('');
-    setLanguages('');
-    setCr('');
-    setTraits([]);
-    setActions([]);
-    setBonusActions([]);
-    setReactions([]);
-    setLairActions([]);
-    setResources([]);
-    setHitDiceMax(0);
-    setHitDieCurrent(0);
-    setHitDieType('d8');
-    setProficiencyBonus(2);
-    setProficiencyOverridden(false);
-    setPassivePerception(10);
-    setPassiveInsight(10);
-    setPassiveInvestigation(10);
-    setPassivesOverridden(false);
-  }
-
-  function resetAll() {
-    setActiveFormTab('basic');
-    setName('');
-    setDescription('');
-    setAc('10');
-    setHp(10);
-    setTempHp(0);
-    setTempAc('');
-    setXp(0);
-    setHpFormula('');
-    setSpeed('30 ft.');
-    setSize('Medium');
-    setCreatureType('Humanoid');
-    setAlignment('');
-    setAvatarUrl('');
-    setBestiarySourceId(null);
-    setBestiarySourceName('');
-    setLoreHtml('');
-    setInventoryItems([]);
-    setResources([]);
-    setBestiaryQuery('');
-    setBestiaryResults([]);
-    setGroup('');
-    setTags([]);
-    setTagInput('');
-    setInitiativeModifier(0);
-    setInitiativeOverridden(false);
-    setSpellcastingEnabled(false);
-    setCasterLevel(1);
-    setSpellcastingAbility('intelligence');
-    setSpellAttackOverride(undefined);
-    setSpellDCOverride(undefined);
-    setSpellSlotOverrides({});
-    setSpells([]);
-    resetAbilityScores();
-    resetDetailFields();
-  }
-
   // ---------- Tag handling ----------
+
+  const commitTagInput = () => {
+    form.addTag(tagInput);
+    setTagInput('');
+  };
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      addTag(tagInput);
-    } else if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
-      setTags(prev => prev.slice(0, -1));
+      commitTagInput();
+    } else if (
+      e.key === 'Backspace' &&
+      tagInput === '' &&
+      draft.tags.length > 0
+    ) {
+      form.removeLastTag();
     }
-  };
-
-  const addTag = (raw: string) => {
-    const trimmed = raw.trim().replace(/,$/, '');
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags(prev => [...prev, trimmed]);
-    }
-    setTagInput('');
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(prev => prev.filter(t => t !== tag));
   };
 
   // ---------- Bestiary Search ----------
@@ -671,103 +206,9 @@ export function NPCFormDialog({
   }, [bestiaryQuery, searchBestiary, editingNpc]);
 
   const handleSelectMonster = (monster: ProcessedMonster) => {
-    const sb = buildMonsterStatBlock(monster);
-    setName(monster.name);
-    setDescription('');
-    setAc(String(monster.acValue));
-    setHp(monster.hpAverage);
-    setTempHp(0);
-    setTempAc('');
-    setXp(0);
-    setHpFormula(monster.hpFormula);
-    setSpeed(sb.speed);
-    setSize(sb.size);
-    setCreatureType(sb.type);
-    setAlignment(sb.alignment);
-    setStr(sb.str);
-    setDex(sb.dex);
-    setCon(sb.con);
-    setInt(sb.int);
-    setWis(sb.wis);
-    setCha(sb.cha);
-    setSaves(sb.saves);
-    setSkills(sb.skills);
-    setResistances(sb.resistances);
-    setImmunities(sb.immunities);
-    setVulnerabilities(sb.vulnerabilities);
-    setConditionImmunities(
-      Array.isArray(sb.conditionImmunities)
-        ? sb.conditionImmunities.join(', ')
-        : ''
-    );
-    setSenses(sb.senses);
-    setLanguages(sb.languages);
-    setCr(sb.cr);
-    const autoUses = (entry: { name: string; text: string; uses?: number }) => {
-      if (entry.uses !== undefined) return { ...entry };
-      const parsed = parseRechargeFromName(entry.name);
-      return parsed.maxUses ? { ...entry, uses: parsed.maxUses } : { ...entry };
-    };
-    setTraits(sb.traits.map(autoUses));
-    setActions(sb.actions.map(autoUses));
-    setBonusActions(sb.bonusActions.map(autoUses));
-    setReactions(sb.reactions.map(autoUses));
-    setLairActions([]);
-    setInflictableConditions([]);
-    setBestiarySourceId(monster.id);
-    setBestiarySourceName(monster.name);
+    form.importMonster(monster);
     setBestiaryQuery('');
     setBestiaryResults([]);
-
-    // Auto-populate hit dice from hpFormula
-    const parsedHd = parseHpFormula(monster.hpFormula);
-    if (parsedHd) {
-      setHitDiceMax(parsedHd.max);
-      setHitDieCurrent(parsedHd.max);
-      setHitDieType(
-        DIE_TYPES.includes(parsedHd.dieType) ? parsedHd.dieType : 'd8'
-      );
-    }
-
-    // Auto-populate initiative modifier from DEX
-    const dexMod = abilityModNum(sb.dex);
-    setInitiativeModifier(dexMod);
-    setInitiativeOverridden(false);
-
-    // Auto-populate proficiency bonus from CR
-    const prof = crToProficiencyBonus(sb.cr);
-    setProficiencyBonus(prof);
-    setProficiencyOverridden(false);
-
-    // Auto-populate passive perception from stat block
-    if (sb.passivePerception) {
-      setPassivePerception(sb.passivePerception);
-    } else {
-      setPassivePerception(10 + abilityModNum(sb.wis));
-    }
-    setPassiveInsight(10 + abilityModNum(sb.wis));
-    setPassiveInvestigation(10 + abilityModNum(sb.int));
-    setPassivesOverridden(false);
-  };
-
-  const clearBestiarySource = () => {
-    setBestiarySourceId(null);
-    setBestiarySourceName('');
-  };
-
-  const handleDeleteResource = (resourceId: string) => {
-    setResources(prev => prev.filter(r => r.id !== resourceId));
-    const strip = (entries: StatBlockEntry[]) =>
-      entries.map(e =>
-        e.resourceCost?.resourceId === resourceId
-          ? { ...e, resourceCost: undefined }
-          : e
-      );
-    setTraits(strip(traits));
-    setActions(strip(actions));
-    setBonusActions(strip(bonusActions));
-    setReactions(strip(reactions));
-    setLairActions(strip(lairActions));
   };
 
   const handleCreateConditionInLibrary = (condition: CustomCondition) => {
@@ -794,13 +235,13 @@ export function NPCFormDialog({
       if (!res.ok) throw new Error('Upload failed');
       const { url } = await res.json();
 
-      if (avatarUrl && avatarUrl.includes('s3.amazonaws.com')) {
-        fetch(`/api/npc/delete?url=${encodeURIComponent(avatarUrl)}`, {
+      if (draft.avatarUrl && draft.avatarUrl.includes('s3.amazonaws.com')) {
+        fetch(`/api/npc/delete?url=${encodeURIComponent(draft.avatarUrl)}`, {
           method: 'DELETE',
         }).catch(() => {});
       }
 
-      setAvatarUrl(url);
+      update({ avatarUrl: url });
     } catch {
       // silently fail
     } finally {
@@ -810,191 +251,25 @@ export function NPCFormDialog({
   };
 
   const handleRemoveAvatar = () => {
-    if (avatarUrl && avatarUrl.includes('s3.amazonaws.com')) {
-      fetch(`/api/npc/delete?url=${encodeURIComponent(avatarUrl)}`, {
+    if (draft.avatarUrl && draft.avatarUrl.includes('s3.amazonaws.com')) {
+      fetch(`/api/npc/delete?url=${encodeURIComponent(draft.avatarUrl)}`, {
         method: 'DELETE',
       }).catch(() => {});
     }
-    setAvatarUrl('');
+    update({ avatarUrl: '' });
   };
 
   // ---------- Save ----------
 
-  const handleSubmit = () => {
-    if (!name.trim()) return;
-
-    const finalResources =
-      resources.length > 0 ? finalizeResourceDrafts(resources) : undefined;
-    const validResourceIds = new Set((finalResources ?? []).map(r => r.id));
-
-    const scores = { str, dex, con, int, wis, cha };
-    const detailFields = {
-      saves,
-      skills,
-      resistances,
-      immunities,
-      vulnerabilities,
-      conditionImmunities,
-      senses,
-      languages,
-      cr,
-    };
-    const coreFields = {
-      size,
-      creatureType,
-      alignment,
-      hpFormula,
-      speed,
-    };
-
-    const shouldPersistStatBlock =
-      !bestiarySourceId ||
-      inflictableConditions.length > 0 ||
-      hasSubstantiveStatBlock(
-        scores,
-        detailFields,
-        coreFields,
-        traits,
-        actions,
-        bonusActions,
-        reactions,
-        lairActions,
-        bestiarySourceId
-      );
-
-    let monsterStatBlock: MonsterStatBlock | undefined;
-    if (shouldPersistStatBlock) {
-      monsterStatBlock = {
-        str,
-        dex,
-        con,
-        int,
-        wis,
-        cha,
-        saves: saves || '',
-        skills: skills || '',
-        speed: speed || '30 ft.',
-        resistances: resistances || '',
-        immunities: immunities || '',
-        vulnerabilities: vulnerabilities || '',
-        conditionImmunities: conditionImmunities
-          ? conditionImmunities
-              .split(',')
-              .map(s => s.trim())
-              .filter(Boolean)
-          : [],
-        senses: senses || '',
-        passivePerception: passivePerception,
-        traits: stripDanglingResourceCosts(
-          sanitizeEntryResourceCosts(traits.filter(t => t.name.trim())),
-          validResourceIds
-        ),
-        actions: stripDanglingResourceCosts(
-          sanitizeEntryResourceCosts(actions.filter(a => a.name.trim())),
-          validResourceIds
-        ),
-        bonusActions: stripDanglingResourceCosts(
-          sanitizeEntryResourceCosts(bonusActions.filter(a => a.name.trim())),
-          validResourceIds
-        ),
-        reactions: stripDanglingResourceCosts(
-          sanitizeEntryResourceCosts(reactions.filter(r => r.name.trim())),
-          validResourceIds
-        ),
-        lairActions: stripDanglingResourceCosts(
-          sanitizeEntryResourceCosts(lairActions.filter(a => a.name.trim())),
-          validResourceIds
-        ),
-        cr: cr || '0',
-        type: creatureType,
-        size,
-        languages: languages || '',
-        alignment,
-        hpFormula: hpFormula || '',
-        ...(inflictableConditions.length > 0 ? { inflictableConditions } : {}),
-      };
-    }
-
-    const payload: Omit<
-      CampaignNPC,
-      'id' | 'campaignCode' | 'createdAt' | 'updatedAt'
-    > = {
-      name: name.trim(),
-      armorClass: ac.trim() || '10',
-      maxHp: hp,
-      tempHp: tempHp > 0 ? tempHp : undefined,
-      tempAc: tempAc.trim() || undefined,
-      speed: speed.trim() || '30 ft.',
-      description: description.trim() || undefined,
-      xp: xp > 0 ? xp : undefined,
-      monsterStatBlock,
-      bestiarySourceId: bestiarySourceId ?? undefined,
-      loreHtml: loreHtml.trim() || undefined,
-      avatarUrl: avatarUrl || undefined,
-      group: group.trim() || undefined,
-      tags: tags.length > 0 ? tags : undefined,
-      hitDice:
-        hitDiceMax > 0
-          ? { max: hitDiceMax, current: hitDieCurrent, dieType: hitDieType }
-          : undefined,
-      initiativeModifier,
-      proficiencyBonus,
-      passivePerception,
-      passiveInsight,
-      passiveInvestigation,
-      inventory:
-        inventoryItems.length > 0
-          ? inventoryItems.filter(item => item.name.trim())
-          : undefined,
-      resources: finalResources,
-      spellcasting: spellcastingEnabled
-        ? {
-            casterLevel,
-            ability: spellcastingAbility,
-            spellAttackBonus: spellAttackOverride,
-            spellSaveDC: spellDCOverride,
-            slotOverrides:
-              Object.keys(spellSlotOverrides).length > 0
-                ? Object.fromEntries(
-                    Object.entries(spellSlotOverrides)
-                      .filter(
-                        (entry): entry is [string, number] =>
-                          entry[1] !== undefined
-                      )
-                      .map(([k, v]) => [Number(k), v])
-                  )
-                : undefined,
-            slotsUsed: editingNpc?.spellcasting?.slotsUsed ?? {},
-            spells,
-          }
-        : undefined,
-    };
-
-    onSave(payload);
-    onOpenChange(false);
-  };
-
-  const canSubmit =
-    name.trim().length > 0 &&
-    resources.every(isResourceDraftValid) &&
-    [traits, actions, bonusActions, reactions, lairActions].every(list =>
-      list.every(isResourceCostValid)
-    );
   const submitLabel = editingNpc ? 'Save Changes' : `Create ${entityLabel}`;
 
   const editingInventoryItem = editingInventoryItemId
-    ? inventoryItems.find(i => i.id === editingInventoryItemId)
+    ? draft.inventoryItems.find(i => i.id === editingInventoryItemId)
     : undefined;
 
   const handleInventoryEditSubmit = (data: InventoryFormData) => {
     if (!editingInventoryItemId) return;
-    setInventoryItems(prev =>
-      prev.map(item =>
-        item.id === editingInventoryItemId
-          ? formDataToNpcInventoryPatch(data, item)
-          : item
-      )
-    );
+    form.applyInventoryEdit(editingInventoryItemId, data);
     setInventoryEditFormOpen(false);
     setEditingInventoryItemId(null);
   };
@@ -1020,8 +295,8 @@ export function NPCFormDialog({
               <Button
                 variant="primary"
                 size="sm"
-                onClick={handleSubmit}
-                disabled={!canSubmit}
+                onClick={form.submit}
+                disabled={!form.canSubmit}
               >
                 {submitLabel}
               </Button>
@@ -1101,13 +376,13 @@ export function NPCFormDialog({
                         </div>
                       )}
 
-                      {bestiarySourceId && (
+                      {draft.bestiarySourceId && (
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">
-                            Imported from: {bestiarySourceName}
+                            Imported from: {draft.bestiarySourceName}
                           </Badge>
                           <button
-                            onClick={clearBestiarySource}
+                            onClick={form.clearImport}
                             className="text-muted hover:text-body transition-colors"
                           >
                             <X size={14} />
@@ -1124,9 +399,9 @@ export function NPCFormDialog({
                       onClick={() => fileInputRef.current?.click()}
                       className="border-divider bg-surface-secondary hover:border-accent-purple-border flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-colors"
                     >
-                      {avatarUrl ? (
+                      {draft.avatarUrl ? (
                         <Image
-                          src={avatarUrl}
+                          src={draft.avatarUrl}
                           alt={`${entityLabel} portrait`}
                           width={64}
                           height={64}
@@ -1150,11 +425,11 @@ export function NPCFormDialog({
                     />
                     <div className="flex flex-col gap-1">
                       <span className="text-muted text-xs">
-                        {avatarUrl
+                        {draft.avatarUrl
                           ? 'Portrait uploaded'
                           : 'Click to upload portrait'}
                       </span>
-                      {avatarUrl && (
+                      {draft.avatarUrl && (
                         <button
                           onClick={handleRemoveAvatar}
                           className="text-accent-red-text text-xs hover:underline"
@@ -1168,16 +443,16 @@ export function NPCFormDialog({
                   {/* ===== Name & Description ===== */}
                   <div className="space-y-3">
                     <Input
-                      value={name}
-                      onChange={e => setName(e.target.value)}
+                      value={draft.name}
+                      onChange={e => update({ name: e.target.value })}
                       label="Name"
                       placeholder={`${entityLabel} name`}
                       required
                       autoFocus
                     />
                     <Input
-                      value={description}
-                      onChange={e => setDescription(e.target.value)}
+                      value={draft.description}
+                      onChange={e => update({ description: e.target.value })}
                       label="Description"
                       placeholder="Brief description"
                     />
@@ -1192,8 +467,8 @@ export function NPCFormDialog({
                       <input
                         type="text"
                         list="npc-groups-datalist"
-                        value={group}
-                        onChange={e => setGroup(e.target.value)}
+                        value={draft.group}
+                        onChange={e => update({ group: e.target.value })}
                         placeholder="e.g. Bandits, Town Guard"
                         className="bg-surface border-divider text-body placeholder:text-faint w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
                       />
@@ -1211,7 +486,7 @@ export function NPCFormDialog({
                         Tags
                       </label>
                       <div className="border-divider bg-surface flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
-                        {tags.map(tag => (
+                        {draft.tags.map(tag => (
                           <span
                             key={tag}
                             className="bg-accent-purple-bg text-accent-purple-text flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
@@ -1219,7 +494,7 @@ export function NPCFormDialog({
                             {tag}
                             <button
                               type="button"
-                              onClick={() => removeTag(tag)}
+                              onClick={() => form.removeTag(tag)}
                               className="hover:text-heading transition-colors"
                               aria-label={`Remove tag ${tag}`}
                             >
@@ -1232,9 +507,11 @@ export function NPCFormDialog({
                           value={tagInput}
                           onChange={e => setTagInput(e.target.value)}
                           onKeyDown={handleTagKeyDown}
-                          onBlur={() => tagInput.trim() && addTag(tagInput)}
+                          onBlur={() => tagInput.trim() && commitTagInput()}
                           placeholder={
-                            tags.length === 0 ? 'Add tags (Enter or comma)' : ''
+                            draft.tags.length === 0
+                              ? 'Add tags (Enter or comma)'
+                              : ''
                           }
                           className="text-body placeholder:text-faint min-w-28 flex-1 bg-transparent text-sm focus:outline-none"
                         />
@@ -1247,8 +524,8 @@ export function NPCFormDialog({
                     <div className="grid grid-cols-3 gap-2">
                       <SelectField
                         label="Size"
-                        value={size}
-                        onValueChange={setSize}
+                        value={draft.size}
+                        onValueChange={v => update({ size: v })}
                       >
                         {SIZES.map((s: string) => (
                           <SelectItem key={s} value={s}>
@@ -1258,8 +535,8 @@ export function NPCFormDialog({
                       </SelectField>
                       <SelectField
                         label="Type"
-                        value={creatureType}
-                        onValueChange={setCreatureType}
+                        value={draft.creatureType}
+                        onValueChange={v => update({ creatureType: v })}
                       >
                         {CREATURE_TYPES.map((t: string) => (
                           <SelectItem key={t} value={t}>
@@ -1268,45 +545,45 @@ export function NPCFormDialog({
                         ))}
                       </SelectField>
                       <Input
-                        value={alignment}
-                        onChange={e => setAlignment(e.target.value)}
+                        value={draft.alignment}
+                        onChange={e => update({ alignment: e.target.value })}
                         label="Alignment"
                         placeholder="Unaligned"
                       />
                     </div>
                     <Input
-                      value={ac}
-                      onChange={e => setAc(e.target.value)}
+                      value={draft.ac}
+                      onChange={e => update({ ac: e.target.value })}
                       label="AC"
                       placeholder="16 (natural armor)"
                       helperText="Free text — the leading number is used in combat."
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <NumberInput
-                        value={hp}
-                        onChange={v => setHp(v ?? 1)}
+                        value={draft.hp}
+                        onChange={v => update({ hp: v ?? 1 })}
                         label="HP"
                         min={1}
                       />
                       <Input
-                        value={hpFormula}
-                        onChange={e => setHpFormula(e.target.value)}
+                        value={draft.hpFormula}
+                        onChange={e => update({ hpFormula: e.target.value })}
                         label="HP Formula"
                         placeholder="2d8+2"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <NumberInput
-                        value={tempHp}
-                        onChange={v => setTempHp(v ?? 0)}
+                        value={draft.tempHp}
+                        onChange={v => update({ tempHp: v ?? 0 })}
                         label="Temp HP"
                         min={0}
                         placeholder="0"
                         title="Temporary hit points (absorbed before real HP)"
                       />
                       <Input
-                        value={tempAc}
-                        onChange={e => setTempAc(e.target.value)}
+                        value={draft.tempAc}
+                        onChange={e => update({ tempAc: e.target.value })}
                         label="Temp AC"
                         placeholder="2 (shield spell)"
                         title="Temporary AC bonus; leading number is added to AC. Note the source."
@@ -1314,23 +591,20 @@ export function NPCFormDialog({
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <Input
-                        value={speed}
-                        onChange={e => setSpeed(e.target.value)}
+                        value={draft.speed}
+                        onChange={e => update({ speed: e.target.value })}
                         label="Speed"
                         placeholder="30 ft., fly 60 ft."
                       />
                       <NumberInput
-                        value={initiativeModifier}
-                        onChange={v => {
-                          setInitiativeModifier(v ?? 0);
-                          setInitiativeOverridden(true);
-                        }}
+                        value={derived.initiativeModifier}
+                        onChange={v => update({ initiativeOverride: v ?? 0 })}
                         label="Init Mod"
                         title="Initiative modifier (auto-calculated from DEX, overridable)"
                       />
                       <NumberInput
-                        value={xp}
-                        onChange={v => setXp(v ?? 0)}
+                        value={draft.xp}
+                        onChange={v => update({ xp: v ?? 0 })}
                         label="XP"
                         min={0}
                         placeholder="0"
@@ -1351,33 +625,34 @@ export function NPCFormDialog({
                     <div className="grid grid-cols-6 gap-2">
                       {(
                         [
-                          ['STR', str, setStr],
-                          ['DEX', dex, setDex],
-                          ['CON', con, setCon],
-                          ['INT', int, setInt],
-                          ['WIS', wis, setWis],
-                          ['CHA', cha, setCha],
-                        ] as const
-                      ).map(([label, value, setter]) => (
+                          ['STR', 'str'],
+                          ['DEX', 'dex'],
+                          ['CON', 'con'],
+                          ['INT', 'int'],
+                          ['WIS', 'wis'],
+                          ['CHA', 'cha'],
+                        ] as const satisfies ReadonlyArray<
+                          readonly [string, AbilityKey]
+                        >
+                      ).map(([label, key]) => (
                         <div key={label} className="text-center">
                           <span className="text-muted block text-[10px] font-medium uppercase">
                             {label}
                           </span>
                           <NumberField
-                            value={value}
+                            value={draft[key]}
                             onChange={v =>
-                              (
-                                setter as React.Dispatch<
-                                  React.SetStateAction<number>
-                                >
-                              )(v ?? 0)
+                              update({ [key]: v ?? 0 } as Pick<
+                                NpcFormDraft,
+                                AbilityKey
+                              >)
                             }
                             min={1}
                             max={30}
                             className="bg-surface border-divider text-heading w-full rounded border px-1 py-1 text-center text-sm"
                           />
                           <span className="text-muted text-[10px]">
-                            {abilityMod(value)}
+                            {abilityMod(draft[key])}
                           </span>
                         </div>
                       ))}
@@ -1388,50 +663,54 @@ export function NPCFormDialog({
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       <Input
-                        value={saves}
-                        onChange={e => setSaves(e.target.value)}
+                        value={draft.saves}
+                        onChange={e => update({ saves: e.target.value })}
                         label="Saving Throws"
                         placeholder="Dex +4, Wis +2"
                       />
                       <Input
-                        value={skills}
-                        onChange={e => setSkills(e.target.value)}
+                        value={draft.skills}
+                        onChange={e => update({ skills: e.target.value })}
                         label="Skills"
                         placeholder="Perception +4, Stealth +6"
                       />
                       <Input
-                        value={resistances}
-                        onChange={e => setResistances(e.target.value)}
+                        value={draft.resistances}
+                        onChange={e => update({ resistances: e.target.value })}
                         label="Resistances"
                         placeholder="fire, cold"
                       />
                       <Input
-                        value={immunities}
-                        onChange={e => setImmunities(e.target.value)}
+                        value={draft.immunities}
+                        onChange={e => update({ immunities: e.target.value })}
                         label="Immunities"
                         placeholder="poison"
                       />
                       <Input
-                        value={vulnerabilities}
-                        onChange={e => setVulnerabilities(e.target.value)}
+                        value={draft.vulnerabilities}
+                        onChange={e =>
+                          update({ vulnerabilities: e.target.value })
+                        }
                         label="Vulnerabilities"
                         placeholder="radiant"
                       />
                       <Input
-                        value={conditionImmunities}
-                        onChange={e => setConditionImmunities(e.target.value)}
+                        value={draft.conditionImmunities}
+                        onChange={e =>
+                          update({ conditionImmunities: e.target.value })
+                        }
                         label="Condition Immunities"
                         placeholder="poisoned, charmed"
                       />
                       <Input
-                        value={senses}
-                        onChange={e => setSenses(e.target.value)}
+                        value={draft.senses}
+                        onChange={e => update({ senses: e.target.value })}
                         label="Senses"
                         placeholder="Darkvision 60 ft."
                       />
                       <Input
-                        value={languages}
-                        onChange={e => setLanguages(e.target.value)}
+                        value={draft.languages}
+                        onChange={e => update({ languages: e.target.value })}
                         label="Languages"
                         placeholder="Common, Sylvan"
                       />
@@ -1439,11 +718,13 @@ export function NPCFormDialog({
 
                     {/* ===== Inflicted conditions ===== */}
                     <NpcInflictsEditor
-                      conditions={inflictableConditions}
+                      conditions={draft.inflictableConditions}
                       library={conditionLibrary}
                       officialConditions={officialConditions}
                       officialConditionsLoading={officialConditionsLoading}
-                      onChange={setInflictableConditions}
+                      onChange={inflictableConditions =>
+                        update({ inflictableConditions })
+                      }
                       onCreateInLibrary={handleCreateConditionInLibrary}
                     />
 
@@ -1451,18 +732,15 @@ export function NPCFormDialog({
                     <div className="grid grid-cols-2 gap-2">
                       <div className="w-full">
                         <Input
-                          value={cr}
-                          onChange={e => setCr(e.target.value)}
+                          value={draft.cr}
+                          onChange={e => update({ cr: e.target.value })}
                           label="CR"
                           placeholder="0"
                         />
                       </div>
                       <NumberInput
-                        value={proficiencyBonus}
-                        onChange={v => {
-                          setProficiencyBonus(v ?? 2);
-                          setProficiencyOverridden(true);
-                        }}
+                        value={derived.proficiencyBonus}
+                        onChange={v => update({ proficiencyOverride: v ?? 2 })}
                         label="Prof Bonus"
                         min={2}
                         max={9}
@@ -1477,16 +755,16 @@ export function NPCFormDialog({
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         <NumberInput
-                          value={hitDiceMax}
-                          onChange={v => setHitDiceMax(v ?? 0)}
+                          value={draft.hitDiceMax}
+                          onChange={v => update({ hitDiceMax: v ?? 0 })}
                           label="Max"
                           min={0}
                           placeholder="8"
                         />
                         <SelectField
                           label="Die Type"
-                          value={hitDieType}
-                          onValueChange={setHitDieType}
+                          value={draft.hitDieType}
+                          onValueChange={v => update({ hitDieType: v })}
                         >
                           {DIE_TYPES.map(d => (
                             <SelectItem key={d} value={d}>
@@ -1495,8 +773,8 @@ export function NPCFormDialog({
                           ))}
                         </SelectField>
                         <NumberInput
-                          value={hitDieCurrent}
-                          onChange={v => setHitDieCurrent(v ?? 0)}
+                          value={draft.hitDieCurrent}
+                          onChange={v => update({ hitDieCurrent: v ?? 0 })}
                           label="Current"
                           min={0}
                           placeholder="8"
@@ -1514,29 +792,32 @@ export function NPCFormDialog({
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         <NumberInput
-                          value={passivePerception}
-                          onChange={v => {
-                            setPassivePerception(v ?? 0);
-                            setPassivesOverridden(true);
-                          }}
+                          value={derived.passivePerception}
+                          onChange={v =>
+                            update(d =>
+                              withPassiveOverride(d, 'perception', v ?? 0)
+                            )
+                          }
                           label="Passive Perception"
                           min={1}
                         />
                         <NumberInput
-                          value={passiveInsight}
-                          onChange={v => {
-                            setPassiveInsight(v ?? 0);
-                            setPassivesOverridden(true);
-                          }}
+                          value={derived.passiveInsight}
+                          onChange={v =>
+                            update(d =>
+                              withPassiveOverride(d, 'insight', v ?? 0)
+                            )
+                          }
                           label="Passive Insight"
                           min={1}
                         />
                         <NumberInput
-                          value={passiveInvestigation}
-                          onChange={v => {
-                            setPassiveInvestigation(v ?? 0);
-                            setPassivesOverridden(true);
-                          }}
+                          value={derived.passiveInvestigation}
+                          onChange={v =>
+                            update(d =>
+                              withPassiveOverride(d, 'investigation', v ?? 0)
+                            )
+                          }
                           label="Passive Investigation"
                           min={1}
                         />
@@ -1546,46 +827,46 @@ export function NPCFormDialog({
 
                   {/* ===== Class Resources ===== */}
                   <NpcResourcesEditor
-                    resources={resources}
-                    onChange={setResources}
-                    onDeleteResource={handleDeleteResource}
+                    resources={draft.resources}
+                    onChange={resources => update({ resources })}
+                    onDeleteResource={form.deleteResource}
                   />
 
                   {/* ===== Traits / Actions / Reactions ===== */}
                   <AbilityListEditor
                     label="Traits"
-                    items={traits}
-                    onChange={setTraits}
-                    resources={resources}
-                    inventoryItems={inventoryItems}
+                    items={draft.traits}
+                    onChange={traits => update({ traits })}
+                    resources={draft.resources}
+                    inventoryItems={draft.inventoryItems}
                   />
                   <AbilityListEditor
                     label="Actions"
-                    items={actions}
-                    onChange={setActions}
-                    resources={resources}
-                    inventoryItems={inventoryItems}
+                    items={draft.actions}
+                    onChange={actions => update({ actions })}
+                    resources={draft.resources}
+                    inventoryItems={draft.inventoryItems}
                   />
                   <AbilityListEditor
                     label="Bonus Actions"
-                    items={bonusActions}
-                    onChange={setBonusActions}
-                    resources={resources}
-                    inventoryItems={inventoryItems}
+                    items={draft.bonusActions}
+                    onChange={bonusActions => update({ bonusActions })}
+                    resources={draft.resources}
+                    inventoryItems={draft.inventoryItems}
                   />
                   <AbilityListEditor
                     label="Reactions"
-                    items={reactions}
-                    onChange={setReactions}
-                    resources={resources}
-                    inventoryItems={inventoryItems}
+                    items={draft.reactions}
+                    onChange={reactions => update({ reactions })}
+                    resources={draft.resources}
+                    inventoryItems={draft.inventoryItems}
                   />
                   <AbilityListEditor
                     label="Lair Actions"
-                    items={lairActions}
-                    onChange={setLairActions}
-                    resources={resources}
-                    inventoryItems={inventoryItems}
+                    items={draft.lairActions}
+                    onChange={lairActions => update({ lairActions })}
+                    resources={draft.resources}
+                    inventoryItems={draft.inventoryItems}
                   />
                 </>
               )}
@@ -1601,30 +882,32 @@ export function NPCFormDialog({
                         magicItems={dbMagicItems}
                         loading={dbItemsLoading}
                         onSelect={(item: ProcessedItem) => {
-                          setInventoryItems(prev => [
-                            ...prev,
-                            {
-                              id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                              name: item.name,
-                              quantity: 1,
-                              category: item.category,
-                              weight: item.weight,
-                              value: item.value,
-                              rarity:
-                                item.rarity !== 'none'
-                                  ? item.rarity
-                                  : undefined,
-                              description: item.description,
-                              type: item.rawType,
-                            },
-                          ]);
+                          update(d => ({
+                            inventoryItems: [
+                              ...d.inventoryItems,
+                              {
+                                id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                                name: item.name,
+                                quantity: 1,
+                                category: item.category,
+                                weight: item.weight,
+                                value: item.value,
+                                rarity:
+                                  item.rarity !== 'none'
+                                    ? item.rarity
+                                    : undefined,
+                                description: item.description,
+                                type: item.rawType,
+                              },
+                            ],
+                          }));
                         }}
                         placeholder="Search items database..."
                       />
                     </div>
 
                     {/* Item list */}
-                    {inventoryItems.map((item, index) => (
+                    {draft.inventoryItems.map((item, index) => (
                       <div
                         key={item.id}
                         className="border-divider bg-surface-raised rounded-lg border p-3"
@@ -1635,12 +918,12 @@ export function NPCFormDialog({
                               <Input
                                 value={item.name}
                                 onChange={e => {
-                                  const updated = [...inventoryItems];
+                                  const updated = [...draft.inventoryItems];
                                   updated[index] = {
                                     ...item,
                                     name: e.target.value,
                                   };
-                                  setInventoryItems(updated);
+                                  update({ inventoryItems: updated });
                                 }}
                                 placeholder="Item name"
                                 className="flex-1"
@@ -1649,12 +932,12 @@ export function NPCFormDialog({
                                 min={1}
                                 value={item.quantity}
                                 onChange={v => {
-                                  const updated = [...inventoryItems];
+                                  const updated = [...draft.inventoryItems];
                                   updated[index] = {
                                     ...item,
                                     quantity: v ?? 1,
                                   };
-                                  setInventoryItems(updated);
+                                  update({ inventoryItems: updated });
                                 }}
                                 className="bg-surface border-divider text-heading w-16 rounded border px-2 py-1.5 text-center text-sm"
                                 title="Quantity"
@@ -1673,9 +956,11 @@ export function NPCFormDialog({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setInventoryItems(
-                                    inventoryItems.filter((_, i) => i !== index)
-                                  )
+                                  update({
+                                    inventoryItems: draft.inventoryItems.filter(
+                                      (_, i) => i !== index
+                                    ),
+                                  })
                                 }
                                 className="text-muted hover:text-accent-red-text shrink-0 p-1 transition-colors"
                                 title="Remove item"
@@ -1710,12 +995,12 @@ export function NPCFormDialog({
                                   type="checkbox"
                                   checked={item.equipped ?? false}
                                   onChange={e => {
-                                    const updated = [...inventoryItems];
+                                    const updated = [...draft.inventoryItems];
                                     updated[index] = {
                                       ...item,
                                       equipped: e.target.checked,
                                     };
-                                    setInventoryItems(updated);
+                                    update({ inventoryItems: updated });
                                   }}
                                   className="rounded"
                                 />
@@ -1730,14 +1015,16 @@ export function NPCFormDialog({
                     {/* Manual add */}
                     <button
                       onClick={() =>
-                        setInventoryItems([
-                          ...inventoryItems,
-                          {
-                            id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                            name: '',
-                            quantity: 1,
-                          },
-                        ])
+                        update({
+                          inventoryItems: [
+                            ...draft.inventoryItems,
+                            {
+                              id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                              name: '',
+                              quantity: 1,
+                            },
+                          ],
+                        })
                       }
                       className="text-accent-purple-text flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
                     >
@@ -1755,8 +1042,10 @@ export function NPCFormDialog({
                     {/* Enable toggle */}
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={spellcastingEnabled}
-                        onCheckedChange={setSpellcastingEnabled}
+                        checked={draft.spellcastingEnabled}
+                        onCheckedChange={v =>
+                          update({ spellcastingEnabled: v })
+                        }
                         id="spellcasting-enabled"
                       />
                       <label
@@ -1767,7 +1056,7 @@ export function NPCFormDialog({
                       </label>
                     </div>
 
-                    {spellcastingEnabled && (
+                    {draft.spellcastingEnabled && (
                       <div className="space-y-3">
                         {/* Caster Level + Ability */}
                         <div className="grid grid-cols-2 gap-3">
@@ -1778,8 +1067,8 @@ export function NPCFormDialog({
                             <NumberInput
                               min={1}
                               max={20}
-                              value={casterLevel}
-                              onChange={v => setCasterLevel(v ?? 1)}
+                              value={draft.casterLevel}
+                              onChange={v => update({ casterLevel: v ?? 1 })}
                             />
                           </div>
                           <div>
@@ -1787,11 +1076,12 @@ export function NPCFormDialog({
                               Spellcasting Ability
                             </label>
                             <SelectField
-                              value={spellcastingAbility}
+                              value={draft.spellcastingAbility}
                               onValueChange={v =>
-                                setSpellcastingAbility(
-                                  v as NPCSpellcastingAbility
-                                )
+                                update({
+                                  spellcastingAbility:
+                                    v as NPCSpellcastingAbility,
+                                })
                               }
                             >
                               <SelectItem value="intelligence">
@@ -1806,10 +1096,17 @@ export function NPCFormDialog({
                         {/* Auto-calculated display */}
                         {(() => {
                           const abilityScore = getNPCSpellcastingAbilityScore(
-                            spellcastingAbility,
-                            { str, dex, con, int, wis, cha }
+                            draft.spellcastingAbility,
+                            {
+                              str: draft.str,
+                              dex: draft.dex,
+                              con: draft.con,
+                              int: draft.int,
+                              wis: draft.wis,
+                              cha: draft.cha,
+                            }
                           );
-                          const prof = proficiencyBonus;
+                          const prof = derived.proficiencyBonus;
                           const autoAttack =
                             Math.floor((abilityScore - 10) / 2) + prof;
                           const autoDC =
@@ -1824,8 +1121,10 @@ export function NPCFormDialog({
                               </span>
                               , Save DC{' '}
                               <span className="font-semibold">{autoDC}</span> (
-                              {spellcastingAbility.charAt(0).toUpperCase() +
-                                spellcastingAbility.slice(1)}{' '}
+                              {draft.spellcastingAbility
+                                .charAt(0)
+                                .toUpperCase() +
+                                draft.spellcastingAbility.slice(1)}{' '}
                               {abilityScore}, Prof +{prof})
                             </p>
                           );
@@ -1839,8 +1138,8 @@ export function NPCFormDialog({
                             </label>
                             <NumberInput
                               placeholder="Auto"
-                              value={spellAttackOverride}
-                              onChange={v => setSpellAttackOverride(v)}
+                              value={draft.spellAttackOverride}
+                              onChange={v => update({ spellAttackOverride: v })}
                               allowEmpty
                             />
                           </div>
@@ -1850,8 +1149,8 @@ export function NPCFormDialog({
                             </label>
                             <NumberInput
                               placeholder="Auto"
-                              value={spellDCOverride}
-                              onChange={v => setSpellDCOverride(v)}
+                              value={draft.spellDCOverride}
+                              onChange={v => update({ spellDCOverride: v })}
                               allowEmpty
                             />
                           </div>
@@ -1860,13 +1159,14 @@ export function NPCFormDialog({
                         {/* Spell Slot Overrides */}
                         <div>
                           <label className="text-muted mb-1 block text-xs font-medium">
-                            Spell Slots (by Caster Level {casterLevel})
+                            Spell Slots (by Caster Level {draft.casterLevel})
                           </label>
                           <div className="bg-surface-secondary border-divider rounded-md border p-2">
                             <div className="space-y-1">
                               {(() => {
                                 const baseSlots =
-                                  FULL_CASTER_SPELL_SLOTS[casterLevel] ?? {};
+                                  FULL_CASTER_SPELL_SLOTS[draft.casterLevel] ??
+                                  {};
                                 const levels = Array.from(
                                   { length: 9 },
                                   (_, i) => i + 1
@@ -1874,7 +1174,7 @@ export function NPCFormDialog({
                                 const activeLevels = levels.filter(
                                   lvl =>
                                     (baseSlots[lvl] ?? 0) > 0 ||
-                                    spellSlotOverrides[lvl] !== undefined
+                                    draft.spellSlotOverrides[lvl] !== undefined
                                 );
                                 if (activeLevels.length === 0) {
                                   return (
@@ -1894,11 +1194,13 @@ export function NPCFormDialog({
                                     <NumberInput
                                       min={0}
                                       placeholder={String(baseSlots[lvl] ?? 0)}
-                                      value={spellSlotOverrides[lvl]}
+                                      value={draft.spellSlotOverrides[lvl]}
                                       onChange={v => {
-                                        setSpellSlotOverrides(prev => ({
-                                          ...prev,
-                                          [lvl]: v,
+                                        update(d => ({
+                                          spellSlotOverrides: {
+                                            ...d.spellSlotOverrides,
+                                            [lvl]: v,
+                                          },
                                         }));
                                       }}
                                       allowEmpty
@@ -1918,8 +1220,8 @@ export function NPCFormDialog({
                             Spell List
                           </label>
                           <NPCSpellListEditor
-                            spells={spells}
-                            onChange={setSpells}
+                            spells={draft.spells}
+                            onChange={spells => update({ spells })}
                           />
                         </div>
                       </div>
@@ -1932,8 +1234,8 @@ export function NPCFormDialog({
                 <>
                   {/* ===== Lore ===== */}
                   <CompactRichTextEditor
-                    content={loreHtml}
-                    onChange={setLoreHtml}
+                    content={draft.loreHtml}
+                    onChange={loreHtml => update({ loreHtml })}
                     placeholder="Write NPC lore, backstory, motivations..."
                     minHeight="120px"
                   />

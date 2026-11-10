@@ -377,39 +377,33 @@ describe('NPCFormDialog field wiring', () => {
 describe('V195: editing an NPC without a stat block', () => {
   // Red on the old component (the edit effect wipes these fields). Task 3 flips
   // each it.fails back to it once the split fixes V195.
-  it.fails(
-    'keeps resources, hit dice, proficiency and passives when it has ability scores',
-    async () => {
-      const user = userEvent.setup();
-      const onSave = renderDialog(QUICK_NPC_WITH_SCORES);
-      await user.click(screen.getByRole('button', { name: 'Save Changes' }));
-      const payload = savedPayload(onSave);
-      expect(payload.resources).toEqual([KI]);
-      expect(payload.hitDice).toEqual({ max: 3, current: 2, dieType: 'd8' });
-      expect(payload.proficiencyBonus).toBe(3);
-      expect(payload.passivePerception).toBe(14);
-      expect(payload.passiveInsight).toBe(10);
-      expect(payload.passiveInvestigation).toBe(10);
-      expect(payload.monsterStatBlock.wis).toBe(16);
-      expect(payload.initiativeModifier).toBe(2);
-    }
-  );
+  it('keeps resources, hit dice, proficiency and passives when it has ability scores', async () => {
+    const user = userEvent.setup();
+    const onSave = renderDialog(QUICK_NPC_WITH_SCORES);
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    const payload = savedPayload(onSave);
+    expect(payload.resources).toEqual([KI]);
+    expect(payload.hitDice).toEqual({ max: 3, current: 2, dieType: 'd8' });
+    expect(payload.proficiencyBonus).toBe(3);
+    expect(payload.passivePerception).toBe(14);
+    expect(payload.passiveInsight).toBe(10);
+    expect(payload.passiveInvestigation).toBe(10);
+    expect(payload.monsterStatBlock.wis).toBe(16);
+    expect(payload.initiativeModifier).toBe(2);
+  });
 
-  it.fails(
-    'keeps them when it has neither ability scores nor a stat block',
-    async () => {
-      const user = userEvent.setup();
-      const onSave = renderDialog(QUICK_NPC_BARE);
-      await user.click(screen.getByRole('button', { name: 'Save Changes' }));
-      const payload = savedPayload(onSave);
-      expect(payload.resources).toEqual([KI]);
-      expect(payload.hitDice).toEqual({ max: 3, current: 2, dieType: 'd8' });
-      expect(payload.proficiencyBonus).toBe(3);
-      expect(payload.passivePerception).toBe(14);
-      expect(payload.passiveInsight).toBe(10);
-      expect(payload.passiveInvestigation).toBe(10);
-      expect(payload.monsterStatBlock.wis).toBe(10);
-      expect(payload.initiativeModifier).toBe(0);
-    }
-  );
+  it('keeps them when it has neither ability scores nor a stat block', async () => {
+    const user = userEvent.setup();
+    const onSave = renderDialog(QUICK_NPC_BARE);
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    const payload = savedPayload(onSave);
+    expect(payload.resources).toEqual([KI]);
+    expect(payload.hitDice).toEqual({ max: 3, current: 2, dieType: 'd8' });
+    expect(payload.proficiencyBonus).toBe(3);
+    expect(payload.passivePerception).toBe(14);
+    expect(payload.passiveInsight).toBe(10);
+    expect(payload.passiveInvestigation).toBe(10);
+    expect(payload.monsterStatBlock.wis).toBe(10);
+    expect(payload.initiativeModifier).toBe(0);
+  });
 });
