@@ -15,8 +15,12 @@ import type {
   NpcFormDraft,
   NpcFormUpdate,
 } from './npcFormDraft';
-import { buildNpcPayload, canSubmitDraft } from './npcFormPayload';
-import type { NpcFormPayload } from './npcFormPayload';
+import {
+  buildNpcPayload,
+  canSubmitDraft,
+  submitBlocker,
+} from './npcFormPayload';
+import type { NpcFormPayload, SubmitBlocker } from './npcFormPayload';
 
 interface UseNpcFormStateArgs {
   open: boolean;
@@ -31,6 +35,7 @@ export interface NpcFormState {
   derived: NpcDerivedFields;
   isDirty: boolean;
   canSubmit: boolean;
+  submitBlocker: SubmitBlocker | null;
   submit: () => void;
   importMonster: (monster: ProcessedMonster) => void;
   clearImport: () => void;
@@ -73,7 +78,7 @@ export function useNpcFormState({
   const canSubmit = canSubmitDraft(draft);
 
   const submit = () => {
-    if (!draft.name.trim()) return;
+    if (!canSubmitDraft(draft)) return;
     onSave(buildNpcPayload(draft, editingNpc));
     onOpenChange(false);
   };
@@ -138,6 +143,7 @@ export function useNpcFormState({
     derived,
     isDirty,
     canSubmit,
+    submitBlocker: submitBlocker(draft),
     submit,
     importMonster,
     clearImport,

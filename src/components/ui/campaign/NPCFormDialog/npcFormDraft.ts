@@ -1,4 +1,5 @@
 import type { Spell } from '@/types/character';
+import { CREATURE_TYPES, SIZES } from '@/types/bestiary';
 import type { ProcessedMonster } from '@/types/bestiary';
 import type {
   CampaignNPC,
@@ -7,6 +8,7 @@ import type {
   NPCSpellcastingAbility,
   StatBlockEntry,
 } from '@/types/encounter';
+import { formatSize } from '@/utils/bestiaryUtils';
 import {
   buildMonsterStatBlock,
   parseRechargeFromName,
@@ -17,6 +19,30 @@ import {
 } from '@/utils/npcResources';
 
 export const DEFAULT_ABILITY = 10;
+
+function matchIgnoringCase(list: string[], value: string): string | undefined {
+  const lower = value.toLowerCase();
+  return list.find(entry => entry.toLowerCase() === lower);
+}
+
+/**
+ * Maps a stored size ('S', 'large', 'S, M') to the matching `SIZES` entry so
+ * the form's select shows it. Unknown values come back trimmed, unchanged.
+ */
+export function canonicalSize(raw: string): string {
+  const trimmed = raw.trim();
+  const first = trimmed.split(',')[0].trim();
+  const direct = matchIgnoringCase(SIZES, first);
+  if (direct) return direct;
+  const expanded = formatSize([first]);
+  return SIZES.includes(expanded) ? expanded : trimmed;
+}
+
+/** Maps a stored creature type ('humanoid') to the matching `CREATURE_TYPES` entry. */
+export function canonicalCreatureType(raw: string): string {
+  const trimmed = raw.trim();
+  return matchIgnoringCase(CREATURE_TYPES, trimmed) ?? trimmed;
+}
 
 export const DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 
@@ -218,6 +244,8 @@ export function draftFromNpc(npc: CampaignNPC): NpcFormDraft {
   d.bestiarySourceId = npc.bestiarySourceId ?? null;
   d.bestiarySourceName = npc.bestiarySourceId ? npc.name : '';
   d.loreHtml = npc.loreHtml ?? '';
+  // These arrays share references with the stored record and the baseline, so
+  // every writer must copy, never mutate.
   d.inventoryItems = npc.inventory ?? [];
   d.resources = npc.resources?.map(r => ({ ...r })) ?? [];
   d.group = npc.group ?? '';
@@ -273,8 +301,8 @@ export function draftFromNpc(npc: CampaignNPC): NpcFormDraft {
   }
 
   if (sb) {
-    d.size = sb.size || 'Medium';
-    d.creatureType = sb.type || 'Humanoid';
+    d.size = canonicalSize(sb.size || 'Medium');
+    d.creatureType = canonicalCreatureType(sb.type || 'Humanoid');
     d.alignment = sb.alignment || '';
     d.hpFormula = sb.hpFormula || '';
     d.saves = sb.saves || '';
@@ -339,8 +367,8 @@ export function draftFromMonster(
     xp: 0,
     hpFormula: monster.hpFormula,
     speed: sb.speed,
-    size: sb.size,
-    creatureType: sb.type,
+    size: canonicalSize(sb.size),
+    creatureType: canonicalCreatureType(sb.type),
     alignment: sb.alignment,
     str: sb.str,
     dex: sb.dex,

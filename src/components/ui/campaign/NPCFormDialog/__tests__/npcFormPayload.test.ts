@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { emptyDraft, draftFromNpc } from '../npcFormDraft';
 import type { NpcFormDraft } from '../npcFormDraft';
-import { buildNpcPayload, canSubmitDraft } from '../npcFormPayload';
+import {
+  buildNpcPayload,
+  canSubmitDraft,
+  submitBlocker,
+} from '../npcFormPayload';
 import {
   CASTER_NPC,
   KI,
@@ -161,5 +165,43 @@ describe('canSubmitDraft', () => {
 
   it('accepts a loaded NPC', () => {
     expect(canSubmitDraft(draftFromNpc(STAT_BLOCK_NPC))).toBe(true);
+  });
+});
+
+describe('submitBlocker', () => {
+  const badResource = { ...KI, maxUses: undefined };
+
+  it('names the blank name first, even when a resource is also invalid', () => {
+    expect(
+      submitBlocker({ ...emptyDraft(), name: ' ', resources: [badResource] })
+    ).toBe('name');
+  });
+
+  it('names an invalid resource draft', () => {
+    expect(
+      submitBlocker({ ...emptyDraft(), name: 'X', resources: [badResource] })
+    ).toBe('resources');
+  });
+
+  it('names an entry whose resource cost amount is invalid', () => {
+    expect(
+      submitBlocker({
+        ...emptyDraft(),
+        name: 'X',
+        resources: [KI],
+        actions: [
+          {
+            id: 'a',
+            name: 'A',
+            text: '',
+            resourceCost: { resourceId: KI.id, amount: 0 },
+          },
+        ],
+      })
+    ).toBe('costs');
+  });
+
+  it('is null for a valid draft', () => {
+    expect(submitBlocker(draftFromNpc(STAT_BLOCK_NPC))).toBeNull();
   });
 });

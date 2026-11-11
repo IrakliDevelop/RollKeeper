@@ -150,7 +150,7 @@ describe('LIBRARY_COPY', () => {
       searchPlaceholder: 'Brenn',
       noMatch: 'No NPCs match these filters.',
       deleteConfirm: 'Delete NPC',
-      entityLabel: 'NPC',
+      formLabel: 'NPC form',
       editLabel: 'Edit NPC',
       sheetLabel: 'NPC sheet',
     });
@@ -174,7 +174,7 @@ describe('LIBRARY_COPY', () => {
       searchPlaceholder: 'Dire wolf',
       noMatch: 'No custom monsters match these filters.',
       deleteConfirm: 'Delete custom monster',
-      entityLabel: 'Custom Monster',
+      formLabel: 'Custom monster form',
       editLabel: 'Edit custom monster',
       sheetLabel: 'Custom monster sheet',
     });

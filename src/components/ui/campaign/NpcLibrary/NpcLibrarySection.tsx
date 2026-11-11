@@ -329,7 +329,7 @@ export function NpcLibrarySection({
         onOpenChange={setFormOpen}
         onSave={handleSave}
         editingNpc={editingNpc}
-        entityLabel={copy.entityLabel}
+        kind={kind}
         existingGroups={existingGroups}
       />
 

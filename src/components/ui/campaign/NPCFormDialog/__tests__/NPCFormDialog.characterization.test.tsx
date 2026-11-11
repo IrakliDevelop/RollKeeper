@@ -79,7 +79,7 @@ describe('NPCFormDialog payloads', () => {
   it('blank create saves the default payload', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog();
-    await user.type(screen.getByPlaceholderText('NPC name'), 'Brenn');
+    await user.type(screen.getByPlaceholderText('Brenn Ironhand'), 'Brenn');
     await user.click(screen.getByRole('button', { name: 'Create NPC' }));
     expect(savedPayload(onSave)).toMatchSnapshot();
   });
@@ -91,7 +91,7 @@ describe('NPCFormDialog payloads', () => {
     const user = userEvent.setup();
     const onSave = renderDialog();
     await user.type(
-      screen.getByPlaceholderText('Search bestiary to import...'),
+      screen.getByRole('textbox', { name: 'Search the bestiary' }),
       'gob'
     );
     await user.click(await screen.findByRole('button', { name: /Goblin/ }));
@@ -109,25 +109,25 @@ describe('NPCFormDialog payloads', () => {
   it('edit with a stat block saves it unchanged', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog(STAT_BLOCK_NPC);
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(savedPayload(onSave)).toEqual(withoutMeta(STAT_BLOCK_NPC));
   });
 
   it('edit with spellcasting keeps slot overrides and slots used', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog(CASTER_NPC);
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(savedPayload(onSave)).toEqual(withoutMeta(CASTER_NPC));
   });
 
   it('deleting a resource strips its costs', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog(STAT_BLOCK_NPC);
-    await user.click(screen.getByRole('tab', { name: /Stat Block/ }));
+    await user.click(screen.getByRole('tab', { name: 'Stat block' }));
     await user.click(
       screen.getByRole('button', { name: 'Delete resource Ki' })
     );
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     const payload = savedPayload(onSave);
     expect(payload.resources).toBeUndefined();
     expect(payload.monsterStatBlock.actions[0].resourceCost).toBeUndefined();
@@ -139,7 +139,7 @@ describe('NPCFormDialog payloads', () => {
       ...QUICK_NPC_BARE,
       bestiarySourceId: 'mon-goblin',
     });
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     const payload = savedPayload(onSave);
     expect(payload.monsterStatBlock).toBeDefined();
     expect(payload.monsterStatBlock.str).toBe(10);
@@ -183,30 +183,27 @@ describe('NPCFormDialog field wiring', () => {
     const onSave = renderDialog();
 
     // Basic tab.
-    await user.type(screen.getByPlaceholderText('NPC name'), 'Brenn Voss');
+    await user.type(
+      screen.getByPlaceholderText('Brenn Ironhand'),
+      'Brenn Voss'
+    );
     await fillLabel(user, 'Description', 'Gruff caravan guard');
-    await user.type(
-      screen.getByPlaceholderText('e.g. Bandits, Town Guard'),
-      'Caravan Guard'
-    );
-    await user.type(
-      screen.getByPlaceholderText('Add tags (Enter or comma)'),
-      'ally{Enter}'
-    );
+    await user.type(screen.getByLabelText('Group'), 'Caravan Guard');
+    await user.type(screen.getByPlaceholderText('merchant'), 'ally{Enter}');
     await pickOption(screen.getByRole('combobox', { name: 'Size' }), 'Large');
     await pickOption(screen.getByRole('combobox', { name: 'Type' }), 'Beast');
     await fillLabel(user, 'Alignment', 'Chaotic Neutral');
     await fillLabel(user, 'AC', '17 (chain mail)');
     await fillLabel(user, 'HP', '41');
-    await fillLabel(user, 'HP Formula', '5d8+10');
-    await fillLabel(user, 'Temp HP', '6');
-    await fillLabel(user, 'Temp AC', '2 (shield)');
+    await fillLabel(user, 'HP formula', '5d8+10');
+    await fillLabel(user, 'Temporary HP', '6');
+    await fillLabel(user, 'Temporary AC bonus', '2 (shield)');
     await fillLabel(user, 'Speed', '35 ft., climb 20 ft.');
-    await fillLabel(user, 'Init Mod', '7');
+    await fillLabel(user, 'Initiative modifier', '7');
     await fillLabel(user, 'XP', '450');
 
     // Stat Block tab.
-    await user.click(screen.getByRole('tab', { name: /Stat Block/ }));
+    await user.click(screen.getByRole('tab', { name: 'Stat block' }));
     const scoreInputs = within(
       screen.getByText('Ability Scores').parentElement as HTMLElement
     ).getAllByRole('textbox');
@@ -275,10 +272,13 @@ describe('NPCFormDialog field wiring', () => {
   it('create with list entries saves them', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog();
-    await user.type(screen.getByPlaceholderText('NPC name'), 'Sister Vale');
+    await user.type(
+      screen.getByPlaceholderText('Brenn Ironhand'),
+      'Sister Vale'
+    );
 
     // Stat Block tab: one custom resource, one trait, one action.
-    await user.click(screen.getByRole('tab', { name: /Stat Block/ }));
+    await user.click(screen.getByRole('tab', { name: 'Stat block' }));
     await pickOption(
       screen.getByRole('combobox', { name: 'Add resource…' }),
       'Custom resource…'
@@ -317,10 +317,19 @@ describe('NPCFormDialog field wiring', () => {
 
     // Inventory tab: one manual item.
     await user.click(screen.getByRole('tab', { name: /Inventory/ }));
-    await user.click(screen.getByRole('button', { name: 'Add Item Manually' }));
-    await user.type(screen.getByPlaceholderText('Item name'), 'Hemp rope');
-    await fillField(user, screen.getByTitle('Quantity'), '5');
-    await user.click(screen.getByRole('checkbox', { name: 'Equipped' }));
+    await user.click(screen.getByRole('button', { name: 'Add custom item' }));
+    await user.type(
+      screen.getByRole('textbox', { name: 'Item name' }),
+      'Hemp rope'
+    );
+    await fillField(
+      user,
+      screen.getByRole('textbox', { name: 'Quantity: Hemp rope' }),
+      '5'
+    );
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Equipped: Hemp rope' })
+    );
 
     // Spells tab: caster level, both overrides and one slot override.
     await user.click(screen.getByRole('tab', { name: /Spells/ }));
@@ -380,7 +389,7 @@ describe('V195: editing an NPC without a stat block', () => {
   it('keeps resources, hit dice, proficiency and passives when it has ability scores', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog(QUICK_NPC_WITH_SCORES);
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     const payload = savedPayload(onSave);
     expect(payload.resources).toEqual([KI]);
     expect(payload.hitDice).toEqual({ max: 3, current: 2, dieType: 'd8' });
@@ -395,7 +404,7 @@ describe('V195: editing an NPC without a stat block', () => {
   it('keeps them when it has neither ability scores nor a stat block', async () => {
     const user = userEvent.setup();
     const onSave = renderDialog(QUICK_NPC_BARE);
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     const payload = savedPayload(onSave);
     expect(payload.resources).toEqual([KI]);
     expect(payload.hitDice).toEqual({ max: 3, current: 2, dieType: 'd8' });
