@@ -477,6 +477,37 @@ describe('portrait wiring', () => {
   });
 });
 
+describe('portrait error between records', () => {
+  it('does not carry a size error over to the next NPC', async () => {
+    const user = userEvent.setup();
+    const other = editWith({ id: 'npc-other', name: 'Other' });
+    const onSave = vi.fn();
+    const onOpenChange = vi.fn();
+    const props = { onSave, onOpenChange };
+    const { rerender } = render(
+      <NPCFormDialog open editingNpc={STAT_BLOCK_NPC} {...props} />
+    );
+    const big = new File(['x'], 'photo.png', { type: 'image/png' });
+    Object.defineProperty(big, 'size', { value: 5 * 1024 * 1024 + 1 });
+    await user.upload(
+      document.querySelector<HTMLInputElement>('input[type="file"]')!,
+      big
+    );
+    expect(await screen.findByText('Choose an image under 5 MB.')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    rerender(
+      <NPCFormDialog open={false} editingNpc={STAT_BLOCK_NPC} {...props} />
+    );
+    rerender(<NPCFormDialog open editingNpc={other} {...props} />);
+
+    await screen.findByRole('dialog');
+    expect(screen.queryByText('Choose an image under 5 MB.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
 describe('Q-c3b-1 item 5: stored sizes and types', () => {
   it('shows and saves a size that is not on the list', async () => {
     const user = userEvent.setup();

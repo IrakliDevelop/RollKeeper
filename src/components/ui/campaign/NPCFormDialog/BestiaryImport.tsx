@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Section } from '@/components/ui/layout/section';
@@ -20,6 +21,20 @@ export function BestiaryImport({
   onClear,
 }: BestiaryImportProps) {
   const search = useMonsterSearch();
+  const containerRef = useRef<HTMLElement>(null);
+  const focusSearchAfterClear = useRef(false);
+
+  // "Clear import" unmounts, so the keyboard position moves to the search field.
+  useEffect(() => {
+    if (sourceName || !focusSearchAfterClear.current) return;
+    focusSearchAfterClear.current = false;
+    containerRef.current?.querySelector('input')?.focus();
+  }, [sourceName]);
+
+  const handleClear = () => {
+    focusSearchAfterClear.current = true;
+    onClear();
+  };
 
   const handleSelect = (monster: ProcessedMonster) => {
     onSelect(monster);
@@ -28,6 +43,7 @@ export function BestiaryImport({
 
   return (
     <Section
+      ref={containerRef}
       level={3}
       heading="Import from the bestiary"
       contentClassName="space-y-3"
@@ -43,7 +59,7 @@ export function BestiaryImport({
             size="sm"
             className="px-2"
             aria-label={`Clear import from ${sourceName}`}
-            onClick={onClear}
+            onClick={handleClear}
           >
             <X size={16} aria-hidden="true" />
           </Button>

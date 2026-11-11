@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, type ChangeEvent } from 'react';
+import { useEffect, useRef, type ChangeEvent } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/forms/button';
 import {
@@ -21,6 +21,20 @@ const ERROR_TEXT = {
 
 export function PortraitField({ url, portrait }: PortraitFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const focusAddAfterRemove = useRef(false);
+
+  // "Remove portrait" unmounts, so the keyboard position moves to Add portrait.
+  useEffect(() => {
+    if (url || !focusAddAfterRemove.current) return;
+    focusAddAfterRemove.current = false;
+    addButtonRef.current?.focus();
+  }, [url]);
+
+  const handleRemove = () => {
+    focusAddAfterRemove.current = true;
+    portrait.remove();
+  };
 
   const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.target;
@@ -43,6 +57,7 @@ export function PortraitField({ url, portrait }: PortraitFieldProps) {
           />
         )}
         <Button
+          ref={addButtonRef}
           variant="secondary"
           size="sm"
           loading={portrait.uploading}
@@ -55,7 +70,7 @@ export function PortraitField({ url, portrait }: PortraitFieldProps) {
             variant="danger"
             size="sm"
             disabled={portrait.uploading}
-            onClick={portrait.remove}
+            onClick={handleRemove}
           >
             Remove portrait
           </Button>

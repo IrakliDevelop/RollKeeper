@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -20,6 +20,25 @@ export function TagsField({
   onRemoveLast,
 }: TagsFieldProps) {
   const [text, setText] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const removeButtons = useRef(new Map<string, HTMLButtonElement>());
+  // Where focus goes once the removed tag's button has unmounted: a tag to
+  // keep the keyboard position, or null for the entry field.
+  const pendingFocus = useRef<{ tag: string | null } | null>(null);
+
+  useEffect(() => {
+    const pending = pendingFocus.current;
+    if (!pending) return;
+    pendingFocus.current = null;
+    const button = pending.tag ? removeButtons.current.get(pending.tag) : null;
+    (button ?? inputRef.current)?.focus();
+  }, [tags]);
+
+  const handleRemove = (tag: string) => {
+    const index = tags.indexOf(tag);
+    pendingFocus.current = { tag: tags[index + 1] ?? tags[index - 1] ?? null };
+    onRemove(tag);
+  };
 
   const commit = () => {
     onAdd(text);
@@ -53,7 +72,11 @@ export function TagsField({
                 variant="ghost"
                 size="xs"
                 aria-label={`Remove tag ${tag}`}
-                onClick={() => onRemove(tag)}
+                ref={node => {
+                  if (node) removeButtons.current.set(tag, node);
+                  else removeButtons.current.delete(tag);
+                }}
+                onClick={() => handleRemove(tag)}
               >
                 <X size={14} aria-hidden="true" />
               </Button>
@@ -62,6 +85,7 @@ export function TagsField({
         </ul>
       )}
       <Input
+        ref={inputRef}
         label="Tags"
         placeholder="merchant"
         helperText="Press Enter or a comma to add a tag."

@@ -258,3 +258,75 @@ describe('usePortraitUpload cleanup', () => {
     expect(deleteCalls()).toHaveLength(0);
   });
 });
+
+describe('usePortraitUpload session reset', () => {
+  async function failWithSizeError(result: {
+    current: ReturnType<typeof usePortraitUpload>;
+  }) {
+    const big = imageFile();
+    Object.defineProperty(big, 'size', { value: 5 * 1024 * 1024 + 1 });
+    await act(async () => {
+      await result.current.upload(big);
+    });
+    expect(result.current.error).toBe('size');
+  }
+
+  it('discardAll clears an error', async () => {
+    const { result } = setup();
+    await failWithSizeError(result);
+    act(() => result.current.discardAll());
+    expect(result.current.error).toBeNull();
+  });
+
+  it('commit clears an error', async () => {
+    const { result } = setup();
+    await failWithSizeError(result);
+    act(() => result.current.commit(''));
+    expect(result.current.error).toBeNull();
+  });
+
+  it.each([
+    ['discardAll', (r: ReturnType<typeof usePortraitUpload>) => r.discardAll()],
+    ['commit', (r: ReturnType<typeof usePortraitUpload>) => r.commit('x')],
+  ])(
+    'a POST that resolves after %s is deleted and never applied',
+    async (_name, end) => {
+      const { result, onChange } = setup();
+      let resolve!: (v: unknown) => void;
+      fetchMock.mockReturnValueOnce(new Promise(r => (resolve = r)));
+      let pending!: Promise<void>;
+      act(() => {
+        pending = result.current.upload(imageFile());
+      });
+      expect(result.current.uploading).toBe(true);
+      act(() => end(result.current));
+      expect(result.current.uploading).toBe(false);
+      await act(async () => {
+        resolve({ ok: true, json: async () => ({ url: URL_A }) });
+        await pending;
+      });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(deletedUrls()).toEqual([URL_A]);
+      expect(result.current.uploading).toBe(false);
+      // The late URL was never recorded, so a later discard sends no second DELETE.
+      act(() => result.current.discardAll());
+      expect(deleteCalls()).toHaveLength(1);
+    }
+  );
+
+  it('a late failure sets no error', async () => {
+    const { result } = setup();
+    let reject!: (e: unknown) => void;
+    fetchMock.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.upload(imageFile());
+    });
+    act(() => result.current.discardAll());
+    await act(async () => {
+      reject(new Error('offline'));
+      await pending;
+    });
+    expect(result.current.error).toBeNull();
+  });
+});

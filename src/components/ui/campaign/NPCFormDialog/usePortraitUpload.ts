@@ -29,6 +29,9 @@ export function usePortraitUpload({ npcId, onChange }: UsePortraitUploadArgs) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<PortraitError | null>(null);
   const sessionUploads = useRef<string[]>([]);
+  // Bumped by commit and discardAll. An upload that resolves under a newer
+  // generation belongs to a closed session and must not touch the open one.
+  const generation = useRef(0);
 
   const upload = useCallback(
     async (file: File) => {
@@ -42,6 +45,7 @@ export function usePortraitUpload({ npcId, onChange }: UsePortraitUploadArgs) {
         return;
       }
 
+      const startedIn = generation.current;
       setUploading(true);
       try {
         const formData = new FormData();
@@ -55,12 +59,16 @@ export function usePortraitUpload({ npcId, onChange }: UsePortraitUploadArgs) {
         if (!res.ok) throw new Error('Upload failed');
         const { url } = (await res.json()) as { url: string };
 
+        if (generation.current !== startedIn) {
+          deleteFromS3(url);
+          return;
+        }
         sessionUploads.current.push(url);
         onChange(url);
       } catch {
-        setError('upload');
+        if (generation.current === startedIn) setError('upload');
       } finally {
-        setUploading(false);
+        if (generation.current === startedIn) setUploading(false);
       }
     },
     [npcId, onChange]
@@ -75,11 +83,17 @@ export function usePortraitUpload({ npcId, onChange }: UsePortraitUploadArgs) {
       if (url !== savedUrl) deleteFromS3(url);
     }
     sessionUploads.current = [];
+    generation.current += 1;
+    setError(null);
+    setUploading(false);
   }, []);
 
   const discardAll = useCallback(() => {
     for (const url of sessionUploads.current) deleteFromS3(url);
     sessionUploads.current = [];
+    generation.current += 1;
+    setError(null);
+    setUploading(false);
   }, []);
 
   return { uploading, error, upload, remove, commit, discardAll };

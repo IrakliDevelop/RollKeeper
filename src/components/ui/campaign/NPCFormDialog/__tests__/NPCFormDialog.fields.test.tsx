@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -79,6 +80,28 @@ describe('BestiaryImport', () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
+  it('moves focus to the search field after clearing the import', async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [source, setSource] = useState<string | null>('Goblin');
+      return (
+        <BestiaryImport
+          sourceName={source}
+          onSelect={vi.fn()}
+          onClear={() => setSource(null)}
+        />
+      );
+    }
+    render(<Harness />);
+    await user.click(
+      screen.getByRole('button', { name: 'Clear import from Goblin' })
+    );
+    expect(screen.queryByText(/Imported from/)).toBeNull();
+    expect(
+      screen.getByRole('textbox', { name: 'Search the bestiary' })
+    ).toHaveFocus();
+  });
+
   it('shows no source line without an import', () => {
     render(
       <BestiaryImport sourceName={null} onSelect={vi.fn()} onClear={vi.fn()} />
@@ -135,6 +158,22 @@ describe('PortraitField', () => {
     const input = container.querySelector('input[type="file"]');
     await user.upload(input as HTMLInputElement, file);
     expect(portrait.upload).toHaveBeenCalledWith(file);
+  });
+
+  it('moves focus to Add portrait after removing the portrait', async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [url, setUrl] = useState(PORTRAIT_URL);
+      return (
+        <PortraitField
+          url={url}
+          portrait={stubPortrait({ remove: () => setUrl('') })}
+        />
+      );
+    }
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Remove portrait' }));
+    expect(screen.getByRole('button', { name: 'Add portrait' })).toHaveFocus();
   });
 
   it('disables Add portrait while uploading', () => {
@@ -239,6 +278,51 @@ describe('TagsField', () => {
       screen.getByRole('button', { name: 'Remove tag merchant' })
     );
     expect(onRemove).toHaveBeenCalledWith('merchant');
+  });
+
+  describe('focus after removing a tag', () => {
+    function Harness({ initial }: { initial: string[] }) {
+      const [tags, setTags] = useState(initial);
+      return (
+        <TagsField
+          tags={tags}
+          onAdd={vi.fn()}
+          onRemove={tag => setTags(current => current.filter(t => t !== tag))}
+          onRemoveLast={vi.fn()}
+        />
+      );
+    }
+
+    it('moves to the next tag remove button', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={['merchant', 'guard', 'smith']} />);
+      await user.click(
+        screen.getByRole('button', { name: 'Remove tag guard' })
+      );
+      expect(
+        screen.getByRole('button', { name: 'Remove tag smith' })
+      ).toHaveFocus();
+    });
+
+    it('moves to the previous one when the last tag was removed', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={['merchant', 'guard']} />);
+      await user.click(
+        screen.getByRole('button', { name: 'Remove tag guard' })
+      );
+      expect(
+        screen.getByRole('button', { name: 'Remove tag merchant' })
+      ).toHaveFocus();
+    });
+
+    it('moves to the entry field when no tags remain', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={['merchant']} />);
+      await user.click(
+        screen.getByRole('button', { name: 'Remove tag merchant' })
+      );
+      expect(screen.getByRole('textbox', { name: 'Tags' })).toHaveFocus();
+    });
   });
 
   it('shows the tag list only when tags exist', () => {
