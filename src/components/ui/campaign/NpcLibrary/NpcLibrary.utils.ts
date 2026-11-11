@@ -65,6 +65,13 @@ export const creatureMetaLine = (npc: CampaignNPC): string => {
   return parts.filter(Boolean).join(' · ');
 };
 
+/** Stored override first, else the Dexterity modifier (stat block, then ability scores, then 10). */
+export const creatureInitiativeModifier = (npc: CampaignNPC): number => {
+  if (npc.initiativeModifier !== undefined) return npc.initiativeModifier;
+  const dex = npc.monsterStatBlock?.dex ?? npc.abilityScores?.dex ?? 10;
+  return Math.floor((dex - 10) / 2);
+};
+
 export type CreatureVitalPart = { label: 'AC' | 'Speed'; value: string };
 
 /** AC and speed as stored, as label/value pairs; free-text values are printed unchanged. */
