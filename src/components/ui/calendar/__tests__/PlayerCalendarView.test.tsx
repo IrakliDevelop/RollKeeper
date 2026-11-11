@@ -83,9 +83,6 @@ describe('PlayerCalendarView', () => {
     expect(screen.getByText('Afternoon')).toBeInTheDocument();
     expect(container.querySelectorAll('svg[role="img"]')).toHaveLength(0);
     expect(container.querySelector('svg.lucide-sun')).toHaveClass('text-muted');
-    // Scoped to the time display: the month grid below keeps its accent
-    // classes until the shared grid restyle.
-    const timeDisplay = screen.getByText('Afternoon').closest('.inline-flex')!;
-    expect(timeDisplay.querySelector('[class*="accent-"]')).toBeNull();
+    expect(container.querySelector('[class*="accent-"]')).toBeNull();
   });
 });

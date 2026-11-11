@@ -5,7 +5,6 @@ import { ChevronDown, ChevronUp, Plus, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/forms/button';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
-import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
 import { EventMarker } from './EventMarker';
 import type {
@@ -70,6 +69,7 @@ function DayPopover({
   onDeleteEvent,
   onMoveEvent,
   onClose,
+  onEscape,
 }: {
   selectedDay: SelectedDay;
   events: CalendarEvent[];
@@ -81,6 +81,7 @@ function DayPopover({
   onDeleteEvent: (eventId: string) => void;
   onMoveEvent?: (eventId: string, direction: EventMoveDirection) => void;
   onClose: () => void;
+  onEscape: () => void;
 }) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
@@ -146,9 +147,14 @@ function DayPopover({
       ref={popoverRef}
       className="bg-surface-elevated border-divider absolute z-20 rounded-md border"
       style={{ top, left, width: popoverWidth }}
+      onKeyDown={e => {
+        if (e.key !== 'Escape' || confirmPendingRef.current) return;
+        e.stopPropagation();
+        onEscape();
+      }}
     >
-      <div className="border-divider flex items-center justify-between border-b px-3 py-2">
-        <span className="text-heading text-xs font-semibold">
+      <div className="border-divider flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-3 py-2">
+        <span className="type-ui text-heading">
           {selectedDay.day + 1} {monthName}
         </span>
         <Button
@@ -157,14 +163,13 @@ function DayPopover({
           size="sm"
           leftIcon={<Plus size={12} />}
           onClick={onAddEvent}
-          className="!h-6 !px-1.5 !text-xs"
         >
           Add event
         </Button>
       </div>
       <div className="max-h-32 overflow-y-auto">
         {events.length === 0 ? (
-          <p className="text-muted px-3 py-2 text-xs">No events</p>
+          <p className="type-small text-muted px-3 py-2">No events</p>
         ) : (
           <div className="p-1.5">
             {events.map((event, index) => (
@@ -178,7 +183,7 @@ function DayPopover({
                   onClick={() => onEditEvent(event)}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <span className="text-heading truncate text-xs font-medium">
+                  <span className="type-small text-heading truncate">
                     {event.title}
                   </span>
                 </button>
@@ -258,14 +263,17 @@ export function CalendarGrid({
     currentDate.year === browseYear && currentDate.month === browseMonth;
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const cellRefs = useRef<Map<number, HTMLTableCellElement>>(new Map());
   const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(
     null
   );
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
-  // Update popover position when selectedDay changes
-  useEffect(() => {
+  const hasSelectedDay = !!selectedDay;
+
+  // Measure the selected day's cell so the popover can sit under it.
+  const measurePopover = useCallback(() => {
     if (
       selectedDay &&
       selectedDay.year === browseYear &&
@@ -280,6 +288,23 @@ export function CalendarGrid({
       setPopoverAnchorRect(null);
     }
   }, [selectedDay, browseYear, browseMonth]);
+
+  useEffect(() => {
+    measurePopover();
+  }, [measurePopover]);
+
+  // Keep the popover under its day when the window resizes or the grid
+  // wrapper scrolls sideways.
+  useEffect(() => {
+    if (!hasSelectedDay) return;
+    const scroller = scrollRef.current;
+    window.addEventListener('resize', measurePopover);
+    scroller?.addEventListener('scroll', measurePopover);
+    return () => {
+      window.removeEventListener('resize', measurePopover);
+      scroller?.removeEventListener('scroll', measurePopover);
+    };
+  }, [hasSelectedDay, measurePopover]);
 
   const setCellRef = useCallback(
     (day: number) => (el: HTMLTableCellElement | null) => {
@@ -306,6 +331,21 @@ export function CalendarGrid({
         )
       : [];
 
+  const closePopover = () => {
+    if (selectedDay) {
+      onDayClick?.(selectedDay.year, selectedDay.month, selectedDay.day);
+    }
+  };
+
+  const handleEscape = () => {
+    if (!selectedDay) return;
+    const dayButton = cellRefs.current
+      .get(selectedDay.day)
+      ?.querySelector('button');
+    closePopover();
+    dayButton?.focus();
+  };
+
   const showPopover =
     selectedDay &&
     selectedDay.year === browseYear &&
@@ -318,7 +358,7 @@ export function CalendarGrid({
 
   return (
     <div className="relative" ref={containerRef}>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" ref={scrollRef}>
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -328,13 +368,10 @@ export function CalendarGrid({
                   className="text-muted border-divider border-b px-1 py-2 text-center text-xs font-medium"
                 >
                   <span className="hidden sm:inline">{wd.name}</span>
-                  <TooltipProvider>
-                    <Tooltip content={wd.name} side="top" delayDuration={150}>
-                      <span className="cursor-default sm:hidden">
-                        {wd.name.slice(0, 3)}
-                      </span>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <span aria-hidden="true" className="sm:hidden">
+                    {wd.name.slice(0, 3)}
+                  </span>
+                  <span className="sr-only sm:hidden">{wd.name}</span>
                 </th>
               ))}
             </tr>
@@ -379,27 +416,29 @@ export function CalendarGrid({
                     <td
                       key={day}
                       ref={setCellRef(day)}
-                      className={cn(
-                        'border-divider border-b p-1 text-center align-top',
-                        isToday && !isSelected && 'bg-accent-blue-bg',
-                        isSelected && 'bg-accent-purple-bg'
-                      )}
+                      className="border-divider border-b p-1 text-center align-top"
                     >
                       <button
                         type="button"
                         onClick={() =>
                           onDayClick?.(browseYear, browseMonth, day)
                         }
-                        className="mx-auto flex min-h-14 w-full flex-col items-center focus:outline-none"
+                        aria-label={`${day + 1} ${
+                          config.months[browseMonth]?.name ??
+                          `Month ${browseMonth + 1}`
+                        } ${browseYear}`}
+                        aria-pressed={isSelected}
+                        aria-current={isToday ? 'date' : undefined}
+                        className="focus-visible:ring-brass-fill mx-auto flex min-h-14 w-full flex-col items-center focus-visible:ring-2 focus-visible:outline-none"
                       >
                         <div
                           className={cn(
                             'mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm',
-                            isSelected
-                              ? 'bg-accent-purple-bg text-accent-purple-text ring-accent-purple-border font-bold ring-2'
-                              : isToday
-                                ? 'bg-accent-blue-bg text-accent-blue-text ring-accent-blue-border font-bold ring-2'
-                                : 'text-body hover:bg-surface-secondary'
+                            isToday && 'bg-surface-secondary',
+                            isSelected && 'ring-brass-border ring-2',
+                            isToday || isSelected
+                              ? 'text-heading font-semibold'
+                              : 'text-body hover:bg-surface-secondary'
                           )}
                         >
                           {day + 1}
@@ -411,7 +450,7 @@ export function CalendarGrid({
                             ))}
                             {dayEvents.length > 5 && (
                               <span
-                                className="text-faint text-[9px] leading-none"
+                                className="text-muted text-[9px] leading-none"
                                 aria-hidden="true"
                               >
                                 +{dayEvents.length - 5}
@@ -452,9 +491,8 @@ export function CalendarGrid({
           onEditEvent={onEditEvent}
           onDeleteEvent={onDeleteEvent}
           onMoveEvent={onMoveEvent}
-          onClose={() =>
-            onDayClick?.(selectedDay.year, selectedDay.month, selectedDay.day)
-          }
+          onClose={closePopover}
+          onEscape={handleEscape}
         />
       )}
     </div>

@@ -60,6 +60,12 @@ export function EventDialog({
 
   const isEdit = !!event;
 
+  // Compare the date by value, so a new but equal object from the parent
+  // does not reset the form.
+  const defaultYear = defaultDate?.year;
+  const defaultMonth = defaultDate?.month;
+  const defaultDay = defaultDate?.day;
+
   useEffect(() => {
     if (open) {
       if (event) {
@@ -68,12 +74,16 @@ export function EventDialog({
         setYear(event.year);
         setMonth(event.month);
         setDay(event.day);
-      } else if (defaultDate) {
+      } else if (
+        defaultYear !== undefined &&
+        defaultMonth !== undefined &&
+        defaultDay !== undefined
+      ) {
         setTitle('');
         setDescription('');
-        setYear(defaultDate.year);
-        setMonth(defaultDate.month);
-        setDay(defaultDate.day);
+        setYear(defaultYear);
+        setMonth(defaultMonth);
+        setDay(defaultDay);
       }
       setVisibility(event?.visibility ?? 'private');
 
@@ -90,7 +100,7 @@ export function EventDialog({
         );
       }
     }
-  }, [open, event, defaultDate]);
+  }, [open, event, defaultYear, defaultMonth, defaultDay]);
 
   // Clamp day when month changes
   const daysInSelectedMonth = config.months[month]?.days ?? 30;
@@ -145,17 +155,16 @@ export function EventDialog({
             label="Title"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="Event title"
+            placeholder="Harvest festival"
             required
           />
 
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-body mb-1 block text-sm font-medium">
-                Year
-              </label>
-              <NumberInput value={year} onChange={v => setYear(v ?? 0)} />
-            </div>
+            <NumberInput
+              label="Year"
+              value={year}
+              onChange={v => setYear(v ?? 0)}
+            />
             <SelectField
               label="Month"
               value={String(month)}
@@ -204,14 +213,17 @@ export function EventDialog({
           )}
 
           <div>
-            <label className="text-body mb-1 block text-sm font-medium">
+            <span
+              aria-hidden="true"
+              className="text-body mb-1 block text-sm font-medium"
+            >
               Description
-            </label>
+            </span>
             <RichTextEditor
               ariaLabel="Description"
               content={description}
               onChange={setDescription}
-              placeholder="Event details..."
+              placeholder="What happens that day"
               minHeight="120px"
             />
           </div>
