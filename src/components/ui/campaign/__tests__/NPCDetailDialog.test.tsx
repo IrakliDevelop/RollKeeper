@@ -34,7 +34,18 @@ vi.mock('../NPCShopTab', () => ({
   ),
 }));
 vi.mock('../NPCSpellTab', () => ({
-  NPCSpellTab: () => <div data-testid="spell-tab-stub" />,
+  NPCSpellTab: ({
+    readOnly,
+    addSpellButtonRef,
+  }: {
+    readOnly?: boolean;
+    addSpellButtonRef?: { current: HTMLButtonElement | null };
+  }) => (
+    <div data-testid="spell-tab-stub">
+      spell-tab:{readOnly ? 'readonly' : 'editable'}:
+      {addSpellButtonRef ? 'focus-ref' : 'no-focus-ref'}
+    </div>
+  ),
 }));
 vi.mock('../NPCStatBlockExport', () => ({ NPCStatBlockExport: () => null }));
 vi.mock('@/components/ui/encounter/MonsterStatBlockPanel', () => ({
@@ -467,7 +478,9 @@ describe('NPCDetailDialog — footer', () => {
       initialTab: 'spells',
       readOnly: true,
     });
-    expect(screen.getByTestId('spell-tab-stub')).toBeInTheDocument();
+    expect(screen.getByTestId('spell-tab-stub')).toHaveTextContent(
+      'spell-tab:readonly'
+    );
     expect(screen.queryByRole('button', { name: 'Add spell' })).toBeNull();
   });
 
@@ -475,9 +488,12 @@ describe('NPCDetailDialog — footer', () => {
     setup(makeNpc({ spellcasting: { casterLevel: 3 } as never }), {
       initialTab: 'spells',
     });
-    expect(
-      screen.getByRole('button', { name: 'Add spell' })
-    ).toBeInTheDocument();
+    const addSpell = screen.getByRole('button', { name: 'Add spell' });
+    expect(screen.getByTestId('spell-tab-stub')).toHaveTextContent(
+      'spell-tab:editable:focus-ref'
+    );
+    // The tab focuses this button after removing its last spell.
+    expect(addSpell).toBeInTheDocument();
   });
 });
 

@@ -168,6 +168,15 @@ export function SpellAutocomplete({
         {loading && <Loader2 className="text-muted h-4 w-4 animate-spin" />}
       </div>
 
+      {label && (
+        <label
+          htmlFor={inputId}
+          className="text-heading mb-1.5 block text-sm font-medium"
+        >
+          {label}
+        </label>
+      )}
+
       {/* Selected spell display */}
       {selectedSpell && (
         <div className="border-divider mb-2 flex items-center justify-between border-b py-2">
@@ -199,15 +208,6 @@ export function SpellAutocomplete({
             <X className="h-4 w-4" />
           </button>
         </div>
-      )}
-
-      {label && (
-        <label
-          htmlFor={inputId}
-          className="text-heading mb-1.5 block text-sm font-medium"
-        >
-          {label}
-        </label>
       )}
 
       {/* Search input */}

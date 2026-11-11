@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Section } from '@/components/ui/layout/section';
 import { NpcSpellRow } from './NpcSpellRow';
 import { NpcSpellDialog } from './NpcSpellDialog';
+import { LEVEL_NAMES } from './NPCSpellTab/NPCSpellTab.utils';
 import type { Spell } from '@/types/character';
 
 interface NPCSpellListEditorProps {
@@ -119,7 +120,7 @@ export function NPCSpellListEditor({
           <Section
             key={level}
             level={4}
-            heading={level === 0 ? 'Cantrips' : `Level ${level}`}
+            heading={LEVEL_NAMES[level] ?? `Level ${level}`}
           >
             <ul className="divide-divider divide-y">
               {list.map(spell => (
