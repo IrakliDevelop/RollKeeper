@@ -23,7 +23,7 @@ function innateLabel(spell: Spell, usage: 'play' | 'edit'): string | null {
   const max = spell.freeCastMax;
   if (max === undefined || max === 0) return null;
   if (usage === 'edit') return `${max} per day`;
-  return `${max - (spell.freeCastsUsed ?? 0)} of ${max} left`;
+  return `${Math.max(0, max - (spell.freeCastsUsed ?? 0))} of ${max} left`;
 }
 
 export function NpcSpellRow({

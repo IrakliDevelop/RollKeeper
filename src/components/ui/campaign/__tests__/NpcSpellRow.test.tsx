@@ -47,6 +47,11 @@ describe('NpcSpellRow badges', () => {
     expect(badge).toHaveAttribute('data-variant', 'neutral');
   });
 
+  it('never shows a negative remaining count', () => {
+    renderRow(makeSpell({ freeCastMax: 1, freeCastsUsed: 2 }), 'play');
+    expect(screen.getByText('0 of 1 left')).toBeInTheDocument();
+  });
+
   it('shows the daily count on an edit surface', () => {
     renderRow(makeSpell({ freeCastMax: 2, freeCastsUsed: 2 }), 'edit');
     expect(screen.getByText('2 per day')).toBeInTheDocument();
