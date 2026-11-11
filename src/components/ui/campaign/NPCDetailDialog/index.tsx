@@ -54,6 +54,7 @@ export function NPCDetailDialog({
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const addSpellRef = useRef<(() => void) | null>(null);
+  const addSpellButtonRef = useRef<HTMLButtonElement>(null);
   const tabsId = useId();
 
   const handleTabChange = useCallback(
@@ -90,7 +91,7 @@ export function NPCDetailDialog({
   const showSpellsTab = !!npc.spellcasting;
 
   const canEditDelete = !readOnly && !!onEdit && !!onDelete;
-  const showAddSpell = activeTab === 'spells' && showSpellsTab;
+  const showAddSpell = activeTab === 'spells' && showSpellsTab && !readOnly;
   const hasFooter = !!npc.monsterStatBlock || showAddSpell || canEditDelete;
 
   // The tab list scrolls sideways; a tab reached by keyboard must be in view.
@@ -124,6 +125,8 @@ export function NPCDetailDialog({
                 npc={npc}
                 campaignCode={npc.campaignCode}
                 addSpellRef={addSpellRef}
+                addSpellButtonRef={addSpellButtonRef}
+                readOnly={readOnly}
                 encounterId={encounterId}
                 npcEntityId={npcEntityId}
               />
@@ -226,7 +229,11 @@ export function NPCDetailDialog({
             </div>
             <div className="flex flex-wrap gap-2">
               {showAddSpell && (
-                <Button size="sm" onClick={() => addSpellRef.current?.()}>
+                <Button
+                  ref={addSpellButtonRef}
+                  size="sm"
+                  onClick={() => addSpellRef.current?.()}
+                >
                   Add spell
                 </Button>
               )}

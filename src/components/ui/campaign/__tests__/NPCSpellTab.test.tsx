@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -18,6 +27,12 @@ import type {
   EncounterEntity,
   NPCSpellcasting,
 } from '@/types/encounter';
+
+import {
+  findConfirmDialog,
+  queryConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 import { NPCSpellTab } from '../NPCSpellTab';
 import { castMessage } from '../NPCSpellTab/NPCSpellTab.utils';
@@ -140,6 +155,8 @@ beforeEach(() => {
   useNPCStore.setState({ npcsByCampaign: {} });
   useDmStore.setState({ campaigns: [] });
   useEncounterStore.setState({ encounters: [] });
+  // Without a host, confirmDialog resolves false and Remove never happens.
+  renderConfirmDialogHost();
 });
 
 afterEach(() => {
@@ -357,6 +374,12 @@ describe('NPCSpellTab sections', () => {
     expect(level1).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Detect Magic')).toBeNull();
     expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
+    // A heading carries its name (and pips for slotted levels), no count badge.
+    const cantripsRow = screen.getByRole('heading', {
+      level: 4,
+      name: 'Cantrips',
+    }).parentElement!;
+    expect(cantripsRow).toHaveTextContent(/^Cantrips$/);
   });
 
   it('summarizes a collapsed Spells section with slots inline', () => {
@@ -379,6 +402,10 @@ describe('NPCSpellTab sections', () => {
     expect(
       screen.getByRole('heading', { level: 3, name: 'Spell slots' })
     ).toBeInTheDocument();
+    // The shared tracker renders its own controls under the heading.
+    expect(
+      screen.getAllByRole('button', { name: 'Spend a level 1 slot' }).length
+    ).toBeGreaterThan(0);
   });
 
   it('summarizes a collapsed Spell slots section', () => {
@@ -409,5 +436,270 @@ describe('NPCSpellTab sections', () => {
       screen.getAllByRole('button', { name: 'Spend a level 1 slot' })[0]
     );
     expect(storedNpc().spellcasting?.slotsUsed[1]).toBe(1);
+  });
+});
+
+describe('NPCSpellTab innate casting', () => {
+  const FLY = makeSpell({
+    id: 'spell-4',
+    name: 'Fly',
+    level: 3,
+    freeCastMax: 2,
+    freeCastsUsed: 0,
+  });
+
+  it('a plain innate cast spends one innate cast', async () => {
+    const user = userEvent.setup();
+    setup(makeNpc({ spells: [FLY] }));
+    const modal = await openCastModal(user, 'Fly');
+    await user.click(modal.getByRole('button', { name: 'Cast Fly' }));
+    expect(storedNpc().spellcasting?.spells[0].freeCastsUsed).toBe(1);
+    expect(storedNpc().spellcasting?.slotsUsed[3] ?? 0).toBe(0);
+  });
+
+  it('a ritual cast of an innate spell spends neither a cast nor a slot', async () => {
+    const user = userEvent.setup();
+    const spell = makeSpell({
+      id: 'spell-5',
+      name: 'Augury',
+      level: 2,
+      ritual: true,
+      freeCastMax: 1,
+      freeCastsUsed: 0,
+    });
+    setup(makeNpc({ spells: [spell] }));
+    const modal = await openCastModal(user, 'Augury');
+    await user.click(
+      modal.getByRole('radio', { name: 'Cast as a ritual (no slot)' })
+    );
+    await user.click(modal.getByRole('button', { name: 'Cast Augury' }));
+    expect(storedNpc().spellcasting?.spells[0].freeCastsUsed ?? 0).toBe(0);
+    expect(storedNpc().spellcasting?.slotsUsed[2] ?? 0).toBe(0);
+  });
+});
+
+describe('NPCSpellTab rows', () => {
+  it('shows Cast, View, Edit and Remove buttons named after the spell', () => {
+    setup();
+    for (const verb of ['Cast', 'View', 'Edit', 'Remove']) {
+      expect(
+        screen.getByRole('button', { name: `${verb} Fire Bolt` })
+      ).toBeInTheDocument();
+    }
+  });
+});
+
+describe('NPCSpellTab readOnly', () => {
+  it('bug 17: hides Edit and Remove but keeps casting, pips and Reset slots', async () => {
+    const user = userEvent.setup();
+    setup(makeNpc({ slotsUsed: { 1: 1 } }), { readOnly: true });
+    expect(
+      screen.getByRole('button', { name: 'Cast Fire Bolt' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'View Fire Bolt' })
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Edit / })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Remove / })).toBeNull();
+
+    const modal = await openCastModal(user, 'Misty Step');
+    await user.click(modal.getByRole('button', { name: 'Cast Misty Step' }));
+    expect(storedNpc().spellcasting?.slotsUsed[2]).toBe(1);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Restore a level 1 slot' })
+    );
+    expect(storedNpc().spellcasting?.slotsUsed[1]).toBe(0);
+
+    await user.click(screen.getByRole('button', { name: 'Reset slots' }));
+    expect(storedNpc().spellcasting?.slotsUsed[2] ?? 0).toBe(0);
+  });
+});
+
+describe('NPCSpellTab remove', () => {
+  const spellNames = () =>
+    storedNpc().spellcasting?.spells.map(s => s.name) ?? [];
+
+  it('bug 18: asks first and removes only on confirm', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'Remove Fire Bolt' }));
+    const dialog = await findConfirmDialog();
+    expect(
+      within(dialog).getByRole('heading', { name: 'Remove Fire Bolt?' })
+    ).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('Mira no longer knows this spell.');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(queryConfirmDialog()).toBeNull());
+    expect(spellNames()).toContain('Fire Bolt');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Fire Bolt' }));
+    const again = await findConfirmDialog();
+    fireEvent.click(
+      within(again).getByRole('button', { name: 'Remove spell' })
+    );
+    await waitFor(() => expect(spellNames()).not.toContain('Fire Bolt'));
+  });
+
+  describe('focus', () => {
+    const THREE = [
+      makeSpell({ id: 'a', name: 'Alarm', level: 1 }),
+      makeSpell({ id: 'b', name: 'Bless', level: 1 }),
+      makeSpell({ id: 'c', name: 'Command', level: 1 }),
+    ];
+
+    async function remove(
+      user: ReturnType<typeof userEvent.setup>,
+      name: string
+    ) {
+      await user.click(screen.getByRole('button', { name: `Remove ${name}` }));
+      const dialog = await findConfirmDialog();
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Remove spell' })
+      );
+    }
+
+    it('moves to the next row, else the previous row', async () => {
+      const user = userEvent.setup();
+      setup(makeNpc({ spells: THREE }));
+      await remove(user, 'Bless');
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Cast Command' })
+        ).toHaveFocus()
+      );
+      await remove(user, 'Command');
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Cast Alarm' })).toHaveFocus()
+      );
+    });
+
+    it('moves to the Add spell button when the last spell goes', async () => {
+      const user = userEvent.setup();
+      const only = makeSpell({ id: 'a', name: 'Alarm', level: 1 });
+      function WithAddButton() {
+        const ref = useRef<HTMLButtonElement>(null);
+        return (
+          <>
+            <button type="button" ref={ref}>
+              Add spell
+            </button>
+            <Harness addSpellButtonRef={ref} />
+          </>
+        );
+      }
+      useNPCStore.setState({
+        npcsByCampaign: { [CODE]: [makeNpc({ spells: [only] })] },
+      });
+      render(<WithAddButton />);
+      await remove(user, 'Alarm');
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Add spell' })).toHaveFocus()
+      );
+    });
+  });
+});
+
+describe('NPCSpellTab filters', () => {
+  const SPELLS = [
+    makeSpell({ id: 'a', name: 'Alarm', level: 1, tags: ['Utility'] }),
+    makeSpell({ id: 'b', name: 'Bless', level: 1 }),
+    makeSpell({ id: 'c', name: 'Light', level: 0, freeCastMax: 0 }),
+  ];
+
+  it('toggles types, keeps the last one on, and clears tags', async () => {
+    const user = userEvent.setup();
+    setup(makeNpc({ spells: SPELLS }));
+    const type = within(screen.getByRole('group', { name: 'Type' }));
+    const slots = type.getByRole('button', { name: /^Uses slots/ });
+    const atWill = type.getByRole('button', { name: /^At will/ });
+    expect(slots).toHaveAttribute('aria-pressed', 'true');
+    expect(atWill).toHaveAttribute('aria-pressed', 'true');
+    expect(slots).toHaveTextContent('2');
+    expect(atWill).toHaveTextContent('1');
+
+    await user.click(atWill);
+    expect(atWill).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText('Light')).toBeNull();
+
+    await user.click(slots);
+    expect(slots).toHaveAttribute('aria-pressed', 'true');
+
+    const tags = within(screen.getByRole('group', { name: 'Tags' }));
+    expect(screen.queryByRole('button', { name: 'Clear tags' })).toBeNull();
+    const utility = tags.getByRole('button', { name: 'Utility' });
+    await user.click(utility);
+    expect(utility).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Bless')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Clear tags' }));
+    expect(utility).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: 'Clear tags' })).toBeNull();
+    expect(utility).toHaveFocus();
+    expect(screen.getByText('Bless')).toBeInTheDocument();
+  });
+
+  it('shows no filters for one type and no tags', () => {
+    setup(makeNpc({ spells: [SPELLS[1]] }));
+    expect(screen.queryByRole('group', { name: 'Type' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Tags' })).toBeNull();
+  });
+});
+
+describe('NPCSpellTab empty state', () => {
+  it('says there are no spells and offers no second Add button', () => {
+    setup(makeNpc({ casterLevel: 1, slotOverrides: { 1: 0 }, spells: [] }));
+    expect(screen.getByText('No spells yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add spell' })).toBeNull();
+  });
+});
+
+describe('NPCSpellTab add and edit', () => {
+  it('opens the add dialog through addSpellRef, adds, and focuses the new Cast', async () => {
+    const user = userEvent.setup();
+    const addSpellRef: React.MutableRefObject<(() => void) | null> = {
+      current: null,
+    };
+    setup(makeNpc(), { addSpellRef });
+    act(() => addSpellRef.current?.());
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Add a spell to Mira',
+    });
+    await user.type(within(dialog).getByLabelText(/Spell Name/), 'Shield');
+    await user.click(within(dialog).getByRole('button', { name: 'Add spell' }));
+
+    await waitFor(() =>
+      expect(storedNpc().spellcasting?.spells.map(s => s.name)).toContain(
+        'Shield'
+      )
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Cast Shield' })).toHaveFocus()
+    );
+  });
+
+  it('edits through the dialog, keeps createdAt, and returns focus to Edit', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'Edit Fire Bolt' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Edit Fire Bolt',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save spell' })
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Edit Fire Bolt' })
+      ).toBeNull()
+    );
+    expect(storedNpc().spellcasting?.spells[0].createdAt).toBe(NOW);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Edit Fire Bolt' })
+      ).toHaveFocus()
+    );
   });
 });

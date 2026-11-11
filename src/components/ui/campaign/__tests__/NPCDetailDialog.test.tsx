@@ -461,6 +461,24 @@ describe('NPCDetailDialog — footer', () => {
     expect(screen.queryByRole('button', { name: 'Add spell' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add item' })).toBeNull();
   });
+
+  it('hides the footer Add spell on the Spells tab when read-only', () => {
+    setup(makeNpc({ spellcasting: { casterLevel: 3 } as never }), {
+      initialTab: 'spells',
+      readOnly: true,
+    });
+    expect(screen.getByTestId('spell-tab-stub')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add spell' })).toBeNull();
+  });
+
+  it('shows the footer Add spell on the Spells tab when not read-only', () => {
+    setup(makeNpc({ spellcasting: { casterLevel: 3 } as never }), {
+      initialTab: 'spells',
+    });
+    expect(
+      screen.getByRole('button', { name: 'Add spell' })
+    ).toBeInTheDocument();
+  });
 });
 
 const ROPE: NPCInventoryItem = {

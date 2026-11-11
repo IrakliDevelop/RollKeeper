@@ -5,8 +5,8 @@ import type { Spell } from '@/types/character';
 export type SpellCategory = 'regular' | 'at_will' | 'innate';
 
 export const SPELL_CATEGORY_LABELS: Record<SpellCategory, string> = {
-  regular: 'Slot',
-  at_will: 'At Will',
+  regular: 'Uses slots',
+  at_will: 'At will',
   innate: 'Innate',
 };
 

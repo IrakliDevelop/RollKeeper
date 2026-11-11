@@ -139,4 +139,28 @@ describe('NpcSpellDialog edit mode', () => {
       })
     );
   });
+
+  it('shows the new spell when reopened for a different spell', () => {
+    const other: Spell = {
+      ...spell,
+      id: 'spell-2',
+      name: 'Shield',
+      freeCastMax: undefined,
+      freeCastsUsed: undefined,
+      tags: ['Defense'],
+    };
+    const { props, rerender } = renderDialog({
+      mode: 'edit',
+      title: 'Edit Fire Bolt',
+      spell,
+    });
+    expect(screen.getByLabelText(/Spell Name/)).toHaveValue('Fire Bolt');
+    rerender(<NpcSpellDialog {...props} open={false} />);
+    rerender(
+      <NpcSpellDialog {...props} open spell={other} title="Edit Shield" />
+    );
+    expect(screen.getByLabelText(/Spell Name/)).toHaveValue('Shield');
+    expect(screen.getByText('Defense')).toBeInTheDocument();
+    expect(screen.queryByText('Signature')).toBeNull();
+  });
 });
