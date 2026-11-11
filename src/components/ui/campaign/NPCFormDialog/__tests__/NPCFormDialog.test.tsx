@@ -15,7 +15,7 @@ import { useEncounterStore } from '@/store/encounterStore';
 import { DEFAULT_COMBAT_CONFIG } from '@/types/encounter';
 import type { CampaignCreatureKind, CampaignNPC } from '@/types/encounter';
 import { renderConfirmDialogHost } from '@/test/confirmDialog';
-import { KI, STAT_BLOCK_NPC, withoutMeta } from './npcFormFixtures';
+import { CASTER_NPC, KI, STAT_BLOCK_NPC, withoutMeta } from './npcFormFixtures';
 
 const emptyData = {
   items: [],
@@ -220,6 +220,25 @@ describe('footer', () => {
     expect(
       formDialog().querySelectorAll('[data-variant="primary"]')
     ).toHaveLength(1);
+  });
+
+  it('has exactly one primary button on the Spells tab and in the add-spell dialog', async () => {
+    const user = userEvent.setup();
+    renderForm({ editingNpc: CASTER_NPC });
+    await user.click(screen.getByRole('tab', { name: 'Spells' }));
+    const form = formDialog();
+    expect(form.querySelectorAll('[data-variant="primary"]')).toHaveLength(1);
+    await user.click(
+      within(screen.getByRole('region', { name: 'Spells' })).getByRole(
+        'button',
+        { name: 'Add spell' }
+      )
+    );
+    expect(form.querySelectorAll('[data-variant="primary"]')).toHaveLength(1);
+    const addDialog = screen.getByRole('dialog', { name: 'Add spell' });
+    expect(addDialog.querySelectorAll('[data-variant="primary"]')).toHaveLength(
+      1
+    );
   });
 });
 

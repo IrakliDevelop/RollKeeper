@@ -342,23 +342,15 @@ describe('NPCFormDialog field wiring', () => {
 
     // Spells tab: caster level, both overrides and one slot override.
     await user.click(screen.getByRole('tab', { name: /Spells/ }));
-    await user.click(
-      screen.getByRole('switch', { name: 'Enable Spellcasting' })
+    await user.click(screen.getByRole('switch', { name: 'Spellcasting' }));
+    await fillField(user, screen.getByLabelText('Caster level'), '5');
+    await fillField(user, screen.getByLabelText('Spell attack bonus'), '9');
+    await fillField(user, screen.getByLabelText('Spell save DC'), '15');
+    await pickOption(
+      screen.getByRole('combobox', { name: 'Spellcasting ability' }),
+      'Wisdom'
     );
-    const fieldAfter = (label: string) =>
-      (screen.getByText(label).parentElement as HTMLElement).querySelector(
-        'input'
-      ) as HTMLElement;
-    await fillField(user, fieldAfter('Caster Level'), '5');
-    await fillField(user, screen.getAllByPlaceholderText('Auto')[0], '9');
-    await fillField(user, screen.getAllByPlaceholderText('Auto')[1], '15');
-    await pickOption(screen.getAllByRole('combobox')[0], 'Wisdom');
-    const levelOneRow = screen.getByText('Level 1: 4').parentElement;
-    await fillField(
-      user,
-      within(levelOneRow as HTMLElement).getByRole('textbox'),
-      '2'
-    );
+    await fillField(user, screen.getByLabelText('Level 1 slots'), '2');
 
     await user.click(screen.getByRole('button', { name: 'Create NPC' }));
     const payload = savedPayload(onSave);

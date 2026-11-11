@@ -573,6 +573,129 @@ describe('npcStore — setNPCSpellSlotUsed', () => {
   });
 });
 
+describe('npcStore — spendNPCSpellSlot', () => {
+  beforeEach(() => {
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
+  });
+
+  function createWithUsed(slotsUsed: Record<number, number>) {
+    return useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Mage',
+      armorClass: '12',
+      maxHp: 40,
+      speed: '30 ft.',
+      spellcasting: { ...SPELLCASTING_BASE, slotsUsed },
+    });
+  }
+
+  it('spends one from the current state', () => {
+    const id = createWithUsed({ 1: 1 });
+
+    const changed = useNPCStore
+      .getState()
+      .spendNPCSpellSlot(CAMPAIGN, id, 1, 1);
+
+    expect(changed).toBe(true);
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[1]).toBe(2);
+  });
+
+  it('two spends in a row both land', () => {
+    const id = createWithUsed({ 1: 0 });
+    const { spendNPCSpellSlot } = useNPCStore.getState();
+
+    spendNPCSpellSlot(CAMPAIGN, id, 1, 1);
+    spendNPCSpellSlot(CAMPAIGN, id, 1, 1);
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[1]).toBe(2);
+  });
+
+  it('restores one', () => {
+    const id = createWithUsed({ 1: 2 });
+
+    const changed = useNPCStore
+      .getState()
+      .spendNPCSpellSlot(CAMPAIGN, id, 1, -1);
+
+    expect(changed).toBe(true);
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[1]).toBe(1);
+  });
+
+  it('clamps and reports no change', () => {
+    const id = createNPCWithSpellcasting(CAMPAIGN);
+    useNPCStore.getState().setNPCSpellSlotUsed(CAMPAIGN, id, 1, 4);
+    const before = useNPCStore.getState().getNPC(CAMPAIGN, id);
+
+    const spentAtMax = useNPCStore
+      .getState()
+      .spendNPCSpellSlot(CAMPAIGN, id, 1, 1);
+
+    expect(spentAtMax).toBe(false);
+    const after = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(after?.spellcasting?.slotsUsed[1]).toBe(4);
+    expect(after?.updatedAt).toBe(before?.updatedAt);
+
+    const zeroId = createWithUsed({ 1: 0 });
+    const restoredAtZero = useNPCStore
+      .getState()
+      .spendNPCSpellSlot(CAMPAIGN, zeroId, 1, -1);
+
+    expect(restoredAtZero).toBe(false);
+    const zero = useNPCStore.getState().getNPC(CAMPAIGN, zeroId);
+    expect(zero?.spellcasting?.slotsUsed[1]).toBe(0);
+  });
+
+  it('respects slot overrides', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Mage',
+      armorClass: '12',
+      maxHp: 40,
+      speed: '30 ft.',
+      spellcasting: {
+        ...SPELLCASTING_BASE,
+        slotOverrides: { 1: 2 },
+        slotsUsed: { 1: 2 },
+      },
+    });
+
+    const changed = useNPCStore
+      .getState()
+      .spendNPCSpellSlot(CAMPAIGN, id, 1, 1);
+
+    expect(changed).toBe(false);
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[1]).toBe(2);
+  });
+
+  it('rejects bad input', () => {
+    const id = createWithUsed({ 1: 1 });
+    const plainId = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Brute',
+      armorClass: '12',
+      maxHp: 40,
+      speed: '30 ft.',
+    });
+    const snapshot = useNPCStore.getState().npcsByCampaign;
+    const { spendNPCSpellSlot } = useNPCStore.getState();
+
+    expect(spendNPCSpellSlot(CAMPAIGN, 'missing', 1, 1)).toBe(false);
+    expect(spendNPCSpellSlot(CAMPAIGN, plainId, 1, 1)).toBe(false);
+    expect(spendNPCSpellSlot(CAMPAIGN, id, 1, 0)).toBe(false);
+    expect(spendNPCSpellSlot(CAMPAIGN, id, 1, 1.5)).toBe(false);
+    expect(spendNPCSpellSlot(CAMPAIGN, id, 1, NaN)).toBe(false);
+
+    expect(useNPCStore.getState().npcsByCampaign).toBe(snapshot);
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[1]).toBe(1);
+  });
+});
+
 describe('npcStore — useNPCFreeCast', () => {
   beforeEach(() => {
     useNPCStore.setState({
