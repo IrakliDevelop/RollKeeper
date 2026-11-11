@@ -64,9 +64,10 @@ function EntrySection({
     <div style={sectionStyle}>
       <div
         style={{
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: 600,
           color: P.heading,
+          borderBottom: `1px solid ${P.divider}`,
           paddingBottom: 4,
           marginBottom: 6,
         }}
@@ -127,11 +128,12 @@ export function StatBlockImage({
   const hitPoints = sb.hpFormula
     ? `${npc.maxHp} (${sb.hpFormula})`
     : String(npc.maxHp);
+  const conditionImmunities = sb.conditionImmunities ?? [];
   const hasDefences =
     sb.resistances ||
     sb.immunities ||
     sb.vulnerabilities ||
-    sb.conditionImmunities.length > 0;
+    conditionImmunities.length > 0;
 
   return (
     <div
@@ -193,13 +195,13 @@ export function StatBlockImage({
       >
         {ABILITIES.map(({ key, label }) => (
           <div key={key}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: P.heading }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: P.heading }}>
               {label}
             </div>
             <div style={{ fontSize: 14, fontWeight: 500, color: P.heading }}>
               {sb[key]}
             </div>
-            <div style={{ fontSize: 11, color: P.muted }}>
+            <div style={{ fontSize: 10, color: P.muted }}>
               ({abilityMod(sb[key])})
             </div>
           </div>
@@ -225,7 +227,7 @@ export function StatBlockImage({
           <Row label="Vulnerabilities" value={sb.vulnerabilities} />
           <Row
             label="Condition immunities"
-            value={sb.conditionImmunities.join(', ')}
+            value={conditionImmunities.join(', ')}
           />
         </div>
       )}

@@ -98,18 +98,24 @@ export function useStatBlockExport(
     return captureElement(el);
   }, [containerRef]);
 
-  const begin = (next: ExportStatus) => {
-    clearResetTimer();
-    setError(null);
-    setStatus(next);
-  };
+  const begin = useCallback(
+    (next: ExportStatus) => {
+      clearResetTimer();
+      setError(null);
+      setStatus(next);
+    },
+    [clearResetTimer]
+  );
 
-  const fail = (kind: 'copy' | 'save', label: string, err: unknown) => {
-    console.error(label, err);
-    if (!mounted.current) return;
-    setError(kind);
-    setStatus('idle');
-  };
+  const fail = useCallback(
+    (kind: 'copy' | 'save', label: string, err: unknown) => {
+      console.error(label, err);
+      if (!mounted.current) return;
+      setError(kind);
+      setStatus('idle');
+    },
+    []
+  );
 
   const copy = useCallback(async () => {
     begin('copying');
@@ -127,9 +133,7 @@ export function useStatBlockExport(
     } catch (err) {
       fail('copy', 'Failed to copy stat block image:', err);
     }
-    // begin/fail only touch stable refs and setters
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capture]);
+  }, [begin, capture, fail]);
 
   const download = useCallback(async () => {
     begin('downloading');
@@ -147,8 +151,7 @@ export function useStatBlockExport(
     } catch (err) {
       fail('save', 'Failed to download stat block image:', err);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capture, npc.name]);
+  }, [begin, capture, fail, npc.name]);
 
   return { status, error, canCopy, avatarDataUrl, copy, download };
 }

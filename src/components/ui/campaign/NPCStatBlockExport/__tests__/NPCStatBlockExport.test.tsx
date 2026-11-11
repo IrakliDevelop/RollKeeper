@@ -186,6 +186,18 @@ describe('NPCStatBlockExport buttons', () => {
     expect(screen.getByRole('button', { name: /Copy image/ })).toBeDisabled();
   });
 
+  it('disables Copy while a download is pending', async () => {
+    stubClipboard(() => Promise.resolve());
+    toPng.mockReturnValue(new Promise(() => {}));
+    render(<NPCStatBlockExport npc={makeNpc()} />);
+    const copy = await screen.findByRole('button', { name: 'Copy image' });
+    fireEvent.click(screen.getByRole('button', { name: 'Download image' }));
+    await waitFor(() => expect(copy).toBeDisabled());
+    expect(
+      screen.getByRole('button', { name: /Download image/ })
+    ).toBeDisabled();
+  });
+
   it('shows Image copied for two seconds, then Copy image again', async () => {
     vi.useFakeTimers();
     stubClipboard(() => Promise.resolve());
@@ -282,6 +294,19 @@ describe('exported image contents', () => {
     }
     expect(hidden.queryByText('HP Formula')).toBeNull();
     expect(hidden.queryByText('Bonus Actions')).toBeNull();
+  });
+
+  it('renders a migrated block that lacks condition immunities', () => {
+    const legacy = {
+      ...statBlock,
+      conditionImmunities: undefined,
+    } as unknown as MonsterStatBlock;
+    const { container } = render(
+      <NPCStatBlockExport npc={makeNpc({ monsterStatBlock: legacy })} />
+    );
+    const hidden = within(hiddenImage(container));
+    expect(hidden.getByText('Armor class')).toBeInTheDocument();
+    expect(hidden.queryByText('Condition immunities')).toBeNull();
   });
 
   it('spells the ability labels and transforms no text', () => {

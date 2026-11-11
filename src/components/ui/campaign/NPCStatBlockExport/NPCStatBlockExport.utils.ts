@@ -33,7 +33,7 @@ export function stripEmoji(text: string): string {
 
 /**
  * Strip ALL styling from rich-text HTML for clean image export.
- * Reference badges use Tailwind classes Tailwind classes and emoji
+ * Reference badges use Tailwind classes and emoji
  * icons — these don't render in html-to-image. Replace with bold+italic+
  * underline plain text so they're still identifiable in the exported image.
  */
