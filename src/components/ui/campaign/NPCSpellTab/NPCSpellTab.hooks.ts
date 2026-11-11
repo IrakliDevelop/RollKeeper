@@ -105,8 +105,9 @@ export function useSpellFilters(spells: Spell[]) {
     () => new Set(allTags.filter(tag => pickedTags.has(tag))),
     [allTags, pickedTags]
   );
-  const presentCategories = ALL_SPELL_CATEGORIES.filter(
-    category => categoryCounts[category] > 0
+  const presentCategories = useMemo(
+    () => ALL_SPELL_CATEGORIES.filter(category => categoryCounts[category] > 0),
+    [categoryCounts]
   );
   const isCategoryFiltering =
     presentCategories.length > 1 &&
@@ -160,8 +161,7 @@ export function useSpellFilters(spells: Spell[]) {
         return next;
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the counts
-    [categoryCounts]
+    [presentCategories]
   );
 
   const toggleTag = useCallback((tag: string) => {
