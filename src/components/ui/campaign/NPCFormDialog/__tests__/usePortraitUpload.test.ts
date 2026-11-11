@@ -2,12 +2,8 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePortraitUpload } from '../usePortraitUpload';
 
-const URL_A =
-  'https://rollkeeper-images.s3.eu-central-1.amazonaws.com/npc/a.webp';
-const URL_B =
-  'https://rollkeeper-images.s3.eu-central-1.amazonaws.com/npc/b.webp';
-const ORIGINAL =
-  'https://rollkeeper-images.s3.eu-central-1.amazonaws.com/npc/original.webp';
+const URL_A = 'https://rollkeeper-images.s3.amazonaws.com/npc/a.webp';
+const URL_B = 'https://rollkeeper-images.s3.amazonaws.com/npc/b.webp';
 
 const fetchMock = vi.fn();
 
@@ -34,10 +30,10 @@ function deletedUrls() {
   );
 }
 
-function setup(value = '') {
+function setup() {
   const onChange = vi.fn();
   const hook = renderHook(() =>
-    usePortraitUpload({ npcId: 'npc-1', value, onChange })
+    usePortraitUpload({ npcId: 'npc-1', onChange })
   );
   return { ...hook, onChange };
 }
@@ -87,7 +83,7 @@ describe('usePortraitUpload upload', () => {
   });
 
   it('reports upload when the POST fails and leaves the value alone', async () => {
-    const { result, onChange } = setup(ORIGINAL);
+    const { result, onChange } = setup();
     fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
     await act(async () => {
       await result.current.upload(imageFile());
@@ -124,7 +120,7 @@ describe('usePortraitUpload upload', () => {
   it('uses a generated npcId when there is no NPC yet', async () => {
     const onChange = vi.fn();
     const { result } = renderHook(() =>
-      usePortraitUpload({ npcId: undefined, value: '', onChange })
+      usePortraitUpload({ npcId: undefined, onChange })
     );
     okUpload(URL_A);
     await act(async () => {
@@ -135,7 +131,7 @@ describe('usePortraitUpload upload', () => {
   });
 
   it('calls onChange with the new url, clears the error and sends no DELETE', async () => {
-    const { result, onChange } = setup(ORIGINAL);
+    const { result, onChange } = setup();
     await act(async () => {
       await result.current.upload(imageFile('notes.txt', 'text/plain'));
     });
@@ -195,7 +191,7 @@ describe('usePortraitUpload cleanup', () => {
   });
 
   it('remove clears the value without a DELETE, and commit sends none either', () => {
-    const { result, onChange } = setup(ORIGINAL);
+    const { result, onChange } = setup();
     act(() => result.current.remove());
     expect(onChange).toHaveBeenCalledWith('');
     act(() => result.current.commit(''));
@@ -203,7 +199,7 @@ describe('usePortraitUpload cleanup', () => {
   });
 
   it('discardAll with no session uploads sends no DELETE', () => {
-    const { result } = setup(ORIGINAL);
+    const { result } = setup();
     act(() => result.current.discardAll());
     expect(deleteCalls()).toHaveLength(0);
   });
@@ -243,6 +239,18 @@ describe('usePortraitUpload cleanup', () => {
   it('sends no DELETE for a url that is not on S3', async () => {
     const { result } = setup();
     okUpload('https://example.com/local/a.webp');
+    await act(async () => {
+      await result.current.upload(imageFile());
+    });
+    act(() => result.current.discardAll());
+    expect(deleteCalls()).toHaveLength(0);
+  });
+
+  it('sends no DELETE for a regional S3 URL, matching the other upload controls', async () => {
+    const { result } = setup();
+    okUpload(
+      'https://rollkeeper-images.s3.eu-central-1.amazonaws.com/npc/a.webp'
+    );
     await act(async () => {
       await result.current.upload(imageFile());
     });

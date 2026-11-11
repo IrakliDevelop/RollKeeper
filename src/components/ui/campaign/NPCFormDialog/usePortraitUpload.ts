@@ -8,18 +8,13 @@ export type PortraitError = 'type' | 'size' | 'upload';
 interface UsePortraitUploadArgs {
   /** The saved NPC's id; undefined while creating a new one. */
   npcId: string | undefined;
-  /** The draft's current portrait URL. */
-  value: string;
   onChange: (url: string) => void;
 }
 
-// Matches both s3.amazonaws.com and the regional form the upload route
-// returns (bucket.s3.<region>.amazonaws.com). A plain includes('s3.amazonaws.com')
-// never matches the regional form.
-const S3_URL = /\bs3[.-]([a-z0-9-]+\.)?amazonaws\.com/;
-
+// Regional upload URLs (s3Upload.ts:59) don't match this check, as in every other
+// upload control; kept for parity pending the owner's decision on real S3 deletes.
 function deleteFromS3(url: string) {
-  if (!S3_URL.test(url)) return;
+  if (!url.includes('s3.amazonaws.com')) return;
   fetch(`/api/npc/delete?url=${encodeURIComponent(url)}`, {
     method: 'DELETE',
   }).catch(() => {});
