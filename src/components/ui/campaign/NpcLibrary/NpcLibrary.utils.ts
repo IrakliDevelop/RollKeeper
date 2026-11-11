@@ -13,7 +13,7 @@ export interface LibraryCopy {
   moveLabel: (name: string) => string;
   deleteMessage: (name: string) => string;
   deleteConfirm: string;
-  entityLabel: 'NPC' | 'Custom Monster';
+  formLabel: string;
   editLabel: string;
   sheetLabel: string;
 }
@@ -31,7 +31,7 @@ export const LIBRARY_COPY: Record<CampaignCreatureKind, LibraryCopy> = {
     deleteMessage: name =>
       `${name} is removed from this campaign's NPCs. Encounters that already include them keep their copy.`,
     deleteConfirm: 'Delete NPC',
-    entityLabel: 'NPC',
+    formLabel: 'NPC form',
     editLabel: 'Edit NPC',
     sheetLabel: 'NPC sheet',
   },
@@ -48,7 +48,7 @@ export const LIBRARY_COPY: Record<CampaignCreatureKind, LibraryCopy> = {
     deleteMessage: name =>
       `${name} is removed from this campaign's custom monsters. Encounters that already include them keep their copy.`,
     deleteConfirm: 'Delete custom monster',
-    entityLabel: 'Custom Monster',
+    formLabel: 'Custom monster form',
     editLabel: 'Edit custom monster',
     sheetLabel: 'Custom monster sheet',
   },

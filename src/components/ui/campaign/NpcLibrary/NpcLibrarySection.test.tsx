@@ -36,15 +36,15 @@ const NEW_NPC_DATA: Omit<
 vi.mock('@/components/ui/campaign/NPCFormDialog', () => ({
   NPCFormDialog: ({
     open,
-    entityLabel,
+    kind,
     onSave,
   }: {
     open: boolean;
-    entityLabel?: string;
+    kind?: string;
     onSave: (data: typeof NEW_NPC_DATA) => void;
   }) =>
     open ? (
-      <div role="dialog" aria-label={`Form ${entityLabel}`}>
+      <div role="dialog" aria-label={`Form ${kind}`}>
         <button onClick={() => onSave(NEW_NPC_DATA)}>Save form</button>
       </div>
     ) : null,
@@ -319,7 +319,7 @@ describe('NpcLibrarySection', () => {
     const { unmount } = render(<NpcLibrarySection campaignCode={CODE} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create NPC' }));
     expect(
-      screen.getByRole('dialog', { name: 'Form NPC' })
+      screen.getByRole('dialog', { name: 'Form npc' })
     ).toBeInTheDocument();
     unmount();
 
@@ -328,7 +328,7 @@ describe('NpcLibrarySection', () => {
       screen.getByRole('button', { name: 'Create custom monster' })
     );
     expect(
-      screen.getByRole('dialog', { name: 'Form Custom Monster' })
+      screen.getByRole('dialog', { name: 'Form monster' })
     ).toBeInTheDocument();
   });
 
