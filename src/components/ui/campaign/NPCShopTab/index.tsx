@@ -1,7 +1,7 @@
 'use client';
 
+import { Section } from '@/components/ui/layout/section';
 import { useNPCStore } from '@/store/npcStore';
-import { cn } from '@/utils/cn';
 import type { Currency } from '@/types/character';
 import type { NPCInventoryItem } from '@/types/encounter';
 import { ShopStockRow } from './ShopStockRow';
@@ -9,7 +9,6 @@ import { ShopOpenSection } from './ShopOpenSection';
 import { ShopSalesLog } from './ShopSalesLog';
 import { useShopPublish, useShopSalesLog } from './NPCShopTab.hooks';
 import {
-  SHOP_STOCK_GRID_COLS,
   countItemsInStock,
   shopStockHelperText,
   soldQuantityByItemId,
@@ -26,14 +25,14 @@ const EMPTY_CURRENCY: Currency = {
 };
 
 /**
- * DM-only merchant authoring surface. See the Task 5 brief and spec artboard
- * 1a for the exact copy and layout this implements — including the
- * open-state chrome (bordered/tinted toggle card, subtitle and Stock helper
- * copy that switch when open, the "Open" header badge, and the populated
- * sales log) added in Task 13b. Publishing/teardown against
- * `PUT /shops/[npcId]`, `entityIds` resolution, and the debounced
- * republish-while-open all live in `useShopPublish` (Task 13a/13b); this
- * component owns local NPC-store writes and layout only.
+ * DM-only merchant authoring surface, laid out as three stacked parts: the
+ * open-for-business switch with the purse and shop description
+ * (`ShopOpenSection`), the Stock section (one row per inventory item,
+ * `ShopStockRow`), and the Sales log section (`ShopSalesLog`). Publishing and
+ * teardown against `PUT /shops/[npcId]`, `entityIds` resolution, the publish
+ * error with its retry, and the debounced republish-while-open all live in
+ * `useShopPublish`; this component owns local NPC-store writes and layout
+ * only.
  */
 export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
   const inventory = npc.inventory ?? [];
@@ -94,31 +93,17 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
         onSetCurrency={setCurrency}
       />
 
-      <section className="space-y-2">
-        <div>
-          <h3 className="text-heading text-sm font-semibold">Stock</h3>
-          <p className="text-muted text-xs">
-            {shopStockHelperText(shopOpen, npc.name)}
-          </p>
-        </div>
+      <Section level={3} heading="Stock" contentClassName="space-y-2">
+        <p className="type-small text-muted">
+          {shopStockHelperText(shopOpen, npc.name)}
+        </p>
 
         {inventory.length === 0 ? (
-          <p className="text-faint text-sm">
+          <p className="type-body text-muted">
             No inventory yet — add items in the Inventory tab first.
           </p>
         ) : (
-          <div className="space-y-2">
-            <div
-              className={cn(
-                'text-muted grid gap-3 px-2 text-[10px] font-semibold uppercase',
-                SHOP_STOCK_GRID_COLS
-              )}
-            >
-              <span>Item</span>
-              <span className="text-center">For sale</span>
-              <span>Price</span>
-              <span className="text-right">Stock</span>
-            </div>
+          <ul className="divide-divider divide-y">
             {inventory.map(item => (
               <ShopStockRow
                 key={item.id}
@@ -129,9 +114,9 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
                 onPatch={patch => patchItem(item.id, patch)}
               />
             ))}
-          </div>
+          </ul>
         )}
-      </section>
+      </Section>
 
       <ShopSalesLog campaignCode={npc.campaignCode} entries={salesLog} />
     </div>

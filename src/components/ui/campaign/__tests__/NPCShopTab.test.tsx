@@ -7,6 +7,7 @@ import {
   cleanup,
   waitFor,
   act,
+  within,
 } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NPCShopTab } from '@/components/ui/campaign/NPCShopTab';
@@ -112,10 +113,13 @@ function Harness({ initial }: { initial: CampaignNPC }) {
 }
 
 describe('NPCShopTab', () => {
-  it('shows a "price required" badge and disables the for-sale switch for an unpriceable row', () => {
+  it('shows a "Needs a price" badge and disables the for-sale switch for an unpriceable row', () => {
     render(<Harness initial={makeNpc({ inventory: [makeItem()] })} />);
 
-    expect(screen.getByText('price required')).toBeInTheDocument();
+    expect(screen.getByText('Needs a price')).toHaveAttribute(
+      'data-variant',
+      'warning'
+    );
     expect(
       screen.getByRole('switch', { name: 'List Test Item for sale' })
     ).toBeDisabled();
@@ -279,7 +283,7 @@ describe('NPCShopTab', () => {
     });
     // The badge/copy re-derives from the now-absent override — this item has
     // no `value` or rarity, so it becomes unpriceable again.
-    expect(screen.getByText('price required')).toBeInTheDocument();
+    expect(screen.getByText('Needs a price')).toBeInTheDocument();
   });
 
   it('typing an explicit 0 price persists as a real 0, not as a cleared field', () => {
@@ -293,8 +297,8 @@ describe('NPCShopTab', () => {
     expect(updateNPC).toHaveBeenLastCalledWith('ABCD', 'npc-1', {
       inventory: [expect.objectContaining({ id: 'item-1', priceCopper: 0 })],
     });
-    // A real 0 cp price makes the row sellable — no longer "price required".
-    expect(screen.queryByText('price required')).not.toBeInTheDocument();
+    // A real 0 cp price makes the row sellable — no longer "Needs a price".
+    expect(screen.queryByText('Needs a price')).not.toBeInTheDocument();
   });
 
   it('renders the sales log empty state unchanged when no sales are recorded', () => {
@@ -756,7 +760,11 @@ describe('NPCShopTab', () => {
 
       render(<Harness initial={makeNpc()} />);
 
-      expect(screen.getByText('unreconciled')).toBeInTheDocument();
+      expect(screen.getByText('Not matched to stock')).toHaveAttribute(
+        'data-variant',
+        'warning'
+      );
+      expect(screen.queryByText(/· reconciled/)).not.toBeInTheDocument();
     });
 
     it('shows a "N sold" badge on the matching stock row', () => {
@@ -789,6 +797,129 @@ describe('NPCShopTab', () => {
       );
 
       expect(screen.getByText('2 sold — none left')).toBeInTheDocument();
+    });
+  });
+
+  describe('stock rows and sections (Felt and Brass 2-03c6)', () => {
+    const rowOf = (name: string) =>
+      screen
+        .getByRole('switch', { name: `List ${name} for sale` })
+        .closest('li') as HTMLElement;
+
+    it('words an unpriceable row in an open shop as not listed until priced', () => {
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem()],
+          })}
+        />
+      );
+
+      expect(
+        screen.getByText('Not listed until it has a price')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('not published — players never see it')
+      ).not.toBeInTheDocument();
+    });
+
+    it('has no header row and no uppercase label, and labels every row', () => {
+      const inventory = [
+        makeItem({ id: 'a', name: 'Rope', value: 100 }),
+        makeItem({ id: 'b', name: 'Lantern', value: 500 }),
+      ];
+      const { container } = render(
+        <Harness initial={makeNpc({ inventory })} />
+      );
+
+      expect(screen.queryByText('Item')).not.toBeInTheDocument();
+      expect(screen.getAllByText('For sale')).toHaveLength(inventory.length);
+      expect(container.querySelector('.uppercase')).toBeNull();
+    });
+
+    it('labels the switch, the price group and the stock field inside the row', () => {
+      render(
+        <Harness
+          initial={makeNpc({
+            inventory: [makeItem({ value: 100 })],
+          })}
+        />
+      );
+      const row = rowOf('Test Item');
+
+      expect(within(row).getByText('For sale')).toBeInTheDocument();
+      const group = within(row).getByRole('group', { name: 'Price' });
+      for (const denom of ['gp', 'sp', 'cp']) {
+        expect(
+          within(group).getByRole('textbox', {
+            name: `Test Item price (${denom})`,
+          })
+        ).toBeInTheDocument();
+        expect(within(group).getByText(denom)).toBeInTheDocument();
+      }
+      expect(within(row).getByText('Stock')).toBeInTheDocument();
+      expect(
+        within(row).getByRole('textbox', { name: 'Test Item stock quantity' })
+      ).toBeInTheDocument();
+    });
+
+    it('renders neutral rarity and sold badges', () => {
+      shopSalesLogByNpc = {
+        'npc-1': [makeSaleLogEntry({ entryId: 'item-1', quantity: 2 })],
+      };
+      render(
+        <Harness
+          initial={makeNpc({
+            inventory: [
+              makeItem({ value: 100, rarity: 'uncommon', quantity: 3 }),
+            ],
+          })}
+        />
+      );
+
+      expect(screen.getByText('Uncommon')).toHaveAttribute(
+        'data-variant',
+        'neutral'
+      );
+      expect(screen.getByText('2 sold')).toHaveAttribute(
+        'data-variant',
+        'neutral'
+      );
+    });
+
+    it('lists stock and sales as items of a list under h3 headings', () => {
+      shopSalesLogByNpc = { 'npc-1': [makeSaleLogEntry()] };
+      render(
+        <Harness initial={makeNpc({ inventory: [makeItem({ value: 100 })] })} />
+      );
+
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Stock' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Sales log' })
+      ).toBeInTheDocument();
+      const stockRow = rowOf('Test Item');
+      expect(stockRow.parentElement?.tagName).toBe('UL');
+      const saleRow = screen.getByText('Potion of Healing ×1').closest('li');
+      expect(saleRow?.parentElement?.tagName).toBe('UL');
+    });
+
+    it('shows the sales amount as a neutral fact', () => {
+      shopSalesLogByNpc = { 'npc-1': [makeSaleLogEntry({ copper: 6500 })] };
+      render(<Harness initial={makeNpc()} />);
+
+      expect(screen.getByText('65 gp').className).not.toMatch(/accent-/);
+    });
+
+    it('renders the empty sales log as plain text without a card', () => {
+      render(<Harness initial={makeNpc()} />);
+
+      const empty = screen.getByText(/No sales yet/);
+      expect(empty.tagName).toBe('P');
+      expect(empty).toHaveClass('type-body', 'text-muted');
+      expect(empty).not.toHaveClass('rounded-md');
     });
   });
 

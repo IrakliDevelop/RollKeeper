@@ -56,17 +56,6 @@ export function resolveShopEntityIds(
 import { formatCurrencyFromCopper } from '@/utils/currency';
 
 /**
- * Shared grid-template for the Stock header row and every `ShopStockRow`.
- * Both must reference this constant rather than declaring their own
- * `grid-cols-[...auto...]` — `auto` tracks size independently per grid
- * container, so a header row and a body row (or two body rows with
- * differently-sized content) can drift out of alignment (Task 5 review,
- * Minor finding). Fixed widths on the trailing three columns keep them
- * identical everywhere; only the item-name column flexes.
- */
-export const SHOP_STOCK_GRID_COLS = 'grid-cols-[1fr_4rem_14.5rem_4rem]';
-
-/**
  * The price a row would resolve to with any manual override stripped —
  * `item.value`, then a rarity default, then `null`. This is what the price
  * fields show as placeholder text (spec: "Placeholder is what players would
