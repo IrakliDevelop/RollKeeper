@@ -4,13 +4,10 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from '@/components/ui/layout/card';
+import { Card, CardContent } from '@/components/ui/layout/card';
 import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
+import { Section } from '@/components/ui/layout/section';
+import { CalendarPresetPicker } from '@/components/ui/calendar/CalendarPresetPicker';
 import { CalendarView } from '@/components/ui/calendar/CalendarView';
 import { CalendarSyncControls } from '@/components/ui/calendar/CalendarSyncControls';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -118,42 +115,20 @@ export default function CalendarPage() {
             )}
           </>
         ) : (
-          <Card>
-            <CardHeader className="p-6">
-              <CardTitle>Set Up Campaign Calendar</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 p-6 pt-0">
-              <p className="text-body">
-                Choose a calendar preset to get started. You can fully customize
-                days, months, moons, and more in settings afterwards.
-              </p>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {CALENDAR_PRESETS.map(preset => (
-                  <button
-                    key={preset.id}
-                    onClick={() => setSelectedPreset(preset.id)}
-                    className={`rounded-lg border-2 p-4 text-left transition-all ${
-                      selectedPreset === preset.id
-                        ? 'border-accent-blue-border bg-accent-blue-bg'
-                        : 'border-divider bg-surface hover:bg-surface-secondary'
-                    }`}
-                  >
-                    <span className="text-heading font-semibold">
-                      {preset.name}
-                    </span>
-                    <p className="text-muted mt-1 text-xs">
-                      {getPresetDescription(preset.id)}
-                    </p>
-                  </button>
-                ))}
-              </div>
-
-              <Button variant="primary" onClick={handleCreate}>
-                Create Calendar
-              </Button>
-            </CardContent>
-          </Card>
+          <Section heading="Choose a calendar" contentClassName="space-y-4">
+            <p className="type-body text-muted">
+              Pick a calendar to start from. Months, week days, moons and eras
+              can be changed in settings.
+            </p>
+            <CalendarPresetPicker
+              value={selectedPreset}
+              onChange={setSelectedPreset}
+              aria-label="Choose a calendar"
+            />
+            <Button variant="primary" onClick={handleCreate}>
+              Create calendar
+            </Button>
+          </Section>
         )}
         {campaign && (
           <div className="mt-6">
@@ -163,19 +138,4 @@ export default function CalendarPage() {
       </main>
     </div>
   );
-}
-
-function getPresetDescription(id: string): string {
-  switch (id) {
-    case 'default':
-      return '7-day weeks, 12 months of 30 days, 4 seasons, 1 moon';
-    case 'harptos':
-      return 'Faer\u00fbn calendar with 10-day tendays, 5 holidays, Sel\u00fbne moon';
-    case 'greyhawk':
-      return '7-day weeks, 12 months of 28 days, 4 festivals, 2 moons';
-    case 'barovia':
-      return '7-day weeks, 12 months of 28 days, 28-day moon cycle';
-    default:
-      return '';
-  }
 }

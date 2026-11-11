@@ -9,14 +9,12 @@ import {
   Undo2,
   MapPin,
   Link2,
-  Clock,
-  Sun,
-  Sunrise,
-  Sunset,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { CalendarNav } from './CalendarNav';
+import { CalendarPresetPicker } from './CalendarPresetPicker';
+import { PeriodIcon } from './PeriodIcon';
 import { CalendarGrid } from './CalendarGrid';
 import { EventDialog } from './EventDialog';
 import { EventListView } from './EventListView';
@@ -54,36 +52,6 @@ const TABS: { id: PlayerTab; label: string; icon: React.ReactNode }[] = [
   { id: 'events', label: 'Events', icon: <List size={14} /> },
 ];
 
-function getPresetDescription(id: string): string {
-  switch (id) {
-    case 'default':
-      return '7-day weeks, 12 months of 30 days, 4 seasons';
-    case 'harptos':
-      return 'Faer\u00fbn calendar with 10-day tendays, 5 holidays';
-    case 'greyhawk':
-      return '7-day weeks, 12 months of 28 days, 4 festivals';
-    case 'barovia':
-      return '7-day weeks, 12 months of 28 days, 28-day moon cycle';
-    default:
-      return '';
-  }
-}
-
-function getPeriodIcon(period: string) {
-  switch (period) {
-    case 'Morning':
-      return <Sunrise size={16} className="text-accent-amber-text" />;
-    case 'Afternoon':
-      return <Sun size={16} className="text-accent-amber-text" />;
-    case 'Evening':
-      return <Sunset size={16} className="text-accent-orange-text" />;
-    case 'Night':
-      return <Moon size={16} className="text-accent-blue-text" />;
-    default:
-      return <Clock size={16} className="text-muted" />;
-  }
-}
-
 function SyncedTimeDisplay({
   date,
   config,
@@ -106,7 +74,7 @@ function SyncedTimeDisplay({
       </div>
       <div className="flex flex-col gap-0.5">
         <div className="flex items-center gap-1.5">
-          {getPeriodIcon(period)}
+          <PeriodIcon period={period} />
           <span className="text-body text-sm font-medium">{period}</span>
         </div>
         {weekDayName && (
@@ -204,26 +172,11 @@ export function PlayerCalendarView({
         <p className="text-body text-sm">
           Choose a calendar to track in-game time and events for this character.
         </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {CALENDAR_PRESETS.map(preset => (
-            <button
-              key={preset.id}
-              onClick={() => setSelectedPreset(preset.id)}
-              className={`rounded-lg border-2 p-3 text-left transition-all ${
-                selectedPreset === preset.id
-                  ? 'border-accent-blue-border bg-accent-blue-bg'
-                  : 'border-divider bg-surface hover:bg-surface-secondary'
-              }`}
-            >
-              <span className="text-heading text-sm font-semibold">
-                {preset.name}
-              </span>
-              <p className="text-muted mt-1 text-xs">
-                {getPresetDescription(preset.id)}
-              </p>
-            </button>
-          ))}
-        </div>
+        <CalendarPresetPicker
+          value={selectedPreset}
+          onChange={setSelectedPreset}
+          aria-label="Choose a calendar"
+        />
         <Button variant="primary" size="sm" onClick={handleCreate}>
           Create Calendar
         </Button>
