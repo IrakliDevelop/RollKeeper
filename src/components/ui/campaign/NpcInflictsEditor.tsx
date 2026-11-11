@@ -1,18 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import {
-  SelectField,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-} from '@/components/ui/forms/select';
-import { Badge } from '@/components/ui/layout/badge';
 import { Section } from '@/components/ui/layout/section';
+import { NpcInflictsPicker, ADD_NEW, PLACEHOLDER } from './NpcInflictsPicker';
+import { NpcInflictsRow } from './NpcInflictsRow';
 import { CustomConditionFields } from '@/components/ui/encounter/custom-conditions/CustomConditionFields';
-import { CONDITION_ICON_REGISTRY } from '@/utils/conditionIconRegistry';
 import {
   createCustomCondition,
   resolveInflictableConditions,
@@ -20,18 +13,6 @@ import {
 } from '@/utils/customConditions';
 
 import type { CustomCondition } from '@/types/encounter';
-
-// Add-picker sentinel: a Radix Select only fires onValueChange when its value
-// CHANGES, so the value is pinned to a placeholder that never updates (same
-// pattern as NpcResourcesEditor).
-const PLACEHOLDER = '__placeholder__';
-const ADD_NEW = '__new__';
-
-const KIND_LABELS: Record<CustomCondition['kind'], string> = {
-  buff: 'Buff',
-  debuff: 'Debuff',
-  neutral: 'Neutral',
-};
 
 type PendingFocus = 'picker' | 'panel' | { remove: string } | null;
 
@@ -137,55 +118,21 @@ export function NpcInflictsEditor({
     setDraft(null);
   };
 
-  const picker = (
-    <div className="w-56">
-      <SelectField
-        ref={pickerRef}
-        value={PLACEHOLDER}
-        onValueChange={handleAdd}
-        triggerProps={{ 'aria-label': 'Add inflicted condition' }}
-        contentProps={{ onCloseAutoFocus: handlePickerCloseFocus }}
-      >
-        <SelectItem value={PLACEHOLDER} disabled>
-          Add condition…
-        </SelectItem>
-        <SelectGroup>
-          <SelectLabel>Official conditions</SelectLabel>
-          {officialConditionsLoading ? (
-            <SelectItem value="__loading__" disabled>
-              Loading official conditions…
-            </SelectItem>
-          ) : (
-            availableOfficial.map(entry => (
-              <SelectItem
-                key={entry.id}
-                value={entry.id}
-                description={entry.rulesSource}
-              >
-                {entry.name}
-              </SelectItem>
-            ))
-          )}
-        </SelectGroup>
-        <SelectGroup>
-          <SelectLabel>Custom conditions</SelectLabel>
-          {available.map(entry => (
-            <SelectItem key={entry.id} value={entry.id}>
-              {entry.name}
-            </SelectItem>
-          ))}
-          <SelectItem value={ADD_NEW}>New condition…</SelectItem>
-        </SelectGroup>
-      </SelectField>
-    </div>
-  );
-
   return (
     <Section
       level={3}
       heading="Conditions it inflicts"
       wrapHeading
-      trailing={picker}
+      trailing={
+        <NpcInflictsPicker
+          ref={pickerRef}
+          available={available}
+          availableOfficial={availableOfficial}
+          officialConditionsLoading={officialConditionsLoading}
+          onSelect={handleAdd}
+          onCloseAutoFocus={handlePickerCloseFocus}
+        />
+      }
       contentClassName="space-y-3"
     >
       {resolved.length === 0 && !draft ? (
@@ -195,48 +142,17 @@ export function NpcInflictsEditor({
         </p>
       ) : (
         <ul className="divide-divider divide-y">
-          {resolved.map(condition => {
-            const Icon = CONDITION_ICON_REGISTRY[condition.icon];
-            return (
-              <li
-                key={condition.id}
-                className="flex items-start gap-2 py-2 pointer-coarse:min-h-11"
-              >
-                <Icon
-                  size={16}
-                  aria-hidden
-                  className="text-muted mt-0.5 shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="type-ui text-heading">{condition.name}</p>
-                  {condition.description && (
-                    <p className="type-small text-muted">
-                      {condition.description}
-                    </p>
-                  )}
-                </div>
-                <Badge variant="neutral" size="sm">
-                  {condition.origin === 'official'
-                    ? condition.rulesSource || 'Official'
-                    : KIND_LABELS[condition.kind]}
-                </Badge>
-                <Button
-                  ref={node => {
-                    if (node) removeButtons.current.set(condition.id, node);
-                    else removeButtons.current.delete(condition.id);
-                  }}
-                  variant="danger"
-                  size="sm"
-                  className="px-2"
-                  type="button"
-                  onClick={() => handleRemove(condition.id)}
-                  aria-label={`Remove ${condition.name}`}
-                >
-                  <Trash2 size={16} aria-hidden />
-                </Button>
-              </li>
-            );
-          })}
+          {resolved.map(condition => (
+            <NpcInflictsRow
+              key={condition.id}
+              condition={condition}
+              removeRef={node => {
+                if (node) removeButtons.current.set(condition.id, node);
+                else removeButtons.current.delete(condition.id);
+              }}
+              onRemove={() => handleRemove(condition.id)}
+            />
+          ))}
         </ul>
       )}
 
