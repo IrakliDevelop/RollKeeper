@@ -262,8 +262,9 @@ export const PublishFails: Story = {
 };
 
 /**
- * On a phone nothing pushes the tab wider than the screen, and a long item
- * name wraps above its switch instead of squeezing beside it.
+ * On a phone nothing pushes the page wider than the screen, a long item name
+ * keeps its full 12rem basis (it is never squeezed), and the row's switch
+ * stays inside the row.
  */
 export const Narrow390: Story = {
   args: { npcId: NARROW.id },
@@ -284,14 +285,18 @@ export const Narrow390: Story = {
     const canvas = within(canvasElement);
     const root = canvas.getByTestId('shop-root');
     await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
     const name = canvas.getByText(LONG_ITEM);
+    const nameBlock = name.parentElement as HTMLElement;
+    const row = name.closest('li') as HTMLElement;
     const toggle = canvas.getByRole('switch', {
       name: `List ${LONG_ITEM} for sale`,
     });
-    await waitFor(() =>
-      expect(toggle.getBoundingClientRect().top).toBeGreaterThan(
-        name.getBoundingClientRect().top
-      )
+    await expect(
+      nameBlock.getBoundingClientRect().width
+    ).toBeGreaterThanOrEqual(191);
+    await expect(toggle.getBoundingClientRect().right).toBeLessThanOrEqual(
+      row.getBoundingClientRect().right + 1
     );
   },
 };

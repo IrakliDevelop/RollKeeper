@@ -78,7 +78,7 @@ export const Buttons: Story = {
     // Chromium supports clipboard images, so Copy shows without a stub. It is
     // not clicked here: that would ask for clipboard permission.
     await expect(
-      canvas.getByRole('button', { name: 'Copy image' })
+      await canvas.findByRole('button', { name: 'Copy image' })
     ).toBeVisible();
   },
 };
