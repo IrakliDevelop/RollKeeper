@@ -107,7 +107,9 @@ describe('CalendarView', () => {
 
     const list = screen.getByRole('tablist', { name: 'Calendar and events' });
     expect(within(list).getByRole('tab', { name: 'Calendar' })).toBeVisible();
-    const eventsTab = within(list).getByRole('tab', { name: /^Events/ });
+    const eventsTab = within(list).getByRole('tab', { name: 'Events 2' });
+    // jsdom has no inline-flex Badge, so pin the literal space too
+    expect(eventsTab.textContent).toBe('Events 2');
     const badge = eventsTab.querySelector('[data-variant="neutral"]');
     expect(badge).toHaveTextContent('2');
     expect(list.querySelector('svg')).toBeNull();

@@ -176,6 +176,38 @@ describe('CalendarGrid', () => {
     expect(screen.getByRole('button', { name: '1 Hammer 1' })).toHaveFocus();
   });
 
+  it('Escape on the open day button closes the popover and keeps focus there', async () => {
+    const user = userEvent.setup();
+    render(<Harness onDelete={vi.fn()} />);
+    await screen.findByRole('button', { name: 'Add event' });
+    const day = screen.getByRole('button', { name: '1 Hammer 1' });
+    day.focus();
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('button', { name: 'Add event' })).toBeNull();
+    expect(day).toHaveFocus();
+    expect(day).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('Escape on a day that is not open does nothing', async () => {
+    const user = userEvent.setup();
+    render(<Harness onDelete={vi.fn()} />);
+    await screen.findByRole('button', { name: 'Add event' });
+    screen.getByRole('button', { name: '2 Hammer 1' }).focus();
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('button', { name: 'Add event' })).toBeVisible();
+  });
+
+  it('gives the popover event title a touch-height row', async () => {
+    render(<Harness onDelete={vi.fn()} />);
+    const popover = (
+      await screen.findByRole('button', { name: 'Add event' })
+    ).closest('div.absolute') as HTMLElement;
+    const title = within(popover).getByText('Market').closest('button')!;
+    expect(title).toHaveClass('pointer-coarse:min-h-11');
+  });
+
   it('Escape in the delete confirm keeps the popover', async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();

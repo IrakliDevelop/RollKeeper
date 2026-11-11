@@ -181,7 +181,7 @@ function DayPopover({
                 <button
                   type="button"
                   onClick={() => onEditEvent(event)}
-                  className="min-w-0 flex-1 text-left"
+                  className="min-w-0 flex-1 text-left pointer-coarse:min-h-11"
                 >
                   <span className="type-small text-heading truncate">
                     {event.title}
@@ -429,6 +429,12 @@ export function CalendarGrid({
                         } ${browseYear}`}
                         aria-pressed={isSelected}
                         aria-current={isToday ? 'date' : undefined}
+                        onKeyDown={e => {
+                          if (e.key !== 'Escape' || !isSelected || !showPopover)
+                            return;
+                          e.stopPropagation();
+                          handleEscape();
+                        }}
                         className="focus-visible:ring-brass-fill mx-auto flex min-h-14 w-full flex-col items-center focus-visible:ring-2 focus-visible:outline-none"
                       >
                         <div

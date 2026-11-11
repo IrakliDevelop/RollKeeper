@@ -272,9 +272,12 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
               <>
                 Events
                 {events.length > 0 && (
-                  <Badge variant="neutral" size="sm" className="ml-1">
-                    {events.length}
-                  </Badge>
+                  <>
+                    {' '}
+                    <Badge variant="neutral" size="sm">
+                      {events.length}
+                    </Badge>
+                  </>
                 )}
               </>
             ),
