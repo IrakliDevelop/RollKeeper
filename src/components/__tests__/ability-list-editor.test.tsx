@@ -198,14 +198,17 @@ describe('AbilityListEditor — section and rows', () => {
     const user = userEvent.setup();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     render(<Harness initial={[{ name: 'Bite', text: '' }]} />);
-    await user.click(
-      screen.getByRole('button', { name: 'Replace from outside' })
-    );
-    expect(nameInputs()).toHaveLength(3);
-    expect(
-      errors.mock.calls.filter(call => /same key/.test(String(call[0])))
-    ).toHaveLength(0);
-    errors.mockRestore();
+    try {
+      await user.click(
+        screen.getByRole('button', { name: 'Replace from outside' })
+      );
+      expect(nameInputs()).toHaveLength(3);
+      expect(
+        errors.mock.calls.filter(call => /key/.test(String(call[0])))
+      ).toHaveLength(0);
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it('new entries carry no id', async () => {
