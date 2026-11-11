@@ -10,6 +10,7 @@ import {
   resolvePriceCopper,
   MAGIC_ITEM_RARITY_DEFAULT_COPPER,
 } from '@/utils/itemPricing';
+import type { ShopPublishAttempt } from './NPCShopTab.types';
 
 /** DM-authored player-facing shop subtitle (e.g. "Ironmonger of the Low
  *  Market"). Mirrors the 300-char cap `sanitizePublicShop` (shopProjection.ts)
@@ -53,17 +54,6 @@ export function resolveShopEntityIds(
   return entityIds.slice(0, MAX_SHOP_ENTITY_IDS);
 }
 import { formatCurrencyFromCopper } from '@/utils/currency';
-
-/**
- * Shared grid-template for the Stock header row and every `ShopStockRow`.
- * Both must reference this constant rather than declaring their own
- * `grid-cols-[...auto...]` — `auto` tracks size independently per grid
- * container, so a header row and a body row (or two body rows with
- * differently-sized content) can drift out of alignment (Task 5 review,
- * Minor finding). Fixed widths on the trailing three columns keep them
- * identical everywhere; only the item-name column flexes.
- */
-export const SHOP_STOCK_GRID_COLS = 'grid-cols-[1fr_4rem_14.5rem_4rem]';
 
 /**
  * The price a row would resolve to with any manual override stripped —
@@ -147,6 +137,14 @@ export function shopOpenSubtitle(
   const noun = itemsInStock === 1 ? 'item' : 'items';
   return `${itemsInStock} ${noun} still in stock. Players who tap ${npcName}'s token can buy now.`;
 }
+
+/** What the DM reads when a publish request fails, by which attempt failed.
+ *  Never the server's text — that stays in the console. */
+export const SHOP_PUBLISH_ERROR_COPY: Record<ShopPublishAttempt, string> = {
+  open: "The shop didn't open for players.",
+  close: 'The shop is still open for players.',
+  republish: "Players don't see your latest changes yet.",
+};
 
 /** The Stock section's helper line — REPLACED, not supplemented, when the
  *  shop is open (artboard 1a: "Price falls back..." closed vs. "Stock

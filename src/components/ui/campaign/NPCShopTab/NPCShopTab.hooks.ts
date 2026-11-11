@@ -7,7 +7,9 @@ import { useNPCStore } from '@/store/npcStore';
 import type { CampaignNPC } from '@/types/encounter';
 import type { ShopSaleLogEntry } from '@/types/shop';
 
+import { sendShopPublish } from './shopPublishRequest';
 import { resolveShopEntityIds } from './NPCShopTab.utils';
+import type { ShopPublishAttempt } from './NPCShopTab.types';
 
 /** A DM typing a price (or editing the description) should not fire one
  *  republish per keystroke — trailing-edge debounce collapses a burst of
@@ -43,12 +45,16 @@ export interface UseShopPublishResult {
    * for the double-subtraction bug this replaced).
    */
   republish: () => void;
-  /** Set when the last publish/teardown/republish request failed. The local
-   *  toggle (or edit) has already applied by then, so this is the DM's only
-   *  signal that the shop is NOT actually live (or NOT actually up to date)
-   *  server-side. Cleared at the start of the next attempt that actually
-   *  sends. */
-  publishError: string | null;
+  /** Sends the NPC's current state again after a failure, with whatever
+   *  `shop.open` says now. Cancels any pending debounced `republish()` and
+   *  clears `publishError` before sending. */
+  retryPublish: () => void;
+  /** Which request failed last (`'open'`, `'close'` or `'republish'`), or
+   *  null. The local toggle (or edit) has already applied by then, so this
+   *  is the DM's only signal that the shop is NOT actually live (or NOT
+   *  actually up to date) server-side. Cleared at the start of the next
+   *  attempt that actually sends. */
+  publishError: ShopPublishAttempt | null;
 }
 
 /**
@@ -74,39 +80,21 @@ export interface UseShopPublishResult {
  */
 export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
   const dmId = useDmStore(state => state.dmId);
-  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<ShopPublishAttempt | null>(
+    null
+  );
   const npcRef = useRef(npc);
   npcRef.current = npc;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sendPublish = useCallback(
-    (nextNpc: CampaignNPC, open: boolean) => {
+    (nextNpc: CampaignNPC, kind: ShopPublishAttempt) => {
       const entityIds = resolveShopEntityIds(nextNpc.campaignCode, nextNpc.id);
-      fetch(
-        `/api/campaign/${encodeURIComponent(nextNpc.campaignCode)}/shops/${encodeURIComponent(nextNpc.id)}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dmId, npc: nextNpc, entityIds }),
-        }
-      )
-        .then(async response => {
-          if (response.ok) return;
-          const body = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(
-            body?.error ??
-              `Failed to ${open ? 'publish' : 'close'} the shop (${response.status}).`
-          );
-        })
-        .catch((error: unknown) => {
-          setPublishError(
-            error instanceof Error
-              ? error.message
-              : `Failed to ${open ? 'publish' : 'close'} the shop.`
-          );
-        });
+      sendShopPublish(nextNpc, dmId, entityIds).catch((error: unknown) => {
+        // Status and server text stay in the console; the DM sees fixed copy.
+        console.error('Shop publish failed', kind, error);
+        setPublishError(kind);
+      });
     },
     [dmId]
   );
@@ -127,8 +115,12 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
     // The shop may have been closed (or never opened) by the time this
     // fires — never send an unsolicited publish.
     if (current.shop?.open !== true) return;
+    // A deleted NPC's shop was already closed by the delete; the unmount
+    // flush that follows must not publish it again.
+    const stored = useNPCStore.getState().npcsByCampaign[current.campaignCode];
+    if (!stored?.some(entry => entry.id === current.id)) return;
     setPublishError(null);
-    sendPublish(current, true);
+    sendPublish(current, 'republish');
   }, [sendPublish]);
 
   const setOpen = useCallback(
@@ -146,7 +138,7 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
         .updateNPC(npc.campaignCode, npc.id, { shop: nextShop });
       setPublishError(null);
       cancelPendingRepublish();
-      sendPublish(nextNpc, open);
+      sendPublish(nextNpc, open ? 'open' : 'close');
     },
     [npc, sendPublish, cancelPendingRepublish]
   );
@@ -158,6 +150,23 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
       runPendingRepublish();
     }, REPUBLISH_DEBOUNCE_MS);
   }, [cancelPendingRepublish, runPendingRepublish]);
+
+  // A retry sends what the NPC says now, not what failed: the DM may have
+  // toggled since. A failed republish that is retried while the shop is
+  // still open stays a republish, so the message does not change to "didn't
+  // open" for a shop that was open all along.
+  const retryPublish = useCallback(() => {
+    cancelPendingRepublish();
+    const current = npcRef.current;
+    const open = current.shop?.open === true;
+    const kind: ShopPublishAttempt = !open
+      ? 'close'
+      : publishError === 'republish'
+        ? 'republish'
+        : 'open';
+    setPublishError(null);
+    sendPublish(current, kind);
+  }, [cancelPendingRepublish, sendPublish, publishError]);
 
   // Read via a ref, like `npcRef` above, so the unmount effect below can
   // keep a STABLE dependency array ([cancelPendingRepublish] never changes
@@ -182,7 +191,7 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
     };
   }, [cancelPendingRepublish]);
 
-  return { setOpen, republish, publishError };
+  return { setOpen, republish, retryPublish, publishError };
 }
 
 const EMPTY_SALES_LOG: ShopSaleLogEntry[] = [];

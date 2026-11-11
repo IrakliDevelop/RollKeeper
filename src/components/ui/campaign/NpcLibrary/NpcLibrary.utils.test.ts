@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  creatureInitiativeModifier,
   creatureMetaLine,
   creaturePassives,
   creatureVitalParts,
@@ -182,5 +183,40 @@ describe('LIBRARY_COPY', () => {
     expect(monsterDelete('Dire Wolf')).toBe(
       "Dire Wolf is removed from this campaign's custom monsters. Encounters that already include them keep their copy."
     );
+  });
+});
+
+describe('creatureInitiativeModifier', () => {
+  it('prefers the stored override over Dexterity', () => {
+    expect(
+      creatureInitiativeModifier(
+        makeNpc({
+          initiativeModifier: 5,
+          monsterStatBlock: statBlock({ dex: 14 }),
+        })
+      )
+    ).toBe(5);
+  });
+
+  it('uses the stat block Dexterity modifier', () => {
+    expect(
+      creatureInitiativeModifier(
+        makeNpc({ monsterStatBlock: statBlock({ dex: 14 }) })
+      )
+    ).toBe(2);
+  });
+
+  it('falls back to ability scores without a stat block', () => {
+    expect(
+      creatureInitiativeModifier(
+        makeNpc({
+          abilityScores: { dex: 8 } as CampaignNPC['abilityScores'],
+        })
+      )
+    ).toBe(-1);
+  });
+
+  it('defaults to a Dexterity of 10', () => {
+    expect(creatureInitiativeModifier(makeNpc())).toBe(0);
   });
 });

@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 
 import { Badge } from '@/components/ui/layout/badge';
-import { Card } from '@/components/ui/layout/card';
+import { Section } from '@/components/ui/layout/section';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import { usePlayerDirectory } from '../location-map/usePlayerDirectory';
 import { totalSalesCopper } from './NPCShopTab.utils';
@@ -30,10 +30,10 @@ function formatSaleTime(at: string): string {
  * populated case is new.
  *
  * A `reconciled: false` entry (its inventory row, or the NPC itself, was
- * gone by drain time — see `applySaleToNpc`'s doc comment) renders an
- * "unreconciled" badge instead of the plain "· reconciled" suffix, so a sale
- * that could not be fully applied stays visible to the DM rather than only
- * ever reaching a console warning.
+ * gone by drain time — see `applySaleToNpc`'s doc comment) renders a "Not
+ * matched to stock" badge, so a sale that could not be fully applied stays
+ * visible to the DM rather than only ever reaching a console warning.
+ * Reconciled entries carry no marker.
  *
  * Buyer names are resolved via the DM-only player directory
  * (`usePlayerDirectory`, `location-map/`), keyed by `ShopSale.playerId`
@@ -52,53 +52,53 @@ export function ShopSalesLog({ campaignCode, entries }: ShopSalesLogProps) {
   }, [entries, ensureKnown, hasSales]);
 
   return (
-    <section className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-heading text-sm font-semibold">Sales log</h3>
-        {hasSales && (
-          <span className="text-muted text-xs">
+    <Section
+      level={3}
+      heading="Sales log"
+      trailing={
+        hasSales ? (
+          <span className="type-small text-muted tabular-nums">
             {entries.length} sale{entries.length === 1 ? '' : 's'} ·{' '}
             {formatCurrencyFromCopper(totalSalesCopper(entries))}
           </span>
-        )}
-      </div>
-
+        ) : undefined
+      }
+    >
       {!hasSales ? (
-        <Card padding="md" className="text-muted text-sm">
+        <p className="type-body text-muted">
           No sales yet. Sales appear here once the shop is open, even if your
           tab was closed at the time.
-        </Card>
+        </p>
       ) : (
-        <div className="space-y-2">
+        <ul className="divide-divider divide-y">
           {entries.map(entry => (
-            <div
+            <li
               key={entry.id}
-              className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-2"
+              className="flex items-start justify-between gap-3 py-2"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-heading truncate text-sm font-semibold">
+                <p className="type-ui text-heading break-words">
                   {entry.itemName} ×{entry.quantity}
                 </p>
-                <p className="text-faint flex flex-wrap items-center gap-1.5 text-[11px]">
+                <div className="type-small text-muted flex flex-wrap items-center gap-1.5">
                   <span>
                     {directory?.nameOf(entry.playerId) ?? 'A player'} ·{' '}
                     {formatSaleTime(entry.at)}
-                    {entry.reconciled ? ' · reconciled' : ''}
                   </span>
                   {!entry.reconciled && (
                     <Badge variant="warning" size="sm">
-                      unreconciled
+                      Not matched to stock
                     </Badge>
                   )}
-                </p>
+                </div>
               </div>
-              <span className="text-accent-emerald-text shrink-0 text-sm font-bold tabular-nums">
+              <span className="type-ui text-heading shrink-0 tabular-nums">
                 {formatCurrencyFromCopper(entry.copper)}
               </span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </section>
+    </Section>
   );
 }

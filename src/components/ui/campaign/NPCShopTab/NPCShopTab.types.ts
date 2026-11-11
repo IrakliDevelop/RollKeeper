@@ -7,6 +7,10 @@ export interface NPCShopTabProps {
   readOnly?: boolean;
 }
 
+/** Which publish request failed: opening the shop, closing it, or
+ *  re-sending its latest edits while open. */
+export type ShopPublishAttempt = 'open' | 'close' | 'republish';
+
 export interface ShopOpenSectionProps {
   npcName: string;
   shopOpen: boolean;
@@ -15,7 +19,7 @@ export interface ShopOpenSectionProps {
   readOnly: boolean;
   /** Set when the last publish/teardown/republish attempt failed (see
    *  `useShopPublish`). */
-  publishError: string | null;
+  publishError: ShopPublishAttempt | null;
   currency: Currency;
   /** Count of for-sale, priceable, in-stock rows — drives the open-state
    *  subtitle's "N items still in stock" (artboard 1a). */
@@ -24,6 +28,7 @@ export interface ShopOpenSectionProps {
    *  today" delta (artboard 1a). 0 renders no delta at all. */
   todayCopper: number;
   onSetOpen: (open: boolean) => void;
+  onRetryPublish: () => void;
   onSetDescription: (description: string) => void;
   onSetCurrency: (type: keyof Currency, amount: number) => void;
 }

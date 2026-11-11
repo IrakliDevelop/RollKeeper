@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/forms/button';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
 import { NpcResourceList } from '@/components/ui/encounter/combat-screen/detail/NpcResourceList';
 import {
+  creatureInitiativeModifier,
   creaturePassives,
   creatureVitalParts,
 } from '../NpcLibrary/NpcLibrary.utils';
@@ -21,12 +22,6 @@ const ABILITIES = [
   { key: 'wis', label: 'WIS' },
   { key: 'cha', label: 'CHA' },
 ] as const;
-
-function getInitiativeModifier(npc: CampaignNPC): number {
-  if (npc.initiativeModifier !== undefined) return npc.initiativeModifier;
-  const dex = npc.monsterStatBlock?.dex ?? npc.abilityScores?.dex ?? 10;
-  return Math.floor((dex - 10) / 2);
-}
 
 function Pair({ label, value }: { label: string; value: string }) {
   return (
@@ -87,7 +82,7 @@ export function StatBlockTab({ npc, readOnly }: StatBlockTabProps) {
           ))}
           <Pair
             label="Initiative"
-            value={formatMod(getInitiativeModifier(npc))}
+            value={formatMod(creatureInitiativeModifier(npc))}
           />
         </dl>
       </div>
