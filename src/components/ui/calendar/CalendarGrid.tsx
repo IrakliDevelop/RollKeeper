@@ -365,7 +365,7 @@ export function CalendarGrid({
               {displayedWeekDays.map((wd, index) => (
                 <th
                   key={`${wd.name}-${index}`}
-                  className="text-muted border-divider border-b px-1 py-2 text-center text-xs font-medium"
+                  className="text-muted border-divider relative border-b px-1 py-2 text-center text-xs font-medium"
                 >
                   <span className="hidden sm:inline">{wd.name}</span>
                   <span aria-hidden="true" className="sm:hidden">
