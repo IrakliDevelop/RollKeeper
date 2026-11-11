@@ -259,6 +259,14 @@ describe('NpcInflictsEditor', () => {
       );
     });
 
+    it('picking a library condition leaves focus on the picker', async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+      await pick(user, /^Webbed$/);
+      expect(screen.getByText('Webbed')).toBeTruthy();
+      await waitFor(() => expect(document.activeElement).toBe(picker()));
+    });
+
     it('Cancel returns focus to the Add inflicted condition picker', async () => {
       const user = userEvent.setup();
       render(<Harness />);

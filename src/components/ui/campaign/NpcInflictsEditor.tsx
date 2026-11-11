@@ -3,9 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Section } from '@/components/ui/layout/section';
+import { CustomConditionFields } from '@/components/ui/encounter/custom-conditions/CustomConditionFields';
 import { NpcInflictsPicker, ADD_NEW, PLACEHOLDER } from './NpcInflictsPicker';
 import { NpcInflictsRow } from './NpcInflictsRow';
-import { CustomConditionFields } from '@/components/ui/encounter/custom-conditions/CustomConditionFields';
 import {
   createCustomCondition,
   resolveInflictableConditions,
