@@ -63,15 +63,29 @@ const makeNpc = (overrides: Partial<CampaignNPC> = {}): CampaignNPC => ({
 const COPY_FAILED = "Couldn't copy the image. Download it instead.";
 const SAVE_FAILED = "The image wasn't saved. Try again.";
 
-const stubClipboard = (write: () => Promise<void>) => {
+const stubClipboard = (
+  write: (
+    items: Array<{ items: Record<string, Blob | Promise<Blob>> }>
+  ) => Promise<void>
+) => {
   vi.stubGlobal(
     'ClipboardItem',
     class {
-      constructor(public items: Record<string, Blob>) {}
+      constructor(public items: Record<string, Blob | Promise<Blob>>) {}
     }
   );
+  // Like a real clipboard, the write settles only once every item's blob
+  // promise has, and rejects when one of them rejects.
   Object.defineProperty(navigator, 'clipboard', {
-    value: { write },
+    value: {
+      write: (
+        items: Array<{ items: Record<string, Blob | Promise<Blob>> }>
+      ) => {
+        const result = write(items);
+        const blobs = items.flatMap(item => Object.values(item.items));
+        return Promise.all([...blobs, result]).then(() => undefined);
+      },
+    },
     configurable: true,
   });
 };
@@ -137,6 +151,35 @@ describe('NPCStatBlockExport buttons', () => {
     render(<NPCStatBlockExport npc={makeNpc()} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Copy image' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(COPY_FAILED);
+  });
+
+  it('starts the clipboard write inside the click, before the capture resolves', async () => {
+    let resolveCapture: (url: string) => void = () => {};
+    toPng.mockReturnValue(
+      new Promise<string>(resolve => {
+        resolveCapture = resolve;
+      })
+    );
+    const write = vi.fn<
+      (
+        items: Array<{ items: Record<string, Blob | Promise<Blob>> }>
+      ) => Promise<void>
+    >(() => Promise.resolve());
+    stubClipboard(write);
+    render(<NPCStatBlockExport npc={makeNpc()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy image' }));
+
+    expect(write).toHaveBeenCalledTimes(1);
+    const png = write.mock.calls[0][0][0].items['image/png'];
+    expect(png).toBeInstanceOf(Promise);
+    expect(
+      screen.queryByRole('button', { name: 'Image copied' })
+    ).not.toBeInTheDocument();
+
+    resolveCapture('data:image/png;base64,AAAA');
+    expect(
+      await screen.findByRole('button', { name: 'Image copied' })
+    ).toBeInTheDocument();
   });
 
   it('says the image was not saved when a download capture fails', async () => {

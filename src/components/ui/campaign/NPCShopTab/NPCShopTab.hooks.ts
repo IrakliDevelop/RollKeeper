@@ -115,6 +115,10 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
     // The shop may have been closed (or never opened) by the time this
     // fires — never send an unsolicited publish.
     if (current.shop?.open !== true) return;
+    // A deleted NPC's shop was already closed by the delete; the unmount
+    // flush that follows must not publish it again.
+    const stored = useNPCStore.getState().npcsByCampaign[current.campaignCode];
+    if (!stored?.some(entry => entry.id === current.id)) return;
     setPublishError(null);
     sendPublish(current, 'republish');
   }, [sendPublish]);

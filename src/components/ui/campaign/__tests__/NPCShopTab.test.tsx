@@ -20,6 +20,10 @@ import type { ShopSaleLogEntry } from '@/types/shop';
 const updateNPC = vi.fn();
 const getEncountersByCampaign = vi.fn(() => [] as unknown[]);
 let shopSalesLogByNpc: Record<string, ShopSaleLogEntry[]> = {};
+// What `useNPCStore.getState().npcsByCampaign` returns. `Harness` keeps its
+// current NPC in here the way the real store would; a test removes it to
+// simulate a delete.
+let npcsByCampaign: Record<string, CampaignNPC[]> = {};
 
 vi.mock('@/store/npcStore', () => ({
   useNPCStore: Object.assign(
@@ -28,7 +32,7 @@ vi.mock('@/store/npcStore', () => ({
         shopSalesLogByNpc: typeof shopSalesLogByNpc;
       }) => unknown
     ) => selector({ shopSalesLogByNpc }),
-    { getState: () => ({ updateNPC }) }
+    { getState: () => ({ updateNPC, npcsByCampaign }) }
   ),
 }));
 
@@ -57,6 +61,7 @@ beforeEach(() => {
   resetFetch();
   getEncountersByCampaign.mockReturnValue([]);
   shopSalesLogByNpc = {};
+  npcsByCampaign = {};
 });
 
 afterEach(() => {
@@ -104,6 +109,7 @@ function makeItem(overrides: Partial<NPCInventoryItem> = {}): NPCInventoryItem {
  * gp/sp/cp fields) see each other's effect, the way the real store does. */
 function Harness({ initial }: { initial: CampaignNPC }) {
   const [npc, setNpc] = useState(initial);
+  npcsByCampaign = { [npc.campaignCode]: [npc] };
   updateNPC.mockImplementation(
     (_campaignCode: string, _id: string, updates: Partial<CampaignNPC>) => {
       setNpc(prev => ({ ...prev, ...updates }));
@@ -1073,6 +1079,32 @@ describe('NPCShopTab', () => {
       const body = JSON.parse((options as RequestInit).body as string);
       expect(body.npc.inventory[0].priceCopper).toBe(500);
 
+      vi.useRealTimers();
+    });
+
+    it('does not send a republish for an NPC deleted before the debounce fires', async () => {
+      // Deleting the NPC closes its published shop; a flush on unmount must
+      // not follow that close with an open PUT that republishes it.
+      vi.useFakeTimers();
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      const { unmount } = render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem({ value: 100 })],
+          })}
+        />
+      );
+
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+        { target: { value: '5' } }
+      );
+      npcsByCampaign = { ABCD: [] };
+      unmount();
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(fetchFn).not.toHaveBeenCalled();
       vi.useRealTimers();
     });
 

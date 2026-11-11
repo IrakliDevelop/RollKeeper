@@ -615,12 +615,27 @@ describe('NpcLibrarySection', () => {
       expect(storedNames()).toEqual([]);
     });
 
-    it.each([
-      ['a closed shop', { shop: { ...OPEN_SHOP, open: false } }],
-      ['no shop', {}],
-    ])('sends nothing for an NPC with %s', async (_label, extra) => {
+    it('still sends one close when the local shop flag is already closed', async () => {
       const fetchFn = mockFetchResponse(200, { success: true, shop: null });
-      seed([creature('a', 'Brenn Ironhand', extra)]);
+      seed([
+        creature('a', 'Brenn Ironhand', {
+          shop: { ...OPEN_SHOP, open: false },
+        }),
+      ]);
+      render(<NpcLibrarySection campaignCode={CODE} />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete Brenn Ironhand' })
+      );
+      await clickConfirmDialogButton('Delete NPC');
+
+      expectCloseRequest(fetchFn);
+      expect(storedNames()).toEqual([]);
+    });
+
+    it('sends nothing for an NPC with no shop', async () => {
+      const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+      seed([creature('a', 'Brenn Ironhand')]);
       render(<NpcLibrarySection campaignCode={CODE} />);
 
       fireEvent.click(
@@ -629,6 +644,21 @@ describe('NpcLibrarySection', () => {
       await clickConfirmDialogButton('Delete NPC');
 
       expect(fetchFn).not.toHaveBeenCalled();
+      expect(storedNames()).toEqual([]);
+    });
+
+    it('removes the NPC even when the close request never settles', async () => {
+      const fetchFn = vi.fn(() => new Promise(() => {}));
+      global.fetch = fetchFn as unknown as typeof fetch;
+      seed([creature('a', 'Brenn Ironhand', { shop: OPEN_SHOP })]);
+      render(<NpcLibrarySection campaignCode={CODE} />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete Brenn Ironhand' })
+      );
+      await clickConfirmDialogButton('Delete NPC');
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
       expect(storedNames()).toEqual([]);
     });
   });

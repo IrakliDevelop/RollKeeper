@@ -114,16 +114,36 @@ describe('NpcTab — deleting a saved NPC', () => {
     expect(screen.queryByText('Town Guard')).not.toBeInTheDocument();
   });
 
-  it.each([
-    [
-      'a closed shop',
-      { shop: { open: false, updatedAt: '2026-09-12T00:00:00.000Z' } },
-    ],
-    ['no shop', {}],
-  ])('sends nothing when the deleted NPC has %s', async (_label, extra) => {
+  it('still sends one close when the local shop flag is already closed', async () => {
     const fetchFn = mockFetchResponse(200, { success: true, shop: null });
     useNPCStore.setState({
-      npcsByCampaign: { CAMP1: [npc('npc1', 'Town Guard', extra)] },
+      npcsByCampaign: {
+        CAMP1: [
+          npc('npc1', 'Town Guard', {
+            shop: { open: false, updatedAt: '2026-09-12T00:00:00.000Z' },
+          }),
+        ],
+      },
+    });
+    renderConfirmDialogHost();
+    render(<NpcTabInEncounter />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Town Guard' }));
+    await clickConfirmDialogButton('Delete NPC');
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(init.body as string).npc.shop.open).toBe(false);
+    expect(screen.queryByText('Town Guard')).not.toBeInTheDocument();
+  });
+
+  it('sends nothing when the deleted NPC has no shop', async () => {
+    const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+    useNPCStore.setState({
+      npcsByCampaign: { CAMP1: [npc('npc1', 'Town Guard')] },
     });
     renderConfirmDialogHost();
     render(<NpcTabInEncounter />);
@@ -133,6 +153,29 @@ describe('NpcTab — deleting a saved NPC', () => {
 
     expect(fetchFn).not.toHaveBeenCalled();
     expect(screen.queryByText('Town Guard')).not.toBeInTheDocument();
+  });
+
+  it('removes the NPC even when the close request never settles', async () => {
+    const fetchFn = vi.fn(() => new Promise(() => {}));
+    global.fetch = fetchFn as unknown as typeof fetch;
+    useNPCStore.setState({
+      npcsByCampaign: {
+        CAMP1: [
+          npc('npc1', 'Town Guard', {
+            shop: { open: true, updatedAt: '2026-09-12T00:00:00.000Z' },
+          }),
+        ],
+      },
+    });
+    renderConfirmDialogHost();
+    render(<NpcTabInEncounter />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Town Guard' }));
+    await clickConfirmDialogButton('Delete NPC');
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Town Guard')).not.toBeInTheDocument();
+    expect(useNPCStore.getState().npcsByCampaign.CAMP1).toEqual([]);
   });
 
   it('uses the current store version when props still hold an older NPC', () => {

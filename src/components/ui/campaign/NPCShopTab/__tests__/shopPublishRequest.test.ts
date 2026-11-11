@@ -35,15 +35,38 @@ afterEach(() => {
 });
 
 describe('closePublishedShop', () => {
-  it.each([
-    ['a closed shop', { shop: { open: false, updatedAt: 'x' } }],
-    ['no shop', {}],
-  ])('sends nothing for an NPC with %s', (_label, extra) => {
+  it('sends nothing for an NPC with no shop', () => {
     const fetchFn = mockFetchResponse(200, { success: true, shop: null });
 
-    closePublishedShop(makeNpc(extra));
+    closePublishedShop(makeNpc());
 
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('still sends one close for a shop whose local flag is already closed', () => {
+    // A failed close leaves `open: false` locally while the published shop is
+    // still live; deleting the NPC must still tear it down.
+    const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+
+    closePublishedShop(
+      makeNpc({
+        shop: {
+          open: false,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: 'Ironmonger of the Low Market',
+        },
+      })
+    );
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    expect(body.npc.shop.open).toBe(false);
+    expect(body.npc.shop.description).toBe('Ironmonger of the Low Market');
+    expect(body.entityIds).toEqual([]);
   });
 
   it('closes an open shop with one PUT that keeps the description', () => {

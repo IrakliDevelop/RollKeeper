@@ -80,7 +80,7 @@ export function ShopSalesLog({ campaignCode, entries }: ShopSalesLogProps) {
                 <p className="type-ui text-heading break-words">
                   {entry.itemName} ×{entry.quantity}
                 </p>
-                <p className="type-small text-muted flex flex-wrap items-center gap-1.5">
+                <div className="type-small text-muted flex flex-wrap items-center gap-1.5">
                   <span>
                     {directory?.nameOf(entry.playerId) ?? 'A player'} ·{' '}
                     {formatSaleTime(entry.at)}
@@ -90,7 +90,7 @@ export function ShopSalesLog({ campaignCode, entries }: ShopSalesLogProps) {
                       Not matched to stock
                     </Badge>
                   )}
-                </p>
+                </div>
               </div>
               <span className="type-ui text-heading shrink-0 tabular-nums">
                 {formatCurrencyFromCopper(entry.copper)}

@@ -43,11 +43,13 @@ export async function sendShopPublish(
 /**
  * Closes the player-visible shop of an NPC that is about to be deleted. The
  * close `PUT` is the only teardown there is: without it the published shop
- * stays live and every later sale drains unreconciled. A no-op when the shop
- * is not open. Fire-and-forget, like the delete itself.
+ * stays live and every later sale drains unreconciled. Sent for any NPC that
+ * has a `shop`, whatever its local `open` flag says: a failed close leaves the
+ * flag false while the published shop is still live. A no-op when the NPC has
+ * no `shop`. Fire-and-forget, like the delete itself.
  */
 export function closePublishedShop(npc: CampaignNPC): void {
-  if (npc.shop?.open !== true) return;
+  if (!npc.shop) return;
   sendShopPublish(
     {
       ...npc,

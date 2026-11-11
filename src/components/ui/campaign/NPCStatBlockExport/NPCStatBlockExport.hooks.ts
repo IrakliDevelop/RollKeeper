@@ -120,9 +120,16 @@ export function useStatBlockExport(
   const copy = useCallback(async () => {
     begin('copying');
     try {
-      const blob = await capture();
+      // `clipboard.write` must start inside the click (Safari and iPadOS
+      // reject it after an `await`), so it gets the capture as a promise.
+      const blobPromise = capture().then(blob => {
+        if (!blob) throw new Error('Stat block image capture returned no blob');
+        return blob;
+      });
+      // A write that fails first leaves this unread; `await` below reports it.
+      blobPromise.catch(() => {});
       await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob }),
+        new ClipboardItem({ 'image/png': blobPromise }),
       ]);
       if (!mounted.current) return;
       setStatus('copied');
