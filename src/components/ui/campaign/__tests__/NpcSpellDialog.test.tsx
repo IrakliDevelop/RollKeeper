@@ -57,6 +57,18 @@ function renderDialog(overrides: Partial<DialogProps> = {}) {
 }
 
 describe('NpcSpellDialog add mode', () => {
+  it('opens without a missing-description warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      renderDialog();
+      expect(
+        warn.mock.calls.filter(call => /Description/.test(String(call[0])))
+      ).toHaveLength(0);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('shows the passed title and a labelled search field', () => {
     renderDialog();
     expect(

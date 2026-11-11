@@ -91,7 +91,12 @@ export function NpcSpellDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg" onCloseAutoFocus={onCloseAutoFocus}>
+      <DialogContent
+        size="lg"
+        onCloseAutoFocus={onCloseAutoFocus}
+        // No description line; Radix points aria-describedby at one otherwise.
+        aria-describedby={undefined}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
