@@ -63,7 +63,7 @@ export function SpellFilters({
                 aria-pressed={on}
                 onClick={() => onToggleCategory(category)}
               >
-                {SPELL_CATEGORY_LABELS[category]}
+                {SPELL_CATEGORY_LABELS[category]}{' '}
                 <span className="text-muted tabular-nums">
                   {categoryCounts[category]}
                 </span>

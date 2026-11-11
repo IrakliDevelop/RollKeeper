@@ -612,8 +612,8 @@ describe('NPCSpellTab filters', () => {
     const user = userEvent.setup();
     setup(makeNpc({ spells: SPELLS }));
     const type = within(screen.getByRole('group', { name: 'Type' }));
-    const slots = type.getByRole('button', { name: /^Uses slots/ });
-    const atWill = type.getByRole('button', { name: /^At will/ });
+    const slots = type.getByRole('button', { name: 'Uses slots 2' });
+    const atWill = type.getByRole('button', { name: 'At will 1' });
     expect(slots).toHaveAttribute('aria-pressed', 'true');
     expect(atWill).toHaveAttribute('aria-pressed', 'true');
     expect(slots).toHaveTextContent('2');
@@ -701,5 +701,72 @@ describe('NPCSpellTab add and edit', () => {
         screen.getByRole('button', { name: 'Edit Fire Bolt' })
       ).toHaveFocus()
     );
+  });
+});
+
+describe('NPCSpellTab filters after removals', () => {
+  const ALARM = makeSpell({
+    id: 'a',
+    name: 'Alarm',
+    level: 1,
+    tags: ['Utility'],
+  });
+  const BLESS = makeSpell({ id: 'b', name: 'Bless', level: 1 });
+  const LIGHT = makeSpell({ id: 'c', name: 'Light', level: 0, freeCastMax: 0 });
+
+  async function removeSpell(
+    user: ReturnType<typeof userEvent.setup>,
+    name: string
+  ) {
+    await user.click(screen.getByRole('button', { name: `Remove ${name}` }));
+    const dialog = await findConfirmDialog();
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Remove spell' })
+    );
+    await waitFor(() => expect(queryConfirmDialog()).toBeNull());
+  }
+
+  it('shows the remaining spells after the only spell of an active tag is removed', async () => {
+    const user = userEvent.setup();
+    setup(makeNpc({ spells: [ALARM, BLESS, LIGHT] }));
+    await user.click(screen.getByRole('button', { name: 'Utility' }));
+    expect(screen.queryByText('Bless')).toBeNull();
+    await removeSpell(user, 'Alarm');
+    await waitFor(() => expect(screen.getByText('Bless')).toBeInTheDocument());
+    expect(screen.getByText('Light')).toBeInTheDocument();
+  });
+
+  it('shows the at-will rows after every slot spell is removed while At will is off', async () => {
+    const user = userEvent.setup();
+    setup(makeNpc({ spells: [BLESS, LIGHT] }));
+    await user.click(screen.getByRole('button', { name: 'At will 1' }));
+    expect(screen.queryByText('Light')).toBeNull();
+    await removeSpell(user, 'Bless');
+    await waitFor(() => expect(screen.getByText('Light')).toBeInTheDocument());
+  });
+});
+
+describe('NPCSpellTab edit keeps the stored innate count', () => {
+  it('does not reset freeCastsUsed spent while the dialog was open', async () => {
+    const user = userEvent.setup();
+    const fly = makeSpell({
+      id: 'spell-4',
+      name: 'Fly',
+      level: 3,
+      freeCastMax: 2,
+      freeCastsUsed: 0,
+    });
+    setup(makeNpc({ spells: [fly] }));
+    await user.click(screen.getByRole('button', { name: 'Edit Fly' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Fly' });
+    act(() => useNPCStore.getState().useNPCFreeCast(CODE, NPC_ID, 'spell-4'));
+    expect(storedNpc().spellcasting?.spells[0].freeCastsUsed).toBe(1);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save spell' })
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Edit Fly' })).toBeNull()
+    );
+    expect(storedNpc().spellcasting?.spells[0].freeCastsUsed).toBe(1);
   });
 });
