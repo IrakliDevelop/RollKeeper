@@ -321,8 +321,12 @@ export const StatBlockFull: Story = {
   play: async ({ canvasElement }) => {
     const { form } = await openStatBlockTab(canvasElement);
     await expect((await form.findAllByText('Resource cost'))[0]).toBeVisible();
-    await expect((await form.findAllByText('Inventory cost'))[0]).toBeVisible();
-    await expect(form.getByDisplayValue('Bead Toss')).toBeVisible();
+    const beadToss = form.getByDisplayValue('Bead Toss');
+    await expect(beadToss).toBeVisible();
+    const entryRow = beadToss.closest('li') as HTMLElement;
+    await expect(
+      within(entryRow).getByRole('combobox', { name: 'Inventory cost' })
+    ).toHaveTextContent('Prayer beads');
     await expect(
       form.getByText('Disadvantage on attack rolls while it can see Oren.')
     ).toBeVisible();

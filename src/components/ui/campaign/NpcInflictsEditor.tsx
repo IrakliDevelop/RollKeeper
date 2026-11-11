@@ -135,12 +135,13 @@ export function NpcInflictsEditor({
       }
       contentClassName="space-y-3"
     >
-      {resolved.length === 0 && !draft ? (
+      {resolved.length === 0 && !draft && (
         <p className="type-body text-muted">
           No conditions yet. Conditions you add here can be applied with one tap
           in combat.
         </p>
-      ) : (
+      )}
+      {resolved.length > 0 && (
         <ul className="divide-divider divide-y">
           {resolved.map(condition => (
             <NpcInflictsRow

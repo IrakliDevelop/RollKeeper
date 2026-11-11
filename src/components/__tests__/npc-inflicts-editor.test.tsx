@@ -193,6 +193,38 @@ describe('NpcInflictsEditor', () => {
     expect(container.querySelector('[title]')).toBeNull();
   });
 
+  it('shows an official description as plain clamped text', () => {
+    const grappled: CustomCondition = {
+      ...poisoned,
+      id: 'official-grappled',
+      name: 'Grappled',
+      description:
+        '<p><strong>Speed 0.</strong> The grappled creature can&nbsp;not move.</p>',
+    };
+    const emptied: CustomCondition = {
+      ...poisoned,
+      id: 'official-empty',
+      name: 'Hollow',
+      description: '<p></p>',
+    };
+    const { container } = render(
+      <Harness
+        initial={[grappled, emptied]}
+        initialLibrary={[]}
+        officialConditions={[grappled, emptied]}
+      />
+    );
+    const text = screen.getByText(
+      'Speed 0. The grappled creature can not move.'
+    );
+    expect(text.tagName).toBe('P');
+    expect(text.className).toContain('line-clamp-2');
+    expect(container.textContent).not.toContain('<strong>');
+    const items = container.querySelectorAll('li');
+    expect(items).toHaveLength(2);
+    expect(items[1].querySelectorAll('p')).toHaveLength(1);
+  });
+
   it('badges official conditions by source and custom ones by kind', () => {
     const buff: CustomCondition = {
       ...venom,

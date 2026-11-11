@@ -100,7 +100,7 @@ describe('AbilityListEditor — resource cost link', () => {
     expect(state[0].resourceCost?.amount).toBe(2);
   });
 
-  it('selecting a resource via Costs select sets resourceCost with default amount 1', async () => {
+  it('selecting a resource via the Resource cost select sets resourceCost with default amount 1', async () => {
     const user = userEvent.setup();
     render(
       <Harness

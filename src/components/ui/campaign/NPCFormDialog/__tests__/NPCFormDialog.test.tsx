@@ -199,6 +199,13 @@ describe('footer', () => {
     expect(create.getAttribute('data-variant')).toBe('primary');
   });
 
+  it('has exactly one primary button on the Details tab', () => {
+    renderForm({ editingNpc: STAT_BLOCK_NPC });
+    expect(
+      formDialog().querySelectorAll('[data-variant="primary"]')
+    ).toHaveLength(1);
+  });
+
   it('has exactly one primary button, with the create-condition panel open', async () => {
     const user = userEvent.setup();
     renderForm({ editingNpc: STAT_BLOCK_NPC });
