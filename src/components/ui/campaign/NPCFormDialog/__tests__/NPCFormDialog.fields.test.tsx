@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BestiaryImport } from '../BestiaryImport';
@@ -211,6 +211,16 @@ describe('TagsField', () => {
     const { input, onRemoveLast } = renderTags(['merchant']);
     await user.click(input);
     await user.keyboard('{Backspace}');
+    expect(onRemoveLast).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a held Backspace so one press removes one tag', async () => {
+    const user = userEvent.setup();
+    const { input, onRemoveLast } = renderTags(['merchant', 'smith']);
+    await user.click(input);
+    fireEvent.keyDown(input, { key: 'Backspace', repeat: true });
+    expect(onRemoveLast).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Backspace' });
     expect(onRemoveLast).toHaveBeenCalledTimes(1);
   });
 

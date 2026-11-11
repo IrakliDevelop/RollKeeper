@@ -30,7 +30,12 @@ export function TagsField({
     if (event.key === 'Enter' || event.key === ',') {
       event.preventDefault();
       commit();
-    } else if (event.key === 'Backspace' && text === '' && tags.length > 0) {
+    } else if (
+      event.key === 'Backspace' &&
+      !event.repeat &&
+      text === '' &&
+      tags.length > 0
+    ) {
       onRemoveLast();
     }
   };
