@@ -199,8 +199,17 @@ describe('footer', () => {
     expect(create.getAttribute('data-variant')).toBe('primary');
   });
 
-  it('has exactly one primary button outside the Stat block tab', () => {
+  it('has exactly one primary button, with the create-condition panel open', async () => {
+    const user = userEvent.setup();
     renderForm({ editingNpc: STAT_BLOCK_NPC });
+    await user.click(screen.getByRole('tab', { name: 'Stat block' }));
+    await user.click(
+      screen.getByRole('combobox', { name: 'Add inflicted condition' })
+    );
+    await user.click(
+      await screen.findByRole('option', { name: /New condition/ })
+    );
+    expect(screen.getByRole('button', { name: 'Create and add' })).toBeTruthy();
     expect(
       formDialog().querySelectorAll('[data-variant="primary"]')
     ).toHaveLength(1);
