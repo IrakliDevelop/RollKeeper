@@ -10,14 +10,20 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NpcTab } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/NpcTab';
+import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
 import {
   clickConfirmDialogButton,
   renderConfirmDialogHost,
 } from '@/test/confirmDialog';
+import { mockFetchResponse, resetFetch } from '@/test/mocks/fetch';
 import type { CampaignNPC } from '@/types/encounter';
 
-const npc = (id: string, name: string): CampaignNPC => ({
+const npc = (
+  id: string,
+  name: string,
+  extra: Partial<CampaignNPC> = {}
+): CampaignNPC => ({
   id,
   campaignCode: 'CAMP1',
   name,
@@ -26,6 +32,7 @@ const npc = (id: string, name: string): CampaignNPC => ({
   speed: '30 ft.',
   createdAt: '2024-01-01',
   updatedAt: '2024-01-01',
+  ...extra,
 });
 
 // Passes `npcs` the way EncounterView does: read from the store on render.
@@ -51,6 +58,7 @@ describe('NpcTab — deleting a saved NPC', () => {
 
   afterEach(() => {
     cleanup();
+    resetFetch();
     useNPCStore.setState({ npcsByCampaign: {} });
   });
 
@@ -64,6 +72,67 @@ describe('NpcTab — deleting a saved NPC', () => {
 
     expect(screen.queryByText('Town Guard')).not.toBeInTheDocument();
     expect(screen.getByText('Forest Scout')).toBeInTheDocument();
+  });
+
+  it('closes the published shop when the deleted NPC has an open shop', async () => {
+    const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+    useNPCStore.setState({
+      npcsByCampaign: {
+        CAMP1: [
+          npc('npc1', 'Town Guard', {
+            shop: {
+              open: true,
+              updatedAt: '2026-09-12T00:00:00.000Z',
+              description: 'Ironmonger of the Low Market',
+            },
+          }),
+        ],
+      },
+    });
+    renderConfirmDialogHost();
+    render(<NpcTabInEncounter />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Town Guard' }));
+    await clickConfirmDialogButton('Delete NPC');
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const [url, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe('/api/campaign/CAMP1/shops/npc1');
+    expect(init.method).toBe('PUT');
+    const body = JSON.parse(init.body as string);
+    expect(body.npc.shop).toEqual(
+      expect.objectContaining({
+        open: false,
+        description: 'Ironmonger of the Low Market',
+      })
+    );
+    expect(body.entityIds).toEqual([]);
+    expect(body.dmId).toBe(useDmStore.getState().dmId);
+    expect(screen.queryByText('Town Guard')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      'a closed shop',
+      { shop: { open: false, updatedAt: '2026-09-12T00:00:00.000Z' } },
+    ],
+    ['no shop', {}],
+  ])('sends nothing when the deleted NPC has %s', async (_label, extra) => {
+    const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+    useNPCStore.setState({
+      npcsByCampaign: { CAMP1: [npc('npc1', 'Town Guard', extra)] },
+    });
+    renderConfirmDialogHost();
+    render(<NpcTabInEncounter />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Town Guard' }));
+    await clickConfirmDialogButton('Delete NPC');
+
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(screen.queryByText('Town Guard')).not.toBeInTheDocument();
   });
 
   it('uses the current store version when props still hold an older NPC', () => {

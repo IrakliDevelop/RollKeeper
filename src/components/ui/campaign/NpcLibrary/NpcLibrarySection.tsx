@@ -8,6 +8,7 @@ import { Section } from '@/components/ui/layout/section';
 import { MagicItemLibrarySection } from '../MagicItemLibrary/MagicItemLibrarySection';
 import { NPCDetailDialog } from '../NPCDetailDialog';
 import { NPCFormDialog } from '../NPCFormDialog';
+import { closePublishedShop } from '../NPCShopTab/shopPublishRequest';
 import { NpcSyncControls } from '../NpcSyncControls';
 import { NpcLibraryFilters } from './NpcLibraryFilters';
 import { NpcLibraryList, type NpcLibraryListProps } from './NpcLibraryList';
@@ -194,7 +195,10 @@ export function NpcLibrarySection({
     });
     if (!confirmed) return;
     setSelectedId(null);
-    removeThenFocus(npc.id, visibleIds, () => deleteNPC(campaignCode, npc.id));
+    removeThenFocus(npc.id, visibleIds, () => {
+      closePublishedShop(npc);
+      deleteNPC(campaignCode, npc.id);
+    });
   };
 
   const handleUpdateInventory = (

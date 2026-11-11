@@ -17,6 +17,7 @@ import {
   findConfirmDialog,
   renderConfirmDialogHost,
 } from '@/test/confirmDialog';
+import { mockFetchResponse, resetFetch } from '@/test/mocks/fetch';
 import type { CampaignInfo } from '@/types/campaign';
 import type { CampaignNPC } from '@/types/encounter';
 
@@ -139,6 +140,7 @@ describe('NpcLibrarySection', () => {
 
   afterEach(() => {
     cleanup();
+    resetFetch();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -558,6 +560,77 @@ describe('NpcLibrarySection', () => {
     expect(screen.queryByRole('dialog', { name: 'A' })).toBeNull();
     expect(storedNames()).toEqual(['B']);
     await waitFor(() => expect(viewButton('B')).toHaveFocus());
+  });
+
+  describe('closing a published shop on delete', () => {
+    const OPEN_SHOP = {
+      open: true,
+      updatedAt: '2026-09-12T00:00:00.000Z',
+      description: 'Ironmonger of the Low Market',
+    };
+
+    const expectCloseRequest = (fetchFn: typeof global.fetch) => {
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      const [url, init] = (fetchFn as ReturnType<typeof vi.fn>).mock
+        .calls[0] as [string, RequestInit];
+      expect(url).toBe(`/api/campaign/${CODE}/shops/a`);
+      expect(init.method).toBe('PUT');
+      const body = JSON.parse(init.body as string);
+      expect(body.npc.shop).toEqual(
+        expect.objectContaining({
+          open: false,
+          description: 'Ironmonger of the Low Market',
+        })
+      );
+      expect(body.entityIds).toEqual([]);
+      expect(body.dmId).toBe(useDmStore.getState().dmId);
+    };
+
+    it('sends a close request when the deleted NPC has an open shop', async () => {
+      const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+      seed([creature('a', 'Brenn Ironhand', { shop: OPEN_SHOP })]);
+      render(<NpcLibrarySection campaignCode={CODE} />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete Brenn Ironhand' })
+      );
+      await clickConfirmDialogButton('Delete NPC');
+
+      expectCloseRequest(fetchFn);
+      expect(storedNames()).toEqual([]);
+    });
+
+    it('sends the same close request when deleting from the detail dialog', async () => {
+      const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+      seed([creature('a', 'Brenn Ironhand', { shop: OPEN_SHOP })]);
+      render(<NpcLibrarySection campaignCode={CODE} />);
+
+      fireEvent.click(viewButton('Brenn Ironhand'));
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete from dialog' })
+      );
+      await clickConfirmDialogButton('Delete NPC');
+
+      expectCloseRequest(fetchFn);
+      expect(storedNames()).toEqual([]);
+    });
+
+    it.each([
+      ['a closed shop', { shop: { ...OPEN_SHOP, open: false } }],
+      ['no shop', {}],
+    ])('sends nothing for an NPC with %s', async (_label, extra) => {
+      const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+      seed([creature('a', 'Brenn Ironhand', extra)]);
+      render(<NpcLibrarySection campaignCode={CODE} />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete Brenn Ironhand' })
+      );
+      await clickConfirmDialogButton('Delete NPC');
+
+      expect(fetchFn).not.toHaveBeenCalled();
+      expect(storedNames()).toEqual([]);
+    });
   });
 
   it('offers Reorder only with two or more entries', () => {

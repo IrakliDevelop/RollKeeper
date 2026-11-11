@@ -6,6 +6,7 @@ import { useEncounterStore } from '@/store/encounterStore';
 import type { NPCInventoryItem } from '@/types/encounter';
 import type { MagicItemRarity } from '@/types/character';
 import type { ShopSaleLogEntry } from '@/types/shop';
+import type { ShopPublishAttempt } from './NPCShopTab.types';
 import {
   resolvePriceCopper,
   MAGIC_ITEM_RARITY_DEFAULT_COPPER,
@@ -147,6 +148,14 @@ export function shopOpenSubtitle(
   const noun = itemsInStock === 1 ? 'item' : 'items';
   return `${itemsInStock} ${noun} still in stock. Players who tap ${npcName}'s token can buy now.`;
 }
+
+/** What the DM reads when a publish request fails, by which attempt failed.
+ *  Never the server's text — that stays in the console. */
+export const SHOP_PUBLISH_ERROR_COPY: Record<ShopPublishAttempt, string> = {
+  open: "The shop didn't open for players.",
+  close: 'The shop is still open for players.',
+  republish: "Players don't see your latest changes yet.",
+};
 
 /** The Stock section's helper line — REPLACED, not supplemented, when the
  *  shop is open (artboard 1a: "Price falls back..." closed vs. "Stock

@@ -38,7 +38,8 @@ const EMPTY_CURRENCY: Currency = {
 export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
   const inventory = npc.inventory ?? [];
   const shopOpen = npc.shop?.open ?? false;
-  const { setOpen, publishError, republish } = useShopPublish(npc);
+  const { setOpen, publishError, republish, retryPublish } =
+    useShopPublish(npc);
   const salesLog = useShopSalesLog(npc.id);
   const soldByItemId = soldQuantityByItemId(salesLog);
 
@@ -88,6 +89,7 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
         itemsInStock={countItemsInStock(inventory)}
         todayCopper={todaysSalesCopper(salesLog)}
         onSetOpen={setOpen}
+        onRetryPublish={retryPublish}
         onSetDescription={setDescription}
         onSetCurrency={setCurrency}
       />

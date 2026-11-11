@@ -15,6 +15,7 @@ import { buildNpcEntity } from './buildEntity';
 import { SharedOptions } from './SharedOptions';
 import { SavedCreaturePicker } from './SavedCreaturePicker';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import { closePublishedShop } from '@/components/ui/campaign/NPCShopTab/shopPublishRequest';
 
 interface NpcTabProps {
   npcs: CampaignNPC[];
@@ -82,7 +83,10 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
       confirmLabel: 'Delete NPC',
       tone: 'danger',
     });
-    if (confirmed) deleteNPC(campaignCode, npc.id);
+    if (confirmed) {
+      closePublishedShop(npc);
+      deleteNPC(campaignCode, npc.id);
+    }
     return confirmed;
   };
 

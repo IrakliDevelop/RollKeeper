@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NPCShopTab } from '@/components/ui/campaign/NPCShopTab';
+import { SHOP_CLOSED_SUBTITLE } from '@/components/ui/campaign/NPCShopTab/NPCShopTab.utils';
 import { mockFetchResponse, resetFetch } from '@/test/mocks/fetch';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import type { ShopSaleLogEntry } from '@/types/shop';
@@ -51,6 +52,7 @@ vi.mock('@/components/ui/campaign/location-map/usePlayerDirectory', () => ({
 }));
 
 beforeEach(() => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
   resetFetch();
   getEncountersByCampaign.mockReturnValue([]);
   shopSalesLogByNpc = {};
@@ -59,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 function makeSaleLogEntry(
@@ -374,8 +377,8 @@ describe('NPCShopTab', () => {
       expect(body.npc.shop.open).toBe(false);
     });
 
-    it('surfaces a failed publish (non-2xx) to the DM instead of swallowing it', async () => {
-      mockFetchResponse(500, { error: 'Failed to publish shop' });
+    it('tells the DM the shop did not open, never the server text', async () => {
+      mockFetchResponse(500, { error: 'Redis down' });
       render(<Harness initial={makeNpc()} />);
 
       const toggle = screen.getByRole('switch', { name: 'Open for business' });
@@ -385,12 +388,13 @@ describe('NPCShopTab', () => {
 
       await waitFor(() =>
         expect(screen.getByRole('alert')).toHaveTextContent(
-          'Failed to publish shop'
+          "The shop didn't open for players."
         )
       );
+      expect(screen.queryByText(/Redis down/)).toBeNull();
     });
 
-    it('surfaces a rejected fetch (network failure) to the DM too', async () => {
+    it('tells the DM the same for a rejected fetch, never the network error', async () => {
       global.fetch = vi
         .fn()
         .mockRejectedValue(
@@ -403,8 +407,75 @@ describe('NPCShopTab', () => {
       );
 
       await waitFor(() =>
-        expect(screen.getByRole('alert')).toHaveTextContent('Network down')
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          "The shop didn't open for players."
+        )
       );
+      expect(screen.queryByText(/Network down/)).toBeNull();
+    });
+
+    it('tells the DM the shop is still open when closing fails', async () => {
+      mockFetchResponse(500, { error: 'Redis down' });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+          })}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'The shop is still open for players.'
+        )
+      );
+    });
+
+    it('"Try again" after a failed close sends one more close request and clears the alert', async () => {
+      const fetchFn = mockFetchResponse(500, { error: 'Redis down' });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+          })}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+      const alert = await screen.findByRole('alert');
+      const retry = screen.getByRole('button', { name: 'Try again' });
+      expect(retry).toHaveAttribute('aria-describedby', alert.id);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+
+      mockFetchResponse(200, { success: true, shop: null });
+      const retryFetch = global.fetch as ReturnType<typeof vi.fn>;
+      fireEvent.click(retry);
+
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(retryFetch).toHaveBeenCalledTimes(1);
+      const [, options] = retryFetch.mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.npc.shop.open).toBe(false);
+    });
+
+    it('renders no alert and no "Try again" in read-only mode', () => {
+      render(
+        <NPCShopTab
+          npc={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+          })}
+          readOnly
+        />
+      );
+
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     });
 
     it('preserves shop.description across an off/on toggle cycle (regression: setOpen must merge, never replace)', () => {
@@ -505,24 +576,42 @@ describe('NPCShopTab', () => {
   });
 
   describe('open-state chrome (artboard 1a, Task 13b)', () => {
-    it('the toggle card is neutral when closed and emerald-tinted when open', () => {
+    it('the toggle is a labelled switch with no card or tint', () => {
       render(<Harness initial={makeNpc()} />);
 
-      const closedCard = screen
-        .getByRole('switch', { name: 'Open for business' })
-        .closest('div');
-      expect(closedCard).toHaveClass('border-divider');
-      expect(closedCard).toHaveClass('bg-surface-secondary');
+      const toggle = screen.getByRole('switch', { name: 'Open for business' });
+      expect(toggle).not.toHaveAttribute('aria-label');
+      expect(toggle.closest('label')).not.toBeNull();
+      expect(screen.getByText('Open for business')).toBeInTheDocument();
+      expect(toggle).toHaveAccessibleDescription(SHOP_CLOSED_SUBTITLE);
 
-      fireEvent.click(
-        screen.getByRole('switch', { name: 'Open for business' })
+      fireEvent.click(toggle);
+
+      expect(toggle).toHaveAccessibleDescription(
+        "0 items still in stock. Players who tap Merchant Mo's token can buy now."
       );
+      expect(document.querySelector('[class*="accent-emerald"]')).toBeNull();
+    });
 
-      const openCard = screen
-        .getByRole('switch', { name: 'Open for business' })
-        .closest('div');
-      expect(openCard).toHaveClass('border-accent-emerald-border');
-      expect(openCard).toHaveClass('bg-accent-emerald-bg');
+    it('words the description helper for the shop opening', () => {
+      render(<Harness initial={makeNpc({ name: 'Halvard Brenn' })} />);
+
+      expect(
+        screen.getByText(
+          "Players see this under Halvard Brenn's name once the shop opens. Your private description stays hidden."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('shows the "+x today" purse delta without an accent colour', () => {
+      shopSalesLogByNpc = {
+        'npc-1': [makeSaleLogEntry({ at: new Date().toISOString() })],
+      };
+
+      render(<Harness initial={makeNpc()} />);
+
+      const delta = screen.getByText('+65 gp today');
+      expect(delta.className).not.toMatch(/accent-/);
     });
 
     it('switches the subtitle to the open-state copy, counting only for-sale/priceable/in-stock rows', () => {
@@ -816,9 +905,9 @@ describe('NPCShopTab', () => {
       vi.useRealTimers();
     });
 
-    it('surfaces a failed republish to the DM', async () => {
+    it('tells the DM players do not see the latest changes when a republish fails', async () => {
       vi.useFakeTimers();
-      mockFetchResponse(500, { error: 'Failed to publish shop' });
+      mockFetchResponse(500, { error: 'Redis down' });
       render(
         <Harness
           initial={makeNpc({
@@ -841,9 +930,45 @@ describe('NPCShopTab', () => {
 
       await waitFor(() =>
         expect(screen.getByRole('alert')).toHaveTextContent(
-          'Failed to publish shop'
+          "Players don't see your latest changes yet."
         )
       );
+      expect(screen.queryByText(/Redis down/)).toBeNull();
+    });
+
+    it('keeps the republish message when "Try again" fails again on a shop that stays open', async () => {
+      vi.useFakeTimers();
+      const fetchFn = mockFetchResponse(500, { error: 'Redis down' });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem({ value: 100 })],
+          })}
+        />
+      );
+
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+        { target: { value: '5' } }
+      );
+      await vi.advanceTimersByTimeAsync(600);
+      vi.useRealTimers();
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          "Players don't see your latest changes yet."
+        )
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          "Players don't see your latest changes yet."
+        )
+      );
+      expect(fetchFn).toHaveBeenCalledTimes(2);
     });
   });
 });
