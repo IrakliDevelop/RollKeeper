@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NPCShopTab } from '@/components/ui/campaign/NPCShopTab';
+import { ShopOpenSection } from '@/components/ui/campaign/NPCShopTab/ShopOpenSection';
 import { SHOP_CLOSED_SUBTITLE } from '@/components/ui/campaign/NPCShopTab/NPCShopTab.utils';
 import { mockFetchResponse, resetFetch } from '@/test/mocks/fetch';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
@@ -52,7 +53,6 @@ vi.mock('@/components/ui/campaign/location-map/usePlayerDirectory', () => ({
 }));
 
 beforeEach(() => {
-  vi.spyOn(console, 'error').mockImplementation(() => {});
   resetFetch();
   getEncountersByCampaign.mockReturnValue([]);
   shopSalesLogByNpc = {};
@@ -378,6 +378,9 @@ describe('NPCShopTab', () => {
     });
 
     it('tells the DM the shop did not open, never the server text', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       mockFetchResponse(500, { error: 'Redis down' });
       render(<Harness initial={makeNpc()} />);
 
@@ -392,9 +395,17 @@ describe('NPCShopTab', () => {
         )
       );
       expect(screen.queryByText(/Redis down/)).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        'Shop publish failed',
+        'open',
+        expect.anything()
+      );
     });
 
     it('tells the DM the same for a rejected fetch, never the network error', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       global.fetch = vi
         .fn()
         .mockRejectedValue(
@@ -412,9 +423,17 @@ describe('NPCShopTab', () => {
         )
       );
       expect(screen.queryByText(/Network down/)).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        'Shop publish failed',
+        'open',
+        expect.anything()
+      );
     });
 
     it('tells the DM the shop is still open when closing fails', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       mockFetchResponse(500, { error: 'Redis down' });
       render(
         <Harness
@@ -433,9 +452,17 @@ describe('NPCShopTab', () => {
           'The shop is still open for players.'
         )
       );
+      expect(consoleError).toHaveBeenCalledWith(
+        'Shop publish failed',
+        'close',
+        expect.anything()
+      );
     });
 
     it('"Try again" after a failed close sends one more close request and clears the alert', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       const fetchFn = mockFetchResponse(500, { error: 'Redis down' });
       render(
         <Harness
@@ -452,6 +479,11 @@ describe('NPCShopTab', () => {
       const retry = screen.getByRole('button', { name: 'Try again' });
       expect(retry).toHaveAttribute('aria-describedby', alert.id);
       expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        'Shop publish failed',
+        'close',
+        expect.anything()
+      );
 
       mockFetchResponse(200, { success: true, shop: null });
       const retryFetch = global.fetch as ReturnType<typeof vi.fn>;
@@ -464,13 +496,21 @@ describe('NPCShopTab', () => {
       expect(body.npc.shop.open).toBe(false);
     });
 
-    it('renders no alert and no "Try again" in read-only mode', () => {
+    it('renders no alert and no "Try again" in read-only mode even with a failed state', () => {
       render(
-        <NPCShopTab
-          npc={makeNpc({
-            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
-          })}
+        <ShopOpenSection
+          npcName="Merchant Mo"
+          shopOpen
+          description=""
           readOnly
+          publishError="open"
+          currency={{ platinum: 0, gold: 0, electrum: 0, silver: 0, copper: 0 }}
+          itemsInStock={0}
+          todayCopper={0}
+          onSetOpen={vi.fn()}
+          onRetryPublish={vi.fn()}
+          onSetDescription={vi.fn()}
+          onSetCurrency={vi.fn()}
         />
       );
 
@@ -598,7 +638,7 @@ describe('NPCShopTab', () => {
 
       expect(
         screen.getByText(
-          "Players see this under Halvard Brenn's name once the shop opens. Your private description stays hidden."
+          'Players see this under Halvard Brenn once the shop opens. Your private description stays hidden.'
         )
       ).toBeInTheDocument();
     });
@@ -906,6 +946,9 @@ describe('NPCShopTab', () => {
     });
 
     it('tells the DM players do not see the latest changes when a republish fails', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       vi.useFakeTimers();
       mockFetchResponse(500, { error: 'Redis down' });
       render(
@@ -934,9 +977,17 @@ describe('NPCShopTab', () => {
         )
       );
       expect(screen.queryByText(/Redis down/)).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        'Shop publish failed',
+        'republish',
+        expect.anything()
+      );
     });
 
     it('keeps the republish message when "Try again" fails again on a shop that stays open', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       vi.useFakeTimers();
       const fetchFn = mockFetchResponse(500, { error: 'Redis down' });
       render(
@@ -969,6 +1020,7 @@ describe('NPCShopTab', () => {
         )
       );
       expect(fetchFn).toHaveBeenCalledTimes(2);
+      expect(consoleError).toHaveBeenCalledTimes(2);
     });
   });
 });

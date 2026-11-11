@@ -94,7 +94,7 @@ export function ShopOpenSection({
         value={description}
         onChange={event => onSetDescription(event.target.value)}
         placeholder="Ironmonger of the Low Market"
-        helperText={`Players see this under ${npcName}'s name once the shop opens. Your private description stays hidden.`}
+        helperText={`Players see this under ${npcName} once the shop opens. Your private description stays hidden.`}
         maxLength={MAX_SHOP_DESCRIPTION_LENGTH}
         disabled={readOnly}
       />

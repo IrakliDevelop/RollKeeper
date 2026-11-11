@@ -6,11 +6,11 @@ import { useEncounterStore } from '@/store/encounterStore';
 import type { NPCInventoryItem } from '@/types/encounter';
 import type { MagicItemRarity } from '@/types/character';
 import type { ShopSaleLogEntry } from '@/types/shop';
-import type { ShopPublishAttempt } from './NPCShopTab.types';
 import {
   resolvePriceCopper,
   MAGIC_ITEM_RARITY_DEFAULT_COPPER,
 } from '@/utils/itemPricing';
+import type { ShopPublishAttempt } from './NPCShopTab.types';
 
 /** DM-authored player-facing shop subtitle (e.g. "Ironmonger of the Low
  *  Market"). Mirrors the 300-char cap `sanitizePublicShop` (shopProjection.ts)
