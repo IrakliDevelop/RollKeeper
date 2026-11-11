@@ -60,7 +60,7 @@ const seed = (
 
 function Harness() {
   return (
-    <div className="p-4" data-testid="calendar-root">
+    <div className="p-4">
       <CalendarView campaignCode={CODE} onReset={fn()} />
     </div>
   );
@@ -96,12 +96,16 @@ export const Narrow390: Story = {
     const scroller = canvasElement.querySelector('table')!.parentElement!;
     await expect(scroller.scrollWidth).toBeGreaterThan(scroller.clientWidth);
 
-    await userEvent.click(
-      canvas.getByRole('button', { name: '5 Hammer 1492' })
-    );
+    // Last column: an unclamped 220px popover would overflow the right edge.
+    const day = canvas.getByRole('button', { name: '10 Hammer 1492' });
+    await userEvent.click(day);
     const addButton = canvas.getByRole('button', { name: 'Add event' });
     const pop = addButton.closest('.absolute')!.getBoundingClientRect();
     const box = addButton.closest('.relative')!.getBoundingClientRect();
+    const dayRect = day.getBoundingClientRect();
+    await expect(dayRect.left + dayRect.width / 2 + 110).toBeGreaterThan(
+      box.right
+    );
     await expect(pop.left).toBeGreaterThanOrEqual(box.left - 1);
     await expect(pop.right).toBeLessThanOrEqual(box.right + 1);
     await expect(pop.right).toBeLessThanOrEqual(390);
