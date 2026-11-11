@@ -115,6 +115,33 @@ export const STAT_BLOCK_NPC: CampaignNPC = {
   },
 };
 
+/** STAT_BLOCK_NPC plus an entry that spends an inventory stack and a custom inflicted condition. */
+export const STAT_BLOCK_FULL_NPC: CampaignNPC = {
+  ...STAT_BLOCK_NPC,
+  monsterStatBlock: {
+    ...STAT_BLOCK_NPC.monsterStatBlock!,
+    actions: [
+      ...STAT_BLOCK_NPC.monsterStatBlock!.actions,
+      {
+        id: 'action-bead-toss',
+        name: 'Bead Toss',
+        text: 'Hurls a blessed bead.',
+        inventoryCost: { inventoryItemId: 'inv-beads', quantity: 1 },
+      },
+    ],
+    inflictableConditions: [
+      {
+        id: 'cond-shaken',
+        name: 'Shaken',
+        description: 'Disadvantage on attack rolls while it can see Oren.',
+        icon: 'skull',
+        kind: 'debuff',
+        origin: 'custom',
+      },
+    ],
+  },
+};
+
 const ONE_SPELL: Spell = {
   id: 'spell-bless',
   name: 'Bless',

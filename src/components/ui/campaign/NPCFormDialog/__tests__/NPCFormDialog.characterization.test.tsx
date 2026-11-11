@@ -205,25 +205,25 @@ describe('NPCFormDialog field wiring', () => {
     // Stat Block tab.
     await user.click(screen.getByRole('tab', { name: 'Stat block' }));
     const scoreInputs = within(
-      screen.getByText('Ability Scores').parentElement as HTMLElement
+      screen.getByRole('region', { name: 'Ability scores' })
     ).getAllByRole('textbox');
     const scores = ['11', '12', '13', '14', '15', '16'];
     for (const [i, score] of scores.entries()) {
       await fillField(user, scoreInputs[i], score);
     }
-    await fillLabel(user, 'Saving Throws', 'Dex +4, Wis +2');
+    await fillLabel(user, 'Saving throws', 'Dex +4, Wis +2');
     await fillLabel(user, 'Skills', 'Perception +4');
     await fillLabel(user, 'Resistances', 'fire, cold');
     await fillLabel(user, 'Immunities', 'poison');
     await fillLabel(user, 'Vulnerabilities', 'radiant');
-    await fillLabel(user, 'Condition Immunities', 'poisoned, charmed');
+    await fillLabel(user, 'Condition immunities', 'poisoned, charmed');
     await fillLabel(user, 'Senses', 'Darkvision 60 ft.');
     await fillLabel(user, 'Languages', 'Common, Sylvan');
     await fillLabel(user, 'CR', '3');
-    await fillLabel(user, 'Prof Bonus', '5');
-    await fillLabel(user, 'Max', '6');
-    await pickOption(screen.getByRole('combobox', { name: 'Die Type' }), 'd10');
-    await fillLabel(user, 'Current', '4');
+    await fillLabel(user, 'Proficiency bonus', '5');
+    await fillLabel(user, 'Hit dice total', '6');
+    await pickOption(screen.getByRole('combobox', { name: 'Hit die' }), 'd10');
+    await fillLabel(user, 'Hit dice remaining', '4');
     await fillLabel(user, 'Passive Perception', '17');
     await fillLabel(user, 'Passive Insight', '18');
     await fillLabel(user, 'Passive Investigation', '19');
@@ -293,27 +293,36 @@ describe('NPCFormDialog field wiring', () => {
       screen.getByRole('textbox', { name: 'Resource max uses' }),
       '2'
     );
-    const addFor = (label: string) =>
-      within(screen.getByText(label).parentElement as HTMLElement).getByRole(
-        'button',
-        { name: 'Add' }
+    const regionFor = (heading: string) =>
+      within(screen.getByRole('region', { name: heading }));
+    const addEntry = async (
+      heading: string,
+      addLabel: string,
+      name: string
+    ) => {
+      await user.click(
+        regionFor(heading).getByRole('button', { name: addLabel })
       );
-    await user.click(addFor('Traits'));
-    await user.type(screen.getByPlaceholderText('Trait name'), 'Keen Smell');
-    await user.click(addFor('Actions'));
-    await user.type(screen.getByPlaceholderText('Action name'), 'Mace Strike');
-    await user.click(addFor('Bonus Actions'));
-    await user.type(
-      screen.getByPlaceholderText('Bonus Action name'),
-      'Healing Word'
+      await user.type(
+        regionFor(heading).getByRole('textbox', { name: 'Name' }),
+        name
+      );
+    };
+    await addEntry('Traits', 'Add trait', 'Keen Smell');
+    await addEntry('Actions', 'Add action', 'Mace Strike');
+    await addEntry('Bonus actions', 'Add bonus action', 'Healing Word');
+    await addEntry('Reactions', 'Add reaction', 'Parry');
+    await addEntry('Lair actions', 'Add lair action', 'Tremor');
+    await fillField(
+      user,
+      regionFor('Traits').getByRole('textbox', { name: 'Uses per day' }),
+      '2'
     );
-    await user.click(addFor('Reactions'));
-    await user.type(screen.getByPlaceholderText('Reaction name'), 'Parry');
-    await user.click(addFor('Lair Actions'));
-    await user.type(screen.getByPlaceholderText('Lair Action name'), 'Tremor');
-    const usesInputs = screen.getAllByPlaceholderText('Uses');
-    await fillField(user, usesInputs[0], '2');
-    await fillField(user, usesInputs[1], '3');
+    await fillField(
+      user,
+      regionFor('Actions').getByRole('textbox', { name: 'Uses per day' }),
+      '3'
+    );
 
     // Inventory tab: one manual item.
     await user.click(screen.getByRole('tab', { name: /Inventory/ }));

@@ -5,6 +5,7 @@ import { NPCFormDialog } from './index';
 import {
   CASTER_NPC,
   GOBLIN,
+  STAT_BLOCK_FULL_NPC,
   STAT_BLOCK_NPC,
 } from './__tests__/npcFormFixtures';
 
@@ -271,5 +272,124 @@ export const Phone: Story = {
     await userEvent.click(lore);
     await waitFor(() => expect(lore).toHaveAttribute('aria-selected', 'true'));
     await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+  },
+};
+
+const STAT_BLOCK_HEADINGS = [
+  'Ability scores',
+  'Challenge',
+  'Passive scores',
+  'Hit dice',
+  'Defenses and senses',
+  'Conditions it inflicts',
+  'Class resources',
+  'Traits',
+  'Actions',
+  'Bonus actions',
+  'Reactions',
+  'Lair actions',
+];
+
+async function openStatBlockTab(canvasElement: HTMLElement) {
+  const dialog = await openDialog(canvasElement);
+  const form = within(dialog);
+  await userEvent.click(form.getByRole('tab', { name: 'Stat block' }));
+  await waitFor(() =>
+    expect(form.getByRole('tab', { name: 'Stat block' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  );
+  return { dialog, form };
+}
+
+export const StatBlockEmpty: Story = {
+  play: async ({ canvasElement }) => {
+    const { form } = await openStatBlockTab(canvasElement);
+    for (const name of STAT_BLOCK_HEADINGS) {
+      await expect(
+        await form.findByRole('heading', { level: 3, name })
+      ).toBeVisible();
+    }
+    await expect(form.getByText('No traits yet.')).toBeVisible();
+  },
+};
+
+export const StatBlockFull: Story = {
+  args: { editingNpc: STAT_BLOCK_FULL_NPC },
+  beforeEach: stubFetch(INVENTORY_ROUTES),
+  play: async ({ canvasElement }) => {
+    const { form } = await openStatBlockTab(canvasElement);
+    await expect((await form.findAllByText('Resource cost'))[0]).toBeVisible();
+    const beadToss = form.getByDisplayValue('Bead Toss');
+    await expect(beadToss).toBeVisible();
+    const entryRow = beadToss.closest('li') as HTMLElement;
+    await expect(
+      within(entryRow).getByRole('combobox', { name: 'Inventory cost' })
+    ).toHaveTextContent('Prayer beads');
+    await expect(
+      form.getByText('Disadvantage on attack rolls while it can see Oren.')
+    ).toBeVisible();
+    await expect(form.getByText('Debuff')).toBeVisible();
+  },
+};
+
+export const StatBlockCreateCondition: Story = {
+  args: { editingNpc: STAT_BLOCK_FULL_NPC },
+  beforeEach: stubFetch(INVENTORY_ROUTES),
+  play: async ({ canvasElement }) => {
+    const { dialog, form } = await openStatBlockTab(canvasElement);
+    await userEvent.click(
+      await form.findByRole('combobox', { name: 'Add inflicted condition' })
+    );
+    await userEvent.click(
+      await body(canvasElement).findByRole('option', {
+        name: 'New condition…',
+      })
+    );
+    await expect(
+      await form.findByRole('button', { name: 'Create and add' })
+    ).toBeVisible();
+    // The panel's button is secondary, so Save stays the only primary.
+    await expect(
+      dialog.querySelectorAll('[data-variant="primary"]')
+    ).toHaveLength(1);
+  },
+};
+
+/** The 390 layout: three score columns, a wrapped picker, no sideways scroll. */
+export const StatBlockPhone: Story = {
+  args: { editingNpc: STAT_BLOCK_FULL_NPC },
+  beforeEach: stubFetch(INVENTORY_ROUTES),
+  parameters: { viewport: { options: { phone: VIEWPORTS.phone } } },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const { form } = await openStatBlockTab(canvasElement);
+    const top = (el: HTMLElement) => el.getBoundingClientRect().top;
+    const scores = (
+      await Promise.all(
+        ['Strength', 'Dexterity', 'Constitution', 'Intelligence'].map(name =>
+          form.findByLabelText(name)
+        )
+      )
+    ).map(top);
+    await expect(scores[1]).toBe(scores[0]);
+    await expect(scores[2]).toBe(scores[0]);
+    await expect(scores[3]).toBeGreaterThan(scores[0]);
+
+    const panel = form.getByRole('tabpanel');
+    await expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth);
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+
+    const heading = form.getByRole('heading', {
+      level: 3,
+      name: 'Conditions it inflicts',
+    });
+    const trigger = form.getByRole('combobox', {
+      name: 'Add inflicted condition',
+    });
+    await expect(trigger.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      heading.getBoundingClientRect().bottom
+    );
   },
 };

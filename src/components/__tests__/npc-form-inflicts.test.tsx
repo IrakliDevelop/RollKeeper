@@ -100,7 +100,9 @@ describe('NPCFormDialog — Inflicts section', () => {
     );
 
     await user.click(screen.getByRole('tab', { name: 'Stat block' }));
-    expect(screen.getByText('Inflicts')).toBeTruthy();
+    expect(
+      screen.getByRole('region', { name: 'Conditions it inflicts' })
+    ).toBeTruthy();
     expect(screen.getByText('Webbed')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
