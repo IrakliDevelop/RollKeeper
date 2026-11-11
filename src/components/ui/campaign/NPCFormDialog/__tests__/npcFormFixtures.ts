@@ -169,6 +169,61 @@ export const CASTER_NPC: CampaignNPC = {
   },
 };
 
+const STAMP = '2026-01-01T00:00:00.000Z';
+
+const caster = (
+  id: string,
+  name: string,
+  level: number,
+  extra: Partial<Spell> = {}
+): Spell => ({
+  id,
+  name,
+  level,
+  school: 'Evocation',
+  castingTime: '1 action',
+  range: '60 feet',
+  components: { verbal: true, somatic: true, material: false },
+  duration: 'Instantaneous',
+  description: `${name} description.`,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  ...extra,
+});
+
+/**
+ * A level 5 Wisdom caster with one spell of every kind (cantrip, ritual,
+ * concentration, at will, innate). It has no stat block and no proficiency
+ * bonus, so the bonus is worked out from the caster level: attack +7, DC 15.
+ */
+export const SPELLCASTER_NPC: CampaignNPC = {
+  ...META,
+  name: 'Sister Maeve',
+  armorClass: '13',
+  maxHp: 27,
+  speed: '30 ft.',
+  abilityScores: { str: 10, dex: 12, con: 12, int: 11, wis: 18, cha: 13 },
+  spellcasting: {
+    casterLevel: 5,
+    ability: 'wisdom',
+    slotsUsed: { 1: 1 },
+    spells: [
+      caster('spell-flame', 'Sacred Flame', 0),
+      caster('spell-detect', 'Detect Magic', 1, { ritual: true }),
+      caster('spell-hold', 'Hold Person', 2, {
+        concentration: true,
+        tags: ['control'],
+      }),
+      caster('spell-step', 'Misty Step', 2, { freeCastMax: 0 }),
+      caster('spell-fly', 'Fly', 3, {
+        freeCastMax: 2,
+        freeCastsUsed: 1,
+        tags: ['utility'],
+      }),
+    ],
+  },
+};
+
 export const QUICK_NPC_WITH_SCORES: CampaignNPC = {
   ...META,
   name: 'Quick Acolyte',

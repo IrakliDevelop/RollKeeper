@@ -5,6 +5,7 @@ import { NPCFormDialog } from './index';
 import {
   CASTER_NPC,
   GOBLIN,
+  SPELLCASTER_NPC,
   STAT_BLOCK_FULL_NPC,
   STAT_BLOCK_NPC,
 } from './__tests__/npcFormFixtures';
@@ -391,5 +392,62 @@ export const StatBlockPhone: Story = {
     await expect(trigger.getBoundingClientRect().top).toBeGreaterThanOrEqual(
       heading.getBoundingClientRect().bottom
     );
+  },
+};
+
+async function openSpellsTab(canvasElement: HTMLElement) {
+  const dialog = await openDialog(canvasElement);
+  const form = within(dialog);
+  await userEvent.click(form.getByRole('tab', { name: 'Spells' }));
+  await waitFor(() =>
+    expect(form.getByRole('tab', { name: 'Spells' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  );
+  return { dialog, form };
+}
+
+export const SpellsOff: Story = {
+  args: { editingNpc: STAT_BLOCK_NPC },
+  play: async ({ canvasElement }) => {
+    const { form } = await openSpellsTab(canvasElement);
+    await expect(
+      form.getByRole('switch', { name: 'Spellcasting' })
+    ).not.toBeChecked();
+    await expect(form.queryByLabelText('Caster level')).toBeNull();
+  },
+};
+
+export const SpellsFull: Story = {
+  args: { editingNpc: SPELLCASTER_NPC },
+  beforeEach: stubFetch({ '/api/spells': { spells: [] } }),
+  play: async ({ canvasElement }) => {
+    const { form } = await openSpellsTab(canvasElement);
+    await expect(
+      await form.findByRole('heading', {
+        level: 3,
+        name: 'Spell slots at caster level 5',
+      })
+    ).toBeVisible();
+    await expect(form.getByText('2 per day')).toBeVisible();
+  },
+};
+
+export const AddSpellDialog: Story = {
+  args: { editingNpc: SPELLCASTER_NPC },
+  beforeEach: stubFetch({ '/api/spells': { spells: [] } }),
+  play: async ({ canvasElement }) => {
+    const { form } = await openSpellsTab(canvasElement);
+    await userEvent.click(
+      await form.findByRole('button', { name: 'Add spell' })
+    );
+    const nested = await body(canvasElement).findByRole('dialog', {
+      name: 'Add spell',
+    });
+    await waitFor(() => expect(nested).toBeVisible());
+    await expect(
+      nested.querySelectorAll('[data-variant="primary"]')
+    ).toHaveLength(1);
   },
 };
