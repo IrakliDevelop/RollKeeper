@@ -205,25 +205,25 @@ describe('NPCFormDialog field wiring', () => {
     // Stat Block tab.
     await user.click(screen.getByRole('tab', { name: 'Stat block' }));
     const scoreInputs = within(
-      screen.getByText('Ability Scores').parentElement as HTMLElement
+      screen.getByRole('region', { name: 'Ability scores' })
     ).getAllByRole('textbox');
     const scores = ['11', '12', '13', '14', '15', '16'];
     for (const [i, score] of scores.entries()) {
       await fillField(user, scoreInputs[i], score);
     }
-    await fillLabel(user, 'Saving Throws', 'Dex +4, Wis +2');
+    await fillLabel(user, 'Saving throws', 'Dex +4, Wis +2');
     await fillLabel(user, 'Skills', 'Perception +4');
     await fillLabel(user, 'Resistances', 'fire, cold');
     await fillLabel(user, 'Immunities', 'poison');
     await fillLabel(user, 'Vulnerabilities', 'radiant');
-    await fillLabel(user, 'Condition Immunities', 'poisoned, charmed');
+    await fillLabel(user, 'Condition immunities', 'poisoned, charmed');
     await fillLabel(user, 'Senses', 'Darkvision 60 ft.');
     await fillLabel(user, 'Languages', 'Common, Sylvan');
     await fillLabel(user, 'CR', '3');
-    await fillLabel(user, 'Prof Bonus', '5');
-    await fillLabel(user, 'Max', '6');
-    await pickOption(screen.getByRole('combobox', { name: 'Die Type' }), 'd10');
-    await fillLabel(user, 'Current', '4');
+    await fillLabel(user, 'Proficiency bonus', '5');
+    await fillLabel(user, 'Hit dice total', '6');
+    await pickOption(screen.getByRole('combobox', { name: 'Hit die' }), 'd10');
+    await fillLabel(user, 'Hit dice remaining', '4');
     await fillLabel(user, 'Passive Perception', '17');
     await fillLabel(user, 'Passive Insight', '18');
     await fillLabel(user, 'Passive Investigation', '19');
