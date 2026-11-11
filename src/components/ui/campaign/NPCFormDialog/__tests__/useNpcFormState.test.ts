@@ -115,6 +115,20 @@ describe('useNpcFormState submit', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(result.current.canSubmit).toBe(false);
   });
+
+  it('submit refuses an invalid resource draft', () => {
+    const { result, onSave, onOpenChange } = setup({ editingNpc: null });
+    act(() =>
+      result.current.update({
+        name: 'Oren',
+        resources: [{ ...KI, maxUses: undefined }],
+      })
+    );
+    act(() => result.current.submit());
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(result.current.submitBlocker).toBe('resources');
+  });
 });
 
 describe('useNpcFormState actions', () => {

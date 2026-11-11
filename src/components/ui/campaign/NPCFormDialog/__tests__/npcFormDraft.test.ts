@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canonicalCreatureType,
+  canonicalSize,
   deriveAutoFields,
   draftFromMonster,
   draftFromNpc,
@@ -124,7 +126,44 @@ describe('withPassiveOverride', () => {
   });
 });
 
+describe('canonicalSize', () => {
+  it.each([
+    ['S', 'Small'],
+    ['S, M', 'Small'],
+    ['Medium', 'Medium'],
+    ['large', 'Large'],
+    ['Huge ', 'Huge'],
+    ['', ''],
+    ['colossal', 'colossal'],
+  ])('maps %j to %j', (raw, expected) => {
+    expect(canonicalSize(raw)).toBe(expected);
+  });
+});
+
+describe('canonicalCreatureType', () => {
+  it.each([
+    ['humanoid', 'Humanoid'],
+    ['Beast', 'Beast'],
+    ['swarm', 'swarm'],
+  ])('maps %j to %j', (raw, expected) => {
+    expect(canonicalCreatureType(raw)).toBe(expected);
+  });
+});
+
 describe('draftFromNpc', () => {
+  it('shows a stored size code and lowercase type in the form lists', () => {
+    const d = draftFromNpc({
+      ...STAT_BLOCK_NPC,
+      monsterStatBlock: {
+        ...STAT_BLOCK_NPC.monsterStatBlock!,
+        size: 'S',
+        type: 'humanoid',
+      },
+    });
+    expect(d.size).toBe('Small');
+    expect(d.creatureType).toBe('Humanoid');
+  });
+
   it('keeps resources, hit dice, PB and passives for an NPC with scores only', () => {
     const d = draftFromNpc(QUICK_NPC_WITH_SCORES);
     expect(d.resources).toEqual([KI]);
@@ -215,6 +254,12 @@ describe('draftFromNpc', () => {
 });
 
 describe('draftFromMonster', () => {
+  it('shows an imported size code and lowercase type in the form lists', () => {
+    const d = draftFromMonster(GOBLIN, emptyDraft());
+    expect(d.size).toBe('Small');
+    expect(d.creatureType).toBe('Humanoid');
+  });
+
   it('imports the monster and keeps the form-only fields', () => {
     const current: NpcFormDraft = {
       ...emptyDraft(),

@@ -125,16 +125,25 @@ export function buildNpcPayload(
   };
 }
 
+export type SubmitBlocker = 'name' | 'resources' | 'costs';
+
+/** The first check that stops Save: name, then resource drafts, then resource costs. */
+export function submitBlocker(draft: NpcFormDraft): SubmitBlocker | null {
+  if (draft.name.trim().length === 0) return 'name';
+  if (!draft.resources.every(isResourceDraftValid)) return 'resources';
+  const entryLists = [
+    draft.traits,
+    draft.actions,
+    draft.bonusActions,
+    draft.reactions,
+    draft.lairActions,
+  ];
+  if (!entryLists.every(list => list.every(isResourceCostValid))) {
+    return 'costs';
+  }
+  return null;
+}
+
 export function canSubmitDraft(draft: NpcFormDraft): boolean {
-  return (
-    draft.name.trim().length > 0 &&
-    draft.resources.every(isResourceDraftValid) &&
-    [
-      draft.traits,
-      draft.actions,
-      draft.bonusActions,
-      draft.reactions,
-      draft.lairActions,
-    ].every(list => list.every(isResourceCostValid))
-  );
+  return submitBlocker(draft) === null;
 }
