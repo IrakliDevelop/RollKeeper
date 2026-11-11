@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Settings, RotateCcw, CalendarDays, List, MapPin } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/layout/card';
+import { Settings, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import { SubTabs } from '@/components/ui/layout/SubTabs';
 import { TimeDisplay } from './TimeDisplay';
 import { TimeControls } from './TimeControls';
 import { WeatherPicker } from './WeatherPicker';
@@ -22,11 +22,6 @@ import type { SelectedDay } from './CalendarGrid';
 import type { CalendarEvent, CalendarEventInput } from '@/types/calendar';
 
 type CalendarTab = 'calendar' | 'events';
-
-const TABS: { id: CalendarTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'calendar', label: 'Calendar', icon: <CalendarDays size={14} /> },
-  { id: 'events', label: 'Events', icon: <List size={14} /> },
-];
 
 interface CalendarViewProps {
   campaignCode: string;
@@ -160,152 +155,145 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Time display + controls */}
-      <Card>
-        <CardContent className="space-y-4 p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <TimeDisplay
-              date={date}
-              config={config}
-              moonPhases={moonPhases}
-              dayPeriod={dayPeriod}
-              weather={calendar.weather}
-              onTimeEdit={(hour, minute) => {
-                const newTime = dateToTime(
-                  { ...date, hour, minute, second: 0 },
-                  config
-                );
-                setCalendarTime(campaignCode, newTime);
-              }}
-            />
-            <div className="flex flex-col items-start gap-2 sm:items-end">
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<MapPin size={16} />}
-                  onClick={() => setJumpDialogOpen(true)}
-                >
-                  Start Date
-                </Button>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <TimeDisplay
+            date={date}
+            config={config}
+            moonPhases={moonPhases}
+            dayPeriod={dayPeriod}
+            weather={calendar.weather}
+            onTimeEdit={(hour, minute) => {
+              const newTime = dateToTime(
+                { ...date, hour, minute, second: 0 },
+                config
+              );
+              setCalendarTime(campaignCode, newTime);
+            }}
+          />
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<MapPin size={16} />}
+                onClick={() => setJumpDialogOpen(true)}
+              >
+                Start date
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                leftIcon={<Settings size={16} />}
+              >
                 <Link href={`/dm/campaign/${campaignCode}/calendar/settings`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<Settings size={16} />}
-                  >
-                    Settings
-                  </Button>
+                  Settings
                 </Link>
-                {onReset && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<RotateCcw size={16} />}
-                    onClick={onReset}
-                  >
-                    Reset
-                  </Button>
-                )}
-              </div>
-              <span className="text-muted text-sm">
-                Day {campaignDays + 1} of the campaign
-              </span>
+              </Button>
+              {onReset && (
+                <Button variant="danger" size="sm" onClick={onReset}>
+                  Reset calendar
+                </Button>
+              )}
             </div>
+            <p className="type-small text-muted">
+              Day {campaignDays + 1} of the campaign
+            </p>
           </div>
-          <div className="border-divider border-t pt-4">
-            <TimeControls
-              currentTime={calendar.currentTime}
-              config={config}
-              onAdvance={handleAdvance}
-            />
-          </div>
-          <div className="border-divider border-t pt-4">
-            <WeatherPicker
-              current={calendar.weather}
-              onChange={weather => setWeather(campaignCode, weather)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sub-tab switcher */}
-      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-all ${
-              activeTab === tab.id
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-            {tab.id === 'events' && events.length > 0 && (
-              <Badge variant="neutral" className="ml-1">
-                {events.length}
-              </Badge>
-            )}
-          </button>
-        ))}
+        </div>
+        <div className="border-divider border-t pt-4">
+          <TimeControls config={config} onAdvance={handleAdvance} />
+        </div>
+        <div className="border-divider border-t pt-4">
+          <WeatherPicker
+            current={calendar.weather}
+            onChange={weather => setWeather(campaignCode, weather)}
+          />
+        </div>
       </div>
 
-      {/* Tab content */}
-      {activeTab === 'calendar' ? (
-        <Card>
-          <CardContent className="p-4">
-            <CalendarNav
-              browseYear={displayYear}
-              browseMonth={displayMonth}
-              config={config}
-              onPrevMonth={handlePrevMonth}
-              onNextMonth={handleNextMonth}
-              onToday={handleToday}
-              isBrowsing={isBrowsing}
-            />
-            <div className="mt-4">
-              <CalendarGrid
-                browseYear={displayYear}
-                browseMonth={displayMonth}
-                config={config}
-                currentDate={date}
+      <SubTabs
+        label="Calendar and events"
+        value={activeTab}
+        onValueChange={value =>
+          setActiveTab(value === 'events' ? 'events' : 'calendar')
+        }
+        tabs={[
+          {
+            value: 'calendar',
+            id: 'calendar-tab',
+            label: 'Calendar',
+            content: (
+              <>
+                <CalendarNav
+                  browseYear={displayYear}
+                  browseMonth={displayMonth}
+                  config={config}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  onToday={handleToday}
+                  isBrowsing={isBrowsing}
+                />
+                <div className="mt-4">
+                  <CalendarGrid
+                    browseYear={displayYear}
+                    browseMonth={displayMonth}
+                    config={config}
+                    currentDate={date}
+                    events={events}
+                    selectedDay={selectedDay}
+                    onDayClick={handleDayClick}
+                    onAddEvent={handleAddEvent}
+                    onEditEvent={handleEditEvent}
+                    onDeleteEvent={eventId =>
+                      deleteEvent(campaignCode, eventId)
+                    }
+                    onMoveEvent={(eventId, direction) =>
+                      moveEvent(campaignCode, eventId, direction)
+                    }
+                  />
+                </div>
+                {config.moons.length > 0 && (
+                  <div className="border-divider mt-4 border-t pt-4">
+                    <MoonLegend
+                      config={config}
+                      currentMoonPhases={moonPhases}
+                    />
+                  </div>
+                )}
+              </>
+            ),
+          },
+          {
+            value: 'events',
+            id: 'calendar-events-tab',
+            label: (
+              <>
+                Events
+                {events.length > 0 && (
+                  <Badge variant="neutral" size="sm" className="ml-1">
+                    {events.length}
+                  </Badge>
+                )}
+              </>
+            ),
+            content: (
+              <EventListView
                 events={events}
-                selectedDay={selectedDay}
-                onDayClick={handleDayClick}
-                onAddEvent={handleAddEvent}
-                onEditEvent={handleEditEvent}
+                config={config}
+                onUpdateEvent={(eventId, updates) =>
+                  updateEvent(campaignCode, eventId, updates)
+                }
                 onDeleteEvent={eventId => deleteEvent(campaignCode, eventId)}
                 onMoveEvent={(eventId, direction) =>
                   moveEvent(campaignCode, eventId, direction)
                 }
               />
-            </div>
-            {config.moons.length > 0 && (
-              <div className="border-divider mt-4 border-t pt-4">
-                <MoonLegend config={config} currentMoonPhases={moonPhases} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-4">
-            <EventListView
-              events={events}
-              config={config}
-              onUpdateEvent={(eventId, updates) =>
-                updateEvent(campaignCode, eventId, updates)
-              }
-              onDeleteEvent={eventId => deleteEvent(campaignCode, eventId)}
-              onMoveEvent={(eventId, direction) =>
-                moveEvent(campaignCode, eventId, direction)
-              }
-            />
-          </CardContent>
-        </Card>
-      )}
+            ),
+          },
+        ]}
+      />
 
       {/* Event create/edit dialog (for calendar tab) */}
       <EventDialog

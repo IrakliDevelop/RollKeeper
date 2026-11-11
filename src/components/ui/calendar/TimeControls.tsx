@@ -10,7 +10,6 @@ import {
 } from '@/utils/calendarCalculations';
 
 interface TimeControlsProps {
-  currentTime: number;
   config: CalendarConfig;
   onAdvance: (deltaMs: number) => void;
 }

@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { Card, CardContent } from '@/components/ui/layout/card';
 import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { Section } from '@/components/ui/layout/section';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { CalendarPresetPicker } from '@/components/ui/calendar/CalendarPresetPicker';
 import { CalendarView } from '@/components/ui/calendar/CalendarView';
 import { CalendarSyncControls } from '@/components/ui/calendar/CalendarSyncControls';
@@ -39,7 +38,6 @@ export default function CalendarPage() {
   const [selectedPreset, setSelectedPreset] = useState<string>(
     CALENDAR_PRESETS[0].id
   );
-  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const handleCreate = () => {
     const preset = CALENDAR_PRESETS.find(p => p.id === selectedPreset);
@@ -47,13 +45,18 @@ export default function CalendarPage() {
     initCalendar(code, preset.create());
   };
 
-  const handleReset = () => {
-    setConfirmingReset(true);
-  };
-
-  const handleConfirmReset = () => {
-    deleteCalendar(code);
-    setConfirmingReset(false);
+  const handleReset = async () => {
+    if (
+      await confirmDialog({
+        tone: 'danger',
+        title: 'Reset the calendar?',
+        message:
+          'Deletes the time, start date, settings and every event. Players keep the last synced calendar until you create a new one.',
+        confirmLabel: 'Reset calendar',
+      })
+    ) {
+      deleteCalendar(code);
+    }
   };
 
   return (
@@ -67,49 +70,25 @@ export default function CalendarPage() {
       />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        {confirmingReset && (
-          <Card className="mb-6">
-            <CardContent className="flex items-center justify-between p-4">
-              <p className="text-body">
-                Reset this calendar? All time progress and customizations will
-                be lost.
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setConfirmingReset(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="danger-solid"
-                  size="sm"
-                  onClick={handleConfirmReset}
-                >
-                  Reset Calendar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {exists ? (
           <>
-            <CalendarView campaignCode={code} onReset={handleReset} />
+            <CalendarView
+              campaignCode={code}
+              onReset={() => void handleReset()}
+            />
             {legacyProjection && (
-              <div className="mt-4 flex items-center gap-2 text-xs">
+              <div className="mt-4">
                 {syncError ? (
-                  <span className="text-accent-red-text flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    Sync error: {syncError}
-                  </span>
+                  <p role="alert" className="type-small text-blood-text">
+                    Couldn&apos;t sync the calendar to players. The next change
+                    will try again.
+                  </p>
                 ) : lastPushedAgo ? (
-                  <span className="text-muted">
+                  <p className="type-small text-muted">
                     Synced to players {lastPushedAgo}
-                  </span>
+                  </p>
                 ) : (
-                  <span className="text-faint">Syncing...</span>
+                  <p className="type-small text-muted">Syncing…</p>
                 )}
               </div>
             )}

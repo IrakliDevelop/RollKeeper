@@ -15,9 +15,7 @@ const config = createDefaultCalendar();
 
 function renderControls() {
   const onAdvance = vi.fn();
-  const view = render(
-    <TimeControls currentTime={0} config={config} onAdvance={onAdvance} />
-  );
+  const view = render(<TimeControls config={config} onAdvance={onAdvance} />);
   return { onAdvance, ...view };
 }
 
