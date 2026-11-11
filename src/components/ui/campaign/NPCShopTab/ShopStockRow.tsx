@@ -75,12 +75,15 @@ export function ShopStockRow({
 
       <div className="flex flex-wrap items-end gap-3">
         <div role="group" aria-labelledby={priceLabelId}>
-          <span id={priceLabelId} className="type-small text-muted">
+          <span
+            id={priceLabelId}
+            className="text-heading mb-1.5 block text-sm font-medium"
+          >
             Price
           </span>
           <div className="flex items-end gap-1">
             {(['gp', 'sp', 'cp'] as const).map(denom => (
-              <span key={denom} className="flex items-end gap-0.5">
+              <span key={denom} className="flex items-center gap-0.5">
                 <NumberInput
                   aria-label={`${item.name} price (${denom})`}
                   value={draft[denom]}
