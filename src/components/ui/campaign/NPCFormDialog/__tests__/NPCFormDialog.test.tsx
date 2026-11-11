@@ -230,9 +230,9 @@ describe('V198: why Save is disabled', () => {
     const user = userEvent.setup();
     renderForm({ editingNpc: STAT_BLOCK_NPC });
     await user.click(screen.getByRole('tab', { name: 'Stat block' }));
-    const amount = screen.getByRole('textbox', {
-      name: 'Actions entry resource cost amount',
-    });
+    const amount = within(
+      screen.getByRole('region', { name: 'Actions' })
+    ).getByRole('textbox', { name: 'Uses spent' });
     await user.tripleClick(amount);
     await user.keyboard('0');
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();

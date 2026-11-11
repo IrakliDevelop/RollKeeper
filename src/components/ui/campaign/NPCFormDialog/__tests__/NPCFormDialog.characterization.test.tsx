@@ -293,27 +293,36 @@ describe('NPCFormDialog field wiring', () => {
       screen.getByRole('textbox', { name: 'Resource max uses' }),
       '2'
     );
-    const addFor = (label: string) =>
-      within(screen.getByText(label).parentElement as HTMLElement).getByRole(
-        'button',
-        { name: 'Add' }
+    const regionFor = (heading: string) =>
+      within(screen.getByRole('region', { name: heading }));
+    const addEntry = async (
+      heading: string,
+      addLabel: string,
+      name: string
+    ) => {
+      await user.click(
+        regionFor(heading).getByRole('button', { name: addLabel })
       );
-    await user.click(addFor('Traits'));
-    await user.type(screen.getByPlaceholderText('Trait name'), 'Keen Smell');
-    await user.click(addFor('Actions'));
-    await user.type(screen.getByPlaceholderText('Action name'), 'Mace Strike');
-    await user.click(addFor('Bonus Actions'));
-    await user.type(
-      screen.getByPlaceholderText('Bonus Action name'),
-      'Healing Word'
+      await user.type(
+        regionFor(heading).getByRole('textbox', { name: 'Name' }),
+        name
+      );
+    };
+    await addEntry('Traits', 'Add trait', 'Keen Smell');
+    await addEntry('Actions', 'Add action', 'Mace Strike');
+    await addEntry('Bonus actions', 'Add bonus action', 'Healing Word');
+    await addEntry('Reactions', 'Add reaction', 'Parry');
+    await addEntry('Lair actions', 'Add lair action', 'Tremor');
+    await fillField(
+      user,
+      regionFor('Traits').getByRole('textbox', { name: 'Uses per day' }),
+      '2'
     );
-    await user.click(addFor('Reactions'));
-    await user.type(screen.getByPlaceholderText('Reaction name'), 'Parry');
-    await user.click(addFor('Lair Actions'));
-    await user.type(screen.getByPlaceholderText('Lair Action name'), 'Tremor');
-    const usesInputs = screen.getAllByPlaceholderText('Uses');
-    await fillField(user, usesInputs[0], '2');
-    await fillField(user, usesInputs[1], '3');
+    await fillField(
+      user,
+      regionFor('Actions').getByRole('textbox', { name: 'Uses per day' }),
+      '3'
+    );
 
     // Inventory tab: one manual item.
     await user.click(screen.getByRole('tab', { name: /Inventory/ }));

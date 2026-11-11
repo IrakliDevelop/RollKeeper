@@ -246,35 +246,35 @@ export function StatBlockTab({
 
       {/* ===== Traits / Actions / Reactions ===== */}
       <AbilityListEditor
-        label="Traits"
+        section="traits"
         items={draft.traits}
         onChange={traits => update({ traits })}
         resources={draft.resources}
         inventoryItems={draft.inventoryItems}
       />
       <AbilityListEditor
-        label="Actions"
+        section="actions"
         items={draft.actions}
         onChange={actions => update({ actions })}
         resources={draft.resources}
         inventoryItems={draft.inventoryItems}
       />
       <AbilityListEditor
-        label="Bonus Actions"
+        section="bonusActions"
         items={draft.bonusActions}
         onChange={bonusActions => update({ bonusActions })}
         resources={draft.resources}
         inventoryItems={draft.inventoryItems}
       />
       <AbilityListEditor
-        label="Reactions"
+        section="reactions"
         items={draft.reactions}
         onChange={reactions => update({ reactions })}
         resources={draft.resources}
         inventoryItems={draft.inventoryItems}
       />
       <AbilityListEditor
-        label="Lair Actions"
+        section="lairActions"
         items={draft.lairActions}
         onChange={lairActions => update({ lairActions })}
         resources={draft.resources}
