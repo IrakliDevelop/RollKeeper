@@ -170,7 +170,7 @@ describe('EventListView ordering', () => {
     renderList();
     await userEvent
       .setup()
-      .type(screen.getByPlaceholderText('Search events...'), 'ambush');
+      .type(screen.getByPlaceholderText('Search events'), 'ambush');
     expect(screen.queryByRole('button', { name: /^Move / })).toBeNull();
   });
 });

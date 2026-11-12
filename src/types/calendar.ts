@@ -111,7 +111,7 @@ export const WEATHER_OPTIONS: {
   { type: 'overcast', label: 'Overcast' },
   { type: 'fog', label: 'Fog' },
   { type: 'rain', label: 'Rain' },
-  { type: 'heavy-rain', label: 'Heavy Rain' },
+  { type: 'heavy-rain', label: 'Heavy rain' },
   { type: 'thunderstorm', label: 'Thunderstorm' },
   { type: 'snow', label: 'Snow' },
   { type: 'blizzard', label: 'Blizzard' },
@@ -168,14 +168,14 @@ export const MOON_PHASE_NAMES: MoonPhaseName[] = [
 ];
 
 export const MOON_PHASE_LABELS: Record<MoonPhaseName, string> = {
-  'new-moon': 'New Moon',
-  'waxing-crescent': 'Waxing Crescent',
-  'first-quarter': 'First Quarter',
-  'waxing-gibbous': 'Waxing Gibbous',
-  'full-moon': 'Full Moon',
-  'waning-gibbous': 'Waning Gibbous',
-  'last-quarter': 'Last Quarter',
-  'waning-crescent': 'Waning Crescent',
+  'new-moon': 'New moon',
+  'waxing-crescent': 'Waxing crescent',
+  'first-quarter': 'First quarter',
+  'waxing-gibbous': 'Waxing gibbous',
+  'full-moon': 'Full moon',
+  'waning-gibbous': 'Waning gibbous',
+  'last-quarter': 'Last quarter',
+  'waning-crescent': 'Waning crescent',
 };
 
 export interface MoonPhaseInfo {

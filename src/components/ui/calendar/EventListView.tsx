@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Search, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { EventDialog } from './EventDialog';
@@ -51,7 +52,7 @@ export function EventListView({
 }: EventListViewProps) {
   const [search, setSearch] = useState('');
   const [monthFilter, setMonthFilter] = useState<string>('all');
-  const [yearFilter, setYearFilter] = useState<string>('');
+  const [yearFilter, setYearFilter] = useState<number | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<SortOrder>('date-asc');
 
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>();
@@ -70,11 +71,8 @@ export function EventListView({
       result = result.filter(e => e.month === m);
     }
 
-    if (yearFilter !== '') {
-      const y = Number(yearFilter);
-      if (!isNaN(y)) {
-        result = result.filter(e => e.year === y);
-      }
+    if (yearFilter !== undefined) {
+      result = result.filter(e => e.year === yearFilter);
     }
 
     const sorted = [...result];
@@ -138,6 +136,21 @@ export function EventListView({
     return `${day + 1} ${monthName}, Year ${year}${eraStr}`;
   };
 
+  // Keep the dialog's date prop stable so a parent re-render (a sync tick)
+  // does not reset what the user is typing.
+  const editingYear = editingEvent?.year;
+  const editingMonth = editingEvent?.month;
+  const editingDay = editingEvent?.day;
+  const editingDefaultDate = useMemo(
+    () =>
+      editingYear !== undefined &&
+      editingMonth !== undefined &&
+      editingDay !== undefined
+        ? { year: editingYear, month: editingMonth, day: editingDay }
+        : undefined,
+    [editingYear, editingMonth, editingDay]
+  );
+
   const handleEditEvent = (event: CalendarEvent) => {
     setEditingEvent(event);
     setDialogOpen(true);
@@ -171,15 +184,20 @@ export function EventListView({
     <div className="space-y-4">
       {/* Filters */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="col-span-2">
+        <div className="col-span-2 sm:col-span-1">
           <Input
-            placeholder="Search events..."
+            placeholder="Search events"
+            aria-label="Search events"
             value={search}
             onChange={e => setSearch(e.target.value)}
             leftIcon={<Search size={14} className="text-muted" />}
           />
         </div>
-        <SelectField value={monthFilter} onValueChange={setMonthFilter}>
+        <SelectField
+          value={monthFilter}
+          onValueChange={setMonthFilter}
+          triggerProps={{ 'aria-label': 'Month' }}
+        >
           <SelectItem value="all">All months</SelectItem>
           {config.months.map((m, i) => (
             <SelectItem key={i} value={String(i)}>
@@ -190,54 +208,52 @@ export function EventListView({
         <SelectField
           value={sortOrder}
           onValueChange={v => setSortOrder(v as SortOrder)}
+          triggerProps={{ 'aria-label': 'Sort by' }}
         >
           <SelectItem value="date-asc">Date (oldest)</SelectItem>
           <SelectItem value="date-desc">Date (newest)</SelectItem>
           <SelectItem value="recent">Recently added</SelectItem>
         </SelectField>
-      </div>
-
-      <div>
-        <Input
-          type="number"
-          placeholder="Filter by year..."
+        <NumberInput
+          allowEmpty
+          aria-label="Year"
+          placeholder="1492"
           value={yearFilter}
-          onChange={e => setYearFilter(e.target.value)}
-          className="max-w-48"
+          onChange={setYearFilter}
         />
       </div>
 
       {/* Event list */}
       {events.length === 0 ? (
         <div className="py-12 text-center">
-          <p className="text-muted text-sm">
-            No events yet. Click a day on the Calendar tab to add one.
+          <p className="type-body text-muted">
+            Choose a day on the calendar to add an event.
           </p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center">
-          <p className="text-muted text-sm">No events match your filters.</p>
+          <p className="type-body text-muted">No events match your filters.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {grouped.map(group => (
             <div key={group.key}>
-              <h3 className="text-muted mb-1.5 text-xs font-semibold tracking-wide uppercase">
+              <h3 className="type-label-heading text-muted mb-1 px-3">
                 {formatGroupDate(group.year, group.month, group.day)}
               </h3>
-              <div className="bg-surface-secondary rounded-lg">
+              <ul className="divide-divider divide-y">
                 {group.events.map((event, index) => (
-                  <div
+                  <li
                     key={event.id}
-                    className="hover:bg-surface-elevated border-divider group flex w-full items-center gap-2 border-b px-3 py-2.5 transition-colors duration-150 last:border-b-0"
+                    className="group hover:bg-surface-secondary flex w-full items-center gap-2 px-3 py-2.5 transition-colors duration-150"
                   >
                     <EventMarker event={event} size="row" />
                     <button
                       type="button"
                       onClick={() => handleEditEvent(event)}
-                      className="min-w-0 flex-1 text-left"
+                      className="min-w-0 flex-1 text-left pointer-coarse:min-h-11"
                     >
-                      <span className="text-heading truncate text-sm font-medium">
+                      <span className="type-ui text-heading truncate">
                         {event.title}
                       </span>
                     </button>
@@ -281,9 +297,9 @@ export function EventListView({
                         <Trash2 size={12} />
                       </button>
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ))}
         </div>
@@ -297,15 +313,7 @@ export function EventListView({
         event={editingEvent}
         config={config}
         showVisibility={showVisibility}
-        defaultDate={
-          editingEvent
-            ? {
-                year: editingEvent.year,
-                month: editingEvent.month,
-                day: editingEvent.day,
-              }
-            : undefined
-        }
+        defaultDate={editingDefaultDate}
       />
     </div>
   );

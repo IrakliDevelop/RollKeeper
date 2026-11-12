@@ -17,8 +17,8 @@ export function MoonLegend({ config, currentMoonPhases }: MoonLegendProps) {
       {/* Current moon phases */}
       {currentMoonPhases.length > 0 && (
         <div>
-          <h4 className="text-heading mb-2 text-sm font-semibold">
-            Current Phase
+          <h4 className="type-label-heading text-heading mb-2">
+            Current phase
           </h4>
           <div className="flex flex-wrap gap-4">
             {currentMoonPhases.map(mp => (
@@ -32,7 +32,7 @@ export function MoonLegend({ config, currentMoonPhases }: MoonLegendProps) {
                     {' '}
                     &mdash; {MOON_PHASE_LABELS[mp.phase]}
                   </span>
-                  <span className="text-faint ml-1 text-xs">
+                  <span className="text-muted ml-1 text-xs">
                     ({mp.moon.period}-day cycle)
                   </span>
                 </div>
@@ -44,7 +44,7 @@ export function MoonLegend({ config, currentMoonPhases }: MoonLegendProps) {
 
       {/* Phase legend */}
       <div>
-        <h4 className="text-heading mb-2 text-sm font-semibold">Moon Phases</h4>
+        <h4 className="type-label-heading text-heading mb-2">Moon phases</h4>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
           {MOON_PHASE_NAMES.map(phase => (
             <div key={phase} className="flex items-center gap-1.5">

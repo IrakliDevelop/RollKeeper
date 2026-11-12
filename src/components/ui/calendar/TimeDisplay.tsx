@@ -1,19 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Clock,
-  Sun,
-  Moon,
-  Sunrise,
-  Sunset,
-  Pencil,
-  Check,
-  X,
-} from 'lucide-react';
+import { Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { NumberField } from '@/components/ui/forms/NumberInput';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
+import { PeriodIcon } from './PeriodIcon';
+import { TimeEditDialog } from './TimeEditDialog';
 import type {
   CalendarDate,
   MoonPhaseInfo,
@@ -35,21 +28,6 @@ interface TimeDisplayProps {
   onTimeEdit?: (hour: number, minute: number) => void;
 }
 
-function getPeriodIcon(period: string) {
-  switch (period) {
-    case 'Morning':
-      return <Sunrise size={16} className="text-accent-amber-text" />;
-    case 'Afternoon':
-      return <Sun size={16} className="text-accent-amber-text" />;
-    case 'Evening':
-      return <Sunset size={16} className="text-accent-orange-text" />;
-    case 'Night':
-      return <Moon size={16} className="text-accent-blue-text" />;
-    default:
-      return <Clock size={16} className="text-muted" />;
-  }
-}
-
 function getEraDisplay(era: Era | undefined): string {
   return era ? ` ${era.abbreviation}` : '';
 }
@@ -68,89 +46,38 @@ export function TimeDisplay({
   const weekDayName = config.weekDays[date.dayOfWeek]?.name ?? '';
   const eraStr = getEraDisplay(date.era);
 
-  const [editing, setEditing] = useState(false);
-  const [editHour, setEditHour] = useState(date.hour);
-  const [editMinute, setEditMinute] = useState(date.minute);
-
-  const maxHour = config.clock.hoursPerDay - 1;
-  const maxMinute = config.clock.minutesPerHour - 1;
-
-  const handleStartEdit = () => {
-    setEditHour(date.hour);
-    setEditMinute(date.minute);
-    setEditing(true);
-  };
-
-  const handleConfirm = () => {
-    onTimeEdit?.(editHour, editMinute);
-    setEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditing(false);
-  };
-
-  const clamp = (val: number, max: number) => Math.max(0, Math.min(max, val));
+  const [timeDialogOpen, setTimeDialogOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-3">
       {/* Clock */}
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-3">
-          {editing ? (
-            <div className="flex items-center gap-1.5">
-              <NumberField
-                value={editHour}
-                onChange={v => setEditHour(clamp(v ?? 0, maxHour))}
-                min={0}
-                max={maxHour}
-                autoFocus
-                className="text-heading border-divider focus:border-divider-strong w-20 rounded-md border bg-transparent px-3 py-2 text-center font-mono text-3xl font-bold focus:outline-none"
-              />
-              <span className="text-heading font-mono text-3xl font-bold">
-                :
-              </span>
-              <NumberField
-                value={editMinute}
-                onChange={v => setEditMinute(clamp(v ?? 0, maxMinute))}
-                min={0}
-                max={maxMinute}
-                className="text-heading border-divider focus:border-divider-strong w-20 rounded-md border bg-transparent px-3 py-2 text-center font-mono text-3xl font-bold focus:outline-none"
-              />
-              <button
-                onClick={handleConfirm}
-                className="text-accent-emerald-text hover:bg-accent-emerald-bg ml-1 rounded-md p-1.5 transition-colors"
-                title="Confirm"
-              >
-                <Check size={18} />
-              </button>
-              <button
-                onClick={handleCancel}
-                className="text-muted hover:bg-surface-hover rounded-md p-1.5 transition-colors"
-                title="Cancel"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="type-num-lg text-heading tabular-nums">
+            {formatTime(date)}
+          </span>
+          {onTimeEdit && (
             <>
-              <div className="text-heading font-mono text-4xl font-bold tracking-wide">
-                {formatTime(date)}
-              </div>
-              {onTimeEdit && (
-                <button
-                  onClick={handleStartEdit}
-                  className="text-muted hover:text-body hover:bg-surface-hover rounded-md p-1 transition-colors"
-                  title="Edit time"
-                >
-                  <Pencil size={14} />
-                </button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<Pencil size={14} aria-hidden />}
+                onClick={() => setTimeDialogOpen(true)}
+              >
+                Edit time
+              </Button>
+              <TimeEditDialog
+                open={timeDialogOpen}
+                onClose={() => setTimeDialogOpen(false)}
+                date={date}
+                config={config}
+                onSave={onTimeEdit}
+              />
             </>
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          {getPeriodIcon(dayPeriod)}
+          <PeriodIcon period={dayPeriod} />
           <span className="text-body text-sm">{dayPeriod}</span>
         </div>
       </div>
@@ -163,7 +90,7 @@ export function TimeDisplay({
           {eraStr}
         </span>
         {date.yearName && (
-          <Badge variant="info" className="text-xs">
+          <Badge variant="neutral" className="text-xs">
             {date.yearName}
           </Badge>
         )}
@@ -177,7 +104,7 @@ export function TimeDisplay({
           </Badge>
         )}
         {weatherInfo && (
-          <Badge variant="info" className="text-xs">
+          <Badge variant="neutral" className="text-xs">
             <AppIcon
               name={getIconName(
                 WEATHER_ICONS,
