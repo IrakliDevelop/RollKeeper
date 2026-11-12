@@ -86,6 +86,18 @@ describe('LocationListCard', () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 
+  it('draws the link focus ring on the card root so overflow cannot clip it', () => {
+    const { container } = renderCard();
+    const root = container.firstElementChild as HTMLElement;
+    const link = screen.getByRole('link', { name: 'The Yawning Portal' });
+    expect(root).toHaveClass(
+      'has-[a:focus-visible]:ring-2',
+      'has-[a:focus-visible]:ring-brass-fill'
+    );
+    expect(link).toHaveClass('focus-visible:outline-none');
+    expect(link).not.toHaveClass('focus-visible:ring-2');
+  });
+
   it('shows "No image" without a map', () => {
     const { container } = renderCard({ ...LOCATION, mapImageUrl: '' });
     expect(screen.getByText('No image')).toBeInTheDocument();

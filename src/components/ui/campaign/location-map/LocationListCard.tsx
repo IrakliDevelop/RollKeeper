@@ -30,10 +30,10 @@ export function LocationListCard({
   }
 
   return (
-    <div className="bg-surface-raised border-divider relative overflow-hidden rounded-md border">
+    <div className="bg-surface-raised border-divider has-[a:focus-visible]:ring-brass-fill relative overflow-hidden rounded-md border has-[a:focus-visible]:ring-2">
       <Link
         href={`/dm/campaign/${campaignCode}/locations/${location.id}`}
-        className="focus-visible:ring-brass-fill block focus-visible:ring-2 focus-visible:outline-none"
+        className="block focus-visible:outline-none"
       >
         <div className="bg-surface-secondary h-40 w-full">
           {location.mapImageUrl ? (
@@ -48,7 +48,7 @@ export function LocationListCard({
             </div>
           )}
         </div>
-        <div className="flex items-center px-3 py-2 pr-14 pointer-coarse:min-h-11">
+        <div className="flex min-h-12 items-center px-3 py-2 pr-14 pointer-coarse:min-h-14">
           <p className="type-ui text-heading truncate">{location.name}</p>
         </div>
       </Link>

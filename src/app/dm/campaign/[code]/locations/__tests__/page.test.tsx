@@ -1,7 +1,17 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  clickConfirmDialogButton,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 import { useDmStore } from '@/store/dmStore';
 import { useLocationStore } from '@/store/locationStore';
 import { uploadAsset } from '@/utils/uploadAsset';
@@ -51,6 +61,7 @@ beforeEach(() => {
   vi.mocked(uploadAsset).mockReset();
   useLocationStore.setState({ locations: {} });
   useDmStore.setState({
+    dmId: 'dm-test-1',
     campaigns: [
       {
         code: 'K7QX2M',
@@ -147,8 +158,13 @@ describe('DM locations page', () => {
     await user.type(name, 'Cellar');
     const submit = screen.getByRole('button', { name: 'Create location' });
     expect(submit).toBeDisabled();
+    const onSubmit = vi.fn();
+    const form = document.querySelector('form') as HTMLFormElement;
+    form.addEventListener('submit', onSubmit);
     await user.keyboard('{Enter}');
+    expect(onSubmit).not.toHaveBeenCalled();
     expect(uploadAsset).not.toHaveBeenCalled();
+    form.removeEventListener('submit', onSubmit);
 
     await user.upload(
       fileInput,
@@ -208,6 +224,41 @@ describe('DM locations page', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('shows Uploading… and disables the submit button while the upload runs', async () => {
+    const user = userEvent.setup();
+    let rejectUpload: (reason: Error) => void = () => {};
+    vi.mocked(uploadAsset).mockReturnValue(
+      new Promise<string>((_resolve, reject) => {
+        rejectUpload = reject;
+      })
+    );
+    render(<CampaignLocationsPage />);
+    await user.click(
+      screen.getAllByRole('button', { name: 'New location' })[0]
+    );
+    await user.type(
+      await screen.findByRole('textbox', { name: /^Name/ }),
+      'Cellar'
+    );
+    await user.upload(
+      document.querySelector('input[type="file"]') as HTMLInputElement,
+      new File(['x'], 'portal.png', { type: 'image/png' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Create location' }));
+
+    const submit = await screen.findByRole('button', { name: 'Uploading…' });
+    expect(submit).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: 'Create location' })
+    ).toBeNull();
+
+    rejectUpload(new Error('boom'));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create location' })
+    ).toBeEnabled();
+  });
+
   it('lists saved locations as cards', () => {
     useLocationStore.setState({
       locations: { K7QX2M: { 'loc-1': LOCATION } },
@@ -218,6 +269,54 @@ describe('DM locations page', () => {
     expect(
       screen.getByRole('link', { name: 'The Yawning Portal' })
     ).toBeInTheDocument();
+  });
+
+  describe('deleting a location', () => {
+    beforeEach(() => {
+      useLocationStore.setState({
+        locations: { K7QX2M: { 'loc-1': LOCATION } },
+      });
+    });
+
+    it('removes the location and calls the delete API once confirmed', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null));
+      renderConfirmDialogHost();
+      render(<CampaignLocationsPage />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete The Yawning Portal' })
+      );
+      await clickConfirmDialogButton('Delete location');
+
+      expect(
+        useLocationStore.getState().locations.K7QX2M?.['loc-1']
+      ).toBeUndefined();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(url).toBe('/api/campaign/K7QX2M/locations/loc-1');
+      expect(init?.method).toBe('DELETE');
+      expect(JSON.parse(init?.body as string)).toEqual({ dmId: 'dm-test-1' });
+    });
+
+    it('keeps the location and sends nothing when the confirm is cancelled', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null));
+      renderConfirmDialogHost();
+      render(<CampaignLocationsPage />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete The Yawning Portal' })
+      );
+      await clickConfirmDialogButton('Cancel');
+
+      expect(useLocationStore.getState().locations.K7QX2M['loc-1']).toEqual(
+        LOCATION
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
   });
 
   it('drops the old wording', async () => {

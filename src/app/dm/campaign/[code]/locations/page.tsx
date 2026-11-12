@@ -153,7 +153,9 @@ export default function CampaignLocationsPage() {
                         {mapFile ? 'Change image' : 'Choose image'}
                       </Button>
                       {mapFile && (
-                        <p className="type-small text-muted">{mapFile.name}</p>
+                        <p className="type-small text-muted max-w-full min-w-0 truncate">
+                          {mapFile.name}
+                        </p>
                       )}
                       <input
                         ref={fileInputRef}
