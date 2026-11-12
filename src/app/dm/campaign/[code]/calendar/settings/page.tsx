@@ -18,19 +18,6 @@ export default function CalendarSettingsPage() {
   );
   const updateConfig = useCalendarStore(state => state.updateConfig);
 
-  if (!calendar) {
-    return (
-      <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-body mb-4">No calendar found for this campaign.</p>
-          <Link href={`/dm/campaign/${code}/calendar`}>
-            <Button variant="primary">Set Up Calendar</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   const handleSave = (config: CalendarConfig) => {
     updateConfig(code, config);
     router.push(`/dm/campaign/${code}/calendar`);
@@ -44,7 +31,21 @@ export default function CalendarSettingsPage() {
       />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <CalendarSettingsPanel config={calendar.config} onSave={handleSave} />
+        {calendar ? (
+          <CalendarSettingsPanel config={calendar.config} onSave={handleSave} />
+        ) : (
+          <div className="py-12 text-center">
+            <p className="type-subheading text-heading">
+              Choose a calendar first
+            </p>
+            <p className="type-body text-muted mt-2">
+              Settings open once this campaign has a calendar.
+            </p>
+            <Button asChild variant="primary" className="mt-4">
+              <Link href={`/dm/campaign/${code}/calendar`}>Open calendar</Link>
+            </Button>
+          </div>
+        )}
       </main>
     </div>
   );
