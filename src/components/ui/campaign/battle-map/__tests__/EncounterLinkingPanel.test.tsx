@@ -88,6 +88,9 @@ describe('EncounterLinkingPanel', () => {
     fireEvent.click(option);
     await waitFor(() => expect(onLink).toHaveBeenCalledWith(ids.Lair));
     expect(onLink).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('combobox')).toHaveTextContent(
+      'Link an encounter…'
+    );
   });
 
   it('hides the picker when every encounter is linked', () => {

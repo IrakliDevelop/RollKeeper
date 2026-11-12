@@ -260,6 +260,62 @@ describe('DM battle maps page', () => {
     ).toBeEnabled();
   });
 
+  describe('creating a battle map', () => {
+    beforeEach(() => {
+      vi.stubGlobal(
+        'Image',
+        class {
+          naturalWidth = 1200;
+          naturalHeight = 800;
+          onload?: () => void;
+          onerror?: () => void;
+          set src(_v: string) {
+            queueMicrotask(() => this.onload?.());
+          }
+        }
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('saves the map and opens it in the editor', async () => {
+      const user = userEvent.setup();
+      vi.mocked(uploadAsset).mockResolvedValue('/uploads/cellar.png');
+      render(<CampaignBattleMapsPage />);
+      await user.click(
+        screen.getAllByRole('button', { name: 'New battle map' })[0]
+      );
+      await user.type(
+        await screen.findByRole('textbox', { name: /^Name/ }),
+        'Cellar'
+      );
+      await user.upload(
+        document.querySelector('input[type="file"]') as HTMLInputElement,
+        new File(['x'], 'cellar.png', { type: 'image/png' })
+      );
+      await user.click(
+        screen.getByRole('button', { name: 'Create battle map' })
+      );
+
+      await waitFor(() => expect(mocks.push).toHaveBeenCalledTimes(1));
+      const maps = Object.values(
+        useBattleMapStore.getState().battleMaps.K7QX2M ?? {}
+      );
+      expect(maps).toHaveLength(1);
+      const [map] = maps;
+      expect(map.name).toBe('Cellar');
+      expect(map.mapImageUrl).toBe('/uploads/cellar.png');
+      expect(map.mapImageSize).toEqual({ w: 1200, h: 800 });
+      expect(map.canvasState).toBe('');
+      expect(map.linkedEncounterIds).toEqual([]);
+      expect(mocks.push).toHaveBeenCalledWith(
+        `/dm/campaign/K7QX2M/battlemaps/${map.id}`
+      );
+    });
+  });
+
   it('lists saved battle maps as cards', () => {
     useBattleMapStore.setState({
       battleMaps: { K7QX2M: { 'bm-1': BATTLE_MAP } },
