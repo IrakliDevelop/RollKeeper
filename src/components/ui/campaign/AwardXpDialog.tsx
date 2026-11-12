@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,12 @@ export function AwardXpDialog({
 }: AwardXpDialogProps) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
-  const [sending, setSending] = useState(false);
+  const [sendingKind, setSendingKind] = useState<'award' | 'resend' | null>(
+    null
+  );
+  const sending = sendingKind !== null;
+  const idBase = useId();
+  const playersId = `${idBase}-players`;
   const [outcomes, setOutcomes] = useState<Map<string, SendOutcome> | null>(
     null
   );
@@ -62,8 +67,11 @@ export function AwardXpDialog({
     }
   };
 
-  const sendAwards = async (targets: Map<string, DmXpAward>) => {
-    setSending(true);
+  const sendAwards = async (
+    targets: Map<string, DmXpAward>,
+    kind: 'award' | 'resend'
+  ) => {
+    setSendingKind(kind);
     const nextOutcomes = new Map(outcomes ?? []);
     const nextFailed = new Map(failedAwards);
     await Promise.all(
@@ -84,7 +92,7 @@ export function AwardXpDialog({
     if (nextFailed.size === 0) {
       setAmount(undefined);
     }
-    setSending(false);
+    setSendingKind(null);
   };
 
   const handleSend = () => {
@@ -100,80 +108,88 @@ export function AwardXpDialog({
         },
       ])
     );
-    sendAwards(targets);
+    sendAwards(targets, 'award');
   };
 
   const handleRetry = () => {
     if (failedAwards.size === 0) return;
-    sendAwards(new Map(failedAwards));
+    sendAwards(new Map(failedAwards), 'resend');
   };
 
   const playerName = (playerId: string) =>
     players.find(p => p.playerId === playerId)?.characterName ?? playerId;
 
+  const n = selectedPlayers.length;
+  const awardLabel =
+    n === 1 ? 'Award XP to 1 player' : `Award XP to ${n} players`;
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Award XP to Party</DialogTitle>
+          <DialogTitle>Award XP</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-4">
-          <div className="space-y-1">
-            <label
-              htmlFor="award-xp-amount"
-              className="text-body text-sm font-medium"
-            >
-              XP to add
-            </label>
-            <NumberInput
-              id="award-xp-amount"
-              value={amount}
-              onChange={setAmount}
-              min={1}
-              allowEmpty
-              placeholder="e.g. 300"
-            />
-          </div>
+          <NumberInput
+            id="award-xp-amount"
+            label="XP to add"
+            value={amount}
+            onChange={setAmount}
+            min={1}
+            allowEmpty
+            placeholder="300"
+          />
 
-          <div className="space-y-2">
-            <span className="text-body text-sm font-medium">Players</span>
-            {players.map(p => (
-              <label
-                key={p.playerId}
-                className="flex items-center gap-2 text-sm pointer-coarse:min-h-11"
-              >
-                <Checkbox
-                  checked={!excluded.has(p.playerId)}
-                  onCheckedChange={checked => {
-                    setExcluded(prev => {
-                      const next = new Set(prev);
-                      if (checked) next.delete(p.playerId);
-                      else next.add(p.playerId);
-                      return next;
-                    });
-                  }}
-                />
-                <span className="text-heading">{p.characterName}</span>
-                <span className="text-muted">({p.playerName})</span>
-                {outcomes?.get(p.playerId) === 'ok' && (
-                  <span className="text-accent-emerald-text text-xs">sent</span>
-                )}
-                {outcomes?.get(p.playerId) === 'failed' && (
-                  <span className="text-accent-red-text text-xs">failed</span>
-                )}
-              </label>
-            ))}
+          <div role="group" aria-labelledby={playersId} className="space-y-2">
+            <p id={playersId} className="type-ui text-heading">
+              Players
+            </p>
+            {players.map(p => {
+              const nameId = `${idBase}-name-${p.playerId}`;
+              const outcome = outcomes?.get(p.playerId);
+              return (
+                <label
+                  key={p.playerId}
+                  className="flex items-center gap-2 pointer-coarse:min-h-11"
+                >
+                  <Checkbox
+                    aria-labelledby={nameId}
+                    checked={!excluded.has(p.playerId)}
+                    onCheckedChange={checked => {
+                      setExcluded(prev => {
+                        const next = new Set(prev);
+                        if (checked) next.delete(p.playerId);
+                        else next.add(p.playerId);
+                        return next;
+                      });
+                    }}
+                  />
+                  <span id={nameId} className="type-ui text-heading">
+                    {p.characterName}
+                  </span>
+                  <span className="type-small text-muted">
+                    ({p.playerName})
+                  </span>
+                  {outcome === 'ok' && (
+                    <span className="type-small text-muted">Sent</span>
+                  )}
+                  {outcome === 'failed' && (
+                    <span className="type-small text-muted">Not sent</span>
+                  )}
+                </label>
+              );
+            })}
           </div>
 
           {failedAwards.size > 0 && (
-            <p className="text-accent-red-text text-sm">
-              Failed for: {[...failedAwards.keys()].map(playerName).join(', ')}
+            <p role="alert" className="type-small text-blood-text">
+              {`Not sent to ${[...failedAwards.keys()].map(playerName).join(', ')}. Resending gives them the same award.`}
             </p>
           )}
         </DialogBody>
         <DialogFooter>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => handleOpenChange(false)}
           >
@@ -181,12 +197,14 @@ export function AwardXpDialog({
           </Button>
           {failedAwards.size > 0 && (
             <Button
-              variant="warning"
+              variant="secondary"
               size="sm"
               onClick={handleRetry}
               disabled={sending}
             >
-              {sending ? 'Sending...' : 'Retry failed'}
+              {sendingKind === 'resend'
+                ? 'Sending…'
+                : `Resend to ${failedAwards.size}`}
             </Button>
           )}
           <Button
@@ -195,7 +213,7 @@ export function AwardXpDialog({
             onClick={handleSend}
             disabled={!valid || selectedPlayers.length === 0 || sending}
           >
-            {sending ? 'Sending...' : `Award to ${selectedPlayers.length}`}
+            {sendingKind === 'award' ? 'Sending…' : awardLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

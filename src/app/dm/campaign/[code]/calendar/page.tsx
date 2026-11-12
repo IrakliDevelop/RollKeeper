@@ -1,17 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, CalendarDays, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from '@/components/ui/layout/card';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
+import { Section } from '@/components/ui/layout/section';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import { CalendarPresetPicker } from '@/components/ui/calendar/CalendarPresetPicker';
 import { CalendarView } from '@/components/ui/calendar/CalendarView';
 import { CalendarSyncControls } from '@/components/ui/calendar/CalendarSyncControls';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -43,7 +38,6 @@ export default function CalendarPage() {
   const [selectedPreset, setSelectedPreset] = useState<string>(
     CALENDAR_PRESETS[0].id
   );
-  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const handleCreate = () => {
     const preset = CALENDAR_PRESETS.find(p => p.id === selectedPreset);
@@ -51,125 +45,69 @@ export default function CalendarPage() {
     initCalendar(code, preset.create());
   };
 
-  const handleReset = () => {
-    setConfirmingReset(true);
-  };
-
-  const handleConfirmReset = () => {
-    deleteCalendar(code);
-    setConfirmingReset(false);
+  const handleReset = async () => {
+    if (
+      await confirmDialog({
+        tone: 'danger',
+        title: 'Reset the calendar?',
+        message:
+          'Deletes the time, start date, settings and every event. Players keep the last synced calendar until you create a new one.',
+        confirmLabel: 'Reset calendar',
+      })
+    ) {
+      deleteCalendar(code);
+    }
   };
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Back to Campaign
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center gap-3">
-                <CalendarDays className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                <h1 className="text-heading text-xl font-bold">Calendar</h1>
-              </div>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
+      <CampaignHeader
+        crumb={{
+          href: `/dm/campaign/${code}`,
+          label: campaign?.name ?? 'Campaign',
+        }}
+        title={<h1 className="type-heading text-heading">Calendar</h1>}
+      />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        {confirmingReset && (
-          <Card className="mb-6">
-            <CardContent className="flex items-center justify-between p-4">
-              <p className="text-body">
-                Reset this calendar? All time progress and customizations will
-                be lost.
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setConfirmingReset(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="danger-solid"
-                  size="sm"
-                  onClick={handleConfirmReset}
-                >
-                  Reset Calendar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {exists ? (
           <>
-            <CalendarView campaignCode={code} onReset={handleReset} />
+            <CalendarView
+              campaignCode={code}
+              onReset={() => void handleReset()}
+            />
             {legacyProjection && (
-              <div className="mt-4 flex items-center gap-2 text-xs">
+              <div className="mt-4">
                 {syncError ? (
-                  <span className="text-accent-red-text flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    Sync error: {syncError}
-                  </span>
+                  <p role="alert" className="type-small text-blood-text">
+                    Couldn&apos;t sync the calendar to players. The next change
+                    will try again.
+                  </p>
                 ) : lastPushedAgo ? (
-                  <span className="text-muted">
+                  <p className="type-small text-muted">
                     Synced to players {lastPushedAgo}
-                  </span>
+                  </p>
                 ) : (
-                  <span className="text-faint">Syncing...</span>
+                  <p className="type-small text-muted">Syncing…</p>
                 )}
               </div>
             )}
           </>
         ) : (
-          <Card>
-            <CardHeader className="p-6">
-              <CardTitle>Set Up Campaign Calendar</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 p-6 pt-0">
-              <p className="text-body">
-                Choose a calendar preset to get started. You can fully customize
-                days, months, moons, and more in settings afterwards.
-              </p>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {CALENDAR_PRESETS.map(preset => (
-                  <button
-                    key={preset.id}
-                    onClick={() => setSelectedPreset(preset.id)}
-                    className={`rounded-lg border-2 p-4 text-left transition-all ${
-                      selectedPreset === preset.id
-                        ? 'border-accent-blue-border bg-accent-blue-bg'
-                        : 'border-divider bg-surface hover:bg-surface-secondary'
-                    }`}
-                  >
-                    <span className="text-heading font-semibold">
-                      {preset.name}
-                    </span>
-                    <p className="text-muted mt-1 text-xs">
-                      {getPresetDescription(preset.id)}
-                    </p>
-                  </button>
-                ))}
-              </div>
-
-              <Button variant="primary" onClick={handleCreate}>
-                Create Calendar
-              </Button>
-            </CardContent>
-          </Card>
+          <Section heading="Choose a calendar" contentClassName="space-y-4">
+            <p className="type-body text-muted">
+              Pick a calendar to start from. Months, week days, moons and eras
+              can be changed in settings.
+            </p>
+            <CalendarPresetPicker
+              value={selectedPreset}
+              onChange={setSelectedPreset}
+              aria-label="Choose a calendar"
+            />
+            <Button variant="primary" onClick={handleCreate}>
+              Create calendar
+            </Button>
+          </Section>
         )}
         {campaign && (
           <div className="mt-6">
@@ -179,19 +117,4 @@ export default function CalendarPage() {
       </main>
     </div>
   );
-}
-
-function getPresetDescription(id: string): string {
-  switch (id) {
-    case 'default':
-      return '7-day weeks, 12 months of 30 days, 4 seasons, 1 moon';
-    case 'harptos':
-      return 'Faer\u00fbn calendar with 10-day tendays, 5 holidays, Sel\u00fbne moon';
-    case 'greyhawk':
-      return '7-day weeks, 12 months of 28 days, 4 festivals, 2 moons';
-    case 'barovia':
-      return '7-day weeks, 12 months of 28 days, 28-day moon cycle';
-    default:
-      return '';
-  }
 }

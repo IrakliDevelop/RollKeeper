@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Send, User } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +10,10 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
+import {
+  RadioGroupField,
+  RadioGroupItem,
+} from '@/components/ui/forms/radio-group';
 import type { InventoryItem } from '@/types/character';
 import { formatRarity } from '@/utils/formatRarity';
 
@@ -28,6 +31,8 @@ interface SendItemDialogProps {
   targets: SendItemTarget[];
   onSend: (item: InventoryItem, target: SendItemTarget) => Promise<void>;
   sending?: boolean;
+  /** Shown under "Send to" when there is nobody to send to. */
+  emptyMessage?: string;
 }
 
 export function SendItemDialog({
@@ -37,6 +42,7 @@ export function SendItemDialog({
   targets,
   onSend,
   sending = false,
+  emptyMessage = 'No other players in this campaign',
 }: SendItemDialogProps) {
   const [selectedTarget, setSelectedTarget] = useState<SendItemTarget | null>(
     null
@@ -56,77 +62,68 @@ export function SendItemDialog({
     onClose();
   };
 
+  const detail = item
+    ? [
+        item.quantity > 1 && `Sends all ${item.quantity}`,
+        item.rarity && formatRarity(item.rarity),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Send item</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-4">
           {item && (
-            <div className="border-divider border-b pb-3">
-              <p className="text-heading text-sm font-bold">{item.name}</p>
-              {item.quantity > 1 && (
-                <p className="text-muted text-sm">Sends all {item.quantity}</p>
-              )}
-              {item.rarity && (
-                <p className="text-muted mt-1 text-sm">
-                  {formatRarity(item.rarity)}
-                </p>
-              )}
+            <div>
+              <p className="type-ui text-heading">{item.name}</p>
+              {detail && <p className="type-small text-muted">{detail}</p>}
             </div>
           )}
 
-          <div className="space-y-2">
-            <p className="text-body text-sm font-medium">Send to</p>
-            {targets.length === 0 ? (
-              <p className="text-muted text-sm">
-                No other players in this campaign
-              </p>
-            ) : (
-              <div className="space-y-1">
-                {targets.map(target => (
-                  <button
-                    key={target.playerId}
-                    type="button"
-                    onClick={() => setSelectedTarget(target)}
-                    aria-pressed={selectedTarget?.playerId === target.playerId}
-                    className={`border-divider flex w-full items-center gap-3 border-b p-3 text-left transition-colors ${
-                      selectedTarget?.playerId === target.playerId
-                        ? 'bg-surface-hover'
-                        : 'hover:bg-surface-hover'
-                    }`}
-                  >
-                    <div
-                      className="bg-surface-secondary rounded-full p-1.5"
-                      aria-hidden="true"
-                    >
-                      <User size={14} className="text-muted" />
-                    </div>
-                    <div>
-                      <p className="text-heading text-sm font-medium">
-                        {target.characterName}
-                      </p>
-                      <p className="text-muted text-xs">{target.playerName}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {targets.length === 0 ? (
+            <div className="space-y-2">
+              <p className="type-ui text-heading">Send to</p>
+              <p className="type-small text-muted">{emptyMessage}</p>
+            </div>
+          ) : (
+            <RadioGroupField
+              label="Send to"
+              value={selectedTarget?.playerId ?? ''}
+              onValueChange={id =>
+                setSelectedTarget(targets.find(t => t.playerId === id) ?? null)
+              }
+            >
+              {targets.map(target => (
+                <RadioGroupItem
+                  key={target.playerId}
+                  value={target.playerId}
+                  label={target.characterName}
+                  description={target.playerName}
+                />
+              ))}
+            </RadioGroupField>
+          )}
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button
             variant="primary"
             size="sm"
-            leftIcon={<Send size={14} />}
             onClick={handleSend}
             disabled={!selectedTarget || sending}
           >
-            {sending ? 'Sending…' : 'Send'}
+            {sending ? 'Sending…' : 'Send item'}
           </Button>
         </DialogFooter>
       </DialogContent>

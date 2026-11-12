@@ -176,3 +176,38 @@ describe('EventDialog marker section', () => {
     );
   });
 });
+
+describe('EventDialog form', () => {
+  it('keeps a typed title when defaultDate is a new but equal object', () => {
+    const { rerender } = render(<EventDialog {...baseProps} />);
+    const title = screen.getByRole('textbox', { name: /^Title/ });
+    fireEvent.change(title, { target: { value: 'Harvest moon' } });
+
+    rerender(
+      <EventDialog {...baseProps} defaultDate={{ year: 1, month: 0, day: 4 }} />
+    );
+
+    expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue(
+      'Harvest moon'
+    );
+  });
+
+  it('labels Year and Description', () => {
+    render(<EventDialog {...baseProps} />);
+    expect(screen.getByRole('textbox', { name: 'Year' })).toHaveValue('1');
+    const desc = screen.getByText('Description');
+    expect(desc.tagName).not.toBe('LABEL');
+    expect(desc).toHaveAttribute('aria-hidden', 'true');
+    expect(
+      screen.getByRole('textbox', { name: 'Description' })
+    ).toBeInTheDocument();
+  });
+
+  it('uses example placeholders', async () => {
+    render(<EventDialog {...baseProps} />);
+    expect(screen.getByPlaceholderText('Harvest festival')).toBeInTheDocument();
+    expect(
+      await screen.findByText('What happens that day')
+    ).toBeInTheDocument();
+  });
+});

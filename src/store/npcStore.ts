@@ -134,6 +134,16 @@ interface NPCStoreState {
     level: number,
     used: number
   ) => void;
+  /**
+   * Atomic slot spend from current store state: delta +1 spends, -1 restores.
+   * false = unknown NPC, no spellcasting, invalid delta, or clamped to no change.
+   */
+  spendNPCSpellSlot: (
+    campaignCode: string,
+    npcId: string,
+    level: number,
+    delta: number
+  ) => boolean;
   useNPCFreeCast: (
     campaignCode: string,
     npcId: string,
@@ -503,6 +513,45 @@ export const useNPCStore = create<NPCStoreState>()(
             },
           };
         });
+      },
+
+      spendNPCSpellSlot: (campaignCode, npcId, level, delta) => {
+        if (!Number.isInteger(delta) || delta === 0) return false;
+        const nextUsed = (npc: CampaignNPC | undefined): number | null => {
+          const spellcasting = npc?.spellcasting;
+          if (!spellcasting) return null;
+          const max =
+            getNPCSpellSlots(
+              spellcasting.casterLevel,
+              spellcasting.slotOverrides
+            )[level] ?? 0;
+          const current = spellcasting.slotsUsed[level] ?? 0;
+          const next = Math.max(0, Math.min(current + delta, max));
+          return next === current ? null : next;
+        };
+        if (nextUsed(get().getNPC(campaignCode, npcId)) === null) return false;
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc => {
+                if (npc.id !== npcId || !npc.spellcasting) return npc;
+                const next = nextUsed(npc);
+                if (next === null) return npc;
+                return {
+                  ...npc,
+                  spellcasting: {
+                    ...npc.spellcasting,
+                    slotsUsed: { ...npc.spellcasting.slotsUsed, [level]: next },
+                  },
+                  updatedAt: new Date().toISOString(),
+                };
+              }),
+            },
+          };
+        });
+        return true;
       },
 
       useNPCFreeCast: (campaignCode, npcId, spellId) => {

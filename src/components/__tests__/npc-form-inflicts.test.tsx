@@ -99,11 +99,13 @@ describe('NPCFormDialog — Inflicts section', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: /Stat Block/ }));
-    expect(screen.getByText('Inflicts')).toBeTruthy();
+    await user.click(screen.getByRole('tab', { name: 'Stat block' }));
+    expect(
+      screen.getByRole('region', { name: 'Conditions it inflicts' })
+    ).toBeTruthy();
     expect(screen.getByText('Webbed')).toBeTruthy();
 
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(
       onSave.mock.calls[0][0].monsterStatBlock.inflictableConditions
@@ -128,7 +130,7 @@ describe('NPCFormDialog — Inflicts section', () => {
         editingNpc={plain}
       />
     );
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
       'inflictableConditions' in onSave.mock.calls[0][0].monsterStatBlock
     ).toBe(false);

@@ -1,33 +1,24 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Coins } from 'lucide-react';
-import { NumberField } from '@/components/ui/forms/NumberInput';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import type { Currency } from '@/types/character';
 
-const COINS: Array<{
-  type: keyof Currency;
-  label: string;
-  classes: string;
-}> = [
-  {
-    type: 'platinum',
-    label: 'PP',
-    classes: 'text-slate-600 dark:text-slate-300',
-  },
-  { type: 'gold', label: 'GP', classes: 'text-amber-600 dark:text-amber-300' },
-  {
-    type: 'electrum',
-    label: 'EP',
-    classes: 'text-emerald-600 dark:text-emerald-300',
-  },
-  { type: 'silver', label: 'SP', classes: 'text-blue-600 dark:text-blue-300' },
-  {
-    type: 'copper',
-    label: 'CP',
-    classes: 'text-orange-600 dark:text-orange-300',
-  },
+const COINS: Array<{ type: keyof Currency; label: string }> = [
+  { type: 'platinum', label: 'PP' },
+  { type: 'gold', label: 'GP' },
+  { type: 'electrum', label: 'EP' },
+  { type: 'silver', label: 'SP' },
+  { type: 'copper', label: 'CP' },
 ];
+
+export const COIN_NAMES: Record<keyof Currency, string> = {
+  platinum: 'PP (platinum pieces)',
+  gold: 'GP (gold pieces)',
+  electrum: 'EP (electrum pieces)',
+  silver: 'SP (silver pieces)',
+  copper: 'CP (copper pieces)',
+};
 
 interface NPCCurrencyStripProps {
   currency: Currency;
@@ -49,34 +40,31 @@ export function NPCCurrencyStrip({
   labelExtra,
 }: NPCCurrencyStripProps) {
   return (
-    <section aria-label="NPC currency" className="space-y-1.5">
-      <div className="text-muted flex items-center justify-between gap-1.5 text-xs font-semibold">
-        <span className="flex items-center gap-1.5">
-          <Coins className="h-3.5 w-3.5" />
-          {label}
-        </span>
+    <section
+      aria-label="NPC currency"
+      className="min-w-0 flex-1 basis-[18rem] space-y-1.5"
+    >
+      <div className="type-small text-muted flex items-center justify-between gap-1.5">
+        <span>{label}</span>
         {labelExtra}
       </div>
-      <div className="border-divider bg-surface-secondary grid grid-cols-5 gap-px overflow-hidden rounded-lg border">
+      <div className="grid grid-cols-5 gap-2">
         {COINS.map(coin => (
-          <div
-            key={coin.type}
-            className="bg-surface flex min-w-0 items-center justify-center gap-1 px-1.5 py-1.5"
-          >
-            <span className={`text-[10px] font-bold ${coin.classes}`}>
-              {coin.label}
-            </span>
+          <div key={coin.type} className="flex min-w-0 flex-col gap-1">
+            <span className="type-small text-muted">{coin.label}</span>
             {readonly || !onChange ? (
-              <span className="text-heading min-w-0 truncate text-sm font-semibold tabular-nums">
+              <span className="type-ui text-heading truncate tabular-nums">
                 {currency[coin.type].toLocaleString()}
               </span>
             ) : (
-              <NumberField
-                aria-label={`${coin.label} balance`}
+              <NumberInput
+                size="sm"
+                min={0}
+                inputMode="numeric"
+                aria-label={COIN_NAMES[coin.type]}
                 value={currency[coin.type]}
                 onChange={value => onChange(coin.type, Math.max(0, value ?? 0))}
-                min={0}
-                className="h-7 min-w-0 border-0 bg-transparent px-1 text-right text-sm font-semibold tabular-nums shadow-none"
+                className="px-2 text-right tabular-nums"
               />
             )}
           </div>

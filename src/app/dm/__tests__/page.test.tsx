@@ -23,37 +23,16 @@ import {
 
 import DmDashboardPage from '../page';
 
-/**
- * Fix round 1, Important 1 (coordinator review): the real `BannerUpload`
- * `variant="card"` is display-only and never invokes `onBannerChange`, so a
- * DOM-only test cannot observe whether a routed campaign's write path is
- * wired to the live `updateCampaign` callback or a structural no-op. This
- * mock exposes a trigger button that calls whatever `onBannerChange` the
- * dashboard actually passed down, so tests can click it and assert on
- * `rollkeeper-dm-data` directly -- proving the wiring itself, not just
- * today's incidental lack of a clickable affordance.
- */
-vi.mock('@/components/ui/campaign/BannerUpload', () => ({
-  BannerUpload: ({
-    campaignCode,
-    bannerUrl,
-    onBannerChange,
-  }: {
-    campaignCode: string;
-    bannerUrl?: string;
-    onBannerChange: (url: string | undefined) => void;
-  }) => (
-    <div data-testid={`banner-upload-mock-${campaignCode}`}>
-      <span data-testid={`banner-url-${campaignCode}`}>{bannerUrl ?? ''}</span>
-      <button
-        type="button"
-        data-testid={`banner-upload-trigger-${campaignCode}`}
-        onClick={() => onBannerChange('https://example.test/new-banner.png')}
-      >
-        mock upload trigger
-      </button>
-    </div>
-  ),
+// The real `next/image` rejects hosts that aren't configured in
+// `next.config`, which jsdom tests don't load; stand in a plain <img>.
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => {
+    const rest = { ...props };
+    delete rest.fill;
+    delete rest.priority;
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...rest} />;
+  },
 }));
 
 function seedCampaignSettingsMarker(
@@ -221,20 +200,15 @@ describe('DmDashboardPage — migration wizard launcher (spec R2a)', () => {
 /**
  * Spec R2b: once a campaign's `campaign_settings` family is routed off
  * legacy (authority `indexedDB` or `postgres`), `/dm` must not offer a
- * *live* banner write or a legacy delete for that campaign -- both write
- * through `rollkeeper-dm-data`, which `createCampaignSettingsAwareDmStorage`
- * either silently reverts (banner) or which orphans IndexedDB/Postgres data
- * no longer reachable from legacy (delete). The routed check MUST be read
- * directly from the marker in localStorage, independent of the
+ * legacy delete for that campaign -- it writes through
+ * `rollkeeper-dm-data` and orphans IndexedDB/Postgres data no longer
+ * reachable from legacy. The routed check MUST be read directly from the
+ * marker in localStorage, independent of the
  * `NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE` client flag -- R8.3.
  *
- * Fix round 1, Important 1 (coordinator review): the banner image itself
- * keeps rendering for every campaign, routed or not -- `BannerUpload`
- * `variant="card"` is display-only today, so hiding the whole region closed
- * no reachable write and only regressed what a DM sees. What must be
- * disproven for a routed campaign is that the *callback* is wired to a real
- * write, which is why every banner assertion below goes through the mocked
- * trigger button rather than DOM presence/absence.
+ * The dashboard offers no banner upload for any campaign (banners are set
+ * on the campaign page), so there is no banner write path here to guard;
+ * the banner image itself still renders for every campaign that has one.
  */
 describe('DM dashboard — migrated campaigns (spec R2b)', () => {
   beforeEach(() => {
@@ -281,21 +255,18 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
 
     render(<DmDashboardPage />);
 
-    expect(
-      within(campaignCard('ALPHA')).getByTestId('banner-url-ALPHA')
-    ).toHaveTextContent('https://example.test/alpha-current.png');
+    expect(campaignCard('ALPHA').querySelector('img')).not.toBeNull();
   });
 
-  it('does not wire a live banner write for a campaign whose settings are routed', async () => {
+  it('offers no banner upload on the dashboard', () => {
     seedRoutedCampaignSettings('ALPHA');
-    const before = localStorage.getItem('rollkeeper-dm-data');
-
     render(<DmDashboardPage />);
-    await userEvent.click(
-      within(campaignCard('ALPHA')).getByTestId('banner-upload-trigger-ALPHA')
-    );
 
-    expect(localStorage.getItem('rollkeeper-dm-data')).toBe(before);
+    for (const code of ['ALPHA', 'BETA']) {
+      const card = campaignCard(code);
+      expect(card.querySelector('input[type="file"]')).toBeNull();
+      expect(within(card).queryByText(/banner/i)).toBeNull();
+    }
   });
 
   /**
@@ -346,13 +317,10 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
       name: /^manage$/i,
     });
     expect(manageLink).toHaveAttribute('href', '/dm/campaign/ALPHA');
-
-    const manageButton = manageLink.querySelector('button');
-    expect(manageButton).not.toBeNull();
-    // Pin the variant through Button's data-variant attribute, so a silent
-    // variant flip is caught even though both variants render as a
-    // `<button>` with the same accessible name.
-    expect(manageButton).toHaveAttribute('data-variant', 'outline');
+    // Pin the variant through Button's data-variant attribute (asChild puts
+    // it on the link itself), so a silent variant flip is caught even though
+    // both variants render with the same accessible name.
+    expect(manageLink).toHaveAttribute('data-variant', 'outline');
   });
 
   it('shows a Synced badge next to the code badge for a routed campaign', () => {
@@ -379,13 +347,10 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
     await userEvent.click(
       within(card).getByRole('link', { name: /^manage$/i })
     );
-    await userEvent.click(
-      within(card).getByTestId('banner-upload-trigger-ALPHA')
-    );
     expect(localStorage.getItem('rollkeeper-dm-data')).toBe(before);
   });
 
-  it('keeps the delete control hidden and the banner write inert when the family flag is turned off after migration', async () => {
+  it('keeps the delete control hidden when the family flag is turned off after migration', () => {
     seedRoutedCampaignSettings('ALPHA');
     process.env.NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE = 'false';
     const before = localStorage.getItem('rollkeeper-dm-data');
@@ -396,14 +361,10 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
     expect(
       within(card).queryByRole('button', { name: /delete/i })
     ).not.toBeInTheDocument();
-
-    await userEvent.click(
-      within(card).getByTestId('banner-upload-trigger-ALPHA')
-    );
     expect(localStorage.getItem('rollkeeper-dm-data')).toBe(before);
   });
 
-  it('returns the controls for a campaign that was rolled back (legacy_restored)', async () => {
+  it('returns the controls for a campaign that was rolled back (legacy_restored)', () => {
     seedRolledBackCampaignSettings('ALPHA');
     render(<DmDashboardPage />);
 
@@ -415,17 +376,9 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
     expect(
       within(card).getByRole('link', { name: /^open campaign$/i })
     ).toBeInTheDocument();
-
-    // The banner write is live again after rollback.
-    await userEvent.click(
-      within(card).getByTestId('banner-upload-trigger-ALPHA')
-    );
-    expect(
-      useDmStore.getState().campaigns.find(c => c.code === 'ALPHA')?.bannerUrl
-    ).toBe('https://example.test/new-banner.png');
   });
 
-  it('leaves the controls of an unmigrated campaign exactly as they were', async () => {
+  it('leaves the controls of an unmigrated campaign exactly as they were', () => {
     seedRoutedCampaignSettings('ALPHA');
     render(<DmDashboardPage />);
 
@@ -435,19 +388,137 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
     ).toBeInTheDocument();
     // Fix round 1, Important 2: an unmigrated campaign must not pick up
     // either the "Synced" badge (a false cloud-safety claim) or lose its
-    // "Open Campaign" label to "Manage".
+    // "Open campaign" label to "Manage".
     expect(within(card).queryByText(/^synced$/i)).not.toBeInTheDocument();
     expect(
       within(card).getByRole('link', { name: /^open campaign$/i })
     ).toBeInTheDocument();
+  });
+});
 
-    // The banner write is live for an unmigrated campaign.
-    await userEvent.click(
-      within(card).getByTestId('banner-upload-trigger-BETA')
+describe('DmDashboardPage — layout', () => {
+  beforeEach(() => {
+    useCharacterStore.setState({ hasHydrated: true });
+    useDmStore.setState({
+      dmId: 'dm-local',
+      campaigns: [
+        {
+          code: 'ALPHA',
+          name: 'Alpha Campaign',
+          createdAt: '2026-08-24T00:00:00.000Z',
+          bannerUrl: 'https://example.test/alpha.png',
+        },
+        {
+          code: 'BETA',
+          name: 'Beta Campaign',
+          createdAt: '2026-08-24T00:00:00.000Z',
+        },
+      ],
+    });
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new Error('no network in tests')
     );
+    delete process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE;
+    delete process.env.NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE;
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it('titles the page Campaigns', () => {
+    render(<DmDashboardPage />);
     expect(
-      useDmStore.getState().campaigns.find(c => c.code === 'BETA')?.bannerUrl
-    ).toBe('https://example.test/new-banner.png');
+      screen.getByRole('heading', { level: 1, name: 'Campaigns' })
+    ).toBeInTheDocument();
+  });
+
+  it('has one primary Create campaign button and a pluralised summary', () => {
+    render(<DmDashboardPage />);
+    const create = screen.getAllByRole('button', { name: 'Create campaign' });
+    expect(create).toHaveLength(1);
+    expect(create[0]).toHaveAttribute('data-variant', 'primary');
+    expect(
+      screen.getByText('2 campaigns · 0 players connected')
+    ).toBeInTheDocument();
+  });
+
+  it('uses singular nouns for one campaign and one player', async () => {
+    useDmStore.setState({
+      campaigns: [
+        {
+          code: 'ALPHA',
+          name: 'Alpha Campaign',
+          createdAt: '2026-08-24T00:00:00.000Z',
+        },
+      ],
+    });
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ players: [{}] }),
+    } as Response);
+    render(<DmDashboardPage />);
+    expect(
+      await screen.findByText('1 campaign · 1 player connected')
+    ).toBeInTheDocument();
+  });
+
+  it('shows the empty state with its own Create campaign button', () => {
+    useDmStore.setState({ campaigns: [] });
+    render(<DmDashboardPage />);
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: 'Create your first campaign',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: 'Create campaign' })
+    ).toHaveLength(1);
+    expect(
+      screen.getByText(
+        'Players join with the campaign code, and their characters appear on the campaign page.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows a banner only for campaigns that have one', () => {
+    render(<DmDashboardPage />);
+    expect(campaignCard('ALPHA').querySelector('img')).not.toBeNull();
+    expect(campaignCard('BETA').querySelector('img')).toBeNull();
+  });
+
+  it('names the icon actions after the campaign', () => {
+    render(<DmDashboardPage />);
+    const card = within(campaignCard('BETA'));
+    expect(
+      card.getByRole('button', { name: 'Export Beta Campaign' })
+    ).toBeInTheDocument();
+    expect(
+      card.getByRole('button', { name: 'Delete Beta Campaign' })
+    ).toHaveAttribute('data-variant', 'danger');
+    expect(
+      card.getByRole('button', { name: 'Copy code BETA' })
+    ).toBeInTheDocument();
+  });
+
+  it('titles each campaign card with an h2 under the page h1', () => {
+    render(<DmDashboardPage />);
+    expect(
+      screen
+        .getAllByRole('heading', { level: 2 })
+        .map(heading => heading.textContent)
+    ).toEqual(['Alpha Campaign', 'Beta Campaign']);
+  });
+
+  it('describes each Open campaign link by its card heading', () => {
+    render(<DmDashboardPage />);
+    const links = screen.getAllByRole('link', { name: 'Open campaign' });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAccessibleDescription('Alpha Campaign');
+    expect(links[1]).toHaveAccessibleDescription('Beta Campaign');
   });
 });
 

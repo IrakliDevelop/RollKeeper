@@ -1,17 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
-import {
-  SelectField,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-} from '@/components/ui/forms/select';
-import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
 import { CustomConditionFields } from '@/components/ui/encounter/custom-conditions/CustomConditionFields';
-import { CONDITION_ICON_REGISTRY } from '@/utils/conditionIconRegistry';
+import { NpcInflictsPicker, ADD_NEW, PLACEHOLDER } from './NpcInflictsPicker';
+import { NpcInflictsRow } from './NpcInflictsRow';
 import {
   createCustomCondition,
   resolveInflictableConditions,
@@ -20,11 +14,7 @@ import {
 
 import type { CustomCondition } from '@/types/encounter';
 
-// Add-picker sentinel: a Radix Select only fires onValueChange when its value
-// CHANGES, so the value is pinned to a placeholder that never updates (same
-// pattern as NpcResourcesEditor).
-const PLACEHOLDER = '__placeholder__';
-const ADD_NEW = '__new__';
+type PendingFocus = 'picker' | 'panel' | { remove: string } | null;
 
 const EMPTY_DRAFT: CustomConditionDraft = {
   name: '',
@@ -55,6 +45,10 @@ export function NpcInflictsEditor({
   onCreateInLibrary,
 }: NpcInflictsEditorProps) {
   const [draft, setDraft] = useState<CustomConditionDraft | null>(null);
+  const pickerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const removeButtons = useRef(new Map<string, HTMLButtonElement>());
+  const pendingFocus = useRef<PendingFocus>(null);
   const attachedIds = new Set(conditions.map(c => c.id));
   const available = library.filter(entry => !attachedIds.has(entry.id));
   const availableOfficial = officialConditions.filter(
@@ -65,9 +59,43 @@ export function NpcInflictsEditor({
     library
   );
 
+  // Focus moves after the add, remove, create or cancel has rendered. The
+  // panel move waits for the picker to close (see handlePickerCloseFocus).
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (!target || target === 'panel') return;
+    pendingFocus.current = null;
+    if (target === 'picker') pickerRef.current?.focus();
+    else removeButtons.current.get(target.remove)?.focus();
+  }, [draft, conditions]);
+
+  // Radix refocuses the picker trigger after it closes; "New condition…"
+  // sends focus to the panel's name field instead.
+  const handlePickerCloseFocus = (event: Event) => {
+    if (pendingFocus.current !== 'panel') return;
+    pendingFocus.current = null;
+    event.preventDefault();
+    panelRef.current
+      ?.querySelector<HTMLElement>('[aria-label="Condition name"]')
+      ?.focus();
+  };
+
+  const handleRemove = (id: string) => {
+    const index = resolved.findIndex(c => c.id === id);
+    const following = resolved[index + 1];
+    pendingFocus.current = following ? { remove: following.id } : 'picker';
+    onChange(conditions.filter(c => c.id !== id));
+  };
+
+  const handleCancel = () => {
+    pendingFocus.current = 'picker';
+    setDraft(null);
+  };
+
   const handleAdd = (value: string) => {
     if (value === PLACEHOLDER || !value) return;
     if (value === ADD_NEW) {
+      pendingFocus.current = 'panel';
       setDraft(EMPTY_DRAFT);
       return;
     }
@@ -85,97 +113,52 @@ export function NpcInflictsEditor({
       kind: draft.kind,
     });
     onCreateInLibrary(created);
+    pendingFocus.current = 'picker';
     onChange([...conditions, { ...created }]);
     setDraft(null);
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-heading text-sm font-medium">Inflicts</label>
-        <div className="w-56">
-          <SelectField
-            value={PLACEHOLDER}
-            onValueChange={handleAdd}
-            triggerProps={{ 'aria-label': 'Add inflicted condition' }}
-          >
-            <SelectItem value={PLACEHOLDER} disabled>
-              Add condition…
-            </SelectItem>
-            <SelectGroup>
-              <SelectLabel>Official conditions</SelectLabel>
-              {officialConditionsLoading ? (
-                <SelectItem value="__loading__" disabled>
-                  Loading official conditions…
-                </SelectItem>
-              ) : (
-                availableOfficial.map(entry => (
-                  <SelectItem
-                    key={entry.id}
-                    value={entry.id}
-                    description={entry.rulesSource}
-                  >
-                    {entry.name}
-                  </SelectItem>
-                ))
-              )}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>Custom conditions</SelectLabel>
-              {available.map(entry => (
-                <SelectItem key={entry.id} value={entry.id}>
-                  {entry.name}
-                </SelectItem>
-              ))}
-              <SelectItem value={ADD_NEW}>New condition…</SelectItem>
-            </SelectGroup>
-          </SelectField>
-        </div>
-      </div>
-
-      {resolved.length === 0 && !draft ? (
-        <p className="text-faint text-xs">
-          No inflicted conditions — attach official or custom effects this
-          creature can cause, and they appear as one-click options in combat.
+    <Section
+      level={3}
+      heading="Conditions it inflicts"
+      wrapHeading
+      trailing={
+        <NpcInflictsPicker
+          ref={pickerRef}
+          available={available}
+          availableOfficial={availableOfficial}
+          officialConditionsLoading={officialConditionsLoading}
+          onSelect={handleAdd}
+          onCloseAutoFocus={handlePickerCloseFocus}
+        />
+      }
+      contentClassName="space-y-3"
+    >
+      {resolved.length === 0 && !draft && (
+        <p className="type-body text-muted">
+          No conditions yet. Conditions you add here can be applied with one tap
+          in combat.
         </p>
-      ) : (
-        <div className="space-y-1">
-          {resolved.map(condition => {
-            const Icon = CONDITION_ICON_REGISTRY[condition.icon];
-            return (
-              <div
-                key={condition.id}
-                title={condition.description || undefined}
-                className="border-divider bg-surface-raised flex items-center gap-2 rounded-lg border px-2 py-1"
-              >
-                <Icon size={14} aria-hidden className="text-body shrink-0" />
-                <span className="text-body min-w-0 flex-1 truncate text-sm">
-                  {condition.name}
-                </span>
-                <Badge variant="neutral" size="sm">
-                  {condition.origin === 'official'
-                    ? condition.rulesSource || 'Official'
-                    : condition.kind}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  type="button"
-                  onClick={() =>
-                    onChange(conditions.filter(c => c.id !== condition.id))
-                  }
-                  aria-label={`Remove ${condition.name}`}
-                >
-                  <Trash2 size={14} className="text-muted" />
-                </Button>
-              </div>
-            );
-          })}
-        </div>
+      )}
+      {resolved.length > 0 && (
+        <ul className="divide-divider divide-y">
+          {resolved.map(condition => (
+            <NpcInflictsRow
+              key={condition.id}
+              condition={condition}
+              removeRef={node => {
+                if (node) removeButtons.current.set(condition.id, node);
+                else removeButtons.current.delete(condition.id);
+              }}
+              onRemove={() => handleRemove(condition.id)}
+            />
+          ))}
+        </ul>
       )}
 
       {draft && (
-        <div className="border-divider bg-surface-secondary space-y-2 rounded-lg border p-2">
+        <div ref={panelRef} className="border-divider space-y-3 border-t pt-3">
           <CustomConditionFields
             value={draft}
             onChange={changes =>
@@ -184,25 +167,25 @@ export function NpcInflictsEditor({
           />
           <div className="flex justify-end gap-2">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               type="button"
-              onClick={() => setDraft(null)}
+              onClick={handleCancel}
             >
               Cancel
             </Button>
             <Button
-              variant="primary"
+              variant="secondary"
               size="sm"
               type="button"
               onClick={handleCreate}
               disabled={!draft.name.trim()}
             >
-              Create & attach
+              Create and add
             </Button>
           </div>
         </div>
       )}
-    </div>
+    </Section>
   );
 }

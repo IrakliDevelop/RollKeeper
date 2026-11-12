@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { NPCCurrencyStrip } from '../NPCCurrencyStrip';
+import { COIN_NAMES, NPCCurrencyStrip } from '../NPCCurrencyStrip';
 
 const currency = {
   platinum: 1,
@@ -30,9 +30,12 @@ describe('NPCCurrencyStrip', () => {
     const onChange = vi.fn();
     render(<NPCCurrencyStrip currency={currency} onChange={onChange} />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'GP balance' }), {
-      target: { value: '-10' },
-    });
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'GP (gold pieces)' }),
+      {
+        target: { value: '-10' },
+      }
+    );
 
     expect(onChange).toHaveBeenCalledWith('gold', 0);
   });
@@ -50,5 +53,63 @@ describe('NPCCurrencyStrip', () => {
 
     expect(screen.getByText("Merchant's purse")).toBeInTheDocument();
     expect(screen.queryByText('Currency')).not.toBeInTheDocument();
+  });
+
+  it('names each coin input after the coin', () => {
+    render(<NPCCurrencyStrip currency={currency} onChange={vi.fn()} />);
+
+    expect(COIN_NAMES).toEqual({
+      platinum: 'PP (platinum pieces)',
+      gold: 'GP (gold pieces)',
+      electrum: 'EP (electrum pieces)',
+      silver: 'SP (silver pieces)',
+      copper: 'CP (copper pieces)',
+    });
+    for (const name of Object.values(COIN_NAMES)) {
+      expect(screen.getByRole('textbox', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('passes the typed amount to onChange', () => {
+    const onChange = vi.fn();
+    render(<NPCCurrencyStrip currency={currency} onChange={onChange} />);
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'GP (gold pieces)' }),
+      {
+        target: { value: '12' },
+      }
+    );
+
+    expect(onChange).toHaveBeenCalledWith('gold', 12);
+  });
+
+  it('uses no hue-named colour classes', () => {
+    const { container } = render(
+      <NPCCurrencyStrip currency={currency} onChange={vi.fn()} />
+    );
+
+    for (const el of Array.from(container.querySelectorAll('*'))) {
+      expect(el.getAttribute('class') ?? '').not.toMatch(
+        /(slate|amber|emerald|blue|orange)-/
+      );
+    }
+  });
+
+  it('shows a read-only balance with a thousands separator and no textbox', () => {
+    render(
+      <NPCCurrencyStrip currency={{ ...currency, gold: 1250 }} readonly />
+    );
+
+    expect(screen.getByText('1,250')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('keeps the NPC currency region', () => {
+    render(<NPCCurrencyStrip currency={currency} readonly />);
+
+    expect(
+      screen.getByRole('region', { name: 'NPC currency' })
+    ).toBeInTheDocument();
   });
 });

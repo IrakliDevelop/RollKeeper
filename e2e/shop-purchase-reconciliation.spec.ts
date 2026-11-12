@@ -397,10 +397,12 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     // ---- DM (admin tab): price the item, list it for sale, open the shop —
     //      the real UI action this task exists to prove ----
     await dmAdminPage.goto(dashboardUrl(code), { waitUntil: 'networkidle' });
-    await dmAdminPage.getByRole('heading', { name: MERCHANT_NAME }).click();
+    await dmAdminPage
+      .getByRole('button', { name: 'View', description: MERCHANT_NAME })
+      .click();
     const dmDialog1 = merchantDialog(dmAdminPage);
     await expect(dmDialog1).toBeVisible({ timeout: 10_000 });
-    await dmDialog1.getByRole('button', { name: 'Shop' }).click();
+    await dmDialog1.getByRole('tab', { name: 'Shop' }).click();
 
     const priceGpField = dmDialog1.getByRole('textbox', {
       name: `${ITEM_NAME} price (gp)`,
@@ -559,10 +561,12 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     //      layout), which drains this NPC's un-applied sales immediately on
     //      mount — no fixed wait for the 10s poll interval needed. ----
     await dmAdminPage.goto(dashboardUrl(code), { waitUntil: 'networkidle' });
-    await dmAdminPage.getByRole('heading', { name: MERCHANT_NAME }).click();
+    await dmAdminPage
+      .getByRole('button', { name: 'View', description: MERCHANT_NAME })
+      .click();
     const dmDialog2 = merchantDialog(dmAdminPage);
     await expect(dmDialog2).toBeVisible({ timeout: 10_000 });
-    await dmDialog2.getByRole('button', { name: 'Shop' }).click();
+    await dmDialog2.getByRole('tab', { name: 'Shop' }).click();
 
     // Stock decremented by the reconciled sale (1 -> 0) — Playwright's
     // `toHaveValue` retries until the drain's store update lands.
@@ -578,11 +582,15 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
       .poll(
         async () => {
           const [pp, gp, ep, sp, cp] = await Promise.all(
-            (['PP', 'GP', 'EP', 'SP', 'CP'] as const).map(label =>
-              dmDialog2
-                .getByRole('textbox', { name: `${label} balance` })
-                .inputValue()
-            )
+            (
+              [
+                'PP (platinum pieces)',
+                'GP (gold pieces)',
+                'EP (electrum pieces)',
+                'SP (silver pieces)',
+                'CP (copper pieces)',
+              ] as const
+            ).map(name => dmDialog2.getByRole('textbox', { name }).inputValue())
           );
           return (
             Number(pp) * CURRENCY_VALUES.platinum +

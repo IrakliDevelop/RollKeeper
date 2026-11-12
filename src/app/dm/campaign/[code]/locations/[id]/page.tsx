@@ -3,9 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, MapPinned } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { useLocationStore } from '@/store/locationStore';
@@ -25,8 +25,8 @@ export default function LocationEditorPage() {
 
   if (!hasHydrated) {
     return (
-      <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+      <div className="bg-surface flex min-h-dvh items-center justify-center">
+        <p className="text-muted">Loading location…</p>
       </div>
     );
   }
@@ -35,13 +35,14 @@ export default function LocationEditorPage() {
 
   if (!location) {
     return (
-      <div className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-heading text-lg font-semibold">Location not found</p>
-        <Link href={`/dm/campaign/${code}/locations`}>
-          <Button variant="ghost" leftIcon={<ArrowLeft size={16} />}>
-            Back to Locations
-          </Button>
-        </Link>
+      <div className="bg-surface flex min-h-dvh flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="type-subheading text-heading">Location not found</p>
+        <p className="type-body text-muted">
+          It was deleted, or the link is out of date.
+        </p>
+        <Button asChild variant="ghost" leftIcon={<ArrowLeft size={16} />}>
+          <Link href={`/dm/campaign/${code}/locations`}>Back to locations</Link>
+        </Button>
       </div>
     );
   }
@@ -59,34 +60,18 @@ export default function LocationEditorPage() {
   }
 
   return (
-    <div className="bg-surface flex h-screen flex-col overflow-hidden">
+    <div className="bg-surface flex h-dvh flex-col overflow-hidden">
       {campaign && (
         <CampaignSettingsSyncControls campaign={campaign} headless />
       )}
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}/locations`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Locations
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">
-                  {location.name}
-                </h1>
-              </div>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
+      <CampaignHeader
+        crumb={{ href: `/dm/campaign/${code}/locations`, label: 'Locations' }}
+        title={
+          <h1 className="type-heading text-heading truncate">
+            {location.name}
+          </h1>
+        }
+      />
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DmLocationEditor

@@ -1,26 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import {
-  Plus,
-  Crown,
-  Users,
-  ArrowLeft,
-  Check,
-  Trash2,
-  Clock,
-  Download,
-  CloudCog,
-  ShieldCheck,
-} from 'lucide-react';
+import { Plus, Trash2, Download, CloudCog } from 'lucide-react';
 import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { Card } from '@/components/ui/layout/card';
+import { AppHeader } from '@/components/ui/layout/AppHeader';
+import { CopyCodeButton } from '@/components/ui/campaign/CopyCodeButton';
 import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDialog';
 import { DmCloudWorkspaceControls } from '@/components/ui/campaign/DmCloudWorkspaceControls';
-import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { useHydration } from '@/hooks/useHydration';
 import {
   campaignSettingsProjectionAuthorityKey,
@@ -76,30 +67,11 @@ function campaignSettingsRouted(campaignCode: string): boolean {
   return marker?.authority === 'indexedDB' || marker?.authority === 'postgres';
 }
 
-/**
- * Fix round 1, Important 1 (coordinator review): `/dm` renders
- * `BannerUpload` with `variant="card"`, which is display-only today and
- * never invokes `onBannerChange` -- so hiding the whole banner region for a
- * routed campaign closed no reachable write path and only regressed the
- * banner image's visibility. The real hazard is defence-in-depth: if the
- * card variant ever grows edit controls, wiring the live callback would
- * silently revert through `createCampaignSettingsAwareDmStorage` exactly
- * as R2b describes. So the banner still renders for every campaign, and
- * ONLY the callback wiring is swapped for a routed campaign -- this
- * structurally closes the write path without depending on the card variant
- * staying display-only.
- */
-function noOpBannerChange(): void {
-  // Intentionally inert -- see doc comment above.
-}
-
 export default function DmDashboardPage() {
-  const { dmId, campaigns, addCampaign, removeCampaign, updateCampaign } =
-    useDmStore();
+  const { dmId, campaigns, addCampaign, removeCampaign } = useDmStore();
   const hasHydrated = useHydration();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [playerCounts, setPlayerCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -152,12 +124,6 @@ export default function DmDashboardPage() {
     removeCampaign(campaign.code);
   };
 
-  const handleCopyCode = async (code: string) => {
-    await navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
-
   const handleExportCampaign = async (campaign: CampaignInfo) => {
     try {
       const res = await fetch(`/api/campaign/${campaign.code}/players`);
@@ -194,7 +160,7 @@ export default function DmDashboardPage() {
   if (!hasHydrated) {
     return (
       <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+        <p className="text-muted">Loading campaigns…</p>
       </div>
     );
   }
@@ -203,141 +169,65 @@ export default function DmDashboardPage() {
     (sum, n) => sum + n,
     0
   );
+  const openCreateDialog = () => setCreateDialogOpen(true);
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Back to Home
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <Crown className="mr-3 h-6 w-6 text-purple-600 dark:text-purple-400" />
-                <h1 className="text-heading text-xl font-bold">DM Dashboard</h1>
-              </div>
-            </div>
-            <HeaderTrailing showSystemOption />
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        title={<h1 className="type-heading text-heading">Campaigns</h1>}
+      />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-heading mb-2 text-3xl font-bold">
-              Your Campaigns
-            </h1>
-            <p className="text-body">
-              Create and manage campaigns, track your players in real time
-            </p>
-          </div>
-          <Button
-            variant="primary"
-            leftIcon={<Plus size={18} />}
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            Create Campaign
-          </Button>
-        </div>
-
-        {/* Stats */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-6 shadow-md">
-            <div className="flex items-center">
-              <Crown className="text-accent-purple-text-muted mr-3 h-8 w-8" />
-              <div>
-                <h3
-                  className="text-heading text-2xl font-bold"
-                  suppressHydrationWarning
-                >
-                  {campaigns.length}
-                </h3>
-                <p className="text-body">Active Campaigns</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border-2 p-6 shadow-md">
-            <div className="flex items-center">
-              <Users className="text-accent-blue-text-muted mr-3 h-8 w-8" />
-              <div>
-                <h3
-                  className="text-heading text-2xl font-bold"
-                  suppressHydrationWarning
-                >
-                  {totalPlayers}
-                </h3>
-                <p className="text-body">Total Players</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-divider bg-surface-secondary rounded-lg border-2 p-6 shadow-md">
-            <div className="flex items-center">
-              <Clock className="text-muted mr-3 h-8 w-8" />
-              <div>
-                <h3
-                  className="text-heading text-2xl font-bold"
-                  suppressHydrationWarning
-                >
-                  {campaigns.length > 0
-                    ? new Date(
-                        campaigns[campaigns.length - 1].createdAt
-                      ).toLocaleDateString()
-                    : 'Not yet'}
-                </h3>
-                <p className="text-body">Latest Campaign</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <DmCloudWorkspaceControls campaigns={campaigns} dmId={dmId} />
-
-        {/* Campaign Grid */}
+      <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         {campaigns.length === 0 ? (
-          <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-12 text-center shadow-md">
-            <Crown size={64} className="text-faint mx-auto mb-6" />
-            <h3 className="text-heading mb-2 text-xl font-semibold">
-              No Campaigns Yet
-            </h3>
-            <p className="text-body mb-6">
-              Create your first campaign and invite your players to sync their
-              characters.
-            </p>
-            <Button
-              variant="primary"
-              leftIcon={<Plus size={20} />}
-              onClick={() => setCreateDialogOpen(true)}
-            >
-              Create Campaign
-            </Button>
-          </div>
+          <>
+            <DmCloudWorkspaceControls campaigns={campaigns} dmId={dmId} />
+            <div className="py-12 text-center">
+              <h2 className="type-subheading text-heading">
+                Create your first campaign
+              </h2>
+              <p className="type-body text-muted mx-auto mt-2 max-w-md">
+                Players join with the campaign code, and their characters appear
+                on the campaign page.
+              </p>
+              <Button
+                className="mt-4"
+                variant="primary"
+                leftIcon={<Plus size={18} aria-hidden />}
+                onClick={openCreateDialog}
+              >
+                Create campaign
+              </Button>
+            </div>
+          </>
         ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {campaigns.map(campaign => (
-              <CampaignCard
-                key={campaign.code}
-                campaign={campaign}
-                playerCount={playerCounts[campaign.code] ?? 0}
-                copiedCode={copiedCode}
-                onCopyCode={handleCopyCode}
-                onDelete={handleDeleteCampaign}
-                onExport={handleExportCampaign}
-                onBannerChange={url =>
-                  updateCampaign(campaign.code, { bannerUrl: url })
-                }
-              />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <Button
+                variant="primary"
+                leftIcon={<Plus size={18} aria-hidden />}
+                onClick={openCreateDialog}
+              >
+                Create campaign
+              </Button>
+              <p className="type-small text-muted">
+                {`${campaigns.length} ${campaigns.length === 1 ? 'campaign' : 'campaigns'} · ${totalPlayers} ${totalPlayers === 1 ? 'player' : 'players'} connected`}
+              </p>
+            </div>
+
+            <DmCloudWorkspaceControls campaigns={campaigns} dmId={dmId} />
+
+            <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {campaigns.map(campaign => (
+                <CampaignCard
+                  key={campaign.code}
+                  campaign={campaign}
+                  playerCount={playerCounts[campaign.code] ?? 0}
+                  onDelete={handleDeleteCampaign}
+                  onExport={handleExportCampaign}
+                />
+              ))}
+            </div>
+          </>
         )}
       </main>
 
@@ -354,19 +244,13 @@ export default function DmDashboardPage() {
 function CampaignCard({
   campaign,
   playerCount,
-  copiedCode,
-  onCopyCode,
   onDelete,
   onExport,
-  onBannerChange,
 }: {
   campaign: CampaignInfo;
   playerCount: number;
-  copiedCode: string | null;
-  onCopyCode: (code: string) => void;
   onDelete: (campaign: CampaignInfo) => void;
   onExport: (campaign: CampaignInfo) => void;
-  onBannerChange: (url: string | undefined) => void;
 }) {
   // Spec R2a: the launcher is flag-gated on the client, but the route it
   // links to (`/dm/migrate/[code]`) independently re-checks the SAME flag,
@@ -383,9 +267,9 @@ function CampaignCard({
   // picks which LAUNCHER copy to show, and the launcher itself is already
   // gated on the migration wizard's OWN flag above. This is intentionally a
   // DIFFERENT local than the module-level `campaignSettingsRouted` function
-  // below: R2b's banner/delete hardening must be independent of the family
-  // flag (R8.3), while this launcher-copy read may legitimately fall back
-  // to "not yet migrated" copy while the flag is off.
+  // below: R2b's delete hardening must be independent of the family flag
+  // (R8.3), while this launcher-copy read may legitimately fall back to
+  // "not yet migrated" copy while the flag is off.
   const campaignSettingsRoutedForLauncherCopy =
     campaignSettingsUsesIndexedDbAuthority(
       typeof window === 'undefined'
@@ -397,87 +281,70 @@ function CampaignCard({
   // comment above for why this must not reuse
   // `campaignSettingsUsesIndexedDbAuthority`.
   const routed = campaignSettingsRouted(campaign.code);
+  const nameId = `campaign-${campaign.code}-name`;
 
   return (
-    <div
+    <Card
       data-testid={`campaign-card-${campaign.code}`}
-      className="border-accent-purple-border bg-surface-raised hover:bg-surface-secondary rounded-lg border-2 shadow-md transition-all hover:shadow-xl"
+      padding="none"
+      className="min-w-0 overflow-hidden"
     >
-      <BannerUpload
-        bannerUrl={campaign.bannerUrl}
-        campaignCode={campaign.code}
-        onBannerChange={routed ? noOpBannerChange : onBannerChange}
-        variant="card"
-      />
-      <div className="p-6">
-        <div className="mb-4">
-          <h3 className="text-heading mb-2 text-xl font-semibold">
-            {campaign.name}
-          </h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onCopyCode(campaign.code)}
-              className="cursor-pointer"
-              title="Click to copy code"
+      {campaign.bannerUrl && (
+        <div className="relative h-24 w-full">
+          <Image
+            src={campaign.bannerUrl}
+            alt=""
+            fill
+            className="object-cover"
+            sizes="(max-width: 640px) 100vw, 33vw"
+          />
+        </div>
+      )}
+      <div className="p-4 sm:p-5">
+        <h2 id={nameId} className="type-subheading text-heading break-words">
+          {campaign.name}
+        </h2>
+        <p className="type-small text-body mt-1">
+          {playerCount} {playerCount === 1 ? 'player' : 'players'} connected
+        </p>
+        <p className="type-small text-muted mt-1">
+          Created {new Date(campaign.createdAt).toLocaleDateString()}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="type-small text-muted">Code</span>
+          <CopyCodeButton code={campaign.code} />
+          {routed && <Badge variant="success">Synced</Badge>}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-4">
+          {/* Spec R2b: once routed, this campaign's settings are owned by
+              the campaign-detail page's IndexedDB-aware controls, not by
+              this dashboard -- "Manage" links there instead of offering
+              the legacy "Open campaign" affordance. */}
+          <Button asChild size="sm" variant={routed ? 'outline' : 'secondary'}>
+            <Link
+              href={`/dm/campaign/${campaign.code}`}
+              aria-describedby={nameId}
             >
-              <Badge variant="info" className="font-mono tracking-wider">
-                {campaign.code}
-              </Badge>
-            </button>
-            {routed && (
-              <Badge variant="success" leftIcon={<ShieldCheck size={12} />}>
-                Synced
-              </Badge>
-            )}
-            {copiedCode === campaign.code && (
-              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                <Check size={12} /> Copied
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="text-body mb-4 space-y-1 text-sm">
-          <div className="flex items-center gap-2">
-            <Users size={14} className="text-muted" />
-            <span>
-              {playerCount} player{playerCount !== 1 ? 's' : ''} connected
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock size={14} className="text-muted" />
-            <span>
-              Created {new Date(campaign.createdAt).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link href={`/dm/campaign/${campaign.code}`} className="flex-1">
-            {/* Spec R2b: once routed, this campaign's settings are owned by
-                the campaign-detail page's IndexedDB-aware controls, not by
-                this dashboard -- "Manage" links there instead of offering
-                the legacy "Open Campaign" affordance. */}
-            <Button variant={routed ? 'outline' : 'secondary'} fullWidth>
-              {routed ? 'Manage' : 'Open Campaign'}
-            </Button>
-          </Link>
+              {routed ? 'Manage' : 'Open campaign'}
+            </Link>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onExport(campaign)}
-            title="Export Campaign"
+            aria-label={`Export ${campaign.name}`}
           >
-            <Download size={16} />
+            <Download size={16} aria-hidden />
           </Button>
           {!routed && (
             <Button
-              variant="ghost"
+              variant="danger"
               size="sm"
               onClick={() => onDelete(campaign)}
-              title="Delete Campaign"
+              aria-label={`Delete ${campaign.name}`}
             >
-              <Trash2 size={16} />
+              <Trash2 size={16} aria-hidden />
             </Button>
           )}
         </div>
@@ -504,6 +371,6 @@ function CampaignCard({
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

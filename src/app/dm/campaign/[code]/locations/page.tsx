@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import Link from 'next/link';
+import React, { useId, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, MapPinned, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +36,7 @@ export default function CampaignLocationsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imgLabelId = useId();
 
   const locations = hasHydrated ? getLocations(code) : [];
 
@@ -89,7 +89,7 @@ export default function CampaignLocationsPage() {
       setDialogOpen(false);
       router.push(`/dm/campaign/${code}/locations/${newId}`);
     } catch {
-      setUploadError('Failed to upload image. Please try again.');
+      setUploadError("Couldn't upload the map. Check the image and try again.");
     } finally {
       setUploading(false);
     }
@@ -98,146 +98,118 @@ export default function CampaignLocationsPage() {
   if (!hasHydrated) {
     return (
       <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+        <p className="text-muted">Loading locations…</p>
       </div>
     );
   }
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  {campaign?.name ?? 'Campaign'}
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">Locations</h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    leftIcon={<Plus size={16} />}
-                  >
-                    New Location
-                  </Button>
-                </DialogTrigger>
-                <DialogContent size="sm">
-                  <DialogHeader>
-                    <DialogTitle>New Location</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit}>
-                    <DialogBody className="flex flex-col gap-4 px-6 pt-4">
-                      <div>
-                        <label className="text-body mb-1.5 block text-sm font-medium">
-                          Location Name
-                        </label>
-                        <Input
-                          value={locationName}
-                          onChange={e => setLocationName(e.target.value)}
-                          placeholder="e.g. Tavern, Dungeon Level 1"
-                          required
-                          autoFocus
-                        />
-                      </div>
-                      <div>
-                        <label className="text-body mb-1.5 block text-sm font-medium">
-                          Map Image
-                        </label>
-                        <div
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`border-divider bg-surface hover:border-body flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
-                            mapFile ? 'border-accent-emerald-border' : ''
-                          }`}
-                        >
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            required
-                            onChange={e =>
-                              setMapFile(e.target.files?.[0] ?? null)
-                            }
-                            className="hidden"
-                          />
-                          {mapFile ? (
-                            <div className="flex flex-col items-center gap-1">
-                              <MapPinned
-                                size={24}
-                                className="text-accent-emerald-text"
-                              />
-                              <span className="text-body text-sm font-medium">
-                                {mapFile.name}
-                              </span>
-                              <span className="text-muted text-xs">
-                                Click to change
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center gap-1">
-                              <Plus size={24} className="text-muted" />
-                              <span className="text-body text-sm font-medium">
-                                Choose an image
-                              </span>
-                              <span className="text-muted text-xs">
-                                PNG, JPG, or WebP
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {uploadError && (
-                        <p className="text-accent-red-text text-sm">
-                          {uploadError}
-                        </p>
-                      )}
-                    </DialogBody>
-                    <DialogFooter className="mt-4">
+      <CampaignHeader
+        crumb={{
+          href: `/dm/campaign/${code}`,
+          label: campaign?.name ?? 'Campaign',
+        }}
+        title={<h1 className="type-heading text-heading">Locations</h1>}
+        actions={
+          <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+            <DialogTrigger asChild>
+              <Button variant="primary" size="sm" leftIcon={<Plus size={16} />}>
+                New location
+              </Button>
+            </DialogTrigger>
+            <DialogContent size="sm">
+              <DialogHeader>
+                <DialogTitle>New location</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <DialogBody className="flex flex-col gap-4">
+                  <Input
+                    label="Name"
+                    value={locationName}
+                    onChange={e => setLocationName(e.target.value)}
+                    placeholder="The Yawning Portal"
+                    required
+                    autoFocus
+                  />
+                  <div>
+                    <span
+                      id={imgLabelId}
+                      className="text-heading mb-1.5 block text-sm font-medium"
+                    >
+                      Map image
+                    </span>
+                    <div
+                      role="group"
+                      aria-labelledby={imgLabelId}
+                      className="flex flex-wrap items-center gap-2"
+                    >
                       <Button
                         type="button"
-                        variant="ghost"
-                        onClick={() => handleDialogClose(false)}
-                        disabled={uploading}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        Cancel
+                        {mapFile ? 'Change image' : 'Choose image'}
                       </Button>
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        disabled={uploading || !locationName.trim() || !mapFile}
-                      >
-                        {uploading ? 'Uploading...' : 'Create Location'}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-              <HeaderTrailing showSystemOption />
-            </div>
-          </div>
-        </div>
-      </header>
+                      {mapFile && (
+                        <p className="type-small text-muted max-w-full min-w-0 truncate">
+                          {mapFile.name}
+                        </p>
+                      )}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        onChange={e => setMapFile(e.target.files?.[0] ?? null)}
+                      />
+                    </div>
+                  </div>
+                  {uploadError && (
+                    <p role="alert" className="type-small text-blood-text">
+                      {uploadError}
+                    </p>
+                  )}
+                </DialogBody>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleDialogClose(false)}
+                    disabled={uploading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    loading={uploading}
+                    disabled={uploading || !locationName.trim() || !mapFile}
+                  >
+                    {uploading ? 'Uploading…' : 'Create location'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {locations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <MapPinned className="text-muted mb-4 h-12 w-12" />
-            <p className="text-heading mb-1 text-lg font-semibold">
-              No locations yet
+          <div className="py-12 text-center">
+            <p className="type-subheading text-heading">
+              Add your first location
             </p>
-            <p className="text-muted text-sm">Upload a map to get started.</p>
+            <p className="type-body text-muted mt-2">
+              Upload a map image to mark up and share with your players.
+            </p>
+            <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+              New location
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

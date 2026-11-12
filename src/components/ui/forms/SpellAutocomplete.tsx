@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { ProcessedSpell } from '@/types/spells';
 import { Search, X, Loader2 } from 'lucide-react';
 import {
@@ -21,6 +21,8 @@ interface SpellAutocompleteProps {
   loading?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  /** Visible label bound to the search input. Omit to render none. */
+  label?: string;
   className?: string;
 }
 
@@ -30,8 +32,10 @@ export function SpellAutocomplete({
   loading = false,
   disabled = false,
   placeholder = 'Search spells from spellbook...',
+  label,
   className = '',
 }: SpellAutocompleteProps) {
+  const inputId = useId();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -164,6 +168,15 @@ export function SpellAutocomplete({
         {loading && <Loader2 className="text-muted h-4 w-4 animate-spin" />}
       </div>
 
+      {label && (
+        <label
+          htmlFor={inputId}
+          className="text-heading mb-1.5 block text-sm font-medium"
+        >
+          {label}
+        </label>
+      )}
+
       {/* Selected spell display */}
       {selectedSpell && (
         <div className="border-divider mb-2 flex items-center justify-between border-b py-2">
@@ -203,6 +216,7 @@ export function SpellAutocomplete({
           <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <input
             ref={inputRef}
+            id={label ? inputId : undefined}
             type="text"
             value={query}
             onChange={handleInputChange}

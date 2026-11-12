@@ -58,20 +58,19 @@ export function JumpToDateDialog({
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Campaign Start Date</DialogTitle>
+          <DialogTitle>Campaign start date</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <p className="text-muted text-sm">
-            Set when the campaign begins. The day counter will be calculated
-            from this date. Current time will also move to this date.
+          <p className="type-small text-muted">
+            The day counter starts on this date, and the current time moves to
+            it.
           </p>
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-body mb-1 block text-sm font-medium">
-                Year
-              </label>
-              <NumberInput value={year} onChange={v => setYear(v ?? 0)} />
-            </div>
+            <NumberInput
+              label="Year"
+              value={year}
+              onChange={v => setYear(v ?? 0)}
+            />
             <SelectField
               label="Month"
               value={String(month)}
@@ -101,7 +100,7 @@ export function JumpToDateDialog({
             Cancel
           </Button>
           <Button variant="primary" size="sm" onClick={handleJump}>
-            Set Start Date
+            Set start date
           </Button>
         </DialogFooter>
       </DialogContent>

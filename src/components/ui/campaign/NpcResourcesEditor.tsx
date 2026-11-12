@@ -100,7 +100,7 @@ export function NpcResourcesEditor({
       }
     >
       {resources.length === 0 ? (
-        <p className="text-faint text-xs">
+        <p className="type-body text-muted">
           No class resources — add Wild Shape, Channel Divinity, or a custom
           pool, then link entries to it below.
         </p>
@@ -134,7 +134,6 @@ export function NpcResourcesEditor({
                     label="Max uses"
                     size="lg"
                     aria-label="Resource max uses"
-                    title="Maximum uses (required)"
                   />
                   <Button
                     type="button"

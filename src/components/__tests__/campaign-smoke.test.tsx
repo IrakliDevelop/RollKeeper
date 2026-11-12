@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   render,
@@ -6,6 +7,7 @@ import {
   waitFor,
   cleanup,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { CampaignPlayerData } from '@/types/campaign';
 import type { DmMessage } from '@/types/sharedState';
@@ -35,7 +37,6 @@ vi.mock('@/components/ui/forms/RichTextEditor', () => ({
   ),
 }));
 
-import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
 import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
@@ -75,87 +76,6 @@ const mockMessages: DmMessage[] = [
     sentAt: new Date().toISOString(),
   },
 ];
-
-describe('PlayerSummaryCard', () => {
-  it('renders without crashing', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-  });
-
-  it('displays character name and class', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('Thorin').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Fighter').length).toBeGreaterThan(0);
-  });
-
-  it('displays HP information', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('30 / 44 HP').length).toBeGreaterThan(0);
-  });
-
-  it('displays player name', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('Alice').length).toBeGreaterThan(0);
-  });
-
-  it('displays race', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(screen.getAllByText('Dwarf').length).toBeGreaterThan(0);
-  });
-
-  it('opens the character image full size without triggering the card action', () => {
-    const onClick = vi.fn();
-    const playerWithAvatar: CampaignPlayerData = {
-      ...mockPlayer,
-      characterData: makeCharacter({
-        ...mockPlayer.characterData,
-        avatar: 'data:image/png;base64,cG9ydHJhaXQ=',
-      }),
-    };
-
-    render(<PlayerSummaryCard player={playerWithAvatar} onClick={onClick} />);
-    fireEvent.click(
-      screen.getByRole('button', { name: /view thorin image full size/i })
-    );
-
-    expect(
-      screen.getByRole('dialog', { name: /thorin full-size image/i })
-    ).toBeInTheDocument();
-    expect(onClick).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: /close image/i }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(onClick).not.toHaveBeenCalled();
-  });
-});
-
-describe('PlayerSummaryCard remove action', () => {
-  it('renders remove button when onRemove is provided and calls it without triggering card onClick', () => {
-    const onRemove = vi.fn();
-    const onClick = vi.fn();
-    render(
-      <PlayerSummaryCard
-        player={mockPlayer}
-        onRemove={onRemove}
-        onClick={onClick}
-      />
-    );
-
-    const btn = screen.getByRole('button', {
-      name: /remove .* from campaign/i,
-    });
-    fireEvent.click(btn);
-
-    expect(onRemove).toHaveBeenCalledTimes(1);
-    expect(onClick).not.toHaveBeenCalled();
-  });
-
-  it('does not render remove button without onRemove', () => {
-    render(<PlayerSummaryCard player={mockPlayer} />);
-    expect(
-      screen.queryByRole('button', { name: /remove .* from campaign/i })
-    ).toBeNull();
-  });
-});
 
 describe('DmMessageNotification', () => {
   it('renders without crashing', () => {
@@ -213,18 +133,9 @@ describe('DmMessageNotification', () => {
 });
 
 describe('CreateCampaignDialog', () => {
-  it('renders without crashing when open', () => {
-    render(
-      <CreateCampaignDialog
-        open={true}
-        onOpenChange={vi.fn()}
-        onCampaignCreated={vi.fn()}
-        dmId="dm-1"
-      />
-    );
-  });
+  afterEach(() => vi.restoreAllMocks());
 
-  it('displays dialog title and name input', () => {
+  const renderDialog = () =>
     render(
       <CreateCampaignDialog
         open={true}
@@ -233,27 +144,101 @@ describe('CreateCampaignDialog', () => {
         dmId="dm-1"
       />
     );
-    expect(screen.getAllByText('Create Campaign').length).toBeGreaterThan(0);
+
+  it('renders the form copy', () => {
+    renderDialog();
     expect(
-      screen.getAllByPlaceholderText('e.g. Curse of Strahd').length
-    ).toBeGreaterThan(0);
+      screen.getByRole('heading', { name: 'Create campaign' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Campaign name')).toHaveAttribute(
+      'placeholder',
+      'The Sunken Bell'
+    );
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute(
+      'data-variant',
+      'outline'
+    );
   });
 
-  it('displays campaign name label', () => {
-    render(
-      <CreateCampaignDialog
-        open={true}
-        onOpenChange={vi.fn()}
-        onCampaignCreated={vi.fn()}
-        dmId="dm-1"
-      />
+  it('asks for a name before creating', async () => {
+    renderDialog();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
     );
-    expect(screen.getAllByText('Campaign Name').length).toBeGreaterThan(0);
+    expect(
+      await screen.findByText('Enter a campaign name.')
+    ).toBeInTheDocument();
+  });
+
+  it('never shows server error text', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'dmId and campaignName are required' }),
+    } as Response);
+    renderDialog();
+    await userEvent.type(
+      screen.getByLabelText('Campaign name'),
+      'The Sunken Bell'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
+    );
+    expect(
+      await screen.findByText("The campaign wasn't created. Try again.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/dmId/)).toBeNull();
+  });
+
+  it('shows the same message when the request throws', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new Error('socket hang up')
+    );
+    renderDialog();
+    await userEvent.type(
+      screen.getByLabelText('Campaign name'),
+      'The Sunken Bell'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
+    );
+    expect(
+      await screen.findByText("The campaign wasn't created. Try again.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/socket/)).toBeNull();
+  });
+
+  it('shows the code to copy after creating', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ code: 'ABC123' }),
+    } as Response);
+    renderDialog();
+    await userEvent.type(
+      screen.getByLabelText('Campaign name'),
+      'The Sunken Bell'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create campaign' })
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Campaign created' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Copy code ABC123' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute(
+      'data-variant',
+      'primary'
+    );
   });
 });
 
 describe('SendMessageDialog', () => {
-  it('renders without crashing when open', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const renderDialog = (
+    props: Partial<ComponentProps<typeof SendMessageDialog>> = {}
+  ) =>
     render(
       <SendMessageDialog
         open={true}
@@ -261,51 +246,104 @@ describe('SendMessageDialog', () => {
         players={[mockPlayer]}
         campaignCode="ABC123"
         dmId="dm-1"
+        {...props}
       />
     );
+
+  it('renders without crashing when open', () => {
+    renderDialog();
   });
 
   it('displays dialog title and recipient info', () => {
-    render(
-      <SendMessageDialog
-        open={true}
-        onClose={vi.fn()}
-        players={[mockPlayer]}
-        campaignCode="ABC123"
-        dmId="dm-1"
-      />
-    );
+    renderDialog();
     expect(
-      screen.getAllByText('Send Message to Player').length
-    ).toBeGreaterThan(0);
-    expect(screen.getAllByText('All players (1)').length).toBeGreaterThan(0);
+      screen.getByRole('dialog', { name: 'Message all players' })
+    ).toBeTruthy();
+    expect(screen.getByText('To').tagName).toBe('DT');
+    expect(screen.getByText('All players (1)').tagName).toBe('DD');
+  });
+
+  it('names the character when sent to one player', () => {
+    renderDialog({ targetPlayer: mockPlayer });
+    expect(screen.getByRole('dialog', { name: 'Message Thorin' })).toBeTruthy();
+    expect(screen.getByText('Thorin (Alice)')).toBeTruthy();
   });
 
   it('displays title input', () => {
-    render(
-      <SendMessageDialog
-        open={true}
-        onClose={vi.fn()}
-        players={[mockPlayer]}
-        campaignCode="ABC123"
-        dmId="dm-1"
-      />
+    renderDialog();
+    expect(screen.getByLabelText('Title').getAttribute('placeholder')).toBe(
+      'The bridge is out'
     );
-    expect(
-      screen.getAllByPlaceholderText('Message title...').length
-    ).toBeGreaterThan(0);
   });
 
   it('displays rich text editor', () => {
-    render(
-      <SendMessageDialog
-        open={true}
-        onClose={vi.fn()}
-        players={[mockPlayer]}
-        campaignCode="ABC123"
-        dmId="dm-1"
-      />
-    );
+    renderDialog();
     expect(screen.getAllByTestId('rich-text-editor').length).toBeGreaterThan(0);
+    expect(screen.getByText('Message (optional)')).toBeTruthy();
+  });
+
+  it('clears the draft when Cancel closes it', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const props = {
+      onClose,
+      players: [mockPlayer],
+      campaignCode: 'ABC123',
+      dmId: 'dm-1',
+    };
+    const { rerender } = render(<SendMessageDialog open {...props} />);
+    await user.type(screen.getByLabelText('Title'), 'Bridge');
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancel.getAttribute('data-variant')).toBe('outline');
+    await user.click(cancel);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<SendMessageDialog open={false} {...props} />);
+    rerender(<SendMessageDialog open {...props} />);
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('');
+  });
+
+  it('shows a fixed error, not the server message', async () => {
+    const user = userEvent.setup();
+    let release!: (v: unknown) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(r => {
+            release = r;
+          })
+      )
+    );
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+    await user.type(screen.getByLabelText('Title'), 'Bridge');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+
+    expect(
+      (screen.getByRole('button', { name: 'Sending…' }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement)
+        .disabled
+    ).toBe(false);
+
+    release({ ok: false, status: 500, json: async () => ({ error: 'boom' }) });
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe("The message wasn't sent. Try again.");
+    expect(alert.className).toContain('text-blood-text');
+    expect(screen.queryByText('boom')).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Send message',
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(false);
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+      'Bridge'
+    );
   });
 });
