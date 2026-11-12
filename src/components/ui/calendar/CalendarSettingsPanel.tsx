@@ -2,16 +2,11 @@
 
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from '@/components/ui/layout/card';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Section } from '@/components/ui/layout/section';
 import type { CalendarConfig } from '@/types/calendar';
 
 interface CalendarSettingsPanelProps {
@@ -19,15 +14,44 @@ interface CalendarSettingsPanelProps {
   onSave: (config: CalendarConfig) => void;
 }
 
+function RemoveRowButton({
+  label,
+  disabled,
+  className,
+  onClick,
+}: {
+  label: string;
+  disabled?: boolean;
+  className?: string;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-label={label}
+      disabled={disabled}
+      className={className}
+      onClick={onClick}
+    >
+      <Trash2 size={14} className="text-blood-text" aria-hidden="true" />
+    </Button>
+  );
+}
+
+/** A row's name for its remove button, or its position when the name is blank. */
+const rowLabel = (name: string, fallback: string) => name.trim() || fallback;
+
 export function CalendarSettingsPanel({
   config,
   onSave,
 }: CalendarSettingsPanelProps) {
   const [draft, setDraft] = useState<CalendarConfig>(config);
-  const visibleWeekStart =
-    (((draft.weekStartsOn ?? 0) % draft.weekDays.length) +
-      draft.weekDays.length) %
-    draft.weekDays.length;
+  const len = draft.weekDays.length;
+  const wrapIndex = (offset: number) => ((offset % len) + len) % len;
+  const visibleWeekStart = wrapIndex(draft.weekStartsOn ?? 0);
+  const yearStartIndex = wrapIndex(draft.yearStartWeekdayOffset);
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(config);
 
   const update = <K extends keyof CalendarConfig>(
     key: K,
@@ -39,15 +63,11 @@ export function CalendarSettingsPanel({
   const handleSave = () => onSave(draft);
 
   return (
-    <div className="space-y-6">
-      {/* Clock */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Clock</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4 p-4">
+    <div className="space-y-8">
+      <Section heading="Clock" level={2}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <NumberInput
-            label="Hours per Day"
+            label="Hours per day"
             min={1}
             value={draft.clock.hoursPerDay}
             onChange={v =>
@@ -58,7 +78,7 @@ export function CalendarSettingsPanel({
             }
           />
           <NumberInput
-            label="Minutes per Hour"
+            label="Minutes per hour"
             min={1}
             value={draft.clock.minutesPerHour}
             onChange={v =>
@@ -69,7 +89,7 @@ export function CalendarSettingsPanel({
             }
           />
           <NumberInput
-            label="Seconds per Minute"
+            label="Seconds per minute"
             min={1}
             value={draft.clock.secondsPerMinute}
             onChange={v =>
@@ -79,414 +99,393 @@ export function CalendarSettingsPanel({
               })
             }
           />
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
 
-      {/* Week Days */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Week Days</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 p-4">
+      <Section heading="Week days" level={2}>
+        <ul className="divide-divider divide-y">
           {draft.weekDays.map((wd, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
-                value={wd.name}
-                onChange={e => {
-                  const next = [...draft.weekDays];
-                  next[i] = { name: e.target.value };
-                  update('weekDays', next);
-                }}
-                className="flex-1"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (draft.weekDays.length <= 1) return;
-                  update(
-                    'weekDays',
-                    draft.weekDays.filter((_, j) => j !== i)
-                  );
-                }}
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
+            <li key={i} className="py-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  aria-label={`Day ${i + 1} name`}
+                  value={wd.name}
+                  onChange={e => {
+                    const next = [...draft.weekDays];
+                    next[i] = { name: e.target.value };
+                    update('weekDays', next);
+                  }}
+                  wrapperClassName="min-w-0 flex-[1_1_12rem]"
+                />
+                <RemoveRowButton
+                  label={`Remove ${rowLabel(wd.name, `day ${i + 1}`)}`}
+                  disabled={draft.weekDays.length <= 1}
+                  onClick={() => {
+                    if (draft.weekDays.length <= 1) return;
+                    update(
+                      'weekDays',
+                      draft.weekDays.filter((_, j) => j !== i)
+                    );
+                  }}
+                />
+              </div>
+            </li>
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Plus size={14} />}
-            onClick={() =>
-              update('weekDays', [...draft.weekDays, { name: 'New Day' }])
-            }
-          >
-            Add Day
-          </Button>
-        </CardContent>
-      </Card>
+        </ul>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Plus size={14} aria-hidden="true" />}
+          onClick={() =>
+            update('weekDays', [...draft.weekDays, { name: 'New day' }])
+          }
+        >
+          Add day
+        </Button>
+      </Section>
 
-      {/* Months */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Months</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 p-4">
+      <Section heading="Months" level={2}>
+        <ul className="divide-divider divide-y">
           {draft.months.map((m, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-muted w-6 shrink-0 text-center text-xs">
-                {i + 1}.
-              </span>
-              <Input
-                value={m.name}
-                onChange={e => {
-                  const next = [...draft.months];
-                  next[i] = { ...next[i], name: e.target.value };
-                  update('months', next);
-                }}
-                wrapperClassName="flex-1 min-w-0"
-              />
-              <NumberInput
-                min={1}
-                value={m.days}
-                onChange={v => {
-                  const next = [...draft.months];
-                  next[i] = { ...next[i], days: v ?? 1 };
-                  update('months', next);
-                }}
-                wrapperClassName="w-24"
-                rightIcon={<span className="text-muted text-xs">days</span>}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (draft.months.length <= 1) return;
-                  update(
-                    'months',
-                    draft.months.filter((_, j) => j !== i)
-                  );
-                }}
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
+            <li key={i} className="py-3">
+              <div className="flex items-center gap-3">
+                <span className="type-caption text-muted w-6 shrink-0 text-center">
+                  {i + 1}.
+                </span>
+                <Input
+                  aria-label={`Month ${i + 1} name`}
+                  value={m.name}
+                  onChange={e => {
+                    const next = [...draft.months];
+                    next[i] = { ...next[i], name: e.target.value };
+                    update('months', next);
+                  }}
+                  wrapperClassName="min-w-0 flex-[1_1_12rem]"
+                />
+                <NumberInput
+                  aria-label={`Days in ${rowLabel(m.name, `month ${i + 1}`)}`}
+                  min={1}
+                  value={m.days}
+                  onChange={v => {
+                    const next = [...draft.months];
+                    next[i] = { ...next[i], days: v ?? 1 };
+                    update('months', next);
+                  }}
+                  wrapperClassName="w-24"
+                  rightIcon={
+                    <span className="type-caption text-muted">days</span>
+                  }
+                />
+                <RemoveRowButton
+                  label={`Remove ${rowLabel(m.name, `month ${i + 1}`)}`}
+                  disabled={draft.months.length <= 1}
+                  onClick={() => {
+                    if (draft.months.length <= 1) return;
+                    update(
+                      'months',
+                      draft.months.filter((_, j) => j !== i)
+                    );
+                  }}
+                />
+              </div>
+            </li>
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Plus size={14} />}
-            onClick={() =>
-              update('months', [
-                ...draft.months,
-                { name: 'New Month', days: 30 },
-              ])
-            }
-          >
-            Add Month
-          </Button>
-        </CardContent>
-      </Card>
+        </ul>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Plus size={14} aria-hidden="true" />}
+          onClick={() =>
+            update('months', [...draft.months, { name: 'New month', days: 30 }])
+          }
+        >
+          Add month
+        </Button>
+      </Section>
 
-      {/* Seasons */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Seasons</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 p-4">
+      <Section heading="Seasons" level={2}>
+        <ul className="divide-divider divide-y">
           {draft.seasons.map((s, i) => (
-            <div
-              key={i}
-              className="bg-surface-secondary flex items-end gap-2 rounded p-3"
-            >
-              <Input
-                label="Name"
-                value={s.name}
-                onChange={e => {
-                  const next = [...draft.seasons];
-                  next[i] = { ...next[i], name: e.target.value };
-                  update('seasons', next);
-                }}
-                wrapperClassName="flex-1 min-w-0"
-              />
-              <NumberInput
-                label="Start Day"
-                min={0}
-                value={s.startDay}
-                onChange={v => {
-                  const next = [...draft.seasons];
-                  next[i] = {
-                    ...next[i],
-                    startDay: v ?? 0,
-                  };
-                  update('seasons', next);
-                }}
-                wrapperClassName="w-20"
-              />
-              <NumberInput
-                label="End Day"
-                min={0}
-                value={s.endDay}
-                onChange={v => {
-                  const next = [...draft.seasons];
-                  next[i] = { ...next[i], endDay: v ?? 0 };
-                  update('seasons', next);
-                }}
-                wrapperClassName="w-20"
-              />
-              <NumberInput
-                label="Sunrise"
-                min={0}
-                value={s.sunriseHour}
-                onChange={v => {
-                  const next = [...draft.seasons];
-                  next[i] = {
-                    ...next[i],
-                    sunriseHour: v ?? 0,
-                  };
-                  update('seasons', next);
-                }}
-                wrapperClassName="w-20"
-              />
-              <NumberInput
-                label="Sunset"
-                min={0}
-                value={s.sunsetHour}
-                onChange={v => {
-                  const next = [...draft.seasons];
-                  next[i] = {
-                    ...next[i],
-                    sunsetHour: v ?? 0,
-                  };
-                  update('seasons', next);
-                }}
-                wrapperClassName="w-20"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  update(
-                    'seasons',
-                    draft.seasons.filter((_, j) => j !== i)
-                  )
-                }
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
+            <li key={i} className="py-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <Input
+                  label="Name"
+                  value={s.name}
+                  onChange={e => {
+                    const next = [...draft.seasons];
+                    next[i] = { ...next[i], name: e.target.value };
+                    update('seasons', next);
+                  }}
+                  wrapperClassName="min-w-0 flex-[1_1_12rem]"
+                />
+                <NumberInput
+                  label="Start day"
+                  min={0}
+                  value={s.startDay}
+                  onChange={v => {
+                    const next = [...draft.seasons];
+                    next[i] = {
+                      ...next[i],
+                      startDay: v ?? 0,
+                    };
+                    update('seasons', next);
+                  }}
+                  wrapperClassName="w-20"
+                />
+                <NumberInput
+                  label="End day"
+                  min={0}
+                  value={s.endDay}
+                  onChange={v => {
+                    const next = [...draft.seasons];
+                    next[i] = { ...next[i], endDay: v ?? 0 };
+                    update('seasons', next);
+                  }}
+                  wrapperClassName="w-20"
+                />
+                <NumberInput
+                  label="Sunrise (hour)"
+                  min={0}
+                  max={draft.clock.hoursPerDay - 1}
+                  value={s.sunriseHour}
+                  onChange={v => {
+                    const next = [...draft.seasons];
+                    next[i] = {
+                      ...next[i],
+                      sunriseHour: v ?? 0,
+                    };
+                    update('seasons', next);
+                  }}
+                  wrapperClassName="w-24"
+                />
+                <NumberInput
+                  label="Sunset (hour)"
+                  min={0}
+                  max={draft.clock.hoursPerDay - 1}
+                  value={s.sunsetHour}
+                  onChange={v => {
+                    const next = [...draft.seasons];
+                    next[i] = {
+                      ...next[i],
+                      sunsetHour: v ?? 0,
+                    };
+                    update('seasons', next);
+                  }}
+                  wrapperClassName="w-24"
+                />
+                <RemoveRowButton
+                  label={`Remove ${rowLabel(s.name, `season ${i + 1}`)}`}
+                  onClick={() =>
+                    update(
+                      'seasons',
+                      draft.seasons.filter((_, j) => j !== i)
+                    )
+                  }
+                />
+              </div>
+            </li>
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Plus size={14} />}
-            onClick={() =>
-              update('seasons', [
-                ...draft.seasons,
-                {
-                  name: 'New Season',
-                  startDay: 0,
-                  endDay: 89,
-                  sunriseHour: 6,
-                  sunsetHour: 18,
-                },
-              ])
-            }
-          >
-            Add Season
-          </Button>
-        </CardContent>
-      </Card>
+        </ul>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Plus size={14} aria-hidden="true" />}
+          onClick={() =>
+            update('seasons', [
+              ...draft.seasons,
+              {
+                name: 'New season',
+                startDay: 0,
+                endDay: 89,
+                sunriseHour: 6,
+                sunsetHour: 18,
+              },
+            ])
+          }
+        >
+          Add season
+        </Button>
+      </Section>
 
-      {/* Moons */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Moons</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 p-4">
+      <Section heading="Moons" level={2}>
+        <ul className="divide-divider divide-y">
           {draft.moons.map((m, i) => (
-            <div
-              key={i}
-              className="bg-surface-secondary flex items-start gap-2 rounded p-3"
-            >
-              <Input
-                label="Name"
-                value={m.name}
-                onChange={e => {
-                  const next = [...draft.moons];
-                  next[i] = { ...next[i], name: e.target.value };
-                  update('moons', next);
-                }}
-                wrapperClassName="flex-1 min-w-0"
-                helperText="&nbsp;"
-              />
-              <NumberInput
-                label="Period"
-                min={1}
-                value={m.period}
-                onChange={v => {
-                  const next = [...draft.moons];
-                  next[i] = { ...next[i], period: v ?? 1 };
-                  update('moons', next);
-                }}
-                wrapperClassName="w-20"
-                helperText="Days per cycle"
-              />
-              <NumberInput
-                label="Offset"
-                value={m.phaseOffset}
-                onChange={v => {
-                  const next = [...draft.moons];
-                  next[i] = {
-                    ...next[i],
-                    phaseOffset: v ?? 0,
-                  };
-                  update('moons', next);
-                }}
-                wrapperClassName="w-24"
-                helperText="First new moon day"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-6"
-                onClick={() =>
-                  update(
-                    'moons',
-                    draft.moons.filter((_, j) => j !== i)
-                  )
-                }
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
+            <li key={i} className="py-3">
+              <div className="flex flex-wrap items-start gap-3">
+                <Input
+                  label="Name"
+                  value={m.name}
+                  onChange={e => {
+                    const next = [...draft.moons];
+                    next[i] = { ...next[i], name: e.target.value };
+                    update('moons', next);
+                  }}
+                  wrapperClassName="min-w-0 flex-[1_1_12rem]"
+                />
+                <NumberInput
+                  label="Period"
+                  min={1}
+                  value={m.period}
+                  onChange={v => {
+                    const next = [...draft.moons];
+                    next[i] = { ...next[i], period: v ?? 1 };
+                    update('moons', next);
+                  }}
+                  wrapperClassName="w-20"
+                  helperText="Days per cycle"
+                />
+                <NumberInput
+                  label="Offset"
+                  value={m.phaseOffset}
+                  onChange={v => {
+                    const next = [...draft.moons];
+                    next[i] = {
+                      ...next[i],
+                      phaseOffset: v ?? 0,
+                    };
+                    update('moons', next);
+                  }}
+                  wrapperClassName="w-24"
+                  helperText="First new moon day"
+                />
+                <RemoveRowButton
+                  label={`Remove ${rowLabel(m.name, `moon ${i + 1}`)}`}
+                  className="mt-6.5"
+                  onClick={() =>
+                    update(
+                      'moons',
+                      draft.moons.filter((_, j) => j !== i)
+                    )
+                  }
+                />
+              </div>
+            </li>
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Plus size={14} />}
-            onClick={() =>
-              update('moons', [
-                ...draft.moons,
-                {
-                  name: 'New Moon',
-                  color: '#C0C0C0',
-                  phaseOffset: 0,
-                  period: 28,
-                },
-              ])
-            }
-          >
-            Add Moon
-          </Button>
-        </CardContent>
-      </Card>
+        </ul>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Plus size={14} aria-hidden="true" />}
+          onClick={() =>
+            update('moons', [
+              ...draft.moons,
+              {
+                name: 'New moon',
+                color: '#C0C0C0',
+                phaseOffset: 0,
+                period: 28,
+              },
+            ])
+          }
+        >
+          Add moon
+        </Button>
+      </Section>
 
-      {/* Eras */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Eras</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 p-4">
+      <Section heading="Eras" level={2}>
+        <ul className="divide-divider divide-y">
           {draft.eras.map((e, i) => (
-            <div key={i} className="flex items-end gap-2">
-              <Input
-                label="Name"
-                value={e.name}
-                onChange={ev => {
-                  const next = [...draft.eras];
-                  next[i] = { ...next[i], name: ev.target.value };
-                  update('eras', next);
-                }}
-                wrapperClassName="flex-1 min-w-0"
-              />
-              <Input
-                label="Abbr"
-                value={e.abbreviation}
-                onChange={ev => {
-                  const next = [...draft.eras];
-                  next[i] = { ...next[i], abbreviation: ev.target.value };
-                  update('eras', next);
-                }}
-                wrapperClassName="w-20"
-              />
-              <NumberInput
-                label="Start Year"
-                value={e.startYear}
-                onChange={v => {
-                  const next = [...draft.eras];
-                  next[i] = {
-                    ...next[i],
-                    startYear: v ?? 0,
-                  };
-                  update('eras', next);
-                }}
-                wrapperClassName="w-24"
-              />
-              <NumberInput
-                label="End Year"
-                allowEmpty
-                value={e.endYear}
-                onChange={v => {
-                  const next = [...draft.eras];
-                  next[i] = { ...next[i], endYear: v };
-                  update('eras', next);
-                }}
-                wrapperClassName="w-24"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  update(
-                    'eras',
-                    draft.eras.filter((_, j) => j !== i)
-                  )
-                }
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
+            <li key={i} className="py-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <Input
+                  label="Name"
+                  value={e.name}
+                  onChange={ev => {
+                    const next = [...draft.eras];
+                    next[i] = { ...next[i], name: ev.target.value };
+                    update('eras', next);
+                  }}
+                  wrapperClassName="min-w-0 flex-[1_1_12rem]"
+                />
+                <Input
+                  label="Abbreviation"
+                  value={e.abbreviation}
+                  onChange={ev => {
+                    const next = [...draft.eras];
+                    next[i] = { ...next[i], abbreviation: ev.target.value };
+                    update('eras', next);
+                  }}
+                  wrapperClassName="w-24"
+                />
+                <NumberInput
+                  label="Start year"
+                  value={e.startYear}
+                  onChange={v => {
+                    const next = [...draft.eras];
+                    next[i] = {
+                      ...next[i],
+                      startYear: v ?? 0,
+                    };
+                    update('eras', next);
+                  }}
+                  wrapperClassName="w-24"
+                />
+                <NumberInput
+                  label="End year"
+                  allowEmpty
+                  value={e.endYear}
+                  onChange={v => {
+                    const next = [...draft.eras];
+                    next[i] = { ...next[i], endYear: v };
+                    update('eras', next);
+                  }}
+                  wrapperClassName="w-24"
+                />
+                <RemoveRowButton
+                  label={`Remove ${rowLabel(e.name, `era ${i + 1}`)}`}
+                  onClick={() =>
+                    update(
+                      'eras',
+                      draft.eras.filter((_, j) => j !== i)
+                    )
+                  }
+                />
+              </div>
+            </li>
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Plus size={14} />}
-            onClick={() =>
-              update('eras', [
-                ...draft.eras,
-                { name: 'New Era', abbreviation: 'NE', startYear: 1 },
-              ])
-            }
-          >
-            Add Era
-          </Button>
-        </CardContent>
-      </Card>
+        </ul>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Plus size={14} aria-hidden="true" />}
+          onClick={() =>
+            update('eras', [
+              ...draft.eras,
+              { name: 'New era', abbreviation: 'NE', startYear: 1 },
+            ])
+          }
+        >
+          Add era
+        </Button>
+      </Section>
 
-      {/* Year & Mechanics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Year & Mechanics</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 p-4 lg:grid-cols-3">
+      <Section heading="Year and mechanics" level={2}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <NumberInput
-            label="Starting Year"
+            label="Starting year"
             value={draft.yearOffset}
             onChange={v => update('yearOffset', v ?? 0)}
-            helperText="The year number shown at time zero"
-          />
-          <NumberInput
-            label="Year Starts On"
-            min={0}
-            max={draft.weekDays.length - 1}
-            value={draft.yearStartWeekdayOffset}
-            onChange={v => update('yearStartWeekdayOffset', v ?? 0)}
-            helperText={`Weekday index for the first date (0 = ${draft.weekDays[0]?.name ?? 'first day'})`}
+            helperText="The year number at the calendar's first day."
           />
           <SelectField
-            label="Week Starts On"
+            label="Year starts on"
+            value={String(yearStartIndex)}
+            onValueChange={value =>
+              update('yearStartWeekdayOffset', Number(value))
+            }
+            helperText="Weekday of the calendar's first day."
+          >
+            {draft.weekDays.map((weekday, index) => (
+              <SelectItem
+                key={`${weekday.name}-${index}`}
+                value={String(index)}
+              >
+                {weekday.name}
+              </SelectItem>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Week starts on"
             value={String(visibleWeekStart)}
             onValueChange={value => update('weekStartsOn', Number(value))}
             helperText="The first column in month view"
@@ -501,7 +500,7 @@ export function CalendarSettingsPanel({
             ))}
           </SelectField>
           <NumberInput
-            label="Long Rest (hours)"
+            label="Long rest (hours)"
             min={1}
             value={draft.mechanics.hoursPerLongRest}
             onChange={v =>
@@ -512,7 +511,7 @@ export function CalendarSettingsPanel({
             }
           />
           <NumberInput
-            label="Short Rest (minutes)"
+            label="Short rest (minutes)"
             min={1}
             value={draft.mechanics.minutesPerShortRest}
             onChange={v =>
@@ -533,16 +532,19 @@ export function CalendarSettingsPanel({
               })
             }
           />
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
 
-      {/* Save */}
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={() => setDraft(config)}>
-          Reset
+        <Button
+          variant="outline"
+          disabled={!isDirty}
+          onClick={() => setDraft(config)}
+        >
+          Discard changes
         </Button>
         <Button variant="primary" onClick={handleSave}>
-          Save Changes
+          Save changes
         </Button>
       </div>
     </div>
