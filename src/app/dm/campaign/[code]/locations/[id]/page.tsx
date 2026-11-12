@@ -25,8 +25,8 @@ export default function LocationEditorPage() {
 
   if (!hasHydrated) {
     return (
-      <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+      <div className="bg-surface flex min-h-dvh items-center justify-center">
+        <p className="text-muted">Loading location…</p>
       </div>
     );
   }
@@ -35,13 +35,14 @@ export default function LocationEditorPage() {
 
   if (!location) {
     return (
-      <div className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-heading text-lg font-semibold">Location not found</p>
-        <Link href={`/dm/campaign/${code}/locations`}>
-          <Button variant="ghost" leftIcon={<ArrowLeft size={16} />}>
-            Back to Locations
-          </Button>
-        </Link>
+      <div className="bg-surface flex min-h-dvh flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="type-subheading text-heading">Location not found</p>
+        <p className="type-body text-muted">
+          It was deleted, or the link is out of date.
+        </p>
+        <Button asChild variant="ghost" leftIcon={<ArrowLeft size={16} />}>
+          <Link href={`/dm/campaign/${code}/locations`}>Back to locations</Link>
+        </Button>
       </div>
     );
   }
@@ -59,7 +60,7 @@ export default function LocationEditorPage() {
   }
 
   return (
-    <div className="bg-surface flex h-screen flex-col overflow-hidden">
+    <div className="bg-surface flex h-dvh flex-col overflow-hidden">
       {campaign && (
         <CampaignSettingsSyncControls campaign={campaign} headless />
       )}
