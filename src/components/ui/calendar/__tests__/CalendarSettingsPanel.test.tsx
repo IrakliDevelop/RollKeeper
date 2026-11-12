@@ -247,6 +247,27 @@ describe('CalendarSettingsPanel', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it('Discard changes brings back a removed row and the saved weekday', async () => {
+    const { onSave } = setup();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Remove Thaw' }));
+    await user.click(screen.getByRole('combobox', { name: 'Year starts on' }));
+    await user.click(screen.getByRole('option', { name: 'Zor' }));
+    expect(screen.queryByRole('button', { name: 'Remove Thaw' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(screen.getByRole('textbox', { name: 'Month 2 name' })).toHaveValue(
+      'Thaw'
+    );
+    expect(screen.getByRole('textbox', { name: 'Days in Thaw' })).toHaveValue(
+      '28'
+    );
+    expect(
+      screen.getByRole('combobox', { name: 'Year starts on' })
+    ).toHaveTextContent('Mol');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('enables Discard changes after adding a day or choosing a weekday', async () => {
     const user = userEvent.setup();
     const first = setup();
