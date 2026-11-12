@@ -1,9 +1,11 @@
 'use client';
 
-import { useEncounterStore } from '@/store/encounterStore';
-import { SelectField, SelectItem } from '@/components/ui/forms/select';
-import { Badge } from '@/components/ui/layout/badge';
 import { X } from 'lucide-react';
+
+import { Button } from '@/components/ui/forms/button';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+
+import { useEncounterStore } from '@/store/encounterStore';
 
 interface EncounterLinkingPanelProps {
   campaignCode: string;
@@ -11,6 +13,8 @@ interface EncounterLinkingPanelProps {
   onLink: (encounterId: string) => void;
   onUnlink: (encounterId: string) => void;
 }
+
+const PLACEHOLDER = '__placeholder';
 
 export default function EncounterLinkingPanel({
   campaignCode,
@@ -31,12 +35,12 @@ export default function EncounterLinkingPanel({
 
   return (
     <div className="border-divider border-t px-3 py-2">
-      <span className="text-heading text-xs font-semibold">
-        Linked Encounters
+      <span className="type-small text-heading font-medium">
+        Linked encounters
       </span>
 
       {encounters.length === 0 ? (
-        <p className="text-muted mt-1 text-xs">
+        <p className="type-small text-muted mt-1">
           No encounters in this campaign
         </p>
       ) : (
@@ -44,12 +48,15 @@ export default function EncounterLinkingPanel({
           {availableEncounters.length > 0 && (
             <div className="mt-1.5">
               <SelectField
-                label=""
-                value=""
-                onValueChange={(id: string) => onLink(id)}
+                value={PLACEHOLDER}
+                onValueChange={(id: string) => {
+                  if (id === PLACEHOLDER) return;
+                  onLink(id);
+                }}
+                triggerProps={{ 'aria-label': 'Link an encounter…' }}
               >
-                <SelectItem value="__placeholder" disabled>
-                  Link an encounter...
+                <SelectItem value={PLACEHOLDER} disabled>
+                  Link an encounter…
                 </SelectItem>
                 {availableEncounters.map(e => (
                   <SelectItem key={e.id} value={e.id}>
@@ -61,23 +68,27 @@ export default function EncounterLinkingPanel({
           )}
 
           {linkedEncounters.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
+            <ul className="mt-2">
               {linkedEncounters.map(e => (
-                <Badge
+                <li
                   key={e.id}
-                  variant="info"
-                  className="flex items-center gap-1 text-xs"
+                  className="flex items-center justify-between gap-2"
                 >
-                  {e.name}
-                  <button
+                  <span className="type-small text-body truncate">
+                    {e.name}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Unlink ${e.name}`}
                     onClick={() => onUnlink(e.id)}
-                    className="hover:text-accent-red-text ml-0.5"
+                    className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   >
-                    <X size={10} />
-                  </button>
-                </Badge>
+                    <X size={14} aria-hidden="true" />
+                  </Button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </>
       )}
