@@ -5,6 +5,7 @@ import {
   cleanup,
   waitFor,
   fireEvent,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createHtmlElement, createNote } from '@fieldnotes/core';
@@ -14,7 +15,6 @@ import MarkerDetailPanel from './index';
 import {
   resolveMarkerPanelState,
   MARKER_PANEL_CONTAINMENT_CLASS,
-  MARKER_PANEL_TOUCH_TARGET_CLASS,
 } from './MarkerDetailPanel.utils';
 import type {
   MarkerPanelMode,
@@ -315,8 +315,8 @@ describe('MarkerDetailPanel', () => {
         />
       );
 
-      await user.selectOptions(screen.getByLabelText('Status'), status);
-      expect(screen.getByRole('option', { name: label })).toBeTruthy();
+      await user.click(screen.getByLabelText('Status'));
+      await user.click(screen.getByRole('option', { name: label }));
       await user.click(screen.getByRole('button', { name: 'Save' }));
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status }));
       cleanup();
@@ -404,12 +404,11 @@ describe('MarkerDetailPanel', () => {
     );
 
     await user.type(screen.getByLabelText('Discovery DC'), '15');
-    await user.selectOptions(
-      screen.getByLabelText('Discovery skill'),
-      'investigation'
-    );
+    await user.click(screen.getByLabelText('Discovery skill'));
+    await user.click(screen.getByRole('option', { name: 'Investigation' }));
     await user.type(screen.getByLabelText('Disarm DC'), '17');
-    await user.selectOptions(screen.getByLabelText('Disarm method'), 'arcana');
+    await user.click(screen.getByLabelText('Disarm method'));
+    await user.click(screen.getByRole('option', { name: 'Arcana' }));
     await user.type(screen.getByLabelText('Trigger'), 'Touching the idol');
     await user.type(screen.getByLabelText('Damage'), '4d6 fire');
     await user.type(screen.getByLabelText('Trap effect'), 'The room ignites.');
@@ -727,35 +726,215 @@ describe('MarkerDetailPanel', () => {
     expect(bodyNode.className).toContain(MARKER_PANEL_CONTAINMENT_CLASS);
   });
 
-  it('gives every rendered button the exported touch-target class, across the message states, the DM edit form and the player read-only view', () => {
+  it('renders every control as a Button primitive', () => {
     const data = buildMarkerData({ kind: 'note', ref: 'ref-1' });
-    const cases: { mode: MarkerPanelMode; state: MarkerPanelState }[] = [
+    const trapData = buildMarkerData({ kind: 'trap', ref: 'ref-1' });
+    const cases: {
+      mode: MarkerPanelMode;
+      state: MarkerPanelState;
+      portalState?: ResolvedPortalState;
+    }[] = [
       ...nonReadyStateCases(data),
       // The panel's own footer ghost Close is the only interactive control
       // in the player read-only view (and in all three message states
       // above); without this case it is never covered by this test.
       { mode: 'player', state: { kind: 'ready', data, detail: detail() } },
+      // The full DM form: audience toggle, trap fields, destination link,
+      // Delete and Save.
+      {
+        mode: 'dm',
+        state: { kind: 'ready', data: trapData, detail: detail() },
+        portalState: {
+          target: { v: 1, kind: 'battlemap', id: 'map-b' },
+          resolved: {
+            status: 'ready',
+            name: 'Crypt',
+            href: '/dm/campaign/ABC/battlemaps/map-b',
+          },
+          battleMapChoices: [{ id: 'map-b', name: 'Crypt' }],
+          locationChoices: [],
+        },
+      },
     ];
 
-    for (const { mode, state } of cases) {
-      const { baseElement, unmount } = render(
+    for (const { mode, state, portalState } of cases) {
+      const { unmount } = render(
         <MarkerDetailPanel
           open
           mode={mode}
           state={state}
+          isDmOnly
+          onAudienceChange={() => {}}
+          portalState={portalState}
           onClose={() => {}}
           onSave={() => {}}
           onDelete={() => {}}
         />
       );
 
-      const buttons = baseElement.querySelectorAll('button');
+      // Role queries skip the Radix select triggers (role="combobox").
+      const buttons = within(screen.getByRole('dialog')).getAllByRole('button');
       expect(buttons.length).toBeGreaterThan(0);
       buttons.forEach(button => {
-        expect(button.className).toContain(MARKER_PANEL_TOUCH_TARGET_CLASS);
+        expect(button).toHaveAttribute('data-variant');
       });
       unmount();
     }
+  });
+
+  it('the audience toggle is an outline action', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'secret', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        isDmOnly
+        onAudienceChange={() => {}}
+        onClose={() => {}}
+      />
+    );
+    const toggle = screen.getByRole('button', { name: 'Reveal to players' });
+    expect(toggle).toHaveAttribute('data-variant', 'secondary');
+    expect(toggle).not.toHaveAttribute('aria-pressed');
+  });
+
+  it('labels the Status select and saves the chosen status', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    await user.click(screen.getByRole('combobox', { name: 'Status' }));
+    await user.click(screen.getByRole('option', { name: 'Locked' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'locked' })
+    );
+  });
+
+  it('saves an empty discovery DC as undefined and clamps 45 to 40', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail({
+            discovery: { dc: 12, skill: 'perception' },
+            trap: {
+              disarmDc: 10,
+              disarmMethod: 'thieves-tools',
+              trigger: '',
+              effect: '',
+              damage: '',
+            },
+          }),
+        }}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    await user.clear(screen.getByLabelText('Discovery DC'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        discovery: { dc: undefined, skill: 'perception' },
+      })
+    );
+
+    await user.clear(screen.getByLabelText('Disarm DC'));
+    await user.type(screen.getByLabelText('Disarm DC'), '45');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        trap: expect.objectContaining({ disarmDc: 40 }),
+      })
+    );
+  });
+
+  it('groups trap fields under Discovery and Trap mechanics headings', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Discovery', level: 4 })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Trap mechanics', level: 4 })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the DM label as typed and NPC for an unlabelled npc', () => {
+    const labelled = render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({
+            kind: 'loot',
+            ref: 'ref-1',
+            label: 'goblin chest',
+          }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByRole('heading', { level: 2 })
+    ).toHaveTextContent('goblin chest');
+    labelled.unmount();
+
+    const unlabelled = render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{
+          kind: 'unpublished',
+          data: buildMarkerData({ kind: 'npc', ref: 'ref-1' }),
+        }}
+        onClose={() => {}}
+      />
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByRole('heading', { level: 2 })
+    ).toHaveTextContent('NPC');
+    expect(
+      screen.getByTestId('marker-panel-state-unpublished')
+    ).toHaveTextContent('this "NPC" marker.');
+    unlabelled.unmount();
   });
 
   it('resets the form when the panel opens on a different marker', async () => {
@@ -934,7 +1113,9 @@ describe('MarkerDetailPanel player loot: locked container and quantity stepper',
         onClaimLoot={vi.fn()}
       />
     );
-    expect(screen.getByText('Loot')).toBeInTheDocument();
+    // The unlabelled marker's dialog title is also "Loot"; skip it.
+    const outsideTitle = { ignore: 'script, style, h2 *' };
+    expect(screen.getByText('Loot', outsideTitle)).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
 
     rerender(
@@ -950,7 +1131,7 @@ describe('MarkerDetailPanel player loot: locked container and quantity stepper',
         onClaimLoot={vi.fn()}
       />
     );
-    expect(screen.queryByText('Loot')).toBeNull();
+    expect(screen.queryByText('Loot', outsideTitle)).toBeNull();
     expect(screen.queryByText('Open')).toBeNull();
   });
 
