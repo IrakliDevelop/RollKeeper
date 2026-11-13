@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { ShapeKind } from '@fieldnotes/core';
 import type {
   ArrowToolOptions,
@@ -25,13 +26,23 @@ import {
 } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import DmSelectionOptions from './DmSelectionOptions';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
+import { MAP_TOOL_META } from './mapToolDefs';
 import { MARKER_COLOR_KEYS, MARKER_KINDS } from './markerData';
 import { MARKER_KIND_ICONS } from './markerIcons';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
+import {
+  CustomColorButton,
+  OptionLabel,
+  OptionSeparator,
+  RangeField,
+  SegmentedGroup,
+  SwatchButton,
+} from './ToolOptionControls';
 import {
   FogPresetPanel,
   type DmFogControls,
@@ -62,6 +73,22 @@ export const COLOR_SWATCHES = [
   '#ffffff',
 ];
 
+/** The name each `COLOR_SWATCHES` colour is read and hovered as. */
+export const COLOR_SWATCH_NAMES: Readonly<Record<string, string>> = {
+  '#334155': 'Slate',
+  '#ef4444': 'Red',
+  '#f97316': 'Orange',
+  '#eab308': 'Yellow',
+  '#22c55e': 'Green',
+  '#3b82f6': 'Blue',
+  '#8b5cf6': 'Violet',
+  '#ec4899': 'Pink',
+  '#ffffff': 'White',
+};
+
+/** Fills skip white. */
+const FILL_SWATCHES = COLOR_SWATCHES.slice(0, 8);
+
 const NOTE_TEXT_COLORS = [
   '#334155',
   '#1e293b',
@@ -72,22 +99,94 @@ const NOTE_TEXT_COLORS = [
   '#ffffff',
 ];
 
-const TEMPLATE_RENDER_STYLES: {
+const NOTE_TEXT_COLOR_NAMES: Readonly<Record<string, string>> = {
+  '#334155': 'Slate',
+  '#1e293b': 'Ink',
+  '#ef4444': 'Red',
+  '#16a34a': 'Green',
+  '#2563eb': 'Blue',
+  '#7c3aed': 'Violet',
+  '#ffffff': 'White',
+};
+
+const MARKER_KIND_LABELS: Readonly<Record<MarkerKind, string>> = {
+  door: 'Door',
+  trap: 'Trap',
+  loot: 'Loot',
+  npc: 'NPC',
+  secret: 'Secret',
+  note: 'Note',
+};
+
+// The accessible names stay "Marker kind: {kind}" — the e2e clicks them.
+const MARKER_KIND_OPTIONS = MARKER_KINDS.map(kind => ({
+  value: kind,
+  label: MARKER_KIND_LABELS[kind],
+  icon: MARKER_KIND_ICONS[kind],
+  ariaLabel: `Marker kind: ${kind}`,
+}));
+
+const SHAPE_OPTIONS = [
+  { value: 'rectangle', label: 'Rectangle' },
+  { value: 'ellipse', label: 'Ellipse' },
+] as const;
+
+const TEXT_ALIGN_OPTIONS = [
+  { value: 'left', label: 'Left' },
+  { value: 'center', label: 'Center' },
+  { value: 'right', label: 'Right' },
+] as const;
+
+const TEMPLATE_SHAPE_OPTIONS: readonly {
+  value: TemplateShape;
+  label: string;
+}[] = [
+  { value: 'circle', label: 'Circle' },
+  { value: 'cone', label: 'Cone' },
+  { value: 'line', label: 'Line' },
+  { value: 'square', label: 'Square' },
+  { value: 'rectangle', label: 'Rectangle' },
+];
+
+const TEMPLATE_RENDER_STYLES: readonly {
   value: TemplateRenderStyle;
   label: string;
-  title: string;
 }[] = [
-  {
-    value: 'cells',
-    label: 'Cells',
-    title: 'Fill snapped grid cells (square or hex)',
-  },
-  {
-    value: 'geometric',
-    label: 'Smooth',
-    title: 'Smooth geometric shape that rotates and moves freely on hex grids',
-  },
+  { value: 'cells', label: 'Cells' },
+  { value: 'geometric', label: 'Smooth' },
 ];
+
+const DIAGONAL_OPTIONS: readonly { value: DiagonalRule; label: string }[] = [
+  { value: 'chebyshev', label: '5-5-5' },
+  { value: 'alternate', label: '5-10-5' },
+];
+
+const FOG_OPERATION_OPTIONS = [
+  { value: 'reveal', label: 'Reveal' },
+  { value: 'conceal', label: 'Conceal' },
+] as const;
+
+const FOG_SHAPE_OPTIONS = [
+  { value: 'brush', label: 'Brush' },
+  { value: 'rectangle', label: 'Rectangle' },
+  { value: 'polygon', label: 'Polygon' },
+] as const;
+
+/** Exactly the tools `handleColorChange` routes a colour to. */
+const COLOR_STRIP_TOOLS: ReadonlySet<string> = new Set([
+  'shape',
+  'text',
+  'note',
+  'arrow',
+  'pencil',
+  'template',
+  'laser',
+  'ping',
+  'measure',
+]);
+
+const formatPx = (value: number) => `${value}px`;
+const formatFeet = (value: number) => `${value} ft`;
 
 export interface MeasureSharingControl {
   enabled: boolean;
@@ -129,6 +228,11 @@ interface DmLocationToolOptionsProps {
   liveSyncConfigured?: boolean;
 }
 
+/**
+ * The options row under a map toolbar: the active tool's icon and name, then
+ * that tool's options. A tool with a name but no options shows the name alone;
+ * a tool with neither (the player's `token`) renders nothing.
+ */
 export default function DmLocationToolOptions({
   mode = 'location',
   measureSharing,
@@ -141,9 +245,9 @@ export default function DmLocationToolOptions({
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   // Read unconditionally (both DM surfaces render this component inside
-  // ViewportContext.Provider) so the select branch's `showOptionsBar` gate
+  // ViewportContext.Provider) so the select branch's `hasOptions` gate
   // below can require a non-empty selection — otherwise activating the
-  // select tool with nothing selected would render an empty bordered strip.
+  // select tool with nothing selected would show controls for nothing.
   const { selectedCount } = useSelectionOps();
   const [pencilOpts, setPencilOpts] = useToolOptions<
     PencilToolOptions & Record<string, unknown>
@@ -176,26 +280,35 @@ export default function DmLocationToolOptions({
     PingToolOptions & Record<string, unknown>
   >('ping');
 
-  // Single source of truth for whether the select-tool branch renders — used
-  // both to decide if the bar shows at all and, below, to gate the branch
-  // itself, so the two conditions can't drift apart.
-  const showSelectionOptions =
-    selectionControls === true && activeTool === 'select' && selectedCount > 0;
-
-  // Requiring the prop is what makes an empty strip impossible: without it a
-  // surface that activates the marker tool but wires no controls would render
-  // a bordered bar with nothing in it. Same defensive shape as
-  // `pencilOpts !== undefined` and `selectedCount > 0` above.
-  const showMarkerOptions =
-    activeTool === MARKER_TOOL_NAME && markerControls !== undefined;
+  // A pending fog confirm takes the whole row under whichever tool is active:
+  // the row is named for the fog tool and shows only the confirm, so every
+  // other branch below is gated on `!showFogOptions`.
   const showFogOptions =
     fogControls !== undefined &&
     (activeTool === 'fog' || fogControls.pendingAction !== null);
 
+  // Single source of truth for whether the select-tool branch renders — used
+  // both to decide if the row has options at all and, below, to gate the
+  // branch itself, so the two conditions can't drift apart.
+  const showSelectionOptions =
+    !showFogOptions &&
+    selectionControls === true &&
+    activeTool === 'select' &&
+    selectedCount > 0;
+
+  // Requiring the prop is what keeps the row honest: without it a surface
+  // that activates the marker tool but wires no controls would show a picker
+  // that does nothing. Same defensive shape as `pencilOpts !== undefined` and
+  // `selectedCount > 0` above.
+  const showMarkerOptions =
+    !showFogOptions &&
+    activeTool === MARKER_TOOL_NAME &&
+    markerControls !== undefined;
+
   // Mirrors DmLocationToolbar's PRESENCE_TOOL_DEFS gate.
   const presenceToolsEnabled = mode === 'battlemap' || liveSyncConfigured;
 
-  const showOptionsBar =
+  const hasOptions =
     showSelectionOptions ||
     showMarkerOptions ||
     showFogOptions ||
@@ -212,7 +325,14 @@ export default function DmLocationToolOptions({
         activeTool === 'path' ||
         activeTool === 'template'));
 
-  if (!showOptionsBar) return null;
+  const meta = showFogOptions ? MAP_TOOL_META.fog : MAP_TOOL_META[activeTool];
+  if (!hasOptions && !meta) return null;
+
+  // The shared strip carries CSS colour STRINGS for the SDK tools listed in
+  // COLOR_STRIP_TOOLS. The marker carries a palette KEY, so its picker owns
+  // colour entirely; Select and Move have no colour to set at all.
+  const showColorStrip =
+    hasOptions && !showFogOptions && COLOR_STRIP_TOOLS.has(activeTool);
 
   const shapeKind = (shapeOpts?.shape ?? 'rectangle') as ShapeKind;
 
@@ -233,7 +353,18 @@ export default function DmLocationToolOptions({
                   ? pencilOpts?.color
                   : activeTool === 'measure'
                     ? measureOpts?.color
-                    : '#334155';
+                    : activeTool === 'template'
+                      ? templateOpts?.strokeColor
+                      : '#334155';
+
+  const colorStripLabel =
+    activeTool === 'shape'
+      ? 'Stroke'
+      : activeTool === 'note'
+        ? 'Background'
+        : activeTool === 'template'
+          ? 'Outline'
+          : 'Color';
 
   const handleColorChange = (color: string) => {
     if (activeTool === 'shape') setShapeOpts({ strokeColor: color });
@@ -248,577 +379,465 @@ export default function DmLocationToolOptions({
   };
 
   return (
-    <div className="border-divider bg-surface-secondary flex flex-wrap items-center gap-3 border-b px-4 py-1.5">
-      {showSelectionOptions && <DmSelectionOptions />}
-      {activeTool === 'shape' && shapeOpts && (
-        <>
-          <span className="text-muted text-xs font-medium">Shape</span>
-          <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-            {(['rectangle', 'ellipse'] as const).map(value => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setShapeOpts({ shape: value })}
-                className={`rounded px-2 py-1 text-xs capitalize transition-colors ${
-                  shapeKind === value
-                    ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                    : 'text-muted hover:bg-surface-raised hover:text-body'
-                }`}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
-          <div className="bg-divider h-6 w-px" />
-        </>
-      )}
+    <TooltipProvider>
+      <div className="bg-surface-secondary border-divider flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-3 py-1.5">
+        {meta && (
+          <>
+            <span className="type-ui text-heading flex min-h-9 items-center gap-1.5 pointer-coarse:min-h-11">
+              <meta.Icon size={16} aria-hidden="true" />
+              {meta.label}
+            </span>
+            {hasOptions && <OptionSeparator />}
+          </>
+        )}
 
-      {showMarkerOptions && markerControls && (
-        <div
-          data-testid="marker-tool-options"
-          role="group"
-          aria-label="Marker options"
-          className="flex flex-wrap items-center gap-2"
-        >
-          <span className="text-muted text-xs font-medium">Marker</span>
-          <div className="border-divider bg-surface flex flex-wrap items-center gap-0.5 rounded-md border p-0.5">
-            {MARKER_KINDS.map(kind => {
-              const KindIcon = MARKER_KIND_ICONS[kind];
-              return (
-                <Button
-                  key={kind}
-                  variant={markerControls.kind === kind ? 'primary' : 'ghost'}
-                  onClick={() => markerControls.onKindChange(kind)}
-                  title={`Marker kind: ${kind}`}
-                  aria-label={`Marker kind: ${kind}`}
-                  aria-pressed={markerControls.kind === kind}
-                  className="min-h-[44px] min-w-[44px] gap-1.5 px-2 text-xs capitalize"
+        {hasOptions && (
+          <>
+            {showSelectionOptions && <DmSelectionOptions />}
+
+            {!showFogOptions && activeTool === 'shape' && shapeOpts && (
+              <SegmentedGroup
+                label="Shape"
+                options={SHAPE_OPTIONS}
+                value={shapeKind}
+                onChange={value => setShapeOpts({ shape: value })}
+              />
+            )}
+
+            {showMarkerOptions && markerControls && (
+              <MarkerOptions controls={markerControls} />
+            )}
+
+            {showFogOptions && fogControls && (
+              <FogOptions
+                controls={fogControls}
+                presetControls={fogPresetControls}
+              />
+            )}
+
+            {showColorStrip && (
+              <>
+                <OptionLabel>{colorStripLabel}</OptionLabel>
+                <SwatchStrip
+                  label={colorStripLabel}
+                  colors={COLOR_SWATCHES}
+                  names={COLOR_SWATCH_NAMES}
+                  isSelected={color => activeColor === color}
+                  onSelect={handleColorChange}
                 >
-                  <KindIcon aria-hidden="true" size={16} />
-                  {kind}
-                </Button>
-              );
-            })}
-          </div>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Pin colour</span>
-          <div className="flex items-center gap-1">
-            {MARKER_COLOR_KEYS.map(colorKey => (
-              <Button
-                key={colorKey}
-                variant="ghost"
-                onClick={() => markerControls.onColorChange(colorKey)}
-                title={`Marker colour: ${colorKey}`}
-                aria-label={`Marker colour: ${colorKey}`}
-                aria-pressed={markerControls.color === colorKey}
-                className="min-h-[44px] min-w-[44px] p-0"
-              >
-                <span
-                  data-testid="marker-swatch-fill"
-                  aria-hidden="true"
-                  className={`block h-5 w-5 rounded-full border-2 ${
-                    markerControls.color === colorKey
-                      ? 'border-accent-blue-border scale-110'
-                      : 'border-divider'
-                  }`}
-                  // A literal hex from the painter's palette, deliberately not
-                  // a semantic token: this is the colour the CANVAS paints,
-                  // where `var(--…)` does not resolve. Data, not theming.
-                  style={{ backgroundColor: MARKER_COLOR_CSS[colorKey] }}
-                />
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
+                  <CustomColorButton
+                    value={activeColor ?? '#334155'}
+                    onChange={handleColorChange}
+                  />
+                </SwatchStrip>
+              </>
+            )}
 
-      {showFogOptions && fogControls && (
+            {!showFogOptions && activeTool === 'pencil' && pencilOpts && (
+              <>
+                <OptionLabel>Width</OptionLabel>
+                <RangeField
+                  ariaLabel="Pencil width"
+                  min={1}
+                  max={12}
+                  step={0.5}
+                  value={pencilOpts.width ?? 2}
+                  onChange={width => setPencilOpts({ width })}
+                  format={formatPx}
+                />
+              </>
+            )}
+
+            {!showFogOptions && activeTool === 'note' && noteOpts && (
+              <>
+                <OptionLabel>Text</OptionLabel>
+                <SwatchStrip
+                  label="Text"
+                  colors={NOTE_TEXT_COLORS}
+                  names={NOTE_TEXT_COLOR_NAMES}
+                  isSelected={color => noteOpts.textColor === color}
+                  onSelect={color => setNoteOpts({ textColor: color })}
+                />
+              </>
+            )}
+
+            {!showFogOptions && activeTool === 'shape' && shapeOpts && (
+              <>
+                <OptionLabel>Fill</OptionLabel>
+                <SwatchStrip
+                  label="Fill"
+                  colors={FILL_SWATCHES}
+                  names={COLOR_SWATCH_NAMES}
+                  isSelected={color => shapeOpts.fillColor === color}
+                  onSelect={color => setShapeOpts({ fillColor: color })}
+                  leading={
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      selected={shapeOpts.fillColor === 'transparent'}
+                      aria-pressed={shapeOpts.fillColor === 'transparent'}
+                      onClick={() => setShapeOpts({ fillColor: 'transparent' })}
+                    >
+                      None
+                    </Button>
+                  }
+                />
+                <OptionLabel>Width</OptionLabel>
+                <RangeField
+                  ariaLabel="Shape stroke width"
+                  min={1}
+                  max={10}
+                  value={shapeOpts.strokeWidth ?? 2}
+                  onChange={strokeWidth => setShapeOpts({ strokeWidth })}
+                  format={formatPx}
+                />
+              </>
+            )}
+
+            {!showFogOptions && activeTool === 'text' && textOpts && (
+              <>
+                <OptionLabel>Size</OptionLabel>
+                <RangeField
+                  ariaLabel="Text size"
+                  min={10}
+                  max={72}
+                  value={textOpts.fontSize ?? 16}
+                  onChange={fontSize => setTextOpts({ fontSize })}
+                  format={formatPx}
+                />
+                <OptionLabel>Align</OptionLabel>
+                <SegmentedGroup
+                  label="Text align"
+                  options={TEXT_ALIGN_OPTIONS}
+                  value={textOpts.textAlign}
+                  onChange={textAlign => setTextOpts({ textAlign })}
+                />
+              </>
+            )}
+
+            {!showFogOptions &&
+              mode === 'battlemap' &&
+              activeTool === 'measure' &&
+              measureOpts && (
+                <>
+                  <OptionLabel>Feet per cell</OptionLabel>
+                  <RangeField
+                    ariaLabel="Feet per cell"
+                    min={1}
+                    max={20}
+                    value={measureOpts.feetPerCell ?? 5}
+                    onChange={feetPerCell => setMeasureOpts({ feetPerCell })}
+                    format={formatFeet}
+                  />
+                  {measureSharing && (
+                    <Switch
+                      checked={measureSharing.enabled}
+                      onCheckedChange={measureSharing.onChange}
+                      label="Share with players"
+                      wrapperClassName="items-center"
+                    />
+                  )}
+                </>
+              )}
+
+            {!showFogOptions &&
+              mode === 'battlemap' &&
+              activeTool === 'path' && (
+                <>
+                  <OptionLabel>Diagonals</OptionLabel>
+                  <SegmentedGroup
+                    label="Diagonal rule"
+                    options={DIAGONAL_OPTIONS}
+                    value={pathOpts?.diagonalRule ?? 'chebyshev'}
+                    onChange={diagonalRule => setPathOpts({ diagonalRule })}
+                  />
+                  {movementControls && (
+                    <Switch
+                      checked={movementControls.dash.enabled}
+                      onCheckedChange={movementControls.dash.onChange}
+                      label="Dash"
+                      wrapperClassName="items-center"
+                    />
+                  )}
+                  {movementControls?.sharing && (
+                    <Switch
+                      checked={movementControls.sharing.enabled}
+                      onCheckedChange={movementControls.sharing.onChange}
+                      label="Share movement with players"
+                      wrapperClassName="items-center"
+                    />
+                  )}
+                </>
+              )}
+
+            {!showFogOptions &&
+              mode === 'battlemap' &&
+              activeTool === 'template' &&
+              templateOpts && (
+                <TemplateOptions
+                  options={templateOpts}
+                  setOptions={setTemplateOpts}
+                />
+              )}
+          </>
+        )}
+      </div>
+    </TooltipProvider>
+  );
+}
+
+interface SwatchStripProps {
+  /** The group's accessible name: the same word as the visible label. */
+  label: string;
+  colors: readonly string[];
+  names: Readonly<Record<string, string>>;
+  isSelected: (color: string) => boolean;
+  onSelect: (color: string) => void;
+  /** A control before the swatches (the shape fill's "None"). */
+  leading?: ReactNode;
+  /** Trailing controls in the strip (the custom colour picker). */
+  children?: ReactNode;
+}
+
+function SwatchStrip({
+  label,
+  colors,
+  names,
+  isSelected,
+  onSelect,
+  leading,
+  children,
+}: SwatchStripProps) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="flex flex-wrap items-center"
+    >
+      {leading}
+      {colors.map(color => (
+        <SwatchButton
+          key={color}
+          color={color}
+          name={names[color] ?? color}
+          selected={isSelected(color)}
+          onSelect={() => onSelect(color)}
+        />
+      ))}
+      {children}
+    </div>
+  );
+}
+
+function MarkerOptions({ controls }: { controls: MarkerToolControls }) {
+  return (
+    <div
+      data-testid="marker-tool-options"
+      role="group"
+      aria-label="Marker options"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5"
+    >
+      <OptionLabel>Kind</OptionLabel>
+      <SegmentedGroup
+        label="Marker kind"
+        options={MARKER_KIND_OPTIONS}
+        value={controls.kind}
+        onChange={controls.onKindChange}
+      />
+      <OptionLabel>Pin color</OptionLabel>
+      <div className="flex flex-wrap items-center">
+        {MARKER_COLOR_KEYS.map(colorKey => (
+          <SwatchButton
+            key={colorKey}
+            // A literal hex from the painter's palette, deliberately not a
+            // semantic token: this is the colour the CANVAS paints, where
+            // `var(--…)` does not resolve. Data, not theming.
+            color={MARKER_COLOR_CSS[colorKey]}
+            name={`Marker color: ${colorKey}`}
+            selected={controls.color === colorKey}
+            onSelect={() => controls.onColorChange(colorKey)}
+            dotTestId="marker-swatch-fill"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function fogPendingTitle(action: NonNullable<DmFogControls['pendingAction']>) {
+  return action === 'enable'
+    ? FOG_ENABLE_TITLE
+    : action === 'cover-all'
+      ? FOG_COVER_ALL_TITLE
+      : action === 'reveal-all'
+        ? FOG_REVEAL_ALL_TITLE
+        : FOG_DISABLE_TITLE;
+}
+
+function fogPendingDescription(
+  action: NonNullable<DmFogControls['pendingAction']>
+) {
+  return action === 'enable'
+    ? FOG_ENABLE_DESCRIPTION
+    : action === 'cover-all'
+      ? FOG_COVER_ALL_DESCRIPTION
+      : action === 'reveal-all'
+        ? FOG_REVEAL_ALL_DESCRIPTION
+        : FOG_DISABLE_DESCRIPTION;
+}
+
+function FogOptions({
+  controls,
+  presetControls,
+}: {
+  controls: DmFogControls;
+  presetControls?: FogPresetControls;
+}) {
+  const pending = controls.pendingAction;
+  return (
+    <div
+      data-testid="fog-tool-options"
+      role="group"
+      aria-label="Fog of war options"
+      className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5"
+    >
+      {pending ? (
         <div
-          data-testid="fog-tool-options"
-          role="group"
-          aria-label="Fog of war options"
+          role="alertdialog"
+          aria-label={fogPendingTitle(pending)}
           className="flex w-full flex-wrap items-center gap-2"
         >
-          {fogControls.pendingAction ? (
-            <div
-              role="alertdialog"
-              aria-label={
-                fogControls.pendingAction === 'enable'
-                  ? FOG_ENABLE_TITLE
-                  : fogControls.pendingAction === 'cover-all'
-                    ? FOG_COVER_ALL_TITLE
-                    : fogControls.pendingAction === 'reveal-all'
-                      ? FOG_REVEAL_ALL_TITLE
-                      : FOG_DISABLE_TITLE
-              }
-              className="flex w-full flex-wrap items-center gap-2"
-            >
-              <div className="min-w-56 flex-1 text-xs">
-                <div className="text-body font-semibold">
-                  {fogControls.pendingAction === 'enable'
-                    ? FOG_ENABLE_TITLE
-                    : fogControls.pendingAction === 'cover-all'
-                      ? FOG_COVER_ALL_TITLE
-                      : fogControls.pendingAction === 'reveal-all'
-                        ? FOG_REVEAL_ALL_TITLE
-                        : FOG_DISABLE_TITLE}
-                </div>
-                <div className="text-muted">
-                  {fogControls.pendingAction === 'enable'
-                    ? FOG_ENABLE_DESCRIPTION
-                    : fogControls.pendingAction === 'cover-all'
-                      ? FOG_COVER_ALL_DESCRIPTION
-                      : fogControls.pendingAction === 'reveal-all'
-                        ? FOG_REVEAL_ALL_DESCRIPTION
-                        : FOG_DISABLE_DESCRIPTION}
-                </div>
-              </div>
-              <Button
-                variant={
-                  fogControls.pendingAction === 'enable'
-                    ? 'primary'
-                    : 'danger-solid'
-                }
-                onClick={fogControls.confirmAction}
-                className="min-h-[44px] px-3 text-xs"
-              >
-                {fogControls.pendingAction === 'enable'
-                  ? FOG_ENABLE_CONFIRM
-                  : 'Confirm'}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={fogControls.cancelAction}
-                className="min-h-[44px] px-3 text-xs"
-              >
-                Cancel
-              </Button>
+          <div className="min-w-56 flex-1">
+            <div className="type-ui text-heading">
+              {fogPendingTitle(pending)}
             </div>
-          ) : (
-            <>
-              <span className="text-muted text-xs font-semibold">Fog</span>
-              <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-                {(['reveal', 'conceal'] as const).map(value => (
-                  <Button
-                    key={value}
-                    variant={
-                      fogControls.operation === value ? 'primary' : 'ghost'
-                    }
-                    onClick={() => fogControls.setOperation(value)}
-                    aria-pressed={fogControls.operation === value}
-                    className="min-h-[44px] px-3 text-xs capitalize"
-                  >
-                    {value}
-                  </Button>
-                ))}
-              </div>
-              <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-                {(['brush', 'rectangle', 'polygon'] as const).map(value => (
-                  <Button
-                    key={value}
-                    variant={fogControls.shape === value ? 'primary' : 'ghost'}
-                    onClick={() => fogControls.setShape(value)}
-                    aria-pressed={fogControls.shape === value}
-                    className="min-h-[44px] px-3 text-xs capitalize"
-                  >
-                    {value}
-                  </Button>
-                ))}
-              </div>
-              {fogControls.shape === 'brush' && (
-                <label className="text-muted flex min-h-[44px] items-center gap-2 text-xs">
-                  Brush size
-                  <input
-                    aria-label="Fog brush size"
-                    type="range"
-                    min={8}
-                    max={160}
-                    step={4}
-                    value={fogControls.radius}
-                    onChange={event =>
-                      fogControls.setRadius(Number(event.target.value))
-                    }
-                    className="w-24"
-                  />
-                  {fogControls.radius}px
-                </label>
-              )}
-              <Switch
-                checked={fogControls.preview}
-                onCheckedChange={fogControls.setPreview}
-                label="Preview as player"
-                wrapperClassName="min-h-[44px] items-center"
-              />
-              {fogPresetControls && (
-                <FogPresetPanel controls={fogPresetControls} />
-              )}
-              <Button
-                variant="ghost"
-                onClick={() => fogControls.requestAction('cover-all')}
-                className="min-h-[44px] px-3 text-xs"
-              >
-                Cover all
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => fogControls.requestAction('reveal-all')}
-                className="min-h-[44px] px-3 text-xs"
-              >
-                Reveal all
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => fogControls.requestAction('disable')}
-                className="text-accent-red-text min-h-[44px] px-3 text-xs"
-              >
-                Disable fog
-              </Button>
-              <span className="text-muted min-w-64 flex-1 text-xs">
-                {FOG_SECURITY_EXPLANATION}
-              </span>
-            </>
-          )}
-          {fogControls.diagnostic && (
-            <span role="alert" className="text-accent-red-text text-xs">
-              {fogControls.diagnostic}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* The shared strip carries CSS colour STRINGS for the SDK tools. The
-          marker carries a palette KEY, so its picker above owns colour
-          entirely — rendering both would put a dead control (handleColorChange
-          has no 'marker' branch) next to the live one. */}
-      {!showMarkerOptions && !showFogOptions && (
-        <>
-          <span className="text-muted text-xs font-medium">
-            {activeTool === 'shape'
-              ? 'Stroke'
-              : activeTool === 'note'
-                ? 'Background'
-                : activeTool === 'template'
-                  ? 'Outline'
-                  : 'Color'}
-          </span>
-          <div className="flex items-center gap-1">
-            {COLOR_SWATCHES.map(color => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => handleColorChange(color)}
-                title={color}
-                className={`h-5 w-5 rounded-full border-2 transition-transform ${
-                  activeColor === color
-                    ? 'border-accent-blue-border scale-110'
-                    : 'border-divider hover:scale-105'
-                }`}
-                style={{
-                  backgroundColor: color,
-                  boxShadow:
-                    color === '#ffffff' ? 'inset 0 0 0 1px #e2e8f0' : 'none',
-                }}
-              />
-            ))}
-            <label className="relative h-5 w-5 cursor-pointer">
-              <input
-                type="color"
-                value={activeColor ?? '#334155'}
-                onChange={e => handleColorChange(e.target.value)}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-              <div className="border-divider text-muted hover:border-body flex h-5 w-5 items-center justify-center rounded-full border-2 border-dashed text-xs">
-                +
-              </div>
-            </label>
+            <div className="type-small text-muted">
+              {fogPendingDescription(pending)}
+            </div>
           </div>
-        </>
-      )}
-
-      {activeTool === 'pencil' && pencilOpts && (
-        <>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Width</span>
-          <input
-            type="range"
-            min={1}
-            max={12}
-            step={0.5}
-            value={pencilOpts.width ?? 2}
-            onChange={e => setPencilOpts({ width: Number(e.target.value) })}
-            className="w-20"
-          />
-          <span className="text-muted text-xs">{pencilOpts.width ?? 2}px</span>
-        </>
-      )}
-
-      {activeTool === 'note' && noteOpts && (
-        <>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Text</span>
-          <div className="flex items-center gap-1">
-            {NOTE_TEXT_COLORS.map(color => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setNoteOpts({ textColor: color })}
-                title={color}
-                className={`h-5 w-5 rounded-full border-2 transition-transform ${
-                  noteOpts.textColor === color
-                    ? 'border-accent-blue-border scale-110'
-                    : 'border-divider hover:scale-105'
-                }`}
-                style={{
-                  backgroundColor: color,
-                  boxShadow:
-                    color === '#ffffff' ? 'inset 0 0 0 1px #e2e8f0' : 'none',
-                }}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {activeTool === 'shape' && shapeOpts && (
-        <>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Fill</span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setShapeOpts({ fillColor: 'transparent' })}
-              className={`rounded px-2 py-0.5 text-xs transition-colors ${
-                shapeOpts.fillColor === 'transparent'
-                  ? 'bg-accent-blue-bg text-accent-blue-text'
-                  : 'text-muted hover:text-body'
-              }`}
-            >
-              None
-            </button>
-            {COLOR_SWATCHES.slice(0, 8).map(color => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setShapeOpts({ fillColor: color })}
-                title={color}
-                className={`h-5 w-5 rounded-full border-2 transition-transform ${
-                  shapeOpts.fillColor === color
-                    ? 'border-accent-blue-border scale-110'
-                    : 'border-divider hover:scale-105'
-                }`}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Width</span>
-          <input
-            type="range"
-            min={1}
-            max={10}
-            value={shapeOpts.strokeWidth ?? 2}
-            onChange={e =>
-              setShapeOpts({ strokeWidth: Number(e.target.value) })
-            }
-            className="w-20"
-          />
-          <span className="text-muted text-xs">
-            {shapeOpts.strokeWidth ?? 2}px
-          </span>
-        </>
-      )}
-
-      {activeTool === 'text' && textOpts && (
-        <>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Size</span>
-          <input
-            type="range"
-            min={10}
-            max={72}
-            value={textOpts.fontSize ?? 16}
-            onChange={e => setTextOpts({ fontSize: Number(e.target.value) })}
-            className="w-20"
-          />
-          <span className="text-muted text-xs">
-            {textOpts.fontSize ?? 16}px
-          </span>
-          <div className="bg-divider h-6 w-px" />
-          <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-            {(['left', 'center', 'right'] as const).map(align => (
-              <button
-                key={align}
-                type="button"
-                onClick={() => setTextOpts({ textAlign: align })}
-                className={`rounded px-2 py-0.5 text-xs capitalize transition-colors ${
-                  textOpts.textAlign === align
-                    ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                    : 'text-muted hover:bg-surface-raised hover:text-body'
-                }`}
-              >
-                {align}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {mode === 'battlemap' && activeTool === 'measure' && measureOpts && (
-        <>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Feet / Cell</span>
-          <input
-            type="range"
-            min={1}
-            max={20}
-            value={measureOpts.feetPerCell ?? 5}
-            onChange={e =>
-              setMeasureOpts({ feetPerCell: Number(e.target.value) })
-            }
-            className="w-20"
-          />
-          <span className="text-muted w-8 text-xs">
-            {measureOpts.feetPerCell ?? 5}
-          </span>
-          {measureSharing && (
-            <>
-              <div className="bg-divider h-6 w-px" />
-              <label className="text-muted flex items-center gap-2 text-xs font-medium">
-                Share with players
-                <Switch
-                  checked={measureSharing.enabled}
-                  onCheckedChange={measureSharing.onChange}
-                  aria-label="Share with players"
-                />
-              </label>
-            </>
-          )}
-        </>
-      )}
-
-      {mode === 'battlemap' && activeTool === 'path' && (
-        <>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Diagonals</span>
-          <select
-            value={(pathOpts?.diagonalRule as string) ?? 'chebyshev'}
-            onChange={e =>
-              setPathOpts({ diagonalRule: e.target.value as DiagonalRule })
-            }
-            className="border-divider bg-surface text-body rounded border px-1 py-0.5 text-xs"
-            aria-label="Diagonal rule"
+          <Button
+            variant={pending === 'enable' ? 'primary' : 'danger-solid'}
+            size="sm"
+            onClick={controls.confirmAction}
           >
-            <option value="chebyshev">5-5-5</option>
-            <option value="alternate">5-10-5</option>
-          </select>
-          {movementControls && (
-            <label className="text-muted flex items-center gap-2 text-xs font-medium">
-              Dash
-              <Switch
-                checked={movementControls.dash.enabled}
-                onCheckedChange={movementControls.dash.onChange}
-                aria-label="Dash"
-              />
-            </label>
-          )}
-          {movementControls?.sharing && (
+            {pending === 'enable' ? FOG_ENABLE_CONFIRM : 'Confirm'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={controls.cancelAction}>
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <>
+          <SegmentedGroup
+            label="Fog operation"
+            options={FOG_OPERATION_OPTIONS}
+            value={controls.operation}
+            onChange={controls.setOperation}
+          />
+          <SegmentedGroup
+            label="Fog shape"
+            options={FOG_SHAPE_OPTIONS}
+            value={controls.shape}
+            onChange={controls.setShape}
+          />
+          {controls.shape === 'brush' && (
             <>
-              <div className="bg-divider h-6 w-px" />
-              <label className="text-muted flex items-center gap-2 text-xs font-medium">
-                Share with players
-                <Switch
-                  checked={movementControls.sharing.enabled}
-                  onCheckedChange={movementControls.sharing.onChange}
-                  aria-label="Share movement with players"
-                />
-              </label>
+              <OptionLabel>Brush size</OptionLabel>
+              <RangeField
+                ariaLabel="Fog brush size"
+                min={8}
+                max={160}
+                step={4}
+                value={controls.radius}
+                onChange={controls.setRadius}
+                format={formatPx}
+              />
             </>
           )}
-        </>
-      )}
-
-      {mode === 'battlemap' && activeTool === 'template' && templateOpts && (
-        <>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Template</span>
-          <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-            {(
-              [
-                'circle',
-                'cone',
-                'line',
-                'square',
-                'rectangle',
-              ] as TemplateShape[]
-            ).map(shape => (
-              <button
-                key={shape}
-                type="button"
-                onClick={() => setTemplateOpts({ templateShape: shape })}
-                className={`rounded px-2 py-0.5 text-xs capitalize transition-colors ${
-                  (templateOpts.templateShape ?? 'circle') === shape
-                    ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                    : 'text-muted hover:bg-surface-raised hover:text-body'
-                }`}
-              >
-                {shape}
-              </button>
-            ))}
-          </div>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Render</span>
-          <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-            {TEMPLATE_RENDER_STYLES.map(({ value, label, title }) => (
-              <button
-                key={value}
-                type="button"
-                title={title}
-                onClick={() => setTemplateOpts({ renderStyle: value })}
-                className={`rounded px-2 py-0.5 text-xs transition-colors ${
-                  (templateOpts.renderStyle ?? 'cells') === value
-                    ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                    : 'text-muted hover:bg-surface-raised hover:text-body'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Fill</span>
-          <div className="flex items-center gap-1">
-            {COLOR_SWATCHES.slice(0, 8).map(color => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setTemplateOpts({ fillColor: `${color}80` })}
-                title={color}
-                className={`h-5 w-5 rounded-full border-2 transition-transform ${
-                  (templateOpts.fillColor ?? '#ef444480') === `${color}80`
-                    ? 'border-accent-blue-border scale-110'
-                    : 'border-divider hover:scale-105'
-                }`}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-          <div className="bg-divider h-6 w-px" />
-          <span className="text-muted text-xs font-medium">Feet / Cell</span>
-          <input
-            type="range"
-            min={1}
-            max={20}
-            value={templateOpts.feetPerCell ?? 5}
-            onChange={e =>
-              setTemplateOpts({ feetPerCell: Number(e.target.value) })
-            }
-            className="w-20"
+          <Switch
+            checked={controls.preview}
+            onCheckedChange={controls.setPreview}
+            label="Preview as player"
+            wrapperClassName="items-center"
           />
-          <span className="text-muted w-8 text-xs">
-            {templateOpts.feetPerCell ?? 5}
+          {presetControls && <FogPresetPanel controls={presetControls} />}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => controls.requestAction('cover-all')}
+          >
+            Cover all
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => controls.requestAction('reveal-all')}
+          >
+            Reveal all
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => controls.requestAction('disable')}
+          >
+            Disable fog
+          </Button>
+          <span className="type-small text-muted min-w-64 flex-1">
+            {FOG_SECURITY_EXPLANATION}
           </span>
         </>
+      )}
+      {controls.diagnostic && (
+        <span role="alert" className="type-small text-blood-text">
+          {controls.diagnostic}
+        </span>
       )}
     </div>
+  );
+}
+
+function TemplateOptions({
+  options,
+  setOptions,
+}: {
+  options: TemplateToolOptions;
+  setOptions: (partial: Partial<TemplateToolOptions>) => void;
+}) {
+  const fill = options.fillColor ?? '#ef444480';
+  return (
+    <>
+      <OptionLabel>Shape</OptionLabel>
+      <SegmentedGroup
+        label="Template shape"
+        options={TEMPLATE_SHAPE_OPTIONS}
+        value={options.templateShape ?? 'circle'}
+        onChange={templateShape => setOptions({ templateShape })}
+      />
+      <OptionLabel>Render</OptionLabel>
+      <SegmentedGroup
+        label="Render style"
+        options={TEMPLATE_RENDER_STYLES}
+        value={options.renderStyle ?? 'cells'}
+        onChange={renderStyle => setOptions({ renderStyle })}
+      />
+      <OptionLabel>Fill</OptionLabel>
+      <SwatchStrip
+        label="Fill"
+        colors={FILL_SWATCHES}
+        names={COLOR_SWATCH_NAMES}
+        // Template fills are the swatch at 50% alpha (`80`).
+        isSelected={color => fill === `${color}80`}
+        onSelect={color => setOptions({ fillColor: `${color}80` })}
+      />
+      <OptionLabel>Feet per cell</OptionLabel>
+      <RangeField
+        ariaLabel="Feet per cell"
+        min={1}
+        max={20}
+        value={options.feetPerCell ?? 5}
+        onChange={feetPerCell => setOptions({ feetPerCell })}
+        format={formatFeet}
+      />
+    </>
   );
 }

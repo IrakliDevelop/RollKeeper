@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
 import {
   AlignStartVertical,
   AlignCenterVertical,
@@ -13,6 +14,9 @@ import {
 } from 'lucide-react';
 import { useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { DisableableTooltip } from './ToolOptionControls';
 
 const ALIGN_ACTIONS = [
   { edge: 'left', title: 'Align left', Icon: AlignStartVertical },
@@ -44,35 +48,23 @@ const DISTRIBUTE_ACTIONS = [
   },
 ] as const;
 
+const ICON_BUTTON_CLASS = 'w-9 shrink-0 px-0';
+
+/**
+ * The panel is `z-[60]` and the shared Tooltip is `z-50`, so tooltips inside
+ * the panel need a higher z class or they render underneath it.
+ */
+const PANEL_TOOLTIP_CLASS = 'z-[70]';
+
 /**
  * Align/distribute actions for the current selection, behind one toolbar
  * button (six always-visible icon buttons would bloat the freshly slimmed
- * toolbar). Same local-popover pattern as DmLocationGridPopover. The panel
- * stays open after an action — aligning then distributing is a common
- * chain. Must render inside ViewportContext.Provider.
+ * toolbar). The panel stays open after an action — aligning then
+ * distributing is a common chain. Must render inside ViewportContext.Provider.
  */
 export default function DmLocationAlignMenu() {
   const { canAlign, canDistribute, align, distribute } = useSelectionOps();
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
 
   // Selection dropping below two movable elements leaves a dead panel — close it.
   useEffect(() => {
@@ -80,50 +72,80 @@ export default function DmLocationAlignMenu() {
   }, [canAlign]);
 
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant={open ? 'primary' : 'ghost'}
-        onClick={() => setOpen(o => !o)}
-        disabled={!canAlign}
-        title="Align & distribute"
-        aria-expanded={open}
-        className="flex h-11 items-center gap-1.5 px-2 py-1 text-xs"
-      >
-        <AlignStartVertical size={15} />
-        Align
-      </Button>
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          selected={open}
+          disabled={!canAlign}
+          leftIcon={<AlignStartVertical size={16} />}
+        >
+          Align
+        </Button>
+      </Popover.Trigger>
 
-      {open && (
-        <div className="border-divider bg-surface-raised absolute top-full left-0 z-20 mt-1 rounded-lg border p-2 shadow-lg">
-          <div className="flex items-center gap-0.5">
-            {ALIGN_ACTIONS.map(({ edge, title, Icon }) => (
-              <Button
-                key={edge}
-                variant="ghost"
-                onClick={() => align(edge)}
-                title={title}
-                className="h-11 w-11 p-0"
-              >
-                <Icon size={15} />
-              </Button>
-            ))}
-          </div>
-          <div className="mt-1 flex items-center gap-0.5">
-            {DISTRIBUTE_ACTIONS.map(({ axis, title, Icon }) => (
-              <Button
-                key={axis}
-                variant="ghost"
-                onClick={() => distribute(axis)}
-                disabled={!canDistribute}
-                title={title}
-                className="h-11 w-11 p-0"
-              >
-                <Icon size={15} />
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      <Popover.Portal>
+        <Popover.Content
+          aria-label="Align"
+          align="start"
+          sideOffset={8}
+          collisionPadding={8}
+          // Focus the panel, not its first button, so no tooltip opens on
+          // mount (an open tooltip would swallow the first Escape).
+          onOpenAutoFocus={event => {
+            event.preventDefault();
+            (event.currentTarget as HTMLElement).focus();
+          }}
+          className={`${OVERLAY_SURFACE} z-[60] p-3`}
+        >
+          <TooltipProvider>
+            <div className="flex items-center gap-0.5">
+              {ALIGN_ACTIONS.map(({ edge, title, Icon }) => (
+                <Tooltip
+                  key={edge}
+                  content={title}
+                  className={PANEL_TOOLTIP_CLASS}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={ICON_BUTTON_CLASS}
+                    aria-label={title}
+                    onClick={() => align(edge)}
+                  >
+                    <Icon size={16} />
+                  </Button>
+                </Tooltip>
+              ))}
+            </div>
+            <div className="mt-1 flex items-center gap-0.5">
+              {DISTRIBUTE_ACTIONS.map(({ axis, title, Icon }) => (
+                <DisableableTooltip
+                  key={axis}
+                  content={title}
+                  disabled={!canDistribute}
+                  className={PANEL_TOOLTIP_CLASS}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={ICON_BUTTON_CLASS}
+                    aria-label={title}
+                    disabled={!canDistribute}
+                    onClick={() => distribute(axis)}
+                  >
+                    <Icon size={16} />
+                  </Button>
+                </DisableableTooltip>
+              ))}
+            </div>
+          </TooltipProvider>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
