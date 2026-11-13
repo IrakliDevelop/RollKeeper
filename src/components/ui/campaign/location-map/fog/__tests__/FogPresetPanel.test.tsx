@@ -4,8 +4,10 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FogPresetPanel } from '../FogPresetPanel';
 import {
@@ -64,16 +66,26 @@ function controls(
 }
 
 describe('FogPresetPanel selector', () => {
-  it('lists built-ins first, then presets, and applies on change', () => {
+  it('lists built-ins first, then presets, and applies on change', async () => {
+    const user = userEvent.setup();
     const c = controls();
     render(<FogPresetPanel controls={c} />);
-    const select = screen.getByRole('combobox', { name: 'Fog appearance' });
-    const labels = within(select)
-      .getAllByRole('option')
-      .map(o => o.textContent);
+    await user.click(screen.getByRole('combobox', { name: 'Fog appearance' }));
+    const labels = screen.getAllByRole('option').map(o => o.textContent);
     expect(labels).toEqual(['Solid (classic)', 'Cloudy', 'Red Mist']);
-    fireEvent.change(select, { target: { value: 'fp_red' } });
+    await user.click(screen.getByRole('option', { name: 'Red Mist' }));
     expect(c.select).toHaveBeenCalledWith('fp_red');
+  });
+
+  it('selects a fog appearance through the Radix select', async () => {
+    const user = userEvent.setup();
+    const c = controls();
+    render(<FogPresetPanel controls={c} />);
+    const trigger = screen.getByRole('combobox', { name: 'Fog appearance' });
+    expect(trigger).toHaveTextContent('Solid (classic)');
+    await user.click(trigger);
+    await user.click(screen.getByRole('option', { name: 'Cloudy' }));
+    expect(c.select).toHaveBeenCalledWith('cloudy');
   });
 
   it('shows a Custom option with the applied label when the map has a modified snapshot', () => {
@@ -85,11 +97,23 @@ describe('FogPresetPanel selector', () => {
         })}
       />
     );
-    const select = screen.getByRole('combobox', { name: 'Fog appearance' });
-    expect(select).toHaveValue('custom');
-    expect(
-      within(select).getByRole('option', { name: 'Modified' })
-    ).toBeInTheDocument();
+    const trigger = screen.getByRole('combobox', { name: 'Fog appearance' });
+    expect(trigger).toHaveTextContent('Modified');
+  });
+
+  it('shows the applied custom label when the preset was deleted', () => {
+    render(
+      <FogPresetPanel
+        controls={controls({
+          selectedValue: 'custom',
+          appliedLabel: 'Custom (preset deleted)',
+        })}
+      />
+    );
+    const trigger = screen.getByRole('combobox', { name: 'Fog appearance' });
+    expect(trigger).toHaveTextContent('Custom (preset deleted)');
+    // The trigger shows only the chosen appearance, not the whole list.
+    expect(trigger).not.toHaveTextContent('Cloudy');
   });
 
   it('opens the editor and the manager', () => {
@@ -140,6 +164,33 @@ describe('FogMaterialEditor', () => {
     expect(
       within(dialog).queryByRole('button', { name: 'Update preset' })
     ).toBeNull();
+  });
+
+  it('labels Detail and Seed as number inputs', async () => {
+    const user = userEvent.setup();
+    const c = controls({
+      editor: { draft: procedural, sourcePresetId: null, error: null },
+    });
+    render(<FogPresetPanel controls={c} />);
+    const dialog = screen.getByRole('dialog', { name: 'Fog material' });
+    await user.click(within(dialog).getByText('Advanced'));
+    const detail = within(dialog).getByRole('textbox', { name: 'Detail' });
+    expect(within(dialog).getByRole('textbox', { name: 'Seed' })).toHaveValue(
+      '7'
+    );
+    await user.clear(detail);
+    await user.type(detail, '2');
+    expect(c.updateDraft).toHaveBeenCalledWith({ detail: 2 });
+  });
+
+  it('names the preset field once', () => {
+    const c = controls({
+      editor: { draft: preset.material, sourcePresetId: null, error: null },
+    });
+    render(<FogPresetPanel controls={c} />);
+    expect(
+      screen.getByRole('textbox', { name: 'Preset name' })
+    ).not.toHaveAttribute('aria-label');
   });
 
   it('updates colors from the color picker', () => {
@@ -316,5 +367,185 @@ describe('FogPresetManager', () => {
       within(dialog).getByRole('button', { name: `Duplicate ${longName}` })
     );
     expect(screen.getByRole('alert')).toHaveTextContent(FOG_PRESET_ERRORS.name);
+  });
+});
+
+describe('FogPresetManager list and delete focus', () => {
+  const poisonMist = { ...preset, id: 'fp_poison', name: 'Poison Mist' };
+
+  function Harness({ initial }: { initial: FogPresetControls['library'] }) {
+    const [library, setLibrary] = useState(initial);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const c = controls({
+      managerOpen: true,
+      library,
+      pendingDeleteId,
+      requestDelete: setPendingDeleteId,
+      cancelDelete: () => setPendingDeleteId(null),
+      confirmDelete: () => {
+        setLibrary(prev => prev.filter(p => p.id !== pendingDeleteId));
+        setPendingDeleteId(null);
+      },
+      renamePreset: (id, name) => {
+        setLibrary(prev => prev.map(p => (p.id === id ? { ...p, name } : p)));
+        return null;
+      },
+    });
+    return <FogPresetPanel controls={c} />;
+  }
+
+  it('lists presets as list items', () => {
+    render(<Harness initial={[preset, poisonMist]} />);
+    const dialog = screen.getByRole('dialog', { name: 'Fog presets' });
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('focuses Keep preset when a delete is armed', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[preset, poisonMist]} />);
+    await user.click(screen.getByRole('button', { name: 'Delete Red Mist' }));
+    const confirm = screen.getByRole('alertdialog', {
+      name: 'Delete fog preset',
+    });
+    await waitFor(() =>
+      expect(
+        within(confirm).getByRole('button', { name: 'Keep preset' })
+      ).toHaveFocus()
+    );
+  });
+
+  it('returns focus to the row Delete after Keep preset', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[preset, poisonMist]} />);
+    await user.click(
+      screen.getByRole('button', { name: 'Delete Poison Mist' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Keep preset' }));
+    expect(
+      screen.queryByRole('alertdialog', { name: 'Delete fog preset' })
+    ).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Delete Poison Mist' })
+      ).toHaveFocus()
+    );
+  });
+
+  it('re-arming a different row focuses that confirm Keep preset again', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[preset, poisonMist]} />);
+    await user.click(screen.getByRole('button', { name: 'Delete Red Mist' }));
+    const first = screen.getByRole('alertdialog', {
+      name: 'Delete fog preset',
+    });
+    await waitFor(() =>
+      expect(
+        within(first).getByRole('button', { name: 'Keep preset' })
+      ).toHaveFocus()
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Delete Poison Mist' })
+    );
+    const second = screen.getByRole('alertdialog', {
+      name: 'Delete fog preset',
+    });
+    expect(second).toHaveTextContent('Delete “Poison Mist”?');
+    await waitFor(() =>
+      expect(
+        within(second).getByRole('button', { name: 'Keep preset' })
+      ).toHaveFocus()
+    );
+  });
+
+  it('falls back to the dialog after Keep preset when the armed row Delete is gone', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[preset, poisonMist]} />);
+    await user.click(
+      screen.getByRole('button', { name: 'Delete Poison Mist' })
+    );
+    // Renaming the armed row unmounts its Delete button.
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Poison Mist' })
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Delete Poison Mist' })
+    ).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Keep preset' }));
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Fog presets' })).toHaveFocus()
+    );
+  });
+
+  it('focuses the name input when Rename starts', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[preset, poisonMist]} />);
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Poison Mist' })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('textbox', { name: 'New name for Poison Mist' })
+      ).toHaveFocus()
+    );
+  });
+
+  it('returns focus to the row Rename after Save name and after Cancel', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[preset, poisonMist]} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Rename Poison Mist' })
+    );
+    const input = screen.getByRole('textbox', {
+      name: 'New name for Poison Mist',
+    });
+    await user.clear(input);
+    await user.type(input, 'Fog Bank');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+    expect(screen.queryByRole('textbox')).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Rename Fog Bank' })
+      ).toHaveFocus()
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rename Fog Bank' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('textbox')).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Rename Fog Bank' })
+      ).toHaveFocus()
+    );
+  });
+
+  describe('focuses the next row Rename after a confirmed delete, or the dialog when empty', () => {
+    it('focuses the first remaining row Rename', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[preset, poisonMist]} />);
+      await user.click(screen.getByRole('button', { name: 'Delete Red Mist' }));
+      await user.click(screen.getByRole('button', { name: 'Delete preset' }));
+      expect(
+        screen.queryByRole('button', { name: 'Rename Red Mist' })
+      ).toBeNull();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Rename Poison Mist' })
+        ).toHaveFocus()
+      );
+    });
+
+    it('focuses the dialog when the list is empty', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[preset]} />);
+      await user.click(screen.getByRole('button', { name: 'Delete Red Mist' }));
+      await user.click(screen.getByRole('button', { name: 'Delete preset' }));
+      expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+      await waitFor(() =>
+        expect(
+          screen.getByRole('dialog', { name: 'Fog presets' })
+        ).toHaveFocus()
+      );
+    });
   });
 });

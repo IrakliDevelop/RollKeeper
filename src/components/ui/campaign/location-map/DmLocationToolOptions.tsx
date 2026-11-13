@@ -30,7 +30,11 @@ import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import DmSelectionOptions from './DmSelectionOptions';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import { MAP_TOOL_META } from './mapToolDefs';
-import { MARKER_COLOR_KEYS, MARKER_KINDS } from './markerData';
+import {
+  MARKER_COLOR_KEYS,
+  MARKER_KIND_LABELS,
+  MARKER_KINDS,
+} from './markerData';
 import { MARKER_KIND_ICONS } from './markerIcons';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
@@ -107,15 +111,6 @@ const NOTE_TEXT_COLOR_NAMES: Readonly<Record<string, string>> = {
   '#2563eb': 'Blue',
   '#7c3aed': 'Violet',
   '#ffffff': 'White',
-};
-
-const MARKER_KIND_LABELS: Readonly<Record<MarkerKind, string>> = {
-  door: 'Door',
-  trap: 'Trap',
-  loot: 'Loot',
-  npc: 'NPC',
-  secret: 'Secret',
-  note: 'Note',
 };
 
 // The accessible names stay "Marker kind: {kind}" — the e2e clicks them.

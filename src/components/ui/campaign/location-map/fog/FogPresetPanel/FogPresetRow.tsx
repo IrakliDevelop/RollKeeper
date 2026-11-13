@@ -1,5 +1,6 @@
 'use client';
 
+import type { Ref } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { FogPresetRenameForm } from './FogPresetRenameForm';
 import type { FogPresetControls } from '../useFogPresetControls';
@@ -11,15 +12,19 @@ export function FogPresetRow({
   renaming,
   onStartRename,
   onStopRename,
+  renameButtonRef,
+  deleteButtonRef,
 }: {
   preset: FogPresetV1;
   controls: FogPresetControls;
   renaming: boolean;
   onStartRename(): void;
   onStopRename(): void;
+  renameButtonRef?: Ref<HTMLButtonElement>;
+  deleteButtonRef?: Ref<HTMLButtonElement>;
 }) {
   return (
-    <div className="border-divider flex flex-wrap items-center gap-2 rounded-md border p-2">
+    <li className="flex flex-wrap items-center gap-2 py-2 pointer-coarse:min-h-11">
       {renaming ? (
         <FogPresetRenameForm
           preset={preset}
@@ -28,18 +33,19 @@ export function FogPresetRow({
         />
       ) : (
         <>
-          <span className="text-body flex-1 text-sm">{preset.name}</span>
+          <span className="type-ui text-body flex-1">{preset.name}</span>
           <Button
-            variant="ghost"
-            className="min-h-[44px] px-3 text-xs"
+            ref={renameButtonRef}
+            variant="secondary"
+            size="sm"
             aria-label={`Rename ${preset.name}`}
             onClick={onStartRename}
           >
             Rename
           </Button>
           <Button
-            variant="ghost"
-            className="min-h-[44px] px-3 text-xs"
+            variant="secondary"
+            size="sm"
             aria-label={`Duplicate ${preset.name}`}
             onClick={() =>
               controls.setManagerError(controls.duplicatePreset(preset.id))
@@ -48,8 +54,9 @@ export function FogPresetRow({
             Duplicate
           </Button>
           <Button
+            ref={deleteButtonRef}
             variant="danger"
-            className="min-h-[44px] px-3 text-xs"
+            size="sm"
             aria-label={`Delete ${preset.name}`}
             onClick={() => controls.requestDelete(preset.id)}
           >
@@ -57,6 +64,6 @@ export function FogPresetRow({
           </Button>
         </>
       )}
-    </div>
+    </li>
   );
 }

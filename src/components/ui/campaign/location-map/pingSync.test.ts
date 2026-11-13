@@ -390,6 +390,54 @@ describe('attachPingInput', () => {
     expect(drawnPings(vp.overlays[0])).toBe(1);
   });
 
+  it('the hotkey is ignored while a Radix select trigger has focus', () => {
+    const { container, sent } = setup({ hotkey: 'p' });
+    fire(container, 'pointermove', { clientX: 12, clientY: 34 });
+
+    // Radix SelectTrigger renders a <button role="combobox">; its typeahead
+    // does not stop propagation, so "p" would otherwise reach the hotkey.
+    const trigger = document.createElement('button');
+    trigger.setAttribute('role', 'combobox');
+    document.body.appendChild(trigger);
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', bubbles: true })
+    );
+    expect(sent).toHaveLength(0);
+    trigger.remove();
+  });
+
+  it('the hotkey is ignored while a Radix select list is open', () => {
+    const { container, sent } = setup({ hotkey: 'p' });
+    fire(container, 'pointermove', { clientX: 12, clientY: 34 });
+
+    // Open list: div[role="option"] items inside a div[role="listbox"].
+    const listbox = document.createElement('div');
+    listbox.setAttribute('role', 'listbox');
+    const option = document.createElement('div');
+    option.setAttribute('role', 'option');
+    listbox.appendChild(option);
+    document.body.appendChild(listbox);
+    option.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', bubbles: true })
+    );
+    expect(sent).toHaveLength(0);
+    listbox.remove();
+  });
+
+  it('the hotkey still pings from a plain focused button', () => {
+    const { container, sent } = setup({ hotkey: 'p' });
+    fire(container, 'pointermove', { clientX: 12, clientY: 34 });
+
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+    button.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', bubbles: true })
+    );
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ kind: 'ping', x: 12, y: 34 });
+    button.remove();
+  });
+
   it('modified or repeated hotkey presses are ignored', () => {
     const { container, sent } = setup({ hotkey: 'p' });
     fire(container, 'pointermove', { clientX: 1, clientY: 2 });

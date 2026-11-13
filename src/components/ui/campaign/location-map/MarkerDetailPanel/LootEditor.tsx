@@ -8,6 +8,8 @@ import {
 } from '@/components/ui/campaign/MagicItemLibrary/AllItemsAutocomplete';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Section } from '@/components/ui/layout/section';
 import { useItemsData } from '@/hooks/useItemsData';
 import { useMagicItemsData } from '@/hooks/useMagicItemsData';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
@@ -26,6 +28,12 @@ import { deliverMarkerLoot } from '../markerLootDelivery';
 // causes React 19's external-store subscription to rerender indefinitely.
 const EMPTY_CUSTOM_ITEMS: CustomMagicItem[] = [];
 const EMPTY_NPCS: CampaignNPC[] = [];
+
+// Radix Select forbids an empty-string item value, so both pickers use a
+// disabled placeholder item as their resting value. The add-picker stays on
+// it after every pick, so choosing the same item again adds another copy.
+const LIBRARY_PLACEHOLDER = '__placeholder__';
+const NO_RECIPIENT = '__none__';
 
 function now(): string {
   return new Date().toISOString();
@@ -185,56 +193,57 @@ export function LootEditor({
     }
   };
 
+  const addFromLibrary = (itemId: string) => {
+    if (itemId === LIBRARY_PLACEHOLDER) return;
+    const selected = custom.find(item => item.id === itemId);
+    if (!selected) return;
+    const {
+      campaignCode: _campaign,
+      tags: _tags,
+      group: _group,
+      sourceItemId: _source,
+      ...copy
+    } = selected;
+    void _campaign;
+    void _tags;
+    void _group;
+    void _source;
+    onChange([...value, entry('magic', copy)]);
+  };
+
   return (
-    <section
-      className="border-divider bg-surface-secondary space-y-3 rounded-md border p-3"
-      aria-labelledby="marker-loot-heading"
-    >
-      <h4
-        id="marker-loot-heading"
-        className="text-heading text-sm font-semibold"
-      >
-        Loot contents
-      </h4>
+    <Section heading="Loot contents" level={4} contentClassName="space-y-3">
       <div className="flex flex-col gap-1.5">
-        <span className="text-heading text-xs font-semibold">
-          Player access
-        </span>
-        <div
-          role="group"
-          aria-label="Player access"
-          className="border-divider bg-surface flex gap-1 rounded-md border p-1"
-        >
+        <span className="type-small text-muted">Player access</span>
+        <div role="group" aria-label="Player access" className="flex gap-1">
           <Button
-            variant="ghost"
+            variant="secondary"
             selected={access === 'locked'}
             size="sm"
-            className="flex-1"
             aria-pressed={access === 'locked'}
-            leftIcon={<Lock size={14} />}
+            leftIcon={<Lock size={16} />}
             onClick={() => onAccessChange('locked')}
           >
             Locked
           </Button>
           <Button
-            variant="ghost"
+            variant="secondary"
             selected={access === 'open'}
             size="sm"
-            className="flex-1"
             aria-pressed={access === 'open'}
             onClick={() => onAccessChange('open')}
           >
             Open
           </Button>
         </div>
-        <p className="text-body text-xs">
+        <p className="type-small text-body">
           {access === 'locked'
             ? 'Players see a locked chest and nothing inside. Claims are refused on the server too.'
             : "Players can see the contents and claim up to what's left."}
         </p>
       </div>
       {deliveryMessage && (
-        <p role="status" className="text-muted text-sm">
+        <p role="status" className="type-small text-muted">
           {deliveryMessage}
         </p>
       )}
@@ -245,40 +254,20 @@ export function LootEditor({
         onSelect={addCompendium}
       />
       {custom.length > 0 && (
-        <label className="text-body flex flex-col gap-1 text-sm font-medium">
-          Add from campaign item library
-          <select
-            className="border-divider bg-surface text-body min-h-10 rounded-md border px-3"
-            defaultValue=""
-            onChange={event => {
-              const selected = custom.find(
-                item => item.id === event.target.value
-              );
-              if (selected) {
-                const {
-                  campaignCode: _campaign,
-                  tags: _tags,
-                  group: _group,
-                  sourceItemId: _source,
-                  ...copy
-                } = selected;
-                void _campaign;
-                void _tags;
-                void _group;
-                void _source;
-                onChange([...value, entry('magic', copy)]);
-                event.target.value = '';
-              }
-            }}
-          >
-            <option value="">Choose an item…</option>
-            {custom.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Add from campaign item library"
+          value={LIBRARY_PLACEHOLDER}
+          onValueChange={addFromLibrary}
+        >
+          <SelectItem value={LIBRARY_PLACEHOLDER} disabled>
+            Choose an item…
+          </SelectItem>
+          {custom.map(item => (
+            <SelectItem key={item.id} value={item.id}>
+              {item.name}
+            </SelectItem>
+          ))}
+        </SelectField>
       )}
       <div className="flex gap-2">
         <Input
@@ -289,6 +278,7 @@ export function LootEditor({
         />
         <Button
           variant="secondary"
+          size="md"
           className="self-end"
           leftIcon={<Plus size={16} />}
           onClick={() => {
@@ -314,86 +304,92 @@ export function LootEditor({
         </Button>
       </div>
       {value.length === 0 ? (
-        <p className="text-muted text-sm">No loot added yet.</p>
+        <p className="type-small text-muted">No loot added yet.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="divide-divider divide-y">
           {value.map(loot => {
             const remaining = loot.quantity - loot.claimedQuantity;
             return (
-              <li
-                key={loot.id}
-                className="border-divider bg-surface space-y-2 rounded-md border p-2"
-              >
+              <li key={loot.id} className="space-y-2 py-2">
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-heading truncate text-sm font-medium">
+                    <p className="type-ui text-heading truncate">
                       {loot.item.name}
                     </p>
-                    <p className="text-muted text-xs">
+                    <p className="type-small text-muted">
                       {remaining} of {loot.quantity} available
                     </p>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="w-9 shrink-0 px-0"
                     aria-label={`Decrease ${loot.item.name} quantity`}
                     onClick={() => setQuantity(loot.id, loot.quantity - 1)}
                   >
-                    <Minus size={15} />
+                    <Minus size={16} />
                   </Button>
-                  <span className="text-body min-w-6 text-center text-sm">
+                  <span className="type-ui text-body min-w-6 text-center tabular-nums">
                     {loot.quantity}
                   </span>
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="w-9 shrink-0 px-0"
                     aria-label={`Increase ${loot.item.name} quantity`}
                     onClick={() => setQuantity(loot.id, loot.quantity + 1)}
                   >
-                    <Plus size={15} />
+                    <Plus size={16} />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="w-9 shrink-0 px-0"
                     aria-label={`Remove ${loot.item.name}`}
                     onClick={() =>
                       onChange(value.filter(item => item.id !== loot.id))
                     }
                   >
-                    <Trash2 size={15} />
+                    <Trash2 size={16} />
                   </Button>
                 </div>
                 <div className="flex gap-2">
-                  <select
-                    aria-label={`Recipient for ${loot.item.name}`}
-                    className="border-divider bg-surface text-body min-h-9 min-w-0 flex-1 rounded-md border px-2 text-sm"
-                    value={recipients[loot.id] ?? ''}
-                    onChange={event =>
+                  <SelectField
+                    value={recipients[loot.id] ?? NO_RECIPIENT}
+                    onValueChange={recipient => {
+                      if (recipient === NO_RECIPIENT) return;
                       setRecipients(current => ({
                         ...current,
-                        [loot.id]: event.target.value,
-                      }))
-                    }
+                        [loot.id]: recipient,
+                      }));
+                    }}
+                    wrapperClassName="min-w-0 flex-1"
+                    triggerProps={{
+                      'aria-label': `Recipient for ${loot.item.name}`,
+                      size: 'sm',
+                    }}
                   >
-                    <option value="">Give one to…</option>
+                    <SelectItem value={NO_RECIPIENT} disabled>
+                      Give one to…
+                    </SelectItem>
                     {players.map(player => (
-                      <option
+                      <SelectItem
                         key={player.playerId}
                         value={`player:${player.playerId}`}
                       >
                         {player.characterName} (player)
-                      </option>
+                      </SelectItem>
                     ))}
                     {npcs.map(npc => (
-                      <option key={npc.id} value={`npc:${npc.id}`}>
+                      <SelectItem key={npc.id} value={`npc:${npc.id}`}>
                         {npc.name} (NPC)
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
+                  </SelectField>
                   <Button
                     variant="secondary"
                     size="sm"
-                    leftIcon={<Gift size={15} />}
+                    leftIcon={<Gift size={16} />}
                     disabled={
                       !dmId ||
                       !recipients[loot.id] ||
@@ -410,6 +406,6 @@ export function LootEditor({
           })}
         </ul>
       )}
-    </section>
+    </Section>
   );
 }

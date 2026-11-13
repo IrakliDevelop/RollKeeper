@@ -5,6 +5,7 @@ import {
   cleanup,
   waitFor,
   fireEvent,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createHtmlElement, createNote } from '@fieldnotes/core';
@@ -14,7 +15,6 @@ import MarkerDetailPanel from './index';
 import {
   resolveMarkerPanelState,
   MARKER_PANEL_CONTAINMENT_CLASS,
-  MARKER_PANEL_TOUCH_TARGET_CLASS,
 } from './MarkerDetailPanel.utils';
 import type {
   MarkerPanelMode,
@@ -29,7 +29,13 @@ import {
   type MarkerKind,
 } from '../markerData';
 
-import type { MarkerDetail, PublicMarkerDetail } from '@/types/battlemap';
+import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
+import type {
+  MarkerDetail,
+  MarkerLootEntry,
+  PublicMarkerDetail,
+} from '@/types/battlemap';
+import type { CustomMagicItem } from '@/types/magicItemLibrary';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -315,8 +321,8 @@ describe('MarkerDetailPanel', () => {
         />
       );
 
-      await user.selectOptions(screen.getByLabelText('Status'), status);
-      expect(screen.getByRole('option', { name: label })).toBeTruthy();
+      await user.click(screen.getByLabelText('Status'));
+      await user.click(screen.getByRole('option', { name: label }));
       await user.click(screen.getByRole('button', { name: 'Save' }));
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status }));
       cleanup();
@@ -404,12 +410,11 @@ describe('MarkerDetailPanel', () => {
     );
 
     await user.type(screen.getByLabelText('Discovery DC'), '15');
-    await user.selectOptions(
-      screen.getByLabelText('Discovery skill'),
-      'investigation'
-    );
+    await user.click(screen.getByLabelText('Discovery skill'));
+    await user.click(screen.getByRole('option', { name: 'Investigation' }));
     await user.type(screen.getByLabelText('Disarm DC'), '17');
-    await user.selectOptions(screen.getByLabelText('Disarm method'), 'arcana');
+    await user.click(screen.getByLabelText('Disarm method'));
+    await user.click(screen.getByRole('option', { name: 'Arcana' }));
     await user.type(screen.getByLabelText('Trigger'), 'Touching the idol');
     await user.type(screen.getByLabelText('Damage'), '4d6 fire');
     await user.type(screen.getByLabelText('Trap effect'), 'The room ignites.');
@@ -636,6 +641,21 @@ describe('MarkerDetailPanel', () => {
     expect(dm.baseElement.innerHTML).toContain(dmNotesValue);
   });
 
+  it('names an unlabelled npc marker by its kind label in player missing-detail', () => {
+    const data = buildMarkerData({ kind: 'npc', ref: 'ref-1' });
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{ kind: 'missing-detail', data }}
+        onClose={() => {}}
+      />
+    );
+    expect(
+      screen.getByTestId('marker-panel-state-missing-detail')
+    ).toHaveTextContent('for this "NPC" marker.');
+  });
+
   it('gates the missing-detail edit form on dm mode; player mode gets the read-only treatment (positive control: dm mode renders the form)', () => {
     const data = buildMarkerData({ kind: 'door', ref: 'ref-1' });
     const state: MarkerPanelState = { kind: 'missing-detail', data };
@@ -727,35 +747,244 @@ describe('MarkerDetailPanel', () => {
     expect(bodyNode.className).toContain(MARKER_PANEL_CONTAINMENT_CLASS);
   });
 
-  it('gives every rendered button the exported touch-target class, across the message states, the DM edit form and the player read-only view', () => {
+  it('renders every control as a Button primitive', () => {
     const data = buildMarkerData({ kind: 'note', ref: 'ref-1' });
-    const cases: { mode: MarkerPanelMode; state: MarkerPanelState }[] = [
+    const trapData = buildMarkerData({ kind: 'trap', ref: 'ref-1' });
+    const cases: {
+      mode: MarkerPanelMode;
+      state: MarkerPanelState;
+      portalState?: ResolvedPortalState;
+    }[] = [
       ...nonReadyStateCases(data),
       // The panel's own footer ghost Close is the only interactive control
       // in the player read-only view (and in all three message states
       // above); without this case it is never covered by this test.
       { mode: 'player', state: { kind: 'ready', data, detail: detail() } },
+      // The full DM form: audience toggle, trap fields, destination link,
+      // Delete and Save.
+      {
+        mode: 'dm',
+        state: { kind: 'ready', data: trapData, detail: detail() },
+        portalState: {
+          target: { v: 1, kind: 'battlemap', id: 'map-b' },
+          resolved: {
+            status: 'ready',
+            name: 'Crypt',
+            href: '/dm/campaign/ABC/battlemaps/map-b',
+          },
+          battleMapChoices: [{ id: 'map-b', name: 'Crypt' }],
+          locationChoices: [],
+        },
+      },
     ];
 
-    for (const { mode, state } of cases) {
-      const { baseElement, unmount } = render(
+    for (const { mode, state, portalState } of cases) {
+      const { unmount } = render(
         <MarkerDetailPanel
           open
           mode={mode}
           state={state}
+          isDmOnly
+          onAudienceChange={() => {}}
+          portalState={portalState}
           onClose={() => {}}
           onSave={() => {}}
           onDelete={() => {}}
         />
       );
 
-      const buttons = baseElement.querySelectorAll('button');
+      // Role queries skip the Radix select triggers (role="combobox").
+      const buttons = within(screen.getByRole('dialog')).getAllByRole('button');
       expect(buttons.length).toBeGreaterThan(0);
       buttons.forEach(button => {
-        expect(button.className).toContain(MARKER_PANEL_TOUCH_TARGET_CLASS);
+        expect(button).toHaveAttribute('data-variant');
       });
       unmount();
     }
+  });
+
+  it('the audience toggle is an outline action', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'secret', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        isDmOnly
+        onAudienceChange={() => {}}
+        onClose={() => {}}
+      />
+    );
+    const toggle = screen.getByRole('button', { name: 'Reveal to players' });
+    expect(toggle).toHaveAttribute('data-variant', 'secondary');
+    expect(toggle).not.toHaveAttribute('aria-pressed');
+  });
+
+  it('labels the Status select and saves the chosen status', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    await user.click(screen.getByRole('combobox', { name: 'Status' }));
+    await user.click(screen.getByRole('option', { name: 'Locked' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'locked' })
+    );
+  });
+
+  it('saves an empty discovery DC as undefined and clamps 45 to 40', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail({
+            discovery: { dc: 12, skill: 'perception' },
+            trap: {
+              disarmDc: 10,
+              disarmMethod: 'thieves-tools',
+              trigger: '',
+              effect: '',
+              damage: '',
+            },
+          }),
+        }}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    await user.clear(screen.getByLabelText('Discovery DC'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        discovery: { dc: undefined, skill: 'perception' },
+      })
+    );
+
+    await user.clear(screen.getByLabelText('Disarm DC'));
+    await user.type(screen.getByLabelText('Disarm DC'), '45');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        trap: expect.objectContaining({ disarmDc: 40 }),
+      })
+    );
+  });
+
+  it('groups trap fields under Discovery and Trap mechanics headings', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Discovery', level: 4 })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Trap mechanics', level: 4 })
+    ).toBeInTheDocument();
+  });
+
+  it('puts Title, Body and DM notes before the kind sections on a trap form', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    const status = screen.getByRole('combobox', { name: 'Status' });
+    const title = screen.getByLabelText('Title');
+    const dmNotes = screen.getByLabelText('DM notes — never shown to players');
+    const discovery = screen.getByRole('heading', {
+      name: 'Discovery',
+      level: 4,
+    });
+    const follows = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(status, title)).toBe(true);
+    expect(follows(title, dmNotes)).toBe(true);
+    expect(follows(dmNotes, discovery)).toBe(true);
+  });
+
+  it('shows the DM label as typed and NPC for an unlabelled npc', () => {
+    const labelled = render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({
+            kind: 'loot',
+            ref: 'ref-1',
+            label: 'goblin chest',
+          }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByRole('heading', { level: 2 })
+    ).toHaveTextContent('goblin chest');
+    labelled.unmount();
+
+    const unlabelled = render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{
+          kind: 'unpublished',
+          data: buildMarkerData({ kind: 'npc', ref: 'ref-1' }),
+        }}
+        onClose={() => {}}
+      />
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByRole('heading', { level: 2 })
+    ).toHaveTextContent('NPC');
+    expect(
+      screen.getByTestId('marker-panel-state-unpublished')
+    ).toHaveTextContent('this "NPC" marker.');
+    unlabelled.unmount();
   });
 
   it('resets the form when the panel opens on a different marker', async () => {
@@ -934,7 +1163,10 @@ describe('MarkerDetailPanel player loot: locked container and quantity stepper',
         onClaimLoot={vi.fn()}
       />
     );
-    expect(screen.getByText('Loot')).toBeInTheDocument();
+    // The unlabelled marker's dialog title is also "Loot" (an h2); the
+    // section heading is the h4.
+    const lootHeading = { name: 'Loot', level: 4 } as const;
+    expect(screen.getByRole('heading', lootHeading)).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
 
     rerender(
@@ -950,8 +1182,75 @@ describe('MarkerDetailPanel player loot: locked container and quantity stepper',
         onClaimLoot={vi.fn()}
       />
     );
-    expect(screen.queryByText('Loot')).toBeNull();
+    expect(screen.queryByRole('heading', lootHeading)).toBeNull();
     expect(screen.queryByText('Open')).toBeNull();
+  });
+
+  it('lists loot under a Loot heading with one list item per entry', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({
+          loot: [
+            ...arrowsLoot(8),
+            {
+              id: 'loot-2',
+              name: 'Rope',
+              itemKind: 'inventory' as const,
+              quantity: 1,
+              remainingQuantity: 1,
+            },
+          ],
+        })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    const heading = screen.getByRole('heading', { name: 'Loot', level: 4 });
+    expect(heading).toBeInTheDocument();
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByText('Arrows')).toBeInTheDocument();
+    expect(within(items[1]).getByText('Rope')).toBeInTheDocument();
+  });
+
+  it('claim is an outline action, not brass', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(8) })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Claim 8' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Take fewer Arrows' })
+    ).toHaveAttribute('data-variant', 'secondary');
+    expect(
+      screen.getByRole('button', { name: 'Take more Arrows' })
+    ).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('shows the locked state as text with no claim controls', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ lootLocked: true })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Locked')).toBeInTheDocument();
+    expect(screen.getByText("You'd need to get it open first.")).toBeVisible();
+    expect(screen.queryByRole('button', { name: /claim/i })).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
   });
 
   it('claims the quantity the player stepped down to', async () => {
@@ -1588,5 +1887,157 @@ describe('MarkerDetailPanel portal destination', () => {
         screen.getByText(/claims are refused on the server too/i)
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe('MarkerDetailPanel DM loot editor', () => {
+  afterEach(() => {
+    useMagicItemLibraryStore.setState({ itemsByCampaign: {} });
+  });
+
+  /** Routes the campaign roster request; every other fetch (compendium
+   * item lists) gets an empty body. */
+  function stubFetch(players: { playerId: string; characterName: string }[]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => ({
+        ok: true,
+        json: async () => (url.endsWith('/players') ? { players } : {}),
+      }))
+    );
+  }
+
+  function lootEntry(id: string, name: string): MarkerLootEntry {
+    return {
+      id,
+      itemKind: 'inventory',
+      item: {
+        id: `item-${id}`,
+        name,
+        category: 'treasure',
+        quantity: 1,
+        tags: [],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      quantity: 1,
+      claimedQuantity: 0,
+    };
+  }
+
+  function renderLootPanel(
+    lootDetail: Partial<MarkerDetail>,
+    onSave: (patch: unknown) => void = () => {}
+  ) {
+    return render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        campaignCode="ABC123"
+        dmId="dm-1"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+          detail: detail(lootDetail),
+        }}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+  }
+
+  it('adds the same library item twice from the add-picker', async () => {
+    stubFetch([]);
+    const customItem: CustomMagicItem = {
+      id: 'custom-1',
+      name: 'Ring of Warmth',
+      category: 'ring',
+      rarity: 'uncommon',
+      description: 'Keeps the cold out.',
+      properties: [],
+      requiresAttunement: true,
+      isAttuned: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      campaignCode: 'ABC123',
+      tags: [],
+    };
+    useMagicItemLibraryStore.setState({
+      itemsByCampaign: { ABC123: [customItem] },
+    });
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    renderLootPanel({ loot: [] }, onSave);
+
+    const picker = screen.getByRole('combobox', {
+      name: 'Add from campaign item library',
+    });
+    for (let pick = 0; pick < 2; pick += 1) {
+      await user.click(picker);
+      await user.click(screen.getByRole('option', { name: 'Ring of Warmth' }));
+      expect(picker).toHaveTextContent(/^Choose an item…$/);
+    }
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const { loot } = onSave.mock.calls[0][0] as { loot: MarkerLootEntry[] };
+    expect(loot).toHaveLength(2);
+    expect(loot.map(entry => entry.itemKind)).toEqual(['magic', 'magic']);
+    expect(loot.map(entry => entry.item.name)).toEqual([
+      'Ring of Warmth',
+      'Ring of Warmth',
+    ]);
+  });
+
+  it('keeps recipients per row and gates Give', async () => {
+    stubFetch([{ playerId: 'p1', characterName: 'Aria' }]);
+    const user = userEvent.setup();
+    renderLootPanel({
+      loot: [lootEntry('loot-a', 'Rope'), lootEntry('loot-b', 'Lantern')],
+    });
+
+    const ropeRecipient = screen.getByRole('combobox', {
+      name: 'Recipient for Rope',
+    });
+    const lanternRecipient = screen.getByRole('combobox', {
+      name: 'Recipient for Lantern',
+    });
+    await user.click(ropeRecipient);
+    await user.click(
+      await screen.findByRole('option', { name: 'Aria (player)' })
+    );
+
+    expect(ropeRecipient).toHaveTextContent(/^Aria \(player\)$/);
+    expect(lanternRecipient).toHaveTextContent(/^Give one to…$/);
+    const [ropeGive, lanternGive] = screen.getAllByRole('button', {
+      name: 'Give',
+    });
+    expect(ropeGive).toBeEnabled();
+    expect(lanternGive).toBeDisabled();
+  });
+
+  it('player access is a segmented pair', () => {
+    stubFetch([]);
+    renderLootPanel({ loot: [], lootAccess: 'locked' });
+
+    const group = screen.getByRole('group', { name: 'Player access' });
+    const locked = within(group).getByRole('button', { name: 'Locked' });
+    const open = within(group).getByRole('button', { name: 'Open' });
+    expect(locked).toHaveAttribute('aria-pressed', 'true');
+    expect(open).toHaveAttribute('aria-pressed', 'false');
+    expect(locked).toHaveAttribute('data-variant', 'secondary');
+    expect(open).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('lists loot under the Loot contents heading', () => {
+    stubFetch([]);
+    renderLootPanel({ loot: [lootEntry('loot-a', 'Rope')] });
+
+    const heading = screen.getByRole('heading', {
+      name: 'Loot contents',
+      level: 4,
+    });
+    const section = required(heading.closest('section'), 'loot section');
+    expect(within(section).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(section).getByText('1 of 1 available')).toBeInTheDocument();
   });
 });
