@@ -121,7 +121,7 @@ export function StudioPanel({
       data-testid="dm-vtt-studio-panel"
       data-active-tab={activeTab}
     >
-      <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-2 py-1.5">
+      <div className="border-divider flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-2 py-1.5">
         <div className="flex items-center gap-1">
           {TABS.map(({ key, icon, label }) => (
             <Button
@@ -137,12 +137,12 @@ export function StudioPanel({
             </Button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <Button
             asChild
             variant="link"
             size="sm"
-            className="hidden px-1 lg:inline-flex"
+            className="hidden px-1 whitespace-nowrap lg:inline-flex"
             rightIcon={<ExternalLink size={14} />}
           >
             <Link

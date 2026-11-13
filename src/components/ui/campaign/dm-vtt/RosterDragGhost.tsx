@@ -38,7 +38,7 @@ export function RosterDragGhost({ drag }: RosterDragGhostProps) {
       {showOutline && (
         <div
           aria-hidden
-          className="border-brass-border pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 border-dashed opacity-70"
+          className="border-brass-border pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-dashed opacity-70"
           style={{ left: x, top: y, width: footprintPx, height: footprintPx }}
         />
       )}
@@ -64,10 +64,10 @@ export function RosterDragGhost({ drag }: RosterDragGhostProps) {
             firstName.charAt(0).toUpperCase()
           )}
         </span>
-        <span className="text-heading text-xs font-medium whitespace-nowrap">
+        <span className="type-ui text-heading whitespace-nowrap">
           {firstName}
           {cells > 1 && !showOutline && (
-            <span className="text-muted ml-1">
+            <span className="type-small text-muted ml-1">
               {cells}×{cells}
             </span>
           )}

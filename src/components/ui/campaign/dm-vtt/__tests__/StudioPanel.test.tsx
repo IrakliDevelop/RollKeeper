@@ -628,6 +628,30 @@ describe('StudioPanel', () => {
     });
   });
 
+  it('clicking the checked colour swatch again clears it ({ color: undefined })', () => {
+    const onTokenIdentityChange = vi.fn();
+    const red = PIECE_COLORS.find(c => c.name === 'Red')!;
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({
+            entities: [aria, { ...goblin1, color: red.value }, goblin2],
+          }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    const swatch = screen.getByRole('radio', { name: 'Red' });
+    expect(swatch).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(swatch);
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(
+      { ...goblin1, color: red.value },
+      { color: undefined }
+    );
+  });
+
   it('clicking "Clear" on colors sends { color: undefined }', () => {
     const onTokenIdentityChange = vi.fn();
     render(

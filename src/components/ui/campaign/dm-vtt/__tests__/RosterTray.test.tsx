@@ -260,6 +260,17 @@ describe('RosterTray focus across collapse', () => {
       ).toHaveFocus()
     );
   });
+
+  it('does not take focus when it mounts expanded', () => {
+    const outside = document.createElement('button');
+    outside.textContent = 'Outside';
+    document.body.appendChild(outside);
+    outside.focus();
+
+    render(<RosterTray {...baseProps()} />);
+    expect(outside).toHaveFocus();
+    outside.remove();
+  });
 });
 
 describe('RosterRow player eye button', () => {

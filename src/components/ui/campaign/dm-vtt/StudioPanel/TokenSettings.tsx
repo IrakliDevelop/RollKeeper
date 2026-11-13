@@ -63,7 +63,7 @@ export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
   return (
     <TooltipProvider>
       <Section level={4} heading="Token" className="px-3 py-3">
-        <div className="mt-2 flex items-center gap-1.5">
+        <div className="mb-2 flex items-center gap-1.5">
           <Input
             value={url}
             onChange={e => setUrl(e.target.value)}
