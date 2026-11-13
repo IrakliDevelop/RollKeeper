@@ -6,6 +6,8 @@ import { Dices, X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { AppIcon } from '@/components/ui/icons';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 
 import type { InitiativeRollRequest } from '@/types/sharedState';
 
@@ -52,66 +54,70 @@ export function InitiativeRollPrompt({
   };
 
   return (
-    <div
-      className={
-        embedded
-          ? 'bg-surface-raised border-divider pointer-events-auto w-full rounded-md border p-3'
-          : 'bg-surface-raised border-divider pointer-events-auto fixed bottom-4 left-1/2 z-40 w-[min(92vw,380px)] -translate-x-1/2 rounded-2xl border p-3 shadow-xl'
-      }
-    >
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <p className="text-heading text-sm font-semibold">
-          {request.encounterName}: roll for initiative!
-        </p>
-        <Button
-          variant="ghost"
-          onClick={onDismiss}
-          className="min-h-[44px] min-w-[44px] p-0"
-          aria-label="Dismiss"
-        >
-          <X size={16} />
-        </Button>
+    <TooltipProvider>
+      <div
+        className={
+          embedded
+            ? 'bg-surface-elevated border-divider pointer-events-auto w-full rounded-md border p-3'
+            : `${OVERLAY_SURFACE} pointer-events-auto fixed bottom-4 left-1/2 z-40 w-[min(92vw,380px)] -translate-x-1/2 p-3`
+        }
+      >
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <p className="type-ui text-heading font-semibold">
+            Roll initiative for {request.encounterName}
+          </p>
+          <Tooltip content="Dismiss initiative prompt">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDismiss}
+              className="w-9 p-0"
+              aria-label="Dismiss initiative prompt"
+            >
+              <X size={16} aria-hidden />
+            </Button>
+          </Tooltip>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleRoll}
+            leftIcon={<Dices size={16} />}
+          >
+            Roll d20
+          </Button>
+          <Input
+            value={value}
+            onChange={e => {
+              setValue(e.target.value);
+              setBreakdown(null);
+              setError(false);
+            }}
+            inputMode="numeric"
+            placeholder="Total"
+            aria-label="Initiative total"
+            className="w-20 text-center"
+          />
+          <Button
+            variant="primary"
+            onClick={() => void handleConfirm()}
+            disabled={!valid || sending}
+            className="flex-1"
+          >
+            {sending ? 'Sending…' : 'Confirm'}
+          </Button>
+        </div>
+        {breakdown && (
+          <p className="type-small text-muted mt-1.5 flex items-center gap-1">
+            <AppIcon name="dice" className="h-3.5 w-3.5" /> {breakdown}
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="type-small text-blood-text mt-1.5">
+            Couldn&apos;t send your roll. Try again.
+          </p>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="secondary"
-          onClick={handleRoll}
-          className="min-h-[44px]"
-          leftIcon={<Dices size={16} />}
-        >
-          Roll d20
-        </Button>
-        <Input
-          value={value}
-          onChange={e => {
-            setValue(e.target.value);
-            setBreakdown(null);
-            setError(false);
-          }}
-          inputMode="numeric"
-          placeholder="Total"
-          aria-label="Initiative total"
-          className="min-h-[44px] w-20 text-center"
-        />
-        <Button
-          variant="primary"
-          onClick={() => void handleConfirm()}
-          disabled={!valid || sending}
-          className="min-h-[44px] flex-1"
-        >
-          {sending ? 'Sending…' : 'Confirm'}
-        </Button>
-      </div>
-      {breakdown && (
-        <p className="text-muted mt-1.5 flex items-center gap-1 text-xs">
-          <AppIcon name="dice" className="h-3.5 w-3.5" /> {breakdown}
-        </p>
-      )}
-      {error && (
-        <p className="text-accent-red-text mt-1.5 text-xs">
-          Couldn&apos;t send — try again.
-        </p>
-      )}
-    </div>
+    </TooltipProvider>
   );
 }
