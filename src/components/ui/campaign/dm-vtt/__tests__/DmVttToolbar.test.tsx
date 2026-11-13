@@ -1,15 +1,19 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { DmVttToolbar } from '@/components/ui/campaign/dm-vtt/DmVttToolbar';
 import DmLocationToolOptions from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import type { DmFogControls } from '@/components/ui/campaign/location-map/fog';
 import {
   MARKER_MIXED_AUDIENCE_MESSAGE,
   MARKER_SHARE_REVEALS_CLASSIFICATION,
 } from '@/components/ui/campaign/location-map/markerAudienceCopy';
 
+let mockActiveTool = 'select';
+
 vi.mock('@fieldnotes/react', () => ({
-  useActiveTool: () => ['select', vi.fn()] as const,
+  useActiveTool: () => [mockActiveTool, vi.fn()] as const,
   useToolOptions: () => [undefined, vi.fn()] as const,
 }));
 
@@ -21,8 +25,134 @@ vi.mock('@/components/ui/campaign/location-map/DmLocationToolOptions', () => ({
   default: vi.fn(() => null),
 }));
 
+const baseProps = {
+  onClearDrawings: vi.fn(),
+  tokenInfoToggle: { mode: 'compact' as const, onCycle: vi.fn() },
+  hiddenPlacementActive: false,
+  onToggleHiddenPlacement: vi.fn(),
+  hiddenElementCount: 0,
+  onRevealAll: vi.fn(),
+  selectedElementId: null,
+  selectedElementIsDmOnly: false,
+  onToggleSelectedDmOnly: vi.fn(),
+};
+
 describe('DmVttToolbar', () => {
-  afterEach(() => cleanup());
+  beforeEach(() => {
+    mockActiveTool = 'select';
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('active tool and fog use the selected outline', () => {
+    mockActiveTool = 'fog';
+    const fogControls = { disabled: false, requestActivate: vi.fn() };
+    const { rerender } = render(
+      <DmVttToolbar
+        {...baseProps}
+        fogControls={fogControls as unknown as DmFogControls}
+      />
+    );
+    const fog = screen.getByRole('button', { name: 'Fog of war' });
+    expect(fog).toHaveAttribute('aria-pressed', 'true');
+    expect(fog).toHaveAttribute('data-variant', 'ghost');
+    expect(fog).toHaveAttribute('data-selected');
+    const select = screen.getByRole('button', { name: 'Select' });
+    expect(select).toHaveAttribute('aria-pressed', 'false');
+    expect(select).not.toHaveAttribute('data-selected');
+
+    mockActiveTool = 'select';
+    rerender(
+      <DmVttToolbar
+        {...baseProps}
+        fogControls={fogControls as unknown as DmFogControls}
+      />
+    );
+    expect(select).toHaveAttribute('aria-pressed', 'true');
+    expect(select).toHaveAttribute('data-variant', 'ghost');
+    expect(select).toHaveAttribute('data-selected');
+    expect(fog).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('uses the shared tool vocabulary and carries no title attributes', () => {
+    const { container } = render(<DmVttToolbar {...baseProps} />);
+    expect(screen.getByRole('button', { name: 'Sticky note' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Ping' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Template' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Sticky Note' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Ping (look here)' })
+    ).toBeNull();
+    expect(container.querySelectorAll('[title]')).toHaveLength(0);
+  });
+
+  it('keeps the active tool in view', () => {
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const { rerender } = render(<DmVttToolbar {...baseProps} />);
+    spy.mockClear();
+
+    mockActiveTool = 'pencil';
+    rerender(<DmVttToolbar {...baseProps} />);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenLastCalledWith({
+      block: 'nearest',
+      inline: 'nearest',
+    });
+    expect(spy.mock.contexts.at(-1)).toBe(
+      screen.getByRole('button', { name: 'Draw' })
+    );
+  });
+
+  it('Clear drawings is a danger icon button', () => {
+    render(<DmVttToolbar {...baseProps} />);
+    expect(
+      screen.getByRole('button', { name: 'Clear drawings' })
+    ).toHaveAttribute('data-variant', 'danger');
+  });
+
+  it('shows the hidden-placement words and the reveal count with their tooltips', async () => {
+    const user = userEvent.setup();
+    render(
+      <DmVttToolbar
+        {...baseProps}
+        hiddenPlacementActive
+        hiddenElementCount={2}
+      />
+    );
+    expect(screen.getByText('Placing hidden')).toBeInTheDocument();
+    expect(screen.getByText('Reveal all (2)')).toBeInTheDocument();
+    await user.hover(
+      screen.getByRole('button', { name: 'Reveal all hidden elements (2)' })
+    );
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Reveal all 2 hidden elements'
+    );
+  });
+
+  it('explains a disabled Reveal all through its tooltip', async () => {
+    const user = userEvent.setup();
+    render(<DmVttToolbar {...baseProps} />);
+    const reveal = screen.getByRole('button', {
+      name: 'Reveal all hidden elements (0)',
+    });
+    expect(reveal).toBeDisabled();
+    await user.hover(reveal.parentElement as HTMLElement);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'No hidden elements to reveal'
+    );
+  });
 
   it('threads the shared fog controller into the button and options bar', () => {
     const requestActivate = vi.fn();
@@ -224,8 +354,7 @@ describe('DmVttToolbar', () => {
 
     const marker = screen.getByRole('button', { name: 'Marker' });
     expect(marker).toBeInTheDocument();
-    expect(marker.className).toContain('min-h-[44px]');
-    expect(marker.className).toContain('min-w-[44px]');
+    expect(marker).toHaveAttribute('data-variant');
   });
 
   it('threads markerControls through to the shared tool options bar', () => {
@@ -293,7 +422,8 @@ describe('DmVttToolbar', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('the DM-only toggle warns that a shared marker publishes its kind, label and colour', () => {
+  it('the DM-only toggle warns that a shared marker publishes its kind, label and colour', async () => {
+    const user = userEvent.setup();
     const { unmount } = render(
       <DmVttToolbar
         onClearDrawings={vi.fn()}
@@ -309,9 +439,7 @@ describe('DmVttToolbar', () => {
       />
     );
     const markerToggle = screen.getByTestId('dm-vtt-dm-only-toggle');
-    expect(markerToggle.getAttribute('title')).toContain(
-      MARKER_SHARE_REVEALS_CLASSIFICATION
-    );
+    expect(markerToggle).not.toHaveAttribute('title');
     expect(markerToggle.getAttribute('aria-label')).toContain(
       MARKER_SHARE_REVEALS_CLASSIFICATION
     );
@@ -332,7 +460,8 @@ describe('DmVttToolbar', () => {
       />
     );
     const plainToggle = screen.getByTestId('dm-vtt-dm-only-toggle');
-    expect(plainToggle.getAttribute('title')).toBe(
+    await user.hover(plainToggle);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Reveal selected element to players'
     );
   });
