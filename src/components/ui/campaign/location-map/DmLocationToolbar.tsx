@@ -16,6 +16,7 @@ import {
   CloudFog,
 } from 'lucide-react';
 import { useActiveTool, useHistory } from '@fieldnotes/react';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import DmLocationGridPopover from './DmLocationGridPopover';
@@ -77,6 +78,30 @@ function formatSyncTime(iso: string): string {
   const diffHrs = Math.floor(diffMin / 60);
   if (diffHrs < 24) return `${diffHrs}h ago`;
   return date.toLocaleDateString();
+}
+
+/**
+ * Radix never fires a Tooltip whose trigger is a disabled button, so a button
+ * that can be disabled hangs its tooltip on a wrapper span. The span is a tab
+ * stop only while the button is disabled, so keyboard users can still reach
+ * the hint and an enabled button keeps a single tab stop.
+ */
+function DisableableTooltip({
+  content,
+  disabled,
+  children,
+}: {
+  content: ReactNode;
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip content={content}>
+      <span className="inline-flex" tabIndex={disabled ? 0 : undefined}>
+        {children}
+      </span>
+    </Tooltip>
+  );
 }
 
 function LiveSyncChip({
@@ -207,7 +232,10 @@ export default function DmLocationToolbar({
           ))}
           {fogControls && (
             <>
-              <Tooltip content={fogControls.disabledReason ?? 'Fog of war'}>
+              <DisableableTooltip
+                content={fogControls.disabledReason ?? 'Fog of war'}
+                disabled={fogControls.disabled}
+              >
                 <Button
                   variant="ghost"
                   size="sm"
@@ -220,7 +248,7 @@ export default function DmLocationToolbar({
                 >
                   <CloudFog size={16} />
                 </Button>
-              </Tooltip>
+              </DisableableTooltip>
               {fogControls.diagnostic && (
                 <span
                   role="alert"
@@ -237,7 +265,7 @@ export default function DmLocationToolbar({
 
         {/* Center group: History + destructive actions */}
         <div className="flex items-center gap-0.5">
-          <Tooltip content="Undo">
+          <DisableableTooltip content="Undo" disabled={!canUndo}>
             <Button
               variant="ghost"
               size="sm"
@@ -248,8 +276,8 @@ export default function DmLocationToolbar({
             >
               <Undo2 size={16} />
             </Button>
-          </Tooltip>
-          <Tooltip content="Redo">
+          </DisableableTooltip>
+          <DisableableTooltip content="Redo" disabled={!canRedo}>
             <Button
               variant="ghost"
               size="sm"
@@ -260,7 +288,7 @@ export default function DmLocationToolbar({
             >
               <Redo2 size={16} />
             </Button>
-          </Tooltip>
+          </DisableableTooltip>
           <Tooltip content="Fit map to screen">
             <Button
               variant="ghost"
@@ -288,7 +316,10 @@ export default function DmLocationToolbar({
         {mode === 'battlemap' && onPickMapImage && (
           <>
             <div aria-hidden className="bg-divider mx-1 h-6 w-px" />
-            <Tooltip content="Add map image">
+            <DisableableTooltip
+              content="Add map image"
+              disabled={arrangeMapsActive === true}
+            >
               <Button
                 variant="ghost"
                 size="sm"
@@ -298,7 +329,7 @@ export default function DmLocationToolbar({
               >
                 Add map
               </Button>
-            </Tooltip>
+            </DisableableTooltip>
             {onToggleArrangeMaps && (
               <Tooltip
                 content={
@@ -343,7 +374,8 @@ export default function DmLocationToolbar({
                   {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
                 </Button>
               </Tooltip>
-              <Tooltip
+              <DisableableTooltip
+                disabled={hiddenElementCount === 0}
                 content={
                   hiddenElementCount === 0
                     ? 'No hidden elements to reveal'
@@ -359,7 +391,7 @@ export default function DmLocationToolbar({
                 >
                   Reveal all ({hiddenElementCount})
                 </Button>
-              </Tooltip>
+              </DisableableTooltip>
             </>
           )}
 

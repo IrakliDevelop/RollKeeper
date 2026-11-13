@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import DmLocationToolbar, {
   DM_LOCATION_BATTLEMAP_ONLY_TOOL_NAMES,
@@ -73,8 +74,6 @@ afterEach(() => {
 });
 
 describe('DmLocationToolbar', () => {
-  afterEach(() => cleanup());
-
   it('offers the shared fog action only when enabled and respects mutation gating', () => {
     const requestActivate = vi.fn();
     const fogControls = {
@@ -319,8 +318,6 @@ describe('DmLocationToolbar', () => {
 });
 
 describe('DmLocationToolbar marker chrome', () => {
-  afterEach(() => cleanup());
-
   it('offers a Marker tool in both battlemap and location mode', () => {
     const { unmount } = render(<DmLocationToolbar {...baseProps} />);
     expect(screen.getByRole('button', { name: 'Marker' })).toBeInTheDocument();
@@ -386,8 +383,6 @@ describe('DmLocationToolbar marker chrome', () => {
 });
 
 describe('DmLocationToolbar tool chrome', () => {
-  afterEach(() => cleanup());
-
   const BATTLEMAP_TOOLS = DM_LOCATION_TOOL_NAMES;
 
   it('marks the active tool with aria-pressed and the selected outline, not a primary fill', () => {
@@ -603,6 +598,60 @@ describe('DmLocationToolbar tool chrome', () => {
     toggle = screen.getByTestId('dm-only-toggle');
     expect(toggle).toHaveTextContent('Visible');
     expect(toggle).toHaveAttribute('aria-label', 'Visible to players');
+  });
+});
+
+describe('DmLocationToolbar disabled-button tooltips', () => {
+  it('shows the fog disabledReason when the disabled fog button is hovered', async () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        fogControls={{
+          initialized: true,
+          disabled: true,
+          disabledReason: 'Finish arranging map images before editing fog.',
+          operation: 'reveal',
+          shape: 'brush',
+          radius: 40,
+          preview: false,
+          diagnostic: null,
+          pendingAction: null,
+          requestActivate: vi.fn(),
+          setOperation: vi.fn(),
+          setShape: vi.fn(),
+          setRadius: vi.fn(),
+          setPreview: vi.fn(),
+          requestAction: vi.fn(),
+          confirmAction: vi.fn(),
+          cancelAction: vi.fn(),
+          reconcileBounds: vi.fn(),
+          reportError: vi.fn(),
+        }}
+      />
+    );
+    const wrapper = screen.getByRole('button', { name: 'Fog of war' })
+      .parentElement as HTMLElement;
+    expect(wrapper).toHaveAttribute('tabindex', '0');
+    await userEvent.setup().hover(wrapper);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Finish arranging map images before editing fog.'
+    );
+  });
+
+  it('shows why Reveal all is unavailable when no elements are hidden', async () => {
+    render(<DmLocationToolbar {...baseProps} hiddenElementCount={0} />);
+    const button = screen.getByRole('button', { name: 'Reveal all (0)' });
+    await userEvent.setup().hover(button.parentElement as HTMLElement);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'No hidden elements to reveal'
+    );
+  });
+
+  it('adds no extra tab stop while the button is enabled', () => {
+    render(<DmLocationToolbar {...baseProps} hiddenElementCount={2} />);
+    const wrapper = screen.getByRole('button', { name: 'Reveal all (2)' })
+      .parentElement as HTMLElement;
+    expect(wrapper).not.toHaveAttribute('tabindex');
   });
 });
 
