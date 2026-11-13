@@ -466,11 +466,11 @@ describe('CreatureDrawer parity — Stat block tab', () => {
       avatarUrl: 'https://example.test/vex.png',
     });
 
-    await user.click(screen.getByTitle('Knight'));
+    await user.click(screen.getByRole('radio', { name: 'Knight' }));
     expect(onTokenIdentityChange).toHaveBeenCalledWith(FULL_CREATURE, {
       chessPiece: 'knight',
     });
-    await user.click(screen.getByTitle('Red'));
+    await user.click(screen.getByRole('radio', { name: 'Red' }));
     expect(onTokenIdentityChange).toHaveBeenCalledWith(FULL_CREATURE, {
       color: '#ef4444',
     });
@@ -571,7 +571,7 @@ describe('CreatureDrawer parity — variants', () => {
       playerDisposition: 'ally',
     });
     // Token appearance stays reachable for lairs, as in the Studio panel.
-    await user.click(screen.getByTitle('Knight'));
+    await user.click(screen.getByRole('radio', { name: 'Knight' }));
     expect(onTokenIdentityChange).toHaveBeenCalledWith(LAIR, {
       chessPiece: 'knight',
     });
