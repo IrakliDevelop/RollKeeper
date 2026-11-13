@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  within,
+} from '@testing-library/react';
 
 import DmLocationToolOptions from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 import type { MarkerToolControls } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
@@ -20,6 +26,42 @@ let mockActiveTool = 'pencil';
 let mockToolOptions: Record<string, Record<string, unknown> | undefined> = {};
 const setOptionsSpies: Record<string, ReturnType<typeof vi.fn>> = {};
 let mockSelectedCount = 1;
+
+beforeEach(() => {
+  // Radix Tooltip/Popover measure their trigger; jsdom has no ResizeObserver.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/**
+ * A name-only row: the tool's name cell and nothing interactive — no colour
+ * strip, no separator, no stray control.
+ */
+function expectNameOnly(container: HTMLElement, name: string) {
+  expect(container.textContent).toBe(name);
+  expect(
+    container.querySelectorAll('button, input, [role="switch"]').length
+  ).toBe(0);
+}
+
+const MARKER_KIND_TEXT: Record<(typeof MARKER_KINDS)[number], string> = {
+  door: 'Door',
+  trap: 'Trap',
+  loot: 'Loot',
+  npc: 'NPC',
+  secret: 'Secret',
+  note: 'Note',
+};
 
 vi.mock('@fieldnotes/react', () => ({
   useActiveTool: () => [mockActiveTool, vi.fn()] as const,
@@ -86,7 +128,7 @@ describe('DmLocationToolOptions pencil options', () => {
   it('routes color swatches to the pencil tool', () => {
     render(<DmLocationToolOptions mode="battlemap" />);
 
-    fireEvent.click(screen.getByTitle('#ef4444'));
+    fireEvent.click(screen.getByRole('button', { name: 'Red' }));
     expect(setOptionsSpies['pencil']).toHaveBeenCalledWith({
       color: '#ef4444',
     });
@@ -97,7 +139,7 @@ describe('DmLocationToolOptions pencil options', () => {
     mockToolOptions = { laser: { color: '#F4C430', width: 3 } };
     render(<DmLocationToolOptions mode="battlemap" />);
 
-    fireEvent.click(screen.getByTitle('#ef4444'));
+    fireEvent.click(screen.getByRole('button', { name: 'Red' }));
     expect(setOptionsSpies['laser']).toHaveBeenCalledWith({
       color: '#ef4444',
     });
@@ -108,13 +150,13 @@ describe('DmLocationToolOptions pencil options', () => {
     mockToolOptions = { laser: { color: '#F4C430', width: 3 } };
     const { container } = render(<DmLocationToolOptions mode="location" />);
 
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Laser pointer');
   });
 
-  it('renders nothing when no pencil tool is registered (location editor)', () => {
+  it('shows the name alone when no pencil tool is registered (location editor)', () => {
     mockToolOptions = { pencil: undefined };
     const { container } = render(<DmLocationToolOptions mode="location" />);
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Draw');
   });
 
   it('shows ping colors in battle-map mode and updates the ping tool', () => {
@@ -122,7 +164,7 @@ describe('DmLocationToolOptions pencil options', () => {
     mockToolOptions = { ping: { color: '#F4C430' } };
     render(<DmLocationToolOptions mode="battlemap" />);
 
-    fireEvent.click(screen.getByTitle('#3b82f6'));
+    fireEvent.click(screen.getByRole('button', { name: 'Blue' }));
     expect(setOptionsSpies['ping']).toHaveBeenCalledWith({
       color: '#3b82f6',
     });
@@ -132,7 +174,7 @@ describe('DmLocationToolOptions pencil options', () => {
     mockActiveTool = 'ping';
     mockToolOptions = { ping: { color: '#F4C430' } };
     const { container } = render(<DmLocationToolOptions mode="location" />);
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Ping');
   });
 
   it('shows laser colors in location mode once live sync is configured', () => {
@@ -140,7 +182,7 @@ describe('DmLocationToolOptions pencil options', () => {
     mockToolOptions = { laser: { color: '#F4C430', width: 3 } };
     render(<DmLocationToolOptions mode="location" liveSyncConfigured />);
 
-    fireEvent.click(screen.getByTitle('#ef4444'));
+    fireEvent.click(screen.getByRole('button', { name: 'Red' }));
     expect(setOptionsSpies['laser']).toHaveBeenCalledWith({
       color: '#ef4444',
     });
@@ -151,7 +193,7 @@ describe('DmLocationToolOptions pencil options', () => {
     mockToolOptions = { ping: { color: '#F4C430' } };
     render(<DmLocationToolOptions mode="location" liveSyncConfigured />);
 
-    fireEvent.click(screen.getByTitle('#3b82f6'));
+    fireEvent.click(screen.getByRole('button', { name: 'Blue' }));
     expect(setOptionsSpies['ping']).toHaveBeenCalledWith({
       color: '#3b82f6',
     });
@@ -163,7 +205,7 @@ describe('DmLocationToolOptions pencil options', () => {
     const { container } = render(
       <DmLocationToolOptions mode="location" liveSyncConfigured />
     );
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Measure');
   });
 });
 
@@ -304,7 +346,7 @@ describe('DmLocationToolOptions measure sharing control', () => {
   it('sets measureOpts.color when a swatch is clicked', () => {
     render(<DmLocationToolOptions mode="battlemap" />);
 
-    fireEvent.click(screen.getByTitle('#22c55e'));
+    fireEvent.click(screen.getByRole('button', { name: 'Green' }));
     expect(setOptionsSpies['measure']).toHaveBeenCalledWith({
       color: '#22c55e',
     });
@@ -314,8 +356,10 @@ describe('DmLocationToolOptions measure sharing control', () => {
     mockToolOptions = { measure: { color: '#3b82f6', feetPerCell: 5 } };
     render(<DmLocationToolOptions mode="battlemap" />);
 
-    const swatch = screen.getByTitle('#3b82f6');
-    expect(swatch.className).toContain('border-accent-blue-border');
+    expect(screen.getByRole('button', { name: 'Blue' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 });
 
@@ -378,26 +422,31 @@ describe('DmLocationToolOptions selection branch reachability', () => {
     expect(screen.getByText('1 selected')).toBeInTheDocument();
   });
 
-  it('stays hidden when selectionControls is not passed, even with the select tool active', () => {
+  it('shows only the name when selectionControls is not passed, even with the select tool active', () => {
     const { container } = render(<DmLocationToolOptions mode="battlemap" />);
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Select');
   });
 
-  it('stays hidden for a non-select tool even with selectionControls set', () => {
+  it('shows no selection options for a non-select tool even with selectionControls set', () => {
     mockActiveTool = 'pencil';
     mockToolOptions = { pencil: undefined };
     const { container } = render(
       <DmLocationToolOptions mode="battlemap" selectionControls />
     );
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Draw');
   });
 
-  it('regression: stays hidden with selectionControls + select tool active but zero selection (no empty bar strip)', () => {
+  it('regression: shows only the name with selectionControls + select tool active but zero selection (no empty controls)', () => {
     mockSelectedCount = 0;
     const { container } = render(
       <DmLocationToolOptions mode="battlemap" selectionControls />
     );
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Select');
+  });
+
+  it('renders no shared colour strip beside the selection options', () => {
+    render(<DmLocationToolOptions mode="battlemap" selectionControls />);
+    expect(screen.queryByRole('button', { name: 'Slate' })).toBeNull();
   });
 });
 
@@ -437,7 +486,7 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
     }
     for (const color of MARKER_COLOR_KEYS) {
       const swatch = screen.getByRole('button', {
-        name: `Marker colour: ${color}`,
+        name: `Marker color: ${color}`,
       });
       // The fill is the literal hex the CANVAS paints, not a theme token —
       // asserting it here is what stops the picker and the painter drifting.
@@ -461,10 +510,10 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
       screen.getByRole('button', { name: 'Marker kind: door' })
     ).toHaveAttribute('aria-pressed', 'false');
     expect(
-      screen.getByRole('button', { name: 'Marker colour: emerald' })
+      screen.getByRole('button', { name: 'Marker color: emerald' })
     ).toHaveAttribute('aria-pressed', 'true');
     expect(
-      screen.getByRole('button', { name: 'Marker colour: blue' })
+      screen.getByRole('button', { name: 'Marker color: blue' })
     ).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -484,7 +533,7 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
     expect(onKindChange).toHaveBeenCalledWith('secret');
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Marker colour: purple' })
+      screen.getByRole('button', { name: 'Marker color: purple' })
     );
     // A palette KEY, never a CSS colour string — mixing the two is how an
     // unresolvable fillStyle reaches the painter.
@@ -499,10 +548,10 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
     // The generic strip carries CSS colour strings for the SDK tools; it must
     // not render alongside the marker picker, or clicking it would silently
     // do nothing (handleColorChange has no 'marker' branch by design).
-    expect(screen.queryByTitle('#ef4444')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Red' })).toBeNull();
   });
 
-  it('every marker picker control is at least a 44x44 touch target', () => {
+  it('every marker picker control is the Button primitive (which carries the coarse-pointer size)', () => {
     render(
       <DmLocationToolOptions mode="battlemap" markerControls={makeControls()} />
     );
@@ -514,8 +563,7 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
     expect(buttons.length).toBe(MARKER_KINDS.length + MARKER_COLOR_KEYS.length);
     expect(buttons.length).toBeGreaterThan(0);
     for (const button of buttons) {
-      expect(button.className).toContain('min-h-[44px]');
-      expect(button.className).toContain('min-w-[44px]');
+      expect(button).toHaveAttribute('data-variant');
     }
   });
 
@@ -569,15 +617,410 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
     }
   );
 
-  it('renders nothing at all — not an empty strip — when markerControls is undefined', () => {
+  it('shows only the name — no controls — when markerControls is undefined', () => {
     const { container } = render(<DmLocationToolOptions mode="battlemap" />);
-    expect(container).toBeEmptyDOMElement();
+    expectNameOnly(container, 'Marker');
   });
+
+  it('labels the kind group "Kind" and the colours "Pin color"', () => {
+    render(
+      <DmLocationToolOptions mode="battlemap" markerControls={makeControls()} />
+    );
+    const picker = screen.getByTestId('marker-tool-options');
+    expect(within(picker).getByText('Kind')).toBeInTheDocument();
+    expect(within(picker).getByText('Pin color')).toBeInTheDocument();
+    expect(
+      within(picker).getByRole('group', { name: 'Marker kind' })
+    ).toBeInTheDocument();
+    expect(within(picker).getByText('NPC')).toBeInTheDocument();
+  });
+
+  it.each(MARKER_KINDS)(
+    'the %s kind button keeps its e2e name and shows its sentence-case label',
+    kind => {
+      render(
+        <DmLocationToolOptions
+          mode="battlemap"
+          markerControls={makeControls()}
+        />
+      );
+      const button = screen.getByRole('button', {
+        name: `Marker kind: ${kind}`,
+      });
+      expect(button).toHaveTextContent(MARKER_KIND_TEXT[kind]);
+      expect(button).toHaveAttribute('data-variant', 'secondary');
+    }
+  );
 
   it('renders the marker picker in location mode when markerControls is supplied', () => {
     render(
       <DmLocationToolOptions mode="location" markerControls={makeControls()} />
     );
     expect(screen.getByTestId('marker-tool-options')).toBeInTheDocument();
+  });
+});
+
+describe('DmLocationToolOptions named options row', () => {
+  function makeFogControls(
+    overrides: Partial<DmFogControls> = {}
+  ): DmFogControls {
+    return {
+      initialized: true,
+      disabled: false,
+      operation: 'reveal',
+      shape: 'brush',
+      radius: 40,
+      preview: false,
+      diagnostic: null,
+      pendingAction: null,
+      requestActivate: vi.fn(),
+      setOperation: vi.fn(),
+      setShape: vi.fn(),
+      setRadius: vi.fn(),
+      setPreview: vi.fn(),
+      requestAction: vi.fn(),
+      confirmAction: vi.fn(),
+      cancelAction: vi.fn(),
+      reconcileBounds: vi.fn(),
+      reportError: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    mockToolOptions = {};
+    mockSelectedCount = 0;
+    for (const key of Object.keys(setOptionsSpies)) delete setOptionsSpies[key];
+  });
+
+  afterEach(() => cleanup());
+
+  it("shows the active tool's name first in the row", () => {
+    mockActiveTool = 'pencil';
+    mockToolOptions = { pencil: { color: '#ef4444', width: 2 } };
+    const pencil = render(<DmLocationToolOptions mode="battlemap" />);
+    expect(
+      (pencil.container.firstChild as HTMLElement).firstElementChild
+    ).toHaveTextContent(/^Draw$/);
+    pencil.unmount();
+
+    mockActiveTool = 'shape';
+    mockToolOptions = { shape: { shape: 'rectangle', strokeColor: '#ef4444' } };
+    const shape = render(<DmLocationToolOptions mode="battlemap" />);
+    expect(
+      (shape.container.firstChild as HTMLElement).firstElementChild
+    ).toHaveTextContent(/^Shape$/);
+    shape.unmount();
+
+    mockActiveTool = 'fog';
+    const fog = render(
+      <DmLocationToolOptions mode="battlemap" fogControls={makeFogControls()} />
+    );
+    expect(
+      (fog.container.firstChild as HTMLElement).firstElementChild
+    ).toHaveTextContent(/^Fog of war$/);
+  });
+
+  it('shows the name alone for tools without options', () => {
+    mockActiveTool = 'hand';
+    const hand = render(<DmLocationToolOptions mode="battlemap" />);
+    expectNameOnly(hand.container, 'Pan');
+    expect(screen.queryByRole('button')).toBeNull();
+    hand.unmount();
+
+    mockActiveTool = 'eraser';
+    const eraser = render(<DmLocationToolOptions mode="battlemap" />);
+    expectNameOnly(eraser.container, 'Eraser');
+    eraser.unmount();
+
+    mockActiveTool = 'select';
+    mockSelectedCount = 0;
+    const select = render(
+      <DmLocationToolOptions mode="battlemap" selectionControls />
+    );
+    expectNameOnly(select.container, 'Select');
+    expect(screen.queryByRole('button', { name: 'Slate' })).toBeNull();
+    select.unmount();
+
+    mockActiveTool = MARKER_TOOL_NAME;
+    const marker = render(<DmLocationToolOptions mode="battlemap" />);
+    expectNameOnly(marker.container, 'Marker');
+  });
+
+  it('renders nothing for a tool with no MAP_TOOL_META entry and no options', () => {
+    mockActiveTool = 'token';
+    const { container } = render(<DmLocationToolOptions mode="battlemap" />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('keeps a single fog options group', () => {
+    mockActiveTool = 'fog';
+    render(
+      <DmLocationToolOptions mode="battlemap" fogControls={makeFogControls()} />
+    );
+    const groups = screen.getAllByRole('group', { name: 'Fog of war options' });
+    expect(groups).toHaveLength(1);
+    expect(
+      within(groups[0]).getAllByRole('button', { name: 'Rectangle' })
+    ).toHaveLength(1);
+    expect(
+      within(groups[0]).getByRole('button', { name: 'Disable fog' })
+    ).toHaveAttribute('data-variant', 'danger');
+    expect(
+      within(groups[0]).getByRole('slider', { name: 'Fog brush size' })
+    ).toHaveValue('40');
+    expect(within(groups[0]).getByText('Brush size')).toBeInTheDocument();
+    expect(within(groups[0]).getByText('40px')).toBeInTheDocument();
+    expect(
+      within(groups[0]).getByRole('switch', { name: 'Preview as player' })
+    ).toBeInTheDocument();
+  });
+
+  it('names colour swatches and marks the active one', () => {
+    mockActiveTool = 'measure';
+    mockToolOptions = { measure: { color: '#3b82f6', feetPerCell: 5 } };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    for (const name of [
+      'Slate',
+      'Red',
+      'Orange',
+      'Yellow',
+      'Green',
+      'Violet',
+      'Pink',
+      'White',
+    ]) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+    }
+    expect(screen.getByRole('button', { name: 'Blue' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    const custom = screen.getByLabelText('Custom color');
+    expect(custom).toHaveAttribute('type', 'color');
+    expect(custom).toHaveValue('#3b82f6');
+    fireEvent.change(custom, { target: { value: '#123456' } });
+    expect(setOptionsSpies['measure']).toHaveBeenCalledWith({
+      color: '#123456',
+    });
+  });
+
+  it('names the sticky note text colours, including Ink', () => {
+    mockActiveTool = 'note';
+    mockToolOptions = {
+      note: { backgroundColor: '#eab308', textColor: '#1e293b' },
+    };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    expect(screen.getByText('Background')).toBeInTheDocument();
+    expect(screen.getByText('Text')).toBeInTheDocument();
+    const ink = screen.getByRole('button', { name: 'Ink' });
+    expect(ink).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Violet' })[1]);
+    expect(setOptionsSpies['note']).toHaveBeenCalledWith({
+      textColor: '#7c3aed',
+    });
+  });
+
+  it('segmented choices are sentence-case outline buttons with aria-pressed', () => {
+    mockActiveTool = 'shape';
+    mockToolOptions = {
+      shape: {
+        shape: 'ellipse',
+        strokeColor: '#ef4444',
+        fillColor: 'transparent',
+        strokeWidth: 4,
+      },
+    };
+    const shape = render(<DmLocationToolOptions mode="battlemap" />);
+    const shapeGroup = screen.getByRole('group', { name: 'Shape' });
+    const rectangle = within(shapeGroup).getByRole('button', {
+      name: 'Rectangle',
+    });
+    const ellipse = within(shapeGroup).getByRole('button', { name: 'Ellipse' });
+    expect(rectangle).toHaveAttribute('data-variant', 'secondary');
+    expect(rectangle).toHaveAttribute('aria-pressed', 'false');
+    expect(ellipse).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(rectangle);
+    expect(setOptionsSpies['shape']).toHaveBeenCalledWith({
+      shape: 'rectangle',
+    });
+    expect(screen.getByText('Stroke')).toBeInTheDocument();
+    expect(screen.getByText('Fill')).toBeInTheDocument();
+    const none = screen.getByRole('button', { name: 'None' });
+    expect(none).toHaveAttribute('aria-pressed', 'true');
+    expect(none).toHaveAttribute('data-variant', 'secondary');
+    expect(
+      screen.getByRole('slider', { name: 'Shape stroke width' })
+    ).toHaveValue('4');
+    expect(screen.getByText('Width')).toBeInTheDocument();
+    expect(screen.getByText('4px')).toBeInTheDocument();
+    shape.unmount();
+
+    mockActiveTool = 'text';
+    mockToolOptions = {
+      text: { color: '#334155', fontSize: 16, textAlign: 'center' },
+    };
+    const text = render(<DmLocationToolOptions mode="battlemap" />);
+    const align = screen.getByRole('group', { name: 'Text align' });
+    expect(
+      within(align)
+        .getAllByRole('button')
+        .map(b => b.textContent)
+    ).toEqual(['Left', 'Center', 'Right']);
+    expect(
+      within(align).getByRole('button', { name: 'Center' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Align')).toBeInTheDocument();
+    expect(screen.getByText('Size')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Text size' })).toHaveValue('16');
+    expect(screen.getByText('16px')).toBeInTheDocument();
+    text.unmount();
+
+    mockActiveTool = 'template';
+    mockToolOptions = {
+      template: { templateShape: 'cone', renderStyle: 'geometric' },
+    };
+    const template = render(<DmLocationToolOptions mode="battlemap" />);
+    const templateShape = screen.getByRole('group', { name: 'Template shape' });
+    expect(
+      within(templateShape)
+        .getAllByRole('button')
+        .map(b => b.textContent)
+    ).toEqual(['Circle', 'Cone', 'Line', 'Square', 'Rectangle']);
+    expect(
+      within(templateShape).getByRole('button', { name: 'Cone' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    const render_ = screen.getByRole('group', { name: 'Render style' });
+    expect(
+      within(render_).getByRole('button', { name: 'Smooth' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      within(render_).getByRole('button', { name: 'Cells' })
+    ).not.toHaveAttribute('title');
+    expect(screen.getByText('Render')).toBeInTheDocument();
+    expect(screen.getByText('Shape')).toBeInTheDocument();
+    template.unmount();
+
+    mockActiveTool = 'fog';
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        fogControls={makeFogControls({
+          operation: 'conceal',
+          shape: 'polygon',
+        })}
+      />
+    );
+    const operation = screen.getByRole('group', { name: 'Fog operation' });
+    expect(
+      within(operation)
+        .getAllByRole('button')
+        .map(b => b.textContent)
+    ).toEqual(['Reveal', 'Conceal']);
+    expect(
+      within(operation).getByRole('button', { name: 'Conceal' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    const fogShape = screen.getByRole('group', { name: 'Fog shape' });
+    expect(
+      within(fogShape)
+        .getAllByRole('button')
+        .map(b => b.textContent)
+    ).toEqual(['Brush', 'Rectangle', 'Polygon']);
+    expect(
+      within(fogShape).getByRole('button', { name: 'Polygon' })
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('template fill swatches keep the translucent value', () => {
+    mockActiveTool = 'template';
+    mockToolOptions = {
+      template: { templateShape: 'circle', fillColor: '#3b82f680' },
+    };
+    render(<DmLocationToolOptions mode="battlemap" />);
+    // The outline strip comes first, the fill swatches second.
+    const blues = screen.getAllByRole('button', { name: 'Blue' });
+    expect(blues).toHaveLength(2);
+    expect(blues[1]).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Green' })[1]);
+    expect(setOptionsSpies['template']).toHaveBeenCalledWith({
+      fillColor: '#22c55e80',
+    });
+    expect(screen.getByRole('slider', { name: 'Feet per cell' })).toHaveValue(
+      '5'
+    );
+  });
+
+  it('diagonals are a segmented pair', () => {
+    mockActiveTool = 'path';
+    mockToolOptions = { path: { diagonalRule: 'chebyshev' } };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    expect(screen.getByText('Diagonals')).toBeInTheDocument();
+    const group = screen.getByRole('group', { name: 'Diagonal rule' });
+    expect(
+      within(group).getByRole('button', { name: '5-5-5' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(group).getByRole('button', { name: '5-10-5' }));
+    expect(setOptionsSpies['path']).toHaveBeenCalledWith({
+      diagonalRule: 'alternate',
+    });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    // A4: the Move tool has no colour, so no dead colour strip.
+    expect(screen.queryByRole('button', { name: 'Slate' })).toBeNull();
+  });
+
+  it('feet per cell shows a labelled range with a unit', () => {
+    mockActiveTool = 'measure';
+    mockToolOptions = { measure: { color: '#FF5722', feetPerCell: 5 } };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    const slider = screen.getByRole('slider', { name: 'Feet per cell' });
+    expect(slider).toHaveValue('5');
+    expect(screen.getByText('5 ft')).toBeInTheDocument();
+    expect(screen.getByText('Feet per cell')).toBeInTheDocument();
+    fireEvent.change(slider, { target: { value: '10' } });
+    expect(setOptionsSpies['measure']).toHaveBeenCalledWith({
+      feetPerCell: 10,
+    });
+  });
+
+  it('pencil width is a labelled range', () => {
+    mockActiveTool = 'pencil';
+    mockToolOptions = { pencil: { color: '#ef4444', width: 3 } };
+    render(<DmLocationToolOptions mode="battlemap" />);
+    expect(screen.getByRole('slider', { name: 'Pencil width' })).toHaveValue(
+      '3'
+    );
+    expect(screen.getByText('Width')).toBeInTheDocument();
+    expect(screen.getByText('3px')).toBeInTheDocument();
+  });
+
+  it('movement sharing switch is labelled by its visible text', () => {
+    mockActiveTool = 'path';
+    mockToolOptions = { path: { diagonalRule: 'chebyshev' } };
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        movementControls={{
+          dash: { enabled: true, onChange: vi.fn() },
+          sharing: { enabled: false, onChange: vi.fn() },
+        }}
+      />
+    );
+
+    expect(
+      screen.getByRole('switch', { name: 'Share movement with players' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Share movement with players')).toBeVisible();
+    expect(screen.getByRole('switch', { name: 'Dash' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    expect(screen.getByText('Dash')).toBeVisible();
   });
 });
