@@ -129,6 +129,7 @@ export function SyncIndicator({
           aria-label="Campaign sync"
           align="end"
           sideOffset={8}
+          collisionPadding={8}
           className={`${OVERLAY_SURFACE} z-[60] w-64 max-w-[calc(100vw-1rem)] p-3`}
         >
           <div className="mb-3">

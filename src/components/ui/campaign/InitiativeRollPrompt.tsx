@@ -97,6 +97,7 @@ export function InitiativeRollPrompt({
             placeholder="Total"
             aria-label="Initiative total"
             className="w-20 text-center"
+            wrapperClassName="w-20 shrink-0"
           />
           <Button
             variant="primary"
