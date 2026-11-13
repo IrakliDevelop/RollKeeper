@@ -125,6 +125,39 @@ describe('DmLocationAlignMenu', () => {
     expect(distribute).toHaveBeenNthCalledWith(2, 'vertical');
   });
 
+  // Stacking has no role-level signal, so this is the one class assertion in
+  // the file: the popover content is z-[60] and the shared Tooltip is z-50, so
+  // a tooltip inside the panel must carry a higher z class or it renders
+  // underneath the panel and is invisible.
+  it('lifts its tooltips above the popover panel', async () => {
+    mockCanDistribute = false;
+    const { user } = await openMenu();
+
+    // Radix wraps the hidden `role="tooltip"` copy in the visible content box.
+    const tooltipBox = () =>
+      screen.getByRole('tooltip').closest('[data-side]') as HTMLElement;
+
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Align left' })).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip')).toHaveTextContent('Align left')
+    );
+    expect(tooltipBox().className).toContain('z-[70]');
+    expect(tooltipBox().className).not.toContain('z-50');
+
+    // The disabled-distribute hint hangs on the focusable wrapper span.
+    const distributeWrapper = screen.getByRole('button', {
+      name: 'Distribute horizontally',
+    }).parentElement as HTMLElement;
+    distributeWrapper.focus();
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        'Distribute horizontally'
+      )
+    );
+    expect(tooltipBox().className).toContain('z-[70]');
+  });
+
   it('closes on Escape and returns focus to the trigger', async () => {
     const { user } = await openMenu();
     await user.keyboard('{Escape}');

@@ -16,10 +16,10 @@ import {
   CloudFog,
 } from 'lucide-react';
 import { useActiveTool, useHistory } from '@fieldnotes/react';
-import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import DmLocationGridPopover from './DmLocationGridPopover';
+import { DisableableTooltip } from './ToolOptionControls';
 import DmOnlyToggle from './DmOnlyToggle';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import { mapToolDefs } from './mapToolDefs';
@@ -78,30 +78,6 @@ function formatSyncTime(iso: string): string {
   const diffHrs = Math.floor(diffMin / 60);
   if (diffHrs < 24) return `${diffHrs}h ago`;
   return date.toLocaleDateString();
-}
-
-/**
- * Radix never fires a Tooltip whose trigger is a disabled button, so a button
- * that can be disabled hangs its tooltip on a wrapper span. The span is a tab
- * stop only while the button is disabled, so keyboard users can still reach
- * the hint and an enabled button keeps a single tab stop.
- */
-function DisableableTooltip({
-  content,
-  disabled,
-  children,
-}: {
-  content: ReactNode;
-  disabled: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Tooltip content={content}>
-      <span className="inline-flex" tabIndex={disabled ? 0 : undefined}>
-        {children}
-      </span>
-    </Tooltip>
-  );
 }
 
 function LiveSyncChip({

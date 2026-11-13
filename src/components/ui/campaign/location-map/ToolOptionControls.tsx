@@ -175,6 +175,35 @@ export function RangeField({
   );
 }
 
+interface DisableableTooltipProps {
+  content: ReactNode;
+  disabled: boolean;
+  children: ReactNode;
+  /** Forwarded to the `Tooltip` content (e.g. a higher z class inside a popover). */
+  className?: string;
+}
+
+/**
+ * Radix never fires a Tooltip whose trigger is a disabled button, so a button
+ * that can be disabled hangs its tooltip on a wrapper span. The span is a tab
+ * stop only while the button is disabled, so keyboard users can still reach
+ * the hint and an enabled button keeps a single tab stop.
+ */
+export function DisableableTooltip({
+  content,
+  disabled,
+  children,
+  className,
+}: DisableableTooltipProps) {
+  return (
+    <Tooltip content={content} className={className}>
+      <span className="inline-flex" tabIndex={disabled ? 0 : undefined}>
+        {children}
+      </span>
+    </Tooltip>
+  );
+}
+
 /** The small muted word before a control in the options row. */
 export function OptionLabel({ children }: { children: ReactNode }) {
   return <span className="type-small text-muted">{children}</span>;

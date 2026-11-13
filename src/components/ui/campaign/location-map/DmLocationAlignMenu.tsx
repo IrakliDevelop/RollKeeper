@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import {
   AlignStartVertical,
@@ -16,6 +16,7 @@ import { useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { DisableableTooltip } from './ToolOptionControls';
 
 const ALIGN_ACTIONS = [
   { edge: 'left', title: 'Align left', Icon: AlignStartVertical },
@@ -50,26 +51,10 @@ const DISTRIBUTE_ACTIONS = [
 const ICON_BUTTON_CLASS = 'w-9 shrink-0 px-0';
 
 /**
- * Radix tooltips never open on a disabled button, so a disabled action wraps
- * its trigger in a focusable span that keeps the hint reachable.
+ * The panel is `z-[60]` and the shared Tooltip is `z-50`, so tooltips inside
+ * the panel need a higher z class or they render underneath it.
  */
-function DisableableTooltip({
-  content,
-  disabled,
-  children,
-}: {
-  content: ReactNode;
-  disabled: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Tooltip content={content}>
-      <span className="inline-flex" tabIndex={disabled ? 0 : undefined}>
-        {children}
-      </span>
-    </Tooltip>
-  );
-}
+const PANEL_TOOLTIP_CLASS = 'z-[70]';
 
 /**
  * Align/distribute actions for the current selection, behind one toolbar
@@ -117,7 +102,11 @@ export default function DmLocationAlignMenu() {
           <TooltipProvider>
             <div className="flex items-center gap-0.5">
               {ALIGN_ACTIONS.map(({ edge, title, Icon }) => (
-                <Tooltip key={edge} content={title}>
+                <Tooltip
+                  key={edge}
+                  content={title}
+                  className={PANEL_TOOLTIP_CLASS}
+                >
                   <Button
                     type="button"
                     variant="ghost"
@@ -137,6 +126,7 @@ export default function DmLocationAlignMenu() {
                   key={axis}
                   content={title}
                   disabled={!canDistribute}
+                  className={PANEL_TOOLTIP_CLASS}
                 >
                   <Button
                     type="button"
