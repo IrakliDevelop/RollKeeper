@@ -1,11 +1,13 @@
 'use client';
 
+import { useRef } from 'react';
 import { Check, MapPin, Pencil, Send, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import type { SavedCameraView } from '@/types/battlemap';
 import { DisableableTooltip } from '../ToolOptionControls';
+import { useFocusAfterEdit } from './BattleMapViewsControl.hooks';
 
 /** Icon-only row button, used with `size="sm"` (36px; 44px on touch). */
 export const ICON_BUTTON = 'w-9 shrink-0 px-0';
@@ -47,6 +49,12 @@ export function ViewRow({
   onGoToView,
   onSend,
 }: ViewRowProps) {
+  // Where focus returns when a rename ends or an armed delete is disarmed:
+  // the row's own name button. Not the icon button that started the edit —
+  // its Tooltip opens on focus and would then swallow the next Escape.
+  const nameButtonRef = useRef<HTMLButtonElement>(null);
+  useFocusAfterEdit(renaming || deleteArmed, nameButtonRef);
+
   if (renaming) {
     return (
       <li
@@ -59,7 +67,11 @@ export function ViewRow({
           value={renameValue}
           onChange={e => onRenameValueChange(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter') onCommitRename();
+            if (e.key === 'Enter') {
+              // Also stops the keypress reaching the button focus moves to.
+              e.preventDefault();
+              onCommitRename();
+            }
           }}
           className="flex-1"
           autoFocus
@@ -97,6 +109,7 @@ export function ViewRow({
       className="flex items-center gap-1"
     >
       <Button
+        ref={nameButtonRef}
         variant="ghost"
         size="sm"
         onClick={onGoToView}
@@ -110,7 +123,9 @@ export function ViewRow({
           <Button variant="danger-solid" size="sm" onClick={onDeleteClick}>
             Delete
           </Button>
-          <Button variant="ghost" size="sm" onClick={onCancelDelete}>
+          {/* Arming from the keyboard lands on the safe choice, so a second
+              Enter cannot delete. */}
+          <Button variant="ghost" size="sm" onClick={onCancelDelete} autoFocus>
             Cancel
           </Button>
         </>

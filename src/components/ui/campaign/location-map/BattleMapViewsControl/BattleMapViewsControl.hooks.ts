@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { captureCameraView, type CameraView } from '@fieldnotes/core';
 
 /** The minimum viewport surface `captureCameraView` needs. */
@@ -15,6 +15,32 @@ export interface UseBattleMapViewsControlArgs {
   onSaveView: (view: CameraView, name: string) => void;
   onRenameView: (id: string, name: string) => void;
   onDeleteView: (id: string) => void;
+}
+
+/** True when nothing useful holds focus (the browser fell back to `<body>`). */
+export function focusWasLost() {
+  const active = document.activeElement;
+  return active === null || active === document.body;
+}
+
+/**
+ * The views popover is a non-modal Radix Popover, so its `FocusScope` does
+ * not pull focus back when the focused control unmounts. An edit that ends
+ * by Escape, Enter or a Cancel click would drop focus to `<body>`, and the
+ * next Tab would dismiss the popover. When `editing` flips to false and
+ * focus was lost, this puts it on `target` — the control that started the
+ * edit — instead.
+ */
+export function useFocusAfterEdit(
+  editing: boolean,
+  target: RefObject<HTMLElement | null>
+) {
+  const wasEditing = useRef(editing);
+  useEffect(() => {
+    const ended = wasEditing.current && !editing;
+    wasEditing.current = editing;
+    if (ended && focusWasLost()) target.current?.focus();
+  }, [editing, target]);
 }
 
 /**

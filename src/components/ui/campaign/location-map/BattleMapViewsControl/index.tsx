@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import type { CameraView, FocusAudience } from '@fieldnotes/core';
 import { Check, ChevronDown, MapPin, Plus, X } from 'lucide-react';
@@ -15,7 +15,9 @@ import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import type { SavedCameraView } from '@/types/battlemap';
 import {
+  focusWasLost,
   useBattleMapViewsControl,
+  useFocusAfterEdit,
   type CameraCaptureViewport,
 } from './BattleMapViewsControl.hooks';
 import {
@@ -84,6 +86,20 @@ export function BattleMapViewsControl({
     onDeleteView,
   });
 
+  // Non-modal popover: when the focused control unmounts, Radix leaves focus
+  // on <body> and the next Tab would dismiss the popover. A save that ends
+  // goes back to "Save current view"; the rows handle rename and delete.
+  const contentRef = useRef<HTMLDivElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
+  useFocusAfterEdit(savingView !== null, saveButtonRef);
+
+  // Floor for the one case with no control to return to: a confirmed delete
+  // unmounts the whole row. Runs after the row effects above have had their
+  // turn, so it only fires when focus is still lost.
+  useEffect(() => {
+    if (open && focusWasLost()) contentRef.current?.focus();
+  }, [open, views, savingView, renamingId, armedDeleteId]);
+
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     if (!next) resetTransientState();
@@ -120,6 +136,7 @@ export function BattleMapViewsControl({
 
       <Popover.Portal>
         <Popover.Content
+          ref={contentRef}
           aria-label="Views"
           data-testid="battle-map-views-popover"
           align="end"
@@ -137,7 +154,12 @@ export function BattleMapViewsControl({
                   value={saveName}
                   onChange={e => setSaveName(e.target.value)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') commitSave();
+                    if (e.key === 'Enter') {
+                      // Also stops the keypress reaching the button focus
+                      // moves to, which would reopen the field.
+                      e.preventDefault();
+                      commitSave();
+                    }
                   }}
                   className="flex-1"
                   autoFocus
@@ -173,6 +195,7 @@ export function BattleMapViewsControl({
               </div>
             ) : (
               <Button
+                ref={saveButtonRef}
                 variant="ghost"
                 size="sm"
                 fullWidth

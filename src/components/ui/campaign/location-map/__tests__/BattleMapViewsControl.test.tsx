@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   render,
@@ -45,6 +46,22 @@ function getTrigger() {
 
 function getDialog() {
   return screen.getByRole('dialog', { name: 'Views' });
+}
+
+function expectFocusInsideDialog() {
+  expect(getDialog().contains(document.activeElement)).toBe(true);
+}
+
+/** Owns the list so a confirmed delete really removes the row. */
+function DeletingHarness() {
+  const [list, setList] = useState(views);
+  return (
+    <BattleMapViewsControl
+      {...baseProps}
+      views={list}
+      onDeleteView={id => setList(l => l.filter(v => v.id !== id))}
+    />
+  );
 }
 
 beforeEach(() => {
@@ -130,6 +147,9 @@ describe('BattleMapViewsControl', () => {
       );
       expect(onSaveView).toHaveBeenCalledTimes(1);
       expect(onSaveView).toHaveBeenCalledWith(currentView, 'Goblin ambush');
+      expect(
+        screen.getByRole('button', { name: /save current view/i })
+      ).toHaveFocus();
     });
 
     it('saves with the typed name on confirm click', async () => {
@@ -212,8 +232,14 @@ describe('BattleMapViewsControl', () => {
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: /save current view/i })
-      ).toBeInTheDocument();
+      ).toHaveFocus();
+      expectFocusInsideDialog();
       expect(getDialog()).toBeInTheDocument();
+
+      // Tab stays inside the popover instead of dismissing it.
+      await userEvent.tab();
+      expect(getDialog()).toBeInTheDocument();
+      expectFocusInsideDialog();
 
       await userEvent.keyboard('{Escape}');
       await waitFor(() =>
@@ -234,7 +260,8 @@ describe('BattleMapViewsControl', () => {
       expect(onSaveView).not.toHaveBeenCalled();
       expect(
         screen.getByRole('button', { name: /save current view/i })
-      ).toBeInTheDocument();
+      ).toHaveFocus();
+      expectFocusInsideDialog();
     });
   });
 
@@ -250,6 +277,10 @@ describe('BattleMapViewsControl', () => {
     await userEvent.clear(input);
     await userEvent.type(input, 'War room{Enter}');
     expect(onRenameView).toHaveBeenCalledWith('v2', 'War room');
+    // Focus returns to the row (its name button), not to <body>.
+    expect(
+      within(row).getByRole('button', { name: /throne room/i })
+    ).toHaveFocus();
   });
 
   describe('two-click delete confirm', () => {
@@ -384,6 +415,50 @@ describe('BattleMapViewsControl', () => {
       expect(onDeleteView).toHaveBeenCalledTimes(1);
       expect(onDeleteView).toHaveBeenCalledWith('v1');
     });
+
+    it('Enter on the trash arms the delete and lands focus on Cancel', async () => {
+      const onDeleteView = vi.fn();
+      render(
+        <BattleMapViewsControl {...baseProps} onDeleteView={onDeleteView} />
+      );
+      await openPopover();
+      const row = screen.getByRole('group', { name: /goblin ambush/i });
+      const trash = within(row).getByRole('button', { name: 'Delete view' });
+      trash.focus();
+      expect(trash).toHaveFocus();
+
+      await userEvent.keyboard('{Enter}');
+      expect(onDeleteView).not.toHaveBeenCalled();
+      expect(within(row).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+
+      // A second Enter lands on the safe choice and restores the row.
+      await userEvent.keyboard('{Enter}');
+      expect(onDeleteView).not.toHaveBeenCalled();
+      expect(
+        within(row).queryByRole('button', { name: 'Delete' })
+      ).not.toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: /goblin ambush/i })
+      ).toHaveFocus();
+      expectFocusInsideDialog();
+    });
+
+    it('keeps focus inside the popover after a keyboard delete removes the row', async () => {
+      render(<DeletingHarness />);
+      await openPopover();
+      const row = screen.getByRole('group', { name: /goblin ambush/i });
+      within(row).getByRole('button', { name: 'Delete view' }).focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.tab({ shift: true });
+      expect(within(row).getByRole('button', { name: 'Delete' })).toHaveFocus();
+
+      await userEvent.keyboard('{Enter}');
+      expect(
+        screen.queryByRole('group', { name: /goblin ambush/i })
+      ).not.toBeInTheDocument();
+      expect(getDialog()).toBeInTheDocument();
+      expectFocusInsideDialog();
+    });
   });
 
   describe('Escape and closing', () => {
@@ -409,6 +484,10 @@ describe('BattleMapViewsControl', () => {
       expect(
         within(row).getByRole('button', { name: 'Rename view' })
       ).toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: /throne room/i })
+      ).toHaveFocus();
+      expectFocusInsideDialog();
 
       await userEvent.keyboard('{Escape}');
       await waitFor(() =>
@@ -439,6 +518,10 @@ describe('BattleMapViewsControl', () => {
       expect(
         within(row).getByRole('button', { name: 'Delete view' })
       ).toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: /goblin ambush/i })
+      ).toHaveFocus();
+      expectFocusInsideDialog();
       expect(getDialog()).toBeInTheDocument();
 
       await userEvent.keyboard('{Escape}');
