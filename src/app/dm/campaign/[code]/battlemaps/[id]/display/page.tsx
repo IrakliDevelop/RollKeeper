@@ -197,7 +197,7 @@ function DisplayCanvas() {
   const overlayMessage = !relayUrl
     ? 'Live display is not configured'
     : !displayKey
-      ? 'Open this display from the battle map editor ("Open TV Display")'
+      ? 'Open this display from the battle map editor ("Open TV display")'
       : status === 'denied'
         ? 'Display link expired — reopen it from the battle map editor'
         : status !== 'live'

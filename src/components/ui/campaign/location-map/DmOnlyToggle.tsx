@@ -2,6 +2,7 @@
 
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import { markerAudienceToggleTitle } from './markerAudienceCopy';
 
 interface DmOnlyToggleProps {
@@ -24,23 +25,22 @@ export default function DmOnlyToggle({
   const label = isMarker
     ? markerAudienceToggleTitle(isDmOnly)
     : isDmOnly
-      ? 'DM Only — hidden from players'
+      ? 'DM only, hidden from players'
       : 'Visible to players';
 
   return (
-    <Button
-      data-testid="dm-only-toggle"
-      variant="ghost"
-      selected={isDmOnly}
-      onClick={onToggle}
-      title={label}
-      aria-label={label}
-      className="flex items-center gap-1 px-2 py-1 text-xs"
-    >
-      {isDmOnly ? <EyeOff size={14} /> : <Eye size={14} />}
-      <span className="hidden sm:inline">
-        {isDmOnly ? 'DM Only' : 'Visible'}
-      </span>
-    </Button>
+    <Tooltip content={label}>
+      <Button
+        data-testid="dm-only-toggle"
+        variant="ghost"
+        size="sm"
+        selected={isDmOnly}
+        onClick={onToggle}
+        aria-label={label}
+        leftIcon={isDmOnly ? <EyeOff size={16} /> : <Eye size={16} />}
+      >
+        {isDmOnly ? 'DM only' : 'Visible'}
+      </Button>
+    </Tooltip>
   );
 }
