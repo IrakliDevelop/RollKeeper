@@ -161,7 +161,7 @@ export function FogProceduralFields({
         </span>
       </label>
       <details className="border-divider border-t pt-1">
-        <summary className="type-ui text-heading flex cursor-pointer items-center pointer-coarse:min-h-11">
+        <summary className="type-ui text-heading flex min-h-9 cursor-pointer items-center pointer-coarse:min-h-11">
           Advanced
         </summary>
         <div className="grid grid-cols-[5rem_minmax(0,1fr)_auto] items-end gap-3 pb-1">
