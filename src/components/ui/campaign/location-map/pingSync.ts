@@ -164,6 +164,15 @@ export function attachPingInput(
       ) {
         return;
       }
+      // Radix selects: the trigger is a <button role="combobox"> and the open
+      // list's items are [role="option"] inside a [role="listbox"]. Their
+      // typeahead does not stop propagation, so the hotkey would fire.
+      if (
+        target instanceof Element &&
+        target.closest('[role="combobox"], [role="listbox"]')
+      ) {
+        return;
+      }
       input.pingAtPointer();
     };
     document.addEventListener('keydown', onKeyDown);

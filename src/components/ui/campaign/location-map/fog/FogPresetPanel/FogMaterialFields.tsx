@@ -85,7 +85,7 @@ export function FogMaterialPreview({
         role="img"
         className="border-divider aspect-square w-full overflow-hidden rounded-md border"
       />
-      <figcaption className="text-muted text-center text-xs">
+      <figcaption className="type-small text-muted text-center">
         Material preview
       </figcaption>
     </figure>
