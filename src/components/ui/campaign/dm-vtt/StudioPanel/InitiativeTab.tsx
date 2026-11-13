@@ -1,6 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
+
+import { Button } from '@/components/ui/forms/button';
 
 import { getSortedEntities } from '@/store/encounterStore';
 
@@ -19,7 +22,7 @@ export interface InitiativeTabProps {
  * Initiative order list for the studio panel. Sorts with the same
  * `getSortedEntities` util `buildSharedInitiative` uses for the player-facing
  * turn order, so the DM's row order matches what players see. The entity at
- * `sorted[encounter.currentTurn]` is highlighted as the active turn.
+ * `sorted[encounter.currentTurn]` is marked as the current turn.
  */
 export function InitiativeTab({
   encounter,
@@ -29,24 +32,30 @@ export function InitiativeTab({
 }: InitiativeTabProps) {
   if (!encounter) {
     return (
-      <p className="text-muted px-3 py-4 text-xs">No encounter linked yet.</p>
+      <p className="type-small text-muted px-3 py-4">
+        Link an encounter in Setup mode
+      </p>
     );
   }
 
   if (!encounter.isActive) {
     return (
       <div className="space-y-2 px-3 py-4">
-        <p className="text-muted text-xs">
+        <p className="type-small text-muted">
           Start combat from the encounter page.
         </p>
-        <Link
-          href={encounterHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent-blue-text text-xs font-semibold hover:underline"
+        <Button
+          asChild
+          variant="link"
+          size="sm"
+          className="px-1"
+          rightIcon={<ExternalLink size={14} />}
         >
-          Encounter page ↗
-        </Link>
+          <Link href={encounterHref} target="_blank" rel="noopener noreferrer">
+            Encounter page
+            <span className="sr-only"> (opens in a new tab)</span>
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -54,7 +63,7 @@ export function InitiativeTab({
   const sorted = getSortedEntities(encounter.entities);
 
   return (
-    <ul className="space-y-1 px-2 py-2">
+    <ul className="divide-divider divide-y">
       {sorted.map((entity, index) => (
         <InitiativeRow
           key={entity.id}

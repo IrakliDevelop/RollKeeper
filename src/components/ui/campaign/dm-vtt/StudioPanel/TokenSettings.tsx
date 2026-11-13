@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { Section } from '@/components/ui/layout/section';
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { uploadAsset } from '@/utils/uploadAsset';
 
 import { TokenAppearanceRow } from './TokenAppearanceRow';
@@ -57,64 +59,67 @@ export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
     }
   };
 
+  // Also mounted in the creature drawer tabs, which have no tooltip provider.
   return (
-    <div className="border-divider border-t px-3 py-2">
-      <p className="text-muted mb-1.5 text-[11px] font-bold tracking-wider uppercase">
-        Token
-      </p>
-      <div className="mb-2 flex items-center gap-1.5">
-        <Input
-          value={url}
-          onChange={e => setUrl(e.target.value)}
-          onBlur={applyUrl}
-          placeholder="Portrait URL (https://…)"
-          className="min-h-[44px] flex-1 text-xs"
-          aria-label="Portrait URL"
-        />
-        <Button
-          variant="outline"
-          className="min-h-[44px] text-xs"
-          disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-        >
-          {uploading ? 'Uploading…' : 'Upload'}
-        </Button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={e => {
-            const file = e.target.files?.[0];
-            if (file) void handleFile(file);
-            e.target.value = '';
-          }}
-        />
-      </div>
-      {uploadError && (
-        <p className="text-accent-red-text mt-1 text-xs">
-          Upload failed — check S3 config or try a URL.
-        </p>
-      )}
-      <TokenAppearanceRow entity={entity} onChange={onChange} />
-      <div
-        className="flex items-center gap-1"
-        role="radiogroup"
-        aria-label="Token size"
-      >
-        {SIZES.map(s => (
+    <TooltipProvider>
+      <Section level={4} heading="Token" className="px-3 py-3">
+        <div className="mb-2 flex items-center gap-1.5">
+          <Input
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            onBlur={applyUrl}
+            placeholder="Portrait URL (https://…)"
+            size="sm"
+            className="flex-1"
+            aria-label="Portrait URL"
+          />
           <Button
-            key={s.cells}
-            variant={cells === s.cells ? 'primary' : 'ghost'}
-            className="min-h-[44px] flex-1 text-xs"
-            onClick={() => onChange({ tokenSize: s.cells })}
-            role="radio"
-            aria-checked={cells === s.cells}
+            variant="secondary"
+            size="sm"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
           >
-            {s.label}
+            {uploading ? 'Uploading…' : 'Upload'}
           </Button>
-        ))}
-      </div>
-    </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) void handleFile(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
+        {uploadError && (
+          <p role="alert" className="type-small text-blood-text mt-1">
+            Couldn&apos;t upload the image. Paste an image URL instead.
+          </p>
+        )}
+        <TokenAppearanceRow entity={entity} onChange={onChange} />
+        <div
+          className="flex items-center gap-1"
+          role="radiogroup"
+          aria-label="Token size"
+        >
+          {SIZES.map(s => (
+            <Button
+              key={s.cells}
+              variant="secondary"
+              size="sm"
+              selected={cells === s.cells}
+              className="flex-1"
+              onClick={() => onChange({ tokenSize: s.cells })}
+              role="radio"
+              aria-checked={cells === s.cells}
+            >
+              {s.label}
+            </Button>
+          ))}
+        </div>
+      </Section>
+    </TooltipProvider>
   );
 }

@@ -7,6 +7,7 @@ import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { useDmTokenDecorations } from '@/components/ui/campaign/token-overlay/useDmTokenDecorations';
 import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 
 import { DmBattleMapCanvas } from './DmBattleMapCanvas';
 import { CreatureDrawer } from './CreatureDrawer';
@@ -87,7 +88,7 @@ export function DmVttScreen({
           campaignCode={campaignCode}
           battleMapId={battleMapId}
           dmId={dmId}
-          mapName={vtt.battleMap?.name ?? 'Battle Map'}
+          mapName={vtt.battleMap?.name ?? 'Battle map'}
           status={vtt.status}
           gridMode={gridMode}
           onSetGridMode={vtt.setGridMode}
@@ -108,54 +109,60 @@ export function DmVttScreen({
           onCancel={vtt.cancelPlacement}
         />
       )}
-      <div className="pointer-events-none absolute inset-0 z-10">
-        <RosterTray
-          entities={vtt.linkedEntities}
-          placedIndex={vtt.placedIndex}
-          armedEntityId={vtt.pendingPlacement?.config.entityId ?? null}
-          onArmPlacement={entity => !vtt.wasDrag() && vtt.armPlacement(entity)}
-          onSelectEntity={vtt.selectEntity}
-          onDragStart={vtt.startDrag}
-          onViewPlayer={vtt.onViewPlayer}
-          collapsed={rosterCollapsed}
-          onToggleCollapsed={() => setRosterCollapsed(v => !v)}
-          hasLinkedEncounter={vtt.linkedEncounterIds.length > 0}
-        />
-        <RosterDragGhost drag={vtt.drag} />
-        {pillEntity && (
-          <CreatureSheetPill
-            name={pillEntity.name}
-            onOpen={() => vtt.creatureDrawer.open(pillEntity.id)}
-          />
-        )}
-        {vtt.actions && (
-          <StudioPanel
-            encounter={vtt.encounter}
-            selectedEntityId={vtt.selectedEntityId}
+      {/* Floating panels' tooltips; the top bar sits under the dock's own
+          provider and PlacementBanner (above) has no tooltip. */}
+      <TooltipProvider>
+        <div className="pointer-events-none absolute inset-0 z-10">
+          <RosterTray
+            entities={vtt.linkedEntities}
+            placedIndex={vtt.placedIndex}
+            armedEntityId={vtt.pendingPlacement?.config.entityId ?? null}
+            onArmPlacement={entity =>
+              !vtt.wasDrag() && vtt.armPlacement(entity)
+            }
             onSelectEntity={vtt.selectEntity}
-            actions={vtt.actions}
-            activeTab={vtt.studioTab}
-            onTabChange={vtt.setStudioTab}
-            encounterHref={`/dm/campaign/${campaignCode}/encounters/${vtt.encounter?.id ?? ''}`}
-            collapsed={studioCollapsed}
-            onToggleCollapsed={() => setStudioCollapsed(v => !v)}
-            followNote={vtt.followNote}
-            onTokenIdentityChange={vtt.updateTokenIdentity}
+            onDragStart={vtt.startDrag}
+            onViewPlayer={vtt.onViewPlayer}
+            collapsed={rosterCollapsed}
+            onToggleCollapsed={() => setRosterCollapsed(v => !v)}
+            hasLinkedEncounter={vtt.linkedEncounterIds.length > 0}
           />
-        )}
-        {vtt.encounter?.isActive && (
-          <TurnControl
-            round={vtt.encounter.round}
-            activeName={vtt.activeEntity?.name ?? '—'}
-            onNext={vtt.handleNextTurn}
-            onPrev={vtt.handlePrevTurn}
+          <RosterDragGhost drag={vtt.drag} />
+          {pillEntity && (
+            <CreatureSheetPill
+              name={pillEntity.name}
+              onOpen={() => vtt.creatureDrawer.open(pillEntity.id)}
+            />
+          )}
+          {vtt.actions && (
+            <StudioPanel
+              encounter={vtt.encounter}
+              selectedEntityId={vtt.selectedEntityId}
+              onSelectEntity={vtt.selectEntity}
+              actions={vtt.actions}
+              activeTab={vtt.studioTab}
+              onTabChange={vtt.setStudioTab}
+              encounterHref={`/dm/campaign/${campaignCode}/encounters/${vtt.encounter?.id ?? ''}`}
+              collapsed={studioCollapsed}
+              onToggleCollapsed={() => setStudioCollapsed(v => !v)}
+              followNote={vtt.followNote}
+              onTokenIdentityChange={vtt.updateTokenIdentity}
+            />
+          )}
+          {vtt.encounter?.isActive && (
+            <TurnControl
+              round={vtt.encounter.round}
+              activeName={vtt.activeEntity?.name ?? '—'}
+              onNext={vtt.handleNextTurn}
+              onPrev={vtt.handlePrevTurn}
+            />
+          )}
+          <TokenDragDistanceBadge
+            viewport={vtt.viewport}
+            canvasEl={vtt.getCanvasEl()}
           />
-        )}
-        <TokenDragDistanceBadge
-          viewport={vtt.viewport}
-          canvasEl={vtt.getCanvasEl()}
-        />
-      </div>
+        </div>
+      </TooltipProvider>
       {vtt.actions && (
         <CreatureDrawer
           entity={vtt.creatureDrawer.entity}

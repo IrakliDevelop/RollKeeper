@@ -1,5 +1,9 @@
 'use client';
 
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+
+import { cn } from '@/utils/cn';
+
 import { dispositionColor } from './combatantToken';
 
 import { tokenAvatarUrl } from '@/components/ui/campaign/location-map/PlayerTokenTool';
@@ -34,12 +38,15 @@ export function RosterDragGhost({ drag }: RosterDragGhostProps) {
       {showOutline && (
         <div
           aria-hidden
-          className="border-accent-blue-border pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 border-dashed opacity-70"
+          className="border-brass-border pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-dashed opacity-70"
           style={{ left: x, top: y, width: footprintPx, height: footprintPx }}
         />
       )}
       <div
-        className="bg-surface-raised border-divider pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border px-2 py-1 shadow-xl"
+        className={cn(
+          OVERLAY_SURFACE,
+          'pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 px-2 py-1'
+        )}
         style={{ left: x, top: y }}
       >
         <span
@@ -57,10 +64,10 @@ export function RosterDragGhost({ drag }: RosterDragGhostProps) {
             firstName.charAt(0).toUpperCase()
           )}
         </span>
-        <span className="text-heading text-xs font-medium whitespace-nowrap">
+        <span className="type-ui text-heading whitespace-nowrap">
           {firstName}
           {cells > 1 && !showOutline && (
-            <span className="text-muted ml-1">
+            <span className="type-small text-muted ml-1">
               {cells}×{cells}
             </span>
           )}

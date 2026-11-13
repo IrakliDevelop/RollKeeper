@@ -12,7 +12,11 @@ describe('VttErrorFallback', () => {
       screen.getByText(/the battle map hit an error/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /reload map/i })
+      screen.getByText('Nothing on the map is lost. Reload to keep playing.')
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload map' })).toHaveAttribute(
+      'data-variant',
+      'primary'
+    );
   });
 });

@@ -7,6 +7,9 @@ import {
   type Point,
 } from '@/components/ui/campaign/dm-vtt/dragDistance';
 import { isCombatantToken } from '@/components/ui/campaign/dm-vtt/combatantToken';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+
+import { cn } from '@/utils/cn';
 
 interface TokenDragDistanceBadgeProps {
   viewport: Viewport | null;
@@ -152,7 +155,10 @@ export function TokenDragDistanceBadge({
 
   return (
     <div
-      className="bg-surface-raised border-divider pointer-events-none fixed z-30 rounded border px-1.5 py-0.5 text-xs font-bold shadow"
+      className={cn(
+        OVERLAY_SURFACE,
+        'type-ui text-heading pointer-events-none fixed z-30 px-1.5 py-0.5 tabular-nums'
+      )}
       style={{
         left: `${badge.x}px`,
         top: `${badge.y}px`,
