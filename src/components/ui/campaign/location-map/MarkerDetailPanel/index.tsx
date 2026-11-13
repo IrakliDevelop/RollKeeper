@@ -423,14 +423,14 @@ function EditForm({
               ) : (
                 <MapPin className="text-muted h-4 w-4 flex-shrink-0" />
               )}
-              <span className="text-body text-sm">
+              <span className="type-ui text-body">
                 {portalState.resolved.name}
               </span>
             </div>
           )}
 
           {portalState.resolved?.status === 'ready' && (
-            <Button variant="secondary" size="sm" asChild className="mt-1">
+            <Button variant="secondary" size="sm" asChild>
               <Link href={portalState.resolved.href}>
                 Open destination
                 <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
@@ -439,7 +439,7 @@ function EditForm({
           )}
 
           {portalState.resolved?.status === 'missing' && (
-            <p className="text-muted text-sm">Destination unavailable</p>
+            <p className="type-small text-muted">Destination unavailable</p>
           )}
 
           {portalState.resolved &&
@@ -451,7 +451,9 @@ function EditForm({
             )}
 
           {portalState.resolved?.status === 'self' && (
-            <p className="text-muted text-sm">Points to this map (self-link)</p>
+            <p className="type-small text-muted">
+              Points to this map (self-link)
+            </p>
           )}
         </Section>
       )}
@@ -514,123 +516,121 @@ function ReadOnlyView({
     <div className="flex flex-col gap-3">
       <div
         className={cn(
-          'text-heading text-lg font-semibold',
+          'type-subheading text-heading',
           MARKER_PANEL_CONTAINMENT_CLASS
         )}
       >
         <MarkerRichText content={title} />
       </div>
       {status && (
-        <p className="text-accent-blue-text text-sm font-semibold">
-          Status: {statusLabel(status)}
-        </p>
+        <p className="type-ui text-body">Status: {statusLabel(status)}</p>
       )}
       <div
         data-testid="marker-panel-body"
-        className={cn('text-body text-sm', MARKER_PANEL_CONTAINMENT_CLASS)}
+        className={cn('type-ui text-body', MARKER_PANEL_CONTAINMENT_CLASS)}
       >
         <MarkerRichText content={body} />
       </div>
       {lootLocked && (
-        <div className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-3.5">
-          <span className="bg-surface-secondary text-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-            <Lock size={20} />
-          </span>
+        <div className="flex items-center gap-3">
+          <Lock size={20} aria-hidden className="text-muted shrink-0" />
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-heading text-base font-bold">Locked</span>
-            <span className="text-body text-sm">
+            <span className="type-ui text-heading">Locked</span>
+            <span className="type-small text-body">
               You&apos;d need to get it open first.
             </span>
           </span>
         </div>
       )}
       {!lootLocked && loot && loot.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-heading text-sm font-semibold">Loot</span>
-            <Badge variant="success">Open</Badge>
-          </div>
-          {loot.map(entry => {
-            const max = Math.max(1, entry.remainingQuantity);
-            const requested = Math.min(max, quantities[entry.id] ?? max);
-            const soldOut = entry.remainingQuantity <= 0;
-            return (
-              <div
-                key={entry.id}
-                className="border-divider bg-surface-raised flex flex-col gap-2.5 rounded-lg border p-3"
-              >
-                <span className="flex flex-col gap-0.5">
-                  <span className="flex items-center gap-2">
-                    <span className="text-heading text-base font-bold">
-                      {entry.name}
+        <Section
+          heading="Loot"
+          level={4}
+          trailing={<Badge variant="success">Open</Badge>}
+        >
+          <ul className="divide-divider divide-y">
+            {loot.map(entry => {
+              const max = Math.max(1, entry.remainingQuantity);
+              const requested = Math.min(max, quantities[entry.id] ?? max);
+              const soldOut = entry.remainingQuantity <= 0;
+              return (
+                <li
+                  key={entry.id}
+                  className="flex flex-col gap-2 py-2 pointer-coarse:min-h-11"
+                >
+                  <span className="flex flex-col gap-0.5">
+                    <span className="flex items-center gap-2">
+                      <span className="type-ui text-heading">{entry.name}</span>
+                      {entry.rarity && (
+                        <Badge variant="neutral">{entry.rarity}</Badge>
+                      )}
                     </span>
-                    {entry.rarity && (
-                      <Badge variant="neutral">{entry.rarity}</Badge>
-                    )}
+                    <span className="type-small text-body">
+                      {entry.remainingQuantity} available
+                    </span>
                   </span>
-                  <span className="text-body text-sm">
-                    {entry.remainingQuantity} available
-                  </span>
-                </span>
-                {onClaimLoot && (
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        aria-label={`Take fewer ${entry.name}`}
-                        className="h-11 w-11 p-0"
-                        disabled={soldOut || requested <= 1}
-                        onClick={() =>
-                          setQuantities(prev => ({
-                            ...prev,
-                            [entry.id]: Math.max(1, requested - 1),
-                          }))
-                        }
-                      >
-                        <Minus size={19} />
-                      </Button>
-                      <span className="text-heading min-w-8.5 text-center text-lg font-bold tabular-nums">
-                        {soldOut ? 0 : requested}
+                  {onClaimLoot && (
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex items-center gap-1.5">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-label={`Take fewer ${entry.name}`}
+                          className="w-9 shrink-0 px-0"
+                          disabled={soldOut || requested <= 1}
+                          onClick={() =>
+                            setQuantities(prev => ({
+                              ...prev,
+                              [entry.id]: Math.max(1, requested - 1),
+                            }))
+                          }
+                        >
+                          <Minus size={16} />
+                        </Button>
+                        <span className="type-num-md text-heading min-w-8.5 text-center tabular-nums">
+                          {soldOut ? 0 : requested}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-label={`Take more ${entry.name}`}
+                          className="w-9 shrink-0 px-0"
+                          disabled={soldOut || requested >= max}
+                          onClick={() =>
+                            setQuantities(prev => ({
+                              ...prev,
+                              [entry.id]: Math.min(max, requested + 1),
+                            }))
+                          }
+                        >
+                          <Plus size={16} />
+                        </Button>
                       </span>
                       <Button
-                        variant="outline"
-                        aria-label={`Take more ${entry.name}`}
-                        className="h-11 w-11 p-0"
-                        disabled={soldOut || requested >= max}
-                        onClick={() =>
-                          setQuantities(prev => ({
-                            ...prev,
-                            [entry.id]: Math.min(max, requested + 1),
-                          }))
-                        }
+                        variant="secondary"
+                        className="flex-1"
+                        disabled={soldOut || claimingEntryId !== null}
+                        onClick={() => void handleClaim(entry.id, requested)}
                       >
-                        <Plus size={19} />
+                        {claimingEntryId === entry.id
+                          ? 'Claiming…'
+                          : soldOut
+                            ? 'Taken'
+                            : `Claim ${requested}`}
                       </Button>
-                    </span>
-                    <Button
-                      variant="primary"
-                      className="h-11 flex-1"
-                      disabled={soldOut || claimingEntryId !== null}
-                      onClick={() => void handleClaim(entry.id, requested)}
-                    >
-                      {claimingEntryId === entry.id
-                        ? 'Claiming…'
-                        : soldOut
-                          ? 'Taken'
-                          : `Claim ${requested}`}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <p className="text-muted text-sm">
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="type-small text-muted mt-2">
             Claimed items arrive on your character sheet a moment later.
           </p>
-        </div>
+        </Section>
       )}
       {claimMessage && (
-        <p role="status" className="text-body text-sm">
+        <p role="status" className="type-ui text-body">
           {claimMessage}
         </p>
       )}
@@ -766,7 +766,7 @@ function renderPanelBody(
       return (
         <p
           data-testid="marker-panel-state-missing-detail"
-          className="text-body text-sm"
+          className="type-ui text-body"
         >
           Not published yet — the DM hasn&apos;t shared details for this &quot;
           {name}&quot; marker.
@@ -775,7 +775,7 @@ function renderPanelBody(
     }
     return (
       <div data-testid="marker-panel-state-missing-detail">
-        <p className="text-body mb-3 text-sm">
+        <p className="type-ui text-body mb-3">
           This pin doesn&apos;t have details yet — add them below.
         </p>
         <EditForm
@@ -800,7 +800,7 @@ function renderPanelBody(
     return (
       <p
         data-testid="marker-panel-state-unpublished"
-        className="text-body text-sm"
+        className="type-ui text-body"
       >
         Not published yet — the DM hasn&apos;t shared details for this &quot;
         {name}&quot; marker.
@@ -812,7 +812,7 @@ function renderPanelBody(
     return (
       <p
         data-testid="marker-panel-state-invalid-data"
-        className="text-body text-sm"
+        className="type-ui text-body"
       >
         This marker&apos;s data could not be read and cannot be displayed.
       </p>
@@ -822,7 +822,7 @@ function renderPanelBody(
   return (
     <p
       data-testid="marker-panel-state-unsupported-version"
-      className="text-body text-sm"
+      className="type-ui text-body"
     >
       This marker was created by a newer version of RollKeeper and can&apos;t be
       displayed here.

@@ -635,6 +635,21 @@ describe('MarkerDetailPanel', () => {
     expect(dm.baseElement.innerHTML).toContain(dmNotesValue);
   });
 
+  it('names an unlabelled npc marker by its kind label in player missing-detail', () => {
+    const data = buildMarkerData({ kind: 'npc', ref: 'ref-1' });
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{ kind: 'missing-detail', data }}
+        onClose={() => {}}
+      />
+    );
+    expect(
+      screen.getByTestId('marker-panel-state-missing-detail')
+    ).toHaveTextContent('for this "NPC" marker.');
+  });
+
   it('gates the missing-detail edit form on dm mode; player mode gets the read-only treatment (positive control: dm mode renders the form)', () => {
     const data = buildMarkerData({ kind: 'door', ref: 'ref-1' });
     const state: MarkerPanelState = { kind: 'missing-detail', data };
@@ -1113,9 +1128,10 @@ describe('MarkerDetailPanel player loot: locked container and quantity stepper',
         onClaimLoot={vi.fn()}
       />
     );
-    // The unlabelled marker's dialog title is also "Loot"; skip it.
-    const outsideTitle = { ignore: 'script, style, h2 *' };
-    expect(screen.getByText('Loot', outsideTitle)).toBeInTheDocument();
+    // The unlabelled marker's dialog title is also "Loot" (an h2); the
+    // section heading is the h4.
+    const lootHeading = { name: 'Loot', level: 4 } as const;
+    expect(screen.getByRole('heading', lootHeading)).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
 
     rerender(
@@ -1131,8 +1147,75 @@ describe('MarkerDetailPanel player loot: locked container and quantity stepper',
         onClaimLoot={vi.fn()}
       />
     );
-    expect(screen.queryByText('Loot', outsideTitle)).toBeNull();
+    expect(screen.queryByRole('heading', lootHeading)).toBeNull();
     expect(screen.queryByText('Open')).toBeNull();
+  });
+
+  it('lists loot under a Loot heading with one list item per entry', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({
+          loot: [
+            ...arrowsLoot(8),
+            {
+              id: 'loot-2',
+              name: 'Rope',
+              itemKind: 'inventory' as const,
+              quantity: 1,
+              remainingQuantity: 1,
+            },
+          ],
+        })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    const heading = screen.getByRole('heading', { name: 'Loot', level: 4 });
+    expect(heading).toBeInTheDocument();
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByText('Arrows')).toBeInTheDocument();
+    expect(within(items[1]).getByText('Rope')).toBeInTheDocument();
+  });
+
+  it('claim is an outline action, not brass', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(8) })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Claim 8' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Take fewer Arrows' })
+    ).toHaveAttribute('data-variant', 'secondary');
+    expect(
+      screen.getByRole('button', { name: 'Take more Arrows' })
+    ).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('shows the locked state as text with no claim controls', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ lootLocked: true })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Locked')).toBeInTheDocument();
+    expect(screen.getByText("You'd need to get it open first.")).toBeVisible();
+    expect(screen.queryByRole('button', { name: /claim/i })).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
   });
 
   it('claims the quantity the player stepped down to', async () => {
