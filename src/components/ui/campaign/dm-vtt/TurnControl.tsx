@@ -55,7 +55,7 @@ export function TurnControl({
         onClick={onNext}
         rightIcon={<Play size={16} />}
       >
-        Next
+        Next turn
       </Button>
     </div>
   );

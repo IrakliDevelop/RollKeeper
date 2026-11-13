@@ -27,7 +27,7 @@ describe('TurnControl', () => {
 
     expect(screen.getByText('Round 3')).toBeInTheDocument();
     expect(screen.getByText('Goblin')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Next turn' })).toHaveAttribute(
       'data-variant',
       'primary'
     );
@@ -41,7 +41,7 @@ describe('TurnControl', () => {
     const user = userEvent.setup();
     const { onNext, onPrev } = renderControl();
 
-    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next turn' }));
     await user.click(screen.getByRole('button', { name: 'Previous turn' }));
 
     expect(onNext).toHaveBeenCalledOnce();

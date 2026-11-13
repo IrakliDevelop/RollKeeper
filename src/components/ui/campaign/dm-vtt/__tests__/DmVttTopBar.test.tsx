@@ -77,7 +77,7 @@ describe('DmVttTopBar', () => {
     ['live', 'Live'],
     ['connecting', 'Connecting…'],
     ['offline', 'Offline'],
-    ['denied', 'Denied'],
+    ['denied', 'Sync denied'],
     ['unsupported', 'Sync unavailable'],
   ] as const)('shows the %s status word', (status, word) => {
     renderTopBar({ status });

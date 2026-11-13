@@ -33,7 +33,7 @@ export function InitiativeTab({
   if (!encounter) {
     return (
       <p className="type-small text-muted px-3 py-4">
-        No encounter linked yet.
+        Link an encounter in Setup mode
       </p>
     );
   }

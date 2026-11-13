@@ -50,7 +50,7 @@ export function LiveSyncChip({
             ? 'Offline'
             : status === 'unsupported'
               ? 'Sync unavailable'
-              : 'Denied'}
+              : 'Sync denied'}
     </span>
   );
 }
