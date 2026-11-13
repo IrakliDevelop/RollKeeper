@@ -82,19 +82,14 @@ export function SyncIndicator({
   onSharePartyViewChange,
 }: SyncIndicatorProps) {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState(syncStateLabel(syncStatus, lastSyncedAt));
+  const [, setTick] = useState(0);
+  const state = syncStateLabel(syncStatus, lastSyncedAt);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setState(syncStateLabel(syncStatus, lastSyncedAt));
-    }, 5000);
+    const timer = setInterval(() => setTick(t => t + 1), 5000);
     return () => clearInterval(timer);
-  }, [syncStatus, lastSyncedAt]);
-
-  useEffect(() => {
-    setState(syncStateLabel(syncStatus, lastSyncedAt));
-  }, [syncStatus, lastSyncedAt]);
+  }, []);
 
   if (!syncEnabled || !campaignCode) return null;
 
@@ -113,7 +108,9 @@ export function SyncIndicator({
           <span className="type-small text-body sr-only max-w-[120px] truncate sm:not-sr-only">
             {campaignName || campaignCode}
           </span>
-          <span className="type-small text-body sm:hidden">{state.short}</span>
+          <span className="type-small text-body sm:hidden" aria-hidden>
+            {state.short}
+          </span>
           <span className="type-small text-muted sr-only sm:not-sr-only">
             {state.full}
           </span>
@@ -130,7 +127,7 @@ export function SyncIndicator({
           aria-label="Campaign sync"
           align="end"
           sideOffset={8}
-          className={`${OVERLAY_SURFACE} z-50 w-64 max-w-[calc(100vw-1rem)] p-3`}
+          className={`${OVERLAY_SURFACE} z-[60] w-64 max-w-[calc(100vw-1rem)] p-3`}
         >
           <div className="mb-3">
             <div className="flex items-center gap-2">

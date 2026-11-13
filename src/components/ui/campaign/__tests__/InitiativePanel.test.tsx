@@ -293,28 +293,40 @@ describe('InitiativePanel', () => {
   });
 
   it('does not mark a dead current combatant', () => {
-    render(
+    const makeState = (isDead: boolean) => ({
+      ...base,
+      currentEntityId: 'm',
+      turnOrder: [
+        base.turnOrder[0],
+        {
+          entityId: 'm',
+          displayName: 'Enemy',
+          type: 'monster' as const,
+          isDead,
+        },
+      ],
+    });
+    const { rerender } = render(
       <InitiativePanel
-        state={{
-          ...base,
-          currentEntityId: 'm',
-          turnOrder: [
-            base.turnOrder[0],
-            {
-              entityId: 'm',
-              displayName: 'Enemy',
-              type: 'monster',
-              isDead: true,
-            },
-          ],
-        }}
+        state={makeState(true)}
         characterId="char-b"
         onEndTurn={noop}
       />
     );
-    const dead = screen.getByText('Enemy').closest('li')!;
-    expect(dead).not.toHaveAttribute('aria-current', 'true');
+    const deadRow = screen.getByText('Enemy').closest('li')!;
+    expect(deadRow).not.toHaveAttribute('aria-current');
     expect(screen.queryByText('Current turn')).not.toBeInTheDocument();
+
+    rerender(
+      <InitiativePanel
+        state={makeState(false)}
+        characterId="char-b"
+        onEndTurn={noop}
+      />
+    );
+    const aliveRow = screen.getByText('Enemy').closest('li')!;
+    expect(aliveRow).toHaveAttribute('aria-current', 'true');
+    expect(within(aliveRow).getByText('Current turn')).toBeInTheDocument();
   });
 
   it('names the side glyphs', () => {

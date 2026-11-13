@@ -234,12 +234,12 @@ export function PartyHPSidebar({
       >
         {/* Panel Wrapper — collapses width when closed */}
         <div
-          className="overflow-hidden transition-[width] duration-180 ease-out"
-          style={{ width: isOpen ? '240px' : '0px' }}
+          className={`overflow-hidden transition-[width] duration-180 ease-out ${
+            isOpen ? `${OVERLAY_SURFACE} rounded-l-none border-l-0` : ''
+          }`}
+          style={{ width: isOpen ? '241px' : '0px' }}
         >
-          <div
-            className={`${OVERLAY_SURFACE} max-h-[70vh] w-[240px] overflow-hidden rounded-l-none border-l-0`}
-          >
+          <div className="max-h-[70vh] w-[240px] overflow-hidden">
             {/* Header — also the vertical drag handle */}
             <div
               onPointerDown={startDrag}

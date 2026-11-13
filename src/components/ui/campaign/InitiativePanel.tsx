@@ -158,7 +158,7 @@ export function InitiativePanel({
             onClick={() => setIsOpen(o => !o)}
             aria-label={handleLabel}
             aria-expanded={isOpen}
-            className={`relative flex flex-col items-center gap-1 self-center rounded-md rounded-r-none border border-r-0 px-2.5 py-5 transition-colors pointer-coarse:min-w-11 ${
+            className={`flex flex-col items-center gap-1 self-center rounded-md rounded-r-none border border-r-0 px-2.5 py-5 transition-colors pointer-coarse:min-w-11 ${
               isMyTurn
                 ? 'border-brass-border bg-brass-bg text-brass-text'
                 : isOpen
@@ -177,11 +177,13 @@ export function InitiativePanel({
 
         {/* Panel wrapper — collapses width when closed */}
         <div
-          className="overflow-hidden transition-[width] duration-180 ease-out"
-          style={{ width: isOpen ? '240px' : '0px' }}
+          className={`overflow-hidden transition-[width] duration-180 ease-out ${
+            isOpen ? `${OVERLAY_SURFACE} rounded-r-none border-r-0` : ''
+          }`}
+          style={{ width: isOpen ? '241px' : '0px' }}
         >
           <div
-            className={`${OVERLAY_SURFACE} flex w-[240px] flex-col overflow-hidden rounded-r-none border-r-0`}
+            className="flex w-[240px] flex-col overflow-hidden"
             style={{ maxHeight: panelMaxHeight }}
           >
             {/* Header — also the vertical drag handle */}
