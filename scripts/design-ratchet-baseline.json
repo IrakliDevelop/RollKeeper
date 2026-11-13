@@ -3,7 +3,6 @@
     "src/app/bestiary/page.tsx": 2,
     "src/app/classes/[classId]/page.tsx": 3,
     "src/app/classes/page.tsx": 2,
-    "src/app/dm/campaign/[code]/battlemaps/[id]/page.tsx": 1,
     "src/app/feats/page.tsx": 2,
     "src/app/guest/GuestRedemptionPage.tsx": 2,
     "src/app/membership/MembershipInvitationPage.tsx": 1,
