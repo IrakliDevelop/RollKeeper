@@ -32,7 +32,13 @@ vi.mock('@/components/ui/campaign/battle-map/EncounterLinkingPanel', () => ({
   default: () => null,
 }));
 
-function renderPanel(onClose = vi.fn()) {
+function renderPanel(
+  onClose = vi.fn(),
+  publish: {
+    publishLayerUpsert?: (definition: Layer) => void;
+    publishLayerRemove?: (id: string) => void;
+  } = {}
+) {
   return render(
     <DmLocationLayersPanel
       mode="battlemap"
@@ -41,6 +47,7 @@ function renderPanel(onClose = vi.fn()) {
       onLinkEncounter={vi.fn()}
       onUnlinkEncounter={vi.fn()}
       onClose={onClose}
+      {...publish}
     />
   );
 }
@@ -144,6 +151,68 @@ describe('DmLocationLayersPanel', () => {
     // Toggling a layer never makes it active.
     expect(mocks.layers.setActiveLayer).not.toHaveBeenCalled();
     expect(container.querySelectorAll('[title]').length).toBe(0);
+  });
+
+  it('publishes custom layer edits over layer sync, never canonical ones', async () => {
+    const user = userEvent.setup();
+    const trapsLayer = {
+      id: 'layer-custom-1',
+      name: 'Traps',
+      visible: true,
+      locked: false,
+    } as unknown as Layer;
+    mocks.viewport.layerManager.getLayer.mockImplementation(((id: string) =>
+      id === 'layer-custom-1' ? trapsLayer : undefined) as never);
+    const publishLayerUpsert = vi.fn();
+    const publishLayerRemove = vi.fn();
+    renderPanel(vi.fn(), { publishLayerUpsert, publishLayerRemove });
+
+    const traps = within(screen.getByRole('group', { name: 'Traps' }));
+    await user.click(traps.getByRole('button', { name: 'Hide layer' }));
+    expect(publishLayerUpsert).toHaveBeenCalledTimes(1);
+    expect(publishLayerUpsert).toHaveBeenLastCalledWith(trapsLayer);
+
+    await user.click(traps.getByRole('button', { name: 'Lock layer' }));
+    expect(publishLayerUpsert).toHaveBeenCalledTimes(2);
+    expect(publishLayerUpsert).toHaveBeenLastCalledWith(trapsLayer);
+
+    await user.click(traps.getByRole('button', { name: 'Delete layer' }));
+    expect(publishLayerRemove).toHaveBeenCalledWith('layer-custom-1');
+
+    const annotations = within(
+      screen.getByRole('group', { name: 'Annotations' })
+    );
+    await user.click(annotations.getByRole('button', { name: 'Hide layer' }));
+    expect(mocks.layers.setVisible).toHaveBeenLastCalledWith(
+      'layer-annotations',
+      false
+    );
+    expect(publishLayerUpsert).toHaveBeenCalledTimes(2);
+    expect(publishLayerRemove).toHaveBeenCalledTimes(1);
+    expect(mocks.viewport.layerManager.getLayer).not.toHaveBeenCalledWith(
+      'layer-annotations'
+    );
+  });
+
+  it('aligns the map row name with the other rows', () => {
+    renderPanel();
+    const mapRow = screen.getByRole('group', { name: 'Map' });
+    const glyphSlot = mapRow.querySelector('svg.lucide-lock')?.parentElement;
+    expect(glyphSlot?.tagName).toBe('SPAN');
+    expect(glyphSlot).toHaveClass('w-7', 'shrink-0', 'justify-center');
+    expect(glyphSlot?.querySelector('svg')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
+
+  it('hides the header glyphs from assistive tech', () => {
+    renderPanel();
+    for (const name of ['Add layer', 'Close layers']) {
+      expect(
+        screen.getByRole('button', { name }).querySelector('svg')
+      ).toHaveAttribute('aria-hidden', 'true');
+    }
   });
 
   it('shows the locked and hidden states by label', () => {

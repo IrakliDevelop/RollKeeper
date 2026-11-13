@@ -342,7 +342,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 Arranging maps — other layers are locked
               </p>
             )}
-            <div className="flex-1 overflow-hidden">
+            {/* The movement bar floats inside the canvas column so it never
+              paints over the in-flow layers panel on narrow widths. */}
+            <div className="relative min-w-0 flex-1 overflow-hidden">
               <Canvas
                 ref={canvasRef}
                 tools={tools}
@@ -363,19 +365,19 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 style={{ minHeight: 0 }}
                 snapToGrid={mode === 'battlemap'}
               />
-            </div>
 
-            {viewport && mode === 'battlemap' && (
-              <div className="absolute bottom-3 left-3 z-20 max-w-[calc(100%-1.5rem)]">
-                <BattleMapMovement
-                  viewport={viewport}
-                  campaignCode={props.campaignCode}
-                  battleMapId={props.location.id}
-                  dash={movementDash}
-                  onDashChange={handleSetMovementDash}
-                />
-              </div>
-            )}
+              {viewport && mode === 'battlemap' && (
+                <div className="absolute bottom-3 left-3 z-20 max-w-[calc(100%-1.5rem)]">
+                  <BattleMapMovement
+                    viewport={viewport}
+                    campaignCode={props.campaignCode}
+                    battleMapId={props.location.id}
+                    dash={movementDash}
+                    onDashChange={handleSetMovementDash}
+                  />
+                </div>
+              )}
+            </div>
 
             {layersPanelOpen && viewport && (
               <DmLocationLayersPanel

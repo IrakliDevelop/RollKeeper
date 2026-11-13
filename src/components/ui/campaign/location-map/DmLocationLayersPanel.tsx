@@ -76,7 +76,7 @@ export default function DmLocationLayersPanel({
                   viewport.requestRender();
                 }}
               >
-                <Plus size={16} />
+                <Plus size={16} aria-hidden />
               </Button>
             </Tooltip>
             <Tooltip content="Close layers">
@@ -87,7 +87,7 @@ export default function DmLocationLayersPanel({
                 aria-label="Close layers"
                 onClick={onClose}
               >
-                <X size={16} />
+                <X size={16} aria-hidden />
               </Button>
             </Tooltip>
           </div>
@@ -140,11 +140,10 @@ export default function DmLocationLayersPanel({
 
                   {isBgLayer ? (
                     <>
-                      <Lock
-                        size={14}
-                        aria-hidden
-                        className="text-muted shrink-0"
-                      />
+                      {/* Same width as the lock button so the name lines up. */}
+                      <span className="flex w-7 shrink-0 justify-center pointer-coarse:w-11">
+                        <Lock size={14} aria-hidden className="text-muted" />
+                      </span>
                       <span className="type-small text-muted min-w-0 flex-1 truncate px-2">
                         {layer.name}
                       </span>

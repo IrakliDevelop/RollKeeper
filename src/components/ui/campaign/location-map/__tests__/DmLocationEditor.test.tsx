@@ -359,11 +359,16 @@ describe('DmLocationEditor wiring', () => {
       linkedEncounterIds: [],
     } as unknown as BattleMap);
 
+    // The bar sits in the canvas column, not in the shared container that
+    // also holds the in-flow layers panel — so it never paints over the panel.
     const wrapper = screen.getByTestId('movement-bar').parentElement!;
-    expect(wrapper.parentElement).toBe(
-      screen.getByRole('button', { name: 'Show layers' }).parentElement
-    );
-    expect(wrapper.parentElement).not.toBe(container.firstElementChild);
+    const canvasColumn = wrapper.parentElement!;
+    const sharedContainer = screen.getByRole('button', {
+      name: 'Show layers',
+    }).parentElement!;
+    expect(canvasColumn).not.toBe(sharedContainer);
+    expect(canvasColumn.parentElement).toBe(sharedContainer);
+    expect(canvasColumn).not.toBe(container.firstElementChild);
   });
 });
 
