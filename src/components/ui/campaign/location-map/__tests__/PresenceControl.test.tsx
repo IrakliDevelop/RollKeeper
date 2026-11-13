@@ -1,11 +1,14 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   act,
   render,
   screen,
   cleanup,
   fireEvent,
+  waitFor,
+  within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { PeerRoster } from '@fieldnotes/core';
 import { PresenceControl } from '../PresenceControl';
 
@@ -23,6 +26,18 @@ function playersFetch(ids: string[]) {
 }
 
 describe('PresenceControl', () => {
+  beforeEach(() => {
+    // Re-stubbed per test: afterEach runs vi.unstubAllGlobals().
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
@@ -56,6 +71,7 @@ describe('PresenceControl', () => {
         id: 'char-b',
         name: '<b>Bad</b>',
         role: 'player',
+        cursor: { x: 2, y: 2 },
       });
       roster.apply('c3', {
         kind: 'awareness',
@@ -83,9 +99,18 @@ describe('PresenceControl', () => {
       if (!row) throw new Error(`no row containing ${text}`);
       return row;
     };
-    expect(rowWith('Aria')).not.toHaveTextContent('unverified');
-    expect(rowWith('<b>Bad</b>')).toHaveTextContent('unverified'); // literal text, no HTML
-    expect(rowWith('TV display')).not.toHaveTextContent('unverified');
+    expect(rowWith('Aria')).not.toHaveTextContent('Unverified');
+    expect(rowWith('<b>Bad</b>')).toHaveTextContent('Unverified'); // literal text, no HTML
+    expect(rowWith('TV display')).not.toHaveTextContent('Unverified');
+    // Only the newest row per id counts: Aria's reconnect has no cursor.
+    expect(
+      within(rowWith('<b>Bad</b>')).getByRole('img', {
+        name: 'Cursor visible',
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(rowWith('Aria')).queryByRole('img', { name: 'Cursor visible' })
+    ).toBeNull();
     expect(document.querySelector('b')).toBeNull();
     // Role grouping is positional by design (dm → players → display) and is
     // pinned in awarenessPeers.test.ts with explicit fixture names; here only
@@ -107,7 +132,7 @@ describe('PresenceControl', () => {
     roster.dispose();
   });
 
-  it('with a null roster shows zero viewers and an empty-state line, switches still work', () => {
+  it('with a null roster shows zero viewers and an empty-state line, switches still work', async () => {
     vi.stubGlobal('fetch', playersFetch([]));
     render(
       <PresenceControl
@@ -120,12 +145,44 @@ describe('PresenceControl', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /viewers · 0/i }));
-    expect(screen.getByText(/no one else is viewing/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no one else is viewing/i)
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('switch', { name: 'Share my cursor' })
     ).not.toBeChecked();
     expect(
       screen.getByRole('switch', { name: 'Show player cursors' })
     ).not.toBeChecked();
+  });
+
+  it('opens a named popover; Escape closes it and focus returns to the trigger', async () => {
+    vi.stubGlobal('fetch', playersFetch([]));
+    render(
+      <PresenceControl
+        campaignCode="CAMP01"
+        roster={null}
+        cursorSharing={false}
+        onCursorSharingChange={vi.fn()}
+        showPlayerCursors={false}
+        onShowPlayerCursorsChange={vi.fn()}
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'Viewers · 0' });
+    expect(trigger).toHaveAttribute('data-variant', 'ghost');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).not.toHaveAttribute('data-selected');
+
+    await userEvent.click(trigger);
+    const popover = await screen.findByRole('dialog', { name: 'Viewers' });
+    expect(popover).toHaveAttribute('data-testid', 'presence-popover');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger).toHaveAttribute('data-selected', 'true');
+
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByTestId('presence-popover')).toBeNull()
+    );
+    expect(trigger).toHaveFocus();
   });
 });

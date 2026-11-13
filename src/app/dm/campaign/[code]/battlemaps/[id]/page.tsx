@@ -3,9 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Map } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignHeader } from '@/components/ui/campaign/CampaignHeader';
 import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
@@ -33,8 +33,8 @@ export default function BattleMapEditorPage() {
 
   if (!hasHydrated || mode === null) {
     return (
-      <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+      <div className="bg-surface flex min-h-dvh items-center justify-center">
+        <p className="text-muted">Loading battle map…</p>
       </div>
     );
   }
@@ -43,15 +43,16 @@ export default function BattleMapEditorPage() {
 
   if (!battleMap) {
     return (
-      <div className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-heading text-lg font-semibold">
-          Battle map not found
+      <div className="bg-surface flex min-h-dvh flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="type-subheading text-heading">Battle map not found</p>
+        <p className="type-body text-muted">
+          It was deleted, or the link is out of date.
         </p>
-        <Link href={`/dm/campaign/${code}/battlemaps`}>
-          <Button variant="ghost" leftIcon={<ArrowLeft size={16} />}>
-            Back to Battle Maps
-          </Button>
-        </Link>
+        <Button asChild variant="ghost" leftIcon={<ArrowLeft size={16} />}>
+          <Link href={`/dm/campaign/${code}/battlemaps`}>
+            Back to battle maps
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -88,52 +89,48 @@ export default function BattleMapEditorPage() {
   }
 
   return (
-    <div className="bg-surface flex h-screen flex-col overflow-hidden">
+    <div className="bg-surface flex h-dvh flex-col overflow-hidden">
       {campaign && (
         <CampaignSettingsSyncControls campaign={campaign} headless />
       )}
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}/battlemaps`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Battle Maps
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">
-                  {battleMap.name}
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="border-divider bg-surface-raised flex items-center gap-0.5 rounded-lg border p-0.5">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={() => handleModeChange('setup')}
-                >
-                  Setup
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  onClick={() => handleModeChange('play')}
-                >
-                  Play
-                </Button>
-              </div>
-              <HeaderTrailing showSystemOption />
-            </div>
+      <CampaignHeader
+        crumb={{
+          href: `/dm/campaign/${code}/battlemaps`,
+          label: 'Battle maps',
+        }}
+        title={
+          <h1 className="type-heading text-heading truncate">
+            {battleMap.name}
+          </h1>
+        }
+        actions={
+          <div
+            role="group"
+            aria-label="Mode"
+            className="flex items-center gap-1"
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              selected={mode === 'setup'}
+              aria-pressed={mode === 'setup'}
+              onClick={() => handleModeChange('setup')}
+            >
+              Setup
+            </Button>
+            {/* The play branch returned above, so Play is never current here. */}
+            <Button
+              variant="secondary"
+              size="sm"
+              selected={false}
+              aria-pressed={false}
+              onClick={() => handleModeChange('play')}
+            >
+              Play
+            </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DmLocationEditor

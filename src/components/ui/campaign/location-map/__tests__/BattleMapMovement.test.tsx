@@ -201,7 +201,17 @@ describe('player turn movement with the real Fieldnotes SDK', () => {
     render(controls());
     gesture(25, 105);
     const before = vp.store.getById(id)?.position;
+    expect(
+      screen.getByRole('button', { name: 'Reset movement' })
+    ).toHaveAttribute('data-variant', 'ghost');
+    expect(screen.getByRole('button', { name: 'Teleport' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Teleport' }));
+    expect(
+      screen.getByRole('button', { name: 'Cancel teleport' })
+    ).toHaveAttribute('data-variant', 'ghost');
     expect(vp.toolManager.activeTool?.name).toBe('vtt-place');
     gesture(260, 260);
     expect(vp.store.getById(id)?.position).not.toEqual(before);
