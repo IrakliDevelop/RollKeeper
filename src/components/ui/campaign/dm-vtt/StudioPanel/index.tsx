@@ -1,13 +1,20 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon, type IconName } from '@/components/ui/icons';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { CombatantDetail } from '@/components/ui/encounter/combat-screen/detail/CombatantDetail';
+import { focusWasLost } from '@/components/ui/campaign/location-map/useRestoreLostFocus';
 
 import { InitiativeTab } from './InitiativeTab';
 import { TokenSettings } from './TokenSettings';
+
+import { cn } from '@/utils/cn';
 
 import type { Encounter, EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
@@ -19,7 +26,7 @@ export interface StudioPanelProps {
   actions: EntityActions; // built by Task 8 via buildEntityActions
   activeTab: 'initiative' | 'selected';
   onTabChange: (tab: 'initiative' | 'selected') => void;
-  encounterHref: string; // "Encounter page ↗"
+  encounterHref: string; // "Encounter page" link, opens in a new tab
   collapsed: boolean;
   onToggleCollapsed: () => void;
   /** "Following: {name}" when 2+ linked encounters are active; else null. */
@@ -47,6 +54,8 @@ const TABS: {
  * DM VTT studio panel: right-edge collapsible panel with an Initiative tab
  * (turn order, mirrors the player-facing sort) and a Selected tab that
  * reuses the combat-screen `CombatantDetail` for full entity management.
+ * An overlay surface docked to the right edge; its Tooltips need the
+ * `TooltipProvider` that `DmVttScreen` wraps around the floating panels.
  */
 export function StudioPanel({
   encounter,
@@ -61,15 +70,33 @@ export function StudioPanel({
   followNote,
   onTokenIdentityChange,
 }: StudioPanelProps) {
+  const pillRef = useRef<HTMLButtonElement>(null);
+  const collapseRef = useRef<HTMLButtonElement>(null);
+  const prevCollapsed = useRef(collapsed);
+
+  // The pill and the collapse button each unmount on click, which drops
+  // focus to <body>; hand it to the control that replaced them.
+  useEffect(() => {
+    if (prevCollapsed.current === collapsed) return;
+    prevCollapsed.current = collapsed;
+    if (focusWasLost()) (collapsed ? pillRef : collapseRef).current?.focus();
+  }, [collapsed]);
+
   if (collapsed) {
     return (
-      <button
+      <Button
+        ref={pillRef}
+        variant="secondary"
+        size="sm"
+        aria-expanded={false}
         onClick={onToggleCollapsed}
-        title="Expand combat panel"
-        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex min-h-[44px] items-center gap-1.5 rounded-l-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
+        className={cn(
+          OVERLAY_SURFACE,
+          'pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 rounded-r-none border-r-0'
+        )}
       >
-        <AppIcon name="attack" className="h-4 w-4" /> COMBAT
-      </button>
+        Combat
+      </Button>
     );
   }
 
@@ -83,11 +110,13 @@ export function StudioPanel({
 
   return (
     <div
-      className={`bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex w-[min(390px,40vw)] flex-col overflow-hidden rounded-l-2xl border shadow-xl ${
+      className={cn(
+        OVERLAY_SURFACE,
+        'pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex w-[min(390px,40vw)] flex-col overflow-hidden rounded-r-none border-r-0',
         activeTab === 'initiative'
           ? 'max-h-[70vh]'
           : 'max-h-[calc(100vh-var(--dm-vtt-panel-top,8rem)-0.75rem)]'
-      }`}
+      )}
       style={{ maxHeight: maxPanelHeight }}
       data-testid="dm-vtt-studio-panel"
       data-active-tab={activeTab}
@@ -97,36 +126,51 @@ export function StudioPanel({
           {TABS.map(({ key, icon, label }) => (
             <Button
               key={key}
-              variant={activeTab === key ? 'primary' : 'ghost'}
+              variant="ghost"
+              size="sm"
+              selected={activeTab === key}
+              aria-pressed={activeTab === key}
+              leftIcon={<AppIcon name={icon} className="size-4" />}
               onClick={() => onTabChange(key)}
-              className="min-h-[44px] text-xs"
-              aria-label={label}
             >
-              <AppIcon name={icon} className="h-4 w-4" /> {label}
+              {label}
             </Button>
           ))}
         </div>
         <div className="flex items-center gap-1">
-          <Link
-            href={encounterHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent-blue-text hidden px-1 text-xs font-semibold hover:underline lg:block"
-          >
-            Encounter page ↗
-          </Link>
           <Button
-            variant="ghost"
-            size="lg"
-            onClick={onToggleCollapsed}
-            aria-label="Collapse combat panel"
+            asChild
+            variant="link"
+            size="sm"
+            className="hidden px-1 lg:inline-flex"
+            rightIcon={<ExternalLink size={14} />}
           >
-            ▸
+            <Link
+              href={encounterHref}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Encounter page
+              <span className="sr-only"> (opens in a new tab)</span>
+            </Link>
           </Button>
+          <Tooltip content="Collapse combat panel">
+            <Button
+              ref={collapseRef}
+              variant="ghost"
+              size="sm"
+              aria-expanded={true}
+              aria-label="Collapse combat panel"
+              onClick={onToggleCollapsed}
+              className="w-9 shrink-0 px-0"
+            >
+              <ChevronRight size={16} aria-hidden />
+            </Button>
+          </Tooltip>
         </div>
       </div>
       {followNote && (
-        <p className="text-faint border-divider border-b px-3 py-1 text-xs">
+        <p className="type-small text-muted border-divider border-b px-3 py-1">
           {followNote}
         </p>
       )}
@@ -156,7 +200,7 @@ export function StudioPanel({
             )}
           </>
         ) : (
-          <p className="text-muted px-3 py-4 text-xs">
+          <p className="type-small text-muted px-3 py-4">
             Select a combatant or token.
           </p>
         )}
