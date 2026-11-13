@@ -120,7 +120,7 @@ describe('DmLocationToolbar', () => {
       'Delete selected',
       'Rotate 90° clockwise',
       'Rotate 90° counter-clockwise',
-      'Align & distribute',
+      'Align',
     ]) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
