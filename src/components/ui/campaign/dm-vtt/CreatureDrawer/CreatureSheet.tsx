@@ -100,7 +100,7 @@ export function CreatureSheet({
           className="min-h-0 flex-1 overflow-y-auto"
         >
           {!isLair && (
-            <div className="space-y-3 px-5 py-4">
+            <div className="space-y-6 px-5 py-4">
               <CreatureHpCard {...tabProps} />
               <CreatureStatTiles {...tabProps} />
               <CreatureStatusRow {...tabProps} />
@@ -108,18 +108,21 @@ export function CreatureSheet({
             </div>
           )}
 
-          <CreatureTabBar tabs={tabs} activeTab={activeTab} />
+          <CreatureTabBar tabs={tabs} />
 
           {editing && (
-            <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex flex-wrap items-center gap-2 border-b px-5 py-2 text-xs">
-              <LockOpen className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1">
+            <div className="bg-brass-bg border-brass-border text-body flex flex-wrap items-center gap-2 border-b px-5 py-2">
+              <LockOpen
+                className="text-brass-text size-4 shrink-0"
+                aria-hidden
+              />
+              <span className="type-small flex-1">
                 {entity.npcSourceId
                   ? 'Editing this combatant. Changes also sync back to the NPC library record.'
                   : 'Editing this combatant. Changes stay on this combatant.'}
               </span>
               {openEditor && (
-                <Button variant="outline" size="sm" onClick={openEditor}>
+                <Button variant="secondary" size="sm" onClick={openEditor}>
                   Full stat block editor
                 </Button>
               )}

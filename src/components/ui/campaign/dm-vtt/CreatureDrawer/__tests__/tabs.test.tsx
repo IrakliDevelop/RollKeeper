@@ -159,6 +159,9 @@ describe('ActionsTab', () => {
 
     await user.click(screen.getByRole('button', { name: /use fire breath/i }));
     expect(actions.onUseAbility).toHaveBeenCalledWith('e1', 'breath');
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Actions & traits' })
+    ).toBeInTheDocument();
   });
 
   it('renders each section heading once (no outer card heading duplicating the inner one)', () => {
@@ -220,9 +223,11 @@ describe('StatBlockTab', () => {
       />
     );
 
-    await user.click(
-      screen.getByRole('button', { name: /full stat block editor/i })
-    );
+    const button = screen.getByRole('button', {
+      name: /full stat block editor/i,
+    });
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    await user.click(button);
     expect(onOpenEditor).toHaveBeenCalledTimes(1);
   });
 
@@ -262,6 +267,9 @@ describe('StatBlockTab', () => {
     render(
       <StatBlockTab entity={entity} actions={makeActions()} editing={false} />
     );
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Source' })
+    ).toBeInTheDocument();
     expect(screen.getByText('NPC library')).toBeInTheDocument();
   });
 });

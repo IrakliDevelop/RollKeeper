@@ -171,7 +171,12 @@ describe('CreatureDrawer', () => {
         'Editing this combatant. Changes stay on this combatant.'
       )
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(
+      screen.getByRole('button', { name: 'Full stat block editor' })
+    ).toHaveAttribute('data-variant', 'secondary');
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(done).toHaveAttribute('data-variant', 'ghost');
+    await user.click(done);
     expect(
       screen.queryByText(/editing this combatant/i)
     ).not.toBeInTheDocument();
