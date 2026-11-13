@@ -11,10 +11,14 @@ import userEvent from '@testing-library/user-event';
 
 import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { StudioPanel } from '@/components/ui/campaign/dm-vtt/StudioPanel';
+import { PIECE_COLORS } from '@/components/ui/encounter/combat-screen/TokenChip';
+import { uploadAsset } from '@/utils/uploadAsset';
 
 import type { Encounter, EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 import type { StudioPanelProps } from '@/components/ui/campaign/dm-vtt/StudioPanel';
+
+vi.mock('@/utils/uploadAsset', () => ({ uploadAsset: vi.fn() }));
 
 // StudioPanel's Tooltips need the provider DmVttScreen wraps around the
 // floating panels, and Radix measures the trigger with ResizeObserver.
@@ -400,11 +404,152 @@ describe('StudioPanel', () => {
         })}
       />
     );
-    expect(screen.getByText('Token')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Token', level: 4 })
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: 'L 2×2' }));
     expect(onTokenIdentityChange).toHaveBeenCalledWith(goblin1, {
       tokenSize: 2,
     });
+  });
+
+  it('marks the current token size as checked and switches size on click', () => {
+    const sized = { ...goblin1, tokenSize: 2 as const };
+    const onTokenIdentityChange = vi.fn();
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({ entities: [aria, sized, goblin2] }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'L 2×2' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    expect(screen.getByRole('radio', { name: 'M 1×1' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+    ['M 1×1', 'L 2×2', 'H 3×3', 'G 4×4'].forEach(name => {
+      expect(screen.getByRole('radio', { name })).toHaveAttribute(
+        'data-variant',
+        'secondary'
+      );
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'H 3×3' }));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(sized, {
+      tokenSize: 3,
+    });
+  });
+
+  it('renders the pieces as ghost radios, with the chosen one checked', () => {
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({
+            entities: [aria, { ...goblin1, chessPiece: 'rook' }, goblin2],
+          }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange: vi.fn(),
+        })}
+      />
+    );
+    const rook = screen.getByRole('radio', { name: 'Rook' });
+    expect(rook).toHaveAttribute('data-variant', 'ghost');
+    expect(rook).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Pawn' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+    expect(screen.getByRole('radio', { name: 'None' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+  });
+
+  it('checks "None" and "Clear" when no piece or colour is set', () => {
+    render(
+      <StudioPanel
+        {...baseProps({
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange: vi.fn(),
+        })}
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'None' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    expect(screen.getByRole('radio', { name: 'None' })).toHaveAttribute(
+      'data-variant',
+      'ghost'
+    );
+    expect(screen.getByRole('radio', { name: 'Clear' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    expect(screen.getByRole('radio', { name: 'Rook' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+  });
+
+  it('offers every piece colour as a named swatch radio and checks the chosen one', () => {
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({
+            entities: [aria, { ...goblin1, color: '#ef4444' }, goblin2],
+          }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange: vi.fn(),
+        })}
+      />
+    );
+    PIECE_COLORS.forEach(c => {
+      expect(screen.getByRole('radio', { name: c.name })).toHaveAttribute(
+        'aria-checked',
+        c.name === 'Red' ? 'true' : 'false'
+      );
+    });
+    expect(screen.getByRole('radio', { name: 'Clear' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+  });
+
+  it('shows plain-language copy when the portrait upload fails', async () => {
+    vi.mocked(uploadAsset).mockRejectedValueOnce(new Error('nope'));
+    const { container } = render(
+      <StudioPanel
+        {...baseProps({
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange: vi.fn(),
+        })}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Upload' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    const input = container.querySelector('input[type="file"]')!;
+    fireEvent.change(input, {
+      target: {
+        files: [new File(['x'], 'a.png', { type: 'image/png' })],
+      },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't upload the image. Paste an image URL instead."
+    );
+    expect(screen.queryByText(/S3/)).toBeNull();
   });
 
   it('clicking a chess piece calls the handler with { chessPiece }', () => {
@@ -510,7 +655,9 @@ describe('StudioPanel', () => {
         {...baseProps({ activeTab: 'selected', selectedEntityId: 'm1' })}
       />
     );
-    expect(screen.queryByText('Token')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Token' })
+    ).not.toBeInTheDocument();
   });
 
   it('resets the portrait input when the selected entity changes (no state bleed)', () => {
