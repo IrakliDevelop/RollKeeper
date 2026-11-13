@@ -6,6 +6,7 @@ import {
   screen,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FogPresetPanel } from '../FogPresetPanel';
 import {
@@ -64,16 +65,26 @@ function controls(
 }
 
 describe('FogPresetPanel selector', () => {
-  it('lists built-ins first, then presets, and applies on change', () => {
+  it('lists built-ins first, then presets, and applies on change', async () => {
+    const user = userEvent.setup();
     const c = controls();
     render(<FogPresetPanel controls={c} />);
-    const select = screen.getByRole('combobox', { name: 'Fog appearance' });
-    const labels = within(select)
-      .getAllByRole('option')
-      .map(o => o.textContent);
+    await user.click(screen.getByRole('combobox', { name: 'Fog appearance' }));
+    const labels = screen.getAllByRole('option').map(o => o.textContent);
     expect(labels).toEqual(['Solid (classic)', 'Cloudy', 'Red Mist']);
-    fireEvent.change(select, { target: { value: 'fp_red' } });
+    await user.click(screen.getByRole('option', { name: 'Red Mist' }));
     expect(c.select).toHaveBeenCalledWith('fp_red');
+  });
+
+  it('selects a fog appearance through the Radix select', async () => {
+    const user = userEvent.setup();
+    const c = controls();
+    render(<FogPresetPanel controls={c} />);
+    const trigger = screen.getByRole('combobox', { name: 'Fog appearance' });
+    expect(trigger).toHaveTextContent('Solid (classic)');
+    await user.click(trigger);
+    await user.click(screen.getByRole('option', { name: 'Cloudy' }));
+    expect(c.select).toHaveBeenCalledWith('cloudy');
   });
 
   it('shows a Custom option with the applied label when the map has a modified snapshot', () => {
@@ -85,11 +96,23 @@ describe('FogPresetPanel selector', () => {
         })}
       />
     );
-    const select = screen.getByRole('combobox', { name: 'Fog appearance' });
-    expect(select).toHaveValue('custom');
-    expect(
-      within(select).getByRole('option', { name: 'Modified' })
-    ).toBeInTheDocument();
+    const trigger = screen.getByRole('combobox', { name: 'Fog appearance' });
+    expect(trigger).toHaveTextContent('Modified');
+  });
+
+  it('shows the applied custom label when the preset was deleted', () => {
+    render(
+      <FogPresetPanel
+        controls={controls({
+          selectedValue: 'custom',
+          appliedLabel: 'Custom (preset deleted)',
+        })}
+      />
+    );
+    const trigger = screen.getByRole('combobox', { name: 'Fog appearance' });
+    expect(trigger).toHaveTextContent('Custom (preset deleted)');
+    // The trigger shows only the chosen appearance, not the whole list.
+    expect(trigger).not.toHaveTextContent('Cloudy');
   });
 
   it('opens the editor and the manager', () => {
@@ -140,6 +163,33 @@ describe('FogMaterialEditor', () => {
     expect(
       within(dialog).queryByRole('button', { name: 'Update preset' })
     ).toBeNull();
+  });
+
+  it('labels Detail and Seed as number inputs', async () => {
+    const user = userEvent.setup();
+    const c = controls({
+      editor: { draft: procedural, sourcePresetId: null, error: null },
+    });
+    render(<FogPresetPanel controls={c} />);
+    const dialog = screen.getByRole('dialog', { name: 'Fog material' });
+    await user.click(within(dialog).getByText('Advanced'));
+    const detail = within(dialog).getByRole('textbox', { name: 'Detail' });
+    expect(within(dialog).getByRole('textbox', { name: 'Seed' })).toHaveValue(
+      '7'
+    );
+    await user.clear(detail);
+    await user.type(detail, '2');
+    expect(c.updateDraft).toHaveBeenCalledWith({ detail: 2 });
+  });
+
+  it('names the preset field once', () => {
+    const c = controls({
+      editor: { draft: preset.material, sourcePresetId: null, error: null },
+    });
+    render(<FogPresetPanel controls={c} />);
+    expect(
+      screen.getByRole('textbox', { name: 'Preset name' })
+    ).not.toHaveAttribute('aria-label');
   });
 
   it('updates colors from the color picker', () => {

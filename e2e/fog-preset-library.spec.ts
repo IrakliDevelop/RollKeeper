@@ -136,7 +136,7 @@ test('DM creates, applies, edits, and deletes a preset; the map keeps its snapsh
   await enableFog(page);
   const options = page.getByRole('group', { name: 'Fog of war options' });
   const select = options.getByRole('combobox', { name: 'Fog appearance' });
-  await expect(select).toHaveValue('solid');
+  await expect(select).toHaveText('Solid (classic)');
 
   // Create Poison Mist from the editor.
   await options.getByRole('button', { name: 'Customize fog' }).click();
@@ -161,7 +161,7 @@ test('DM creates, applies, edits, and deletes a preset; the map keeps its snapsh
     kind: 'custom',
     material: { kind: 'procedural', baseColor: '#1f3d1f' },
   });
-  await expect(select).toHaveValue((await storedPresets(page))[0].id);
+  await expect(select).toHaveText('Poison Mist');
 
   // Edit the preset in the library; the map must not change.
   await options.getByRole('button', { name: 'Manage fog presets' }).click();
@@ -183,16 +183,14 @@ test('DM creates, applies, edits, and deletes a preset; the map keeps its snapsh
   await page.keyboard.press('Escape');
   await expect(manager).toHaveCount(0);
   expect(await storedAppearance(page)).toEqual(applied);
-  await expect(select).toHaveValue('custom');
-  await expect(select.locator('option[value="custom"]')).toHaveText(
-    'Custom (preset deleted)'
-  );
+  await expect(select).toHaveText('Custom (preset deleted)');
 
   // Reload keeps the snapshot; legacy Solid still selectable.
   await page.reload({ waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Fog of war' }).click();
-  await expect(select).toHaveValue('custom');
-  await select.selectOption('solid');
+  await expect(select).toHaveText('Custom (preset deleted)');
+  await select.click();
+  await page.getByRole('option', { name: 'Solid (classic)' }).click();
   await expect.poll(() => storedAppearance(page)).toBe('solid');
 });
 
@@ -202,9 +200,8 @@ test('Cancel restores the applied appearance without writing', async ({
   await openSeededMap(page);
   await enableFog(page);
   const options = page.getByRole('group', { name: 'Fog of war options' });
-  await options
-    .getByRole('combobox', { name: 'Fog appearance' })
-    .selectOption('cloudy');
+  await options.getByRole('combobox', { name: 'Fog appearance' }).click();
+  await page.getByRole('option', { name: 'Cloudy' }).click();
   await expect.poll(() => storedAppearance(page)).toBe('cloudy');
   await options.getByRole('button', { name: 'Customize fog' }).click();
   const editor = page.getByRole('dialog', { name: 'Fog material' });
@@ -214,7 +211,10 @@ test('Cancel restores the applied appearance without writing', async ({
   expect(await storedAppearance(page)).toBe('cloudy');
 });
 
-test('preset controls meet the 44px touch target', async ({ page }) => {
+test('preset controls meet the 44px touch target', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'ipad', 'coarse-pointer sizing');
   await openSeededMap(page);
   await enableFog(page);
   const options = page.getByRole('group', { name: 'Fog of war options' });
