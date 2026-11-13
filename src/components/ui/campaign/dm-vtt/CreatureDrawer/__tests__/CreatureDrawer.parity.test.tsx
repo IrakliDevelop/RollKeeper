@@ -564,7 +564,7 @@ describe('CreatureDrawer parity — variants', () => {
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(1);
     expect(tabs[0]).toHaveTextContent('Lair');
-    expect(screen.queryByText('Hit Points')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hit points')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /^damage$/i })
     ).not.toBeInTheDocument();
@@ -589,7 +589,7 @@ describe('CreatureDrawer parity — variants', () => {
 
   it('summons show no Damage/Heal controls', () => {
     renderDrawer(SUMMON);
-    expect(screen.getByText('Hit Points')).toBeInTheDocument();
+    expect(screen.getByText('Hit points')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /^damage$/i })
     ).not.toBeInTheDocument();

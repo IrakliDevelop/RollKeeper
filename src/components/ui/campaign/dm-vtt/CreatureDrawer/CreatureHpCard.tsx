@@ -4,61 +4,62 @@ import React from 'react';
 import { X } from 'lucide-react';
 
 import { HPBar } from '@/components/shared/combat/HPBar';
+import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
 import { DamageControls } from '@/components/ui/encounter/combat-screen/detail/DamageControls';
-import {
-  HEADING_CLASS,
-  SECTION_CLASS,
-} from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 
 import { getHpNumberColor } from '@/utils/hpColor';
 
 import { CreatureMaxHpField } from './CreatureMaxHpField';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
 
-/** HP card: big current/max HP, temp-HP pill, HP bar, and damage/heal/temp controls. */
+/** "Hit points" section: current/max HP, temp HP, HP bar, and damage/heal/temp controls. */
 export function CreatureHpCard({
   entity,
   actions,
   editing,
 }: CreatureVitalsProps) {
   return (
-    <div className={`${SECTION_CLASS} space-y-3`}>
-      <p className={HEADING_CLASS}>Hit Points</p>
-
+    <Section level={4} heading="Hit points" contentClassName="space-y-3">
       <div className="flex flex-wrap items-baseline gap-1">
-        <span
-          className={`font-display text-3xl font-bold tabular-nums ${getHpNumberColor(entity.currentHp, entity.maxHp)}`}
-        >
-          {entity.currentHp}
-        </span>
-        <span className="text-muted text-sm font-medium">/</span>
-        {editing ? (
-          <CreatureMaxHpField
-            maxHp={entity.maxHp}
-            onCommit={v => actions.onSetMaxHp(entity.id, v)}
-          />
-        ) : (
-          <span className="text-muted text-sm tabular-nums">
-            {entity.maxHp}
+        {/* Current, "/" and max stay alone in one element: e2e reads "13/13" exactly. */}
+        <div className="flex items-baseline gap-1">
+          <span
+            className={`type-num-xl tabular-nums ${getHpNumberColor(entity.currentHp, entity.maxHp)}`}
+          >
+            {entity.currentHp}
           </span>
-        )}
+          <span className="type-ui text-muted">/</span>
+          {editing ? (
+            <CreatureMaxHpField
+              maxHp={entity.maxHp}
+              onCommit={v => actions.onSetMaxHp(entity.id, v)}
+            />
+          ) : (
+            <span className="type-ui text-muted tabular-nums">
+              {entity.maxHp}
+            </span>
+          )}
+        </div>
 
         {entity.tempHp > 0 && (
-          <span className="bg-accent-blue-bg text-accent-blue-text ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
+          <span className="type-small text-frost-text ml-1 inline-flex items-center gap-1">
             +{entity.tempHp} temp
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
+              className="w-7 px-0"
               onClick={() => actions.onUpdate(entity.id, { tempHp: 0 })}
-              className="text-accent-blue-text hover:text-accent-red-text ml-0.5 transition-colors"
               aria-label="Clear temp HP"
             >
-              <X size={11} aria-hidden />
-            </button>
+              <X size={14} aria-hidden />
+            </Button>
           </span>
         )}
       </div>
 
       {entity.monsterStatBlock?.hpFormula && (
-        <p className="text-faint -mt-2 text-[11px]">
+        <p className="type-small text-muted">
           {entity.monsterStatBlock.hpFormula}
         </p>
       )}
@@ -80,6 +81,6 @@ export function CreatureHpCard({
           onAddTempHp={actions.onAddTempHp}
         />
       )}
-    </div>
+    </Section>
   );
 }

@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 
-import { NumberField } from '@/components/ui/forms/NumberInput';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 
 import { useDraftValue } from './useDraftValue';
 
@@ -35,7 +35,7 @@ export function CreatureMaxHpField({
   };
 
   return (
-    <NumberField
+    <NumberInput
       value={draft}
       onChange={setDraft}
       allowEmpty
@@ -48,7 +48,9 @@ export function CreatureMaxHpField({
           e.currentTarget.blur();
         }
       }}
-      className="bg-surface-raised text-heading w-14 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
+      size="sm"
+      wrapperClassName="w-16"
+      className="px-1 text-center tabular-nums"
       aria-label="Max HP"
     />
   );
