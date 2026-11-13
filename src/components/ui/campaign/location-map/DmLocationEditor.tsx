@@ -335,16 +335,17 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           )}
 
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
-            {arrangeMapsActive && (
-              <p
-                className={`${OVERLAY_SURFACE} type-small text-body absolute top-2 left-1/2 z-20 -translate-x-1/2 px-3 py-1.5 whitespace-nowrap`}
-              >
-                Arranging maps — other layers are locked
-              </p>
-            )}
-            {/* The movement bar floats inside the canvas column so it never
-              paints over the in-flow layers panel on narrow widths. */}
+            {/* The arranging notice and the movement bar float inside the
+              canvas column so they centre over the map and never paint over
+              the in-flow layers panel on narrow widths. */}
             <div className="relative min-w-0 flex-1 overflow-hidden">
+              {arrangeMapsActive && (
+                <p
+                  className={`${OVERLAY_SURFACE} type-small text-body absolute top-2 left-1/2 z-20 -translate-x-1/2 px-3 py-1.5 whitespace-nowrap`}
+                >
+                  Arranging maps — other layers are locked
+                </p>
+              )}
               <Canvas
                 ref={canvasRef}
                 tools={tools}

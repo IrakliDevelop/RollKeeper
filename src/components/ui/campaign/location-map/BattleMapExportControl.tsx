@@ -17,7 +17,7 @@ import {
   type ExportCapableViewport,
 } from './battleMapExport';
 import { DisableableTooltip } from './ToolOptionControls';
-import { useFocusAfterEdit } from './BattleMapViewsControl/BattleMapViewsControl.hooks';
+import { useRestoreLostFocus } from './useRestoreLostFocus';
 
 export interface BattleMapExportControlProps {
   getViewport: () => ExportCapableViewport | null;
@@ -56,7 +56,7 @@ export function BattleMapExportControl({
   // focus goes back to the button; a successful one closes it and Radix
   // returns focus to the trigger (the ref is null by then).
   const exportButtonRef = useRef<HTMLButtonElement>(null);
-  useFocusAfterEdit(busy, exportButtonRef);
+  useRestoreLostFocus(busy, exportButtonRef);
 
   const handleExport = async () => {
     const vp = getViewport();

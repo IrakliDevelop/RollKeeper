@@ -14,10 +14,9 @@ import {
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import type { SavedCameraView } from '@/types/battlemap';
+import { focusWasLost, useRestoreLostFocus } from '../useRestoreLostFocus';
 import {
-  focusWasLost,
   useBattleMapViewsControl,
-  useFocusAfterEdit,
   type CameraCaptureViewport,
 } from './BattleMapViewsControl.hooks';
 import {
@@ -91,13 +90,17 @@ export function BattleMapViewsControl({
   // goes back to "Save current view"; the rows handle rename and delete.
   const contentRef = useRef<HTMLDivElement>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
-  useFocusAfterEdit(savingView !== null, saveButtonRef);
+  useRestoreLostFocus(savingView !== null, saveButtonRef);
 
   // Floor for the one case with no control to return to: a confirmed delete
   // unmounts the whole row. Runs after the row effects above have had their
-  // turn, so it only fires when focus is still lost.
+  // turn, so it only fires when focus is still lost. "Save current view" is
+  // the one control always present; the content div is the fallback while
+  // the save field is open (no focus ring on a container otherwise).
   useEffect(() => {
-    if (open && focusWasLost()) contentRef.current?.focus();
+    if (open && focusWasLost()) {
+      (saveButtonRef.current ?? contentRef.current)?.focus();
+    }
   }, [open, views, savingView, renamingId, armedDeleteId]);
 
   const handleOpenChange = (next: boolean) => {
@@ -210,7 +213,7 @@ export function BattleMapViewsControl({
             {views.length > 0 && (
               <>
                 <div className="border-divider my-2 border-t" />
-                <ul className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1">
                   {views.map(v => (
                     <ViewRow
                       key={v.id}
@@ -229,7 +232,7 @@ export function BattleMapViewsControl({
                       onSend={() => sharingEnabled && onSend(v.view, audience)}
                     />
                   ))}
-                </ul>
+                </div>
               </>
             )}
 

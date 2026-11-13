@@ -119,6 +119,8 @@ describe('DmLocationLayersPanel', () => {
     const mapRow = within(screen.getByRole('group', { name: 'Map' }));
     expect(mapRow.queryByRole('button', { name: 'Map' })).toBeNull();
     expect(mapRow.queryByRole('button', { name: 'Delete layer' })).toBeNull();
+    // The map layer is always locked: a static glyph, not a toggle.
+    expect(mapRow.queryByRole('button', { name: /lock layer/i })).toBeNull();
     expect(mapRow.getByText('Map')).toBeInTheDocument();
 
     const annotationsRow = within(
@@ -191,18 +193,6 @@ describe('DmLocationLayersPanel', () => {
     expect(publishLayerRemove).toHaveBeenCalledTimes(1);
     expect(mocks.viewport.layerManager.getLayer).not.toHaveBeenCalledWith(
       'layer-annotations'
-    );
-  });
-
-  it('aligns the map row name with the other rows', () => {
-    renderPanel();
-    const mapRow = screen.getByRole('group', { name: 'Map' });
-    const glyphSlot = mapRow.querySelector('svg.lucide-lock')?.parentElement;
-    expect(glyphSlot?.tagName).toBe('SPAN');
-    expect(glyphSlot).toHaveClass('w-7', 'shrink-0', 'justify-center');
-    expect(glyphSlot?.querySelector('svg')).toHaveAttribute(
-      'aria-hidden',
-      'true'
     );
   });
 

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/forms/input';
 import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import type { SavedCameraView } from '@/types/battlemap';
 import { DisableableTooltip } from '../ToolOptionControls';
-import { useFocusAfterEdit } from './BattleMapViewsControl.hooks';
+import { useRestoreLostFocus } from '../useRestoreLostFocus';
 
 /** Icon-only row button, used with `size="sm"` (36px; 44px on touch). */
 export const ICON_BUTTON = 'w-9 shrink-0 px-0';
@@ -53,11 +53,11 @@ export function ViewRow({
   // the row's own name button. Not the icon button that started the edit —
   // its Tooltip opens on focus and would then swallow the next Escape.
   const nameButtonRef = useRef<HTMLButtonElement>(null);
-  useFocusAfterEdit(renaming || deleteArmed, nameButtonRef);
+  useRestoreLostFocus(renaming || deleteArmed, nameButtonRef);
 
   if (renaming) {
     return (
-      <li
+      <div
         role="group"
         aria-label={`${view.name} view`}
         className="flex items-center gap-1"
@@ -98,12 +98,12 @@ export function ViewRow({
             <X size={16} />
           </Button>
         </Tooltip>
-      </li>
+      </div>
     );
   }
 
   return (
-    <li
+    <div
       role="group"
       aria-label={`${view.name} view`}
       className="flex items-center gap-1"
@@ -171,6 +171,6 @@ export function ViewRow({
           </Tooltip>
         </>
       )}
-    </li>
+    </div>
   );
 }

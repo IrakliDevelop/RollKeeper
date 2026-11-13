@@ -93,7 +93,7 @@ export default function DmLocationLayersPanel({
           </div>
         </div>
 
-        <ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-1.5">
+        <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-1.5">
           {[...layers]
             .filter(l => !l.id.startsWith(PLAYER_LAYER_PREFIX))
             .reverse()
@@ -112,7 +112,7 @@ export default function DmLocationLayersPanel({
               const lockLabel = layer.locked ? 'Unlock layer' : 'Lock layer';
 
               return (
-                <li
+                <div
                   key={layer.id}
                   role="group"
                   aria-label={layer.name}
@@ -207,10 +207,10 @@ export default function DmLocationLayersPanel({
                       </Button>
                     </Tooltip>
                   )}
-                </li>
+                </div>
               );
             })}
-        </ul>
+        </div>
 
         <p className="border-divider type-small text-muted border-t px-3 py-2">
           {allElements.length} element{allElements.length !== 1 ? 's' : ''}

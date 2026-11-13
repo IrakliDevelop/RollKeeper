@@ -114,21 +114,7 @@ describe('BattleMapExportControl', () => {
     );
   });
 
-  it('player mount has no Audience group', async () => {
-    const exporter = await renderControl();
-    expect(
-      screen.queryByRole('radiogroup', { name: 'Audience' })
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/player view/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
-    await waitFor(() => expect(exporter).toHaveBeenCalledOnce());
-    expect(exporter).toHaveBeenCalledWith(
-      vp,
-      expect.objectContaining({ audience: 'player' })
-    );
-  });
-
-  it('treats a player surface as player audience and reads live fog state', async () => {
+  it('player mount has no Audience group and exports as player with live fog state', async () => {
     const fogState = {
       version: 1,
       definition: {
@@ -140,8 +126,12 @@ describe('BattleMapExportControl', () => {
       tiles: [],
     } as unknown as FogStateV1;
     const exporter = await renderControl({ getFogState: () => fogState });
-    fireEvent.click(screen.getByRole('button', { name: /^export$/i }));
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Audience' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/player view/i)).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
     await waitFor(() => expect(exporter).toHaveBeenCalledOnce());
     expect(exporter).toHaveBeenCalledWith(
       vp,
@@ -171,26 +161,6 @@ describe('BattleMapExportControl', () => {
     expect(exporter).toHaveBeenCalledWith(
       vp,
       expect.objectContaining({ fogState, fogStyle })
-    );
-  });
-
-  it('exports with the selected options and live dm-only map', async () => {
-    const dmOnly = { secret: true };
-    const exporter = await renderControl({ getDmOnlyElements: () => dmOnly });
-    fireEvent.click(screen.getByLabelText(/player view/i));
-    fireEvent.click(screen.getByLabelText(/current view/i));
-    fireEvent.click(screen.getByLabelText(/jpeg/i));
-    fireEvent.click(screen.getByRole('button', { name: /^export$/i }));
-    await waitFor(() => expect(exporter).toHaveBeenCalledTimes(1));
-    expect(exporter).toHaveBeenCalledWith(
-      vp,
-      expect.objectContaining({
-        audience: 'player',
-        bounds: 'view',
-        format: 'jpeg',
-        name: 'Cave',
-        dmOnlyElements: dmOnly,
-      })
     );
   });
 

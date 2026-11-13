@@ -457,7 +457,11 @@ describe('BattleMapViewsControl', () => {
         screen.queryByRole('group', { name: /goblin ambush/i })
       ).not.toBeInTheDocument();
       expect(getDialog()).toBeInTheDocument();
-      expectFocusInsideDialog();
+      // The row is gone, so focus lands on the one control that is always
+      // there, not on the content div (no container focus ring).
+      expect(
+        screen.getByRole('button', { name: 'Save current view' })
+      ).toHaveFocus();
     });
   });
 

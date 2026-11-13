@@ -348,6 +348,16 @@ describe('DmLocationEditor wiring', () => {
 
     const notice = screen.getByText('Arranging maps — other layers are locked');
     expect(notice).not.toHaveAttribute('role');
+
+    // Same anchor as the movement bar: the notice lives in the canvas
+    // column, so it centres over the map and never covers the open layers
+    // panel that shares the outer container.
+    const canvasColumn = notice.parentElement!;
+    const sharedContainer = screen.getByRole('button', {
+      name: 'Show layers',
+    }).parentElement!;
+    expect(canvasColumn).not.toBe(sharedContainer);
+    expect(canvasColumn.parentElement).toBe(sharedContainer);
   });
 
   it('movement bar floats over the canvas', () => {
