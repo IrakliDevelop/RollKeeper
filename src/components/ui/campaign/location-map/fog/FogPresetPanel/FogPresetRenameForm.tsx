@@ -30,11 +30,10 @@ export function FogPresetRenameForm({
           setName(event.target.value);
           setError(null);
         }}
-        className="min-h-[44px]"
       />
       <Button
         variant="primary"
-        className="min-h-[44px] px-3 text-xs"
+        size="sm"
         onClick={() => {
           const nextError = controls.renamePreset(preset.id, name);
           if (nextError) setError(nextError);
@@ -46,11 +45,7 @@ export function FogPresetRenameForm({
       >
         Save name
       </Button>
-      <Button
-        variant="ghost"
-        className="min-h-[44px] px-3 text-xs"
-        onClick={onDone}
-      >
+      <Button variant="ghost" size="sm" onClick={onDone}>
         Cancel
       </Button>
     </>
