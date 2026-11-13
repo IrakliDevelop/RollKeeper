@@ -29,7 +29,13 @@ import {
   type MarkerKind,
 } from '../markerData';
 
-import type { MarkerDetail, PublicMarkerDetail } from '@/types/battlemap';
+import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
+import type {
+  MarkerDetail,
+  MarkerLootEntry,
+  PublicMarkerDetail,
+} from '@/types/battlemap';
+import type { CustomMagicItem } from '@/types/magicItemLibrary';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -1852,5 +1858,157 @@ describe('MarkerDetailPanel portal destination', () => {
         screen.getByText(/claims are refused on the server too/i)
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe('MarkerDetailPanel DM loot editor', () => {
+  afterEach(() => {
+    useMagicItemLibraryStore.setState({ itemsByCampaign: {} });
+  });
+
+  /** Routes the campaign roster request; every other fetch (compendium
+   * item lists) gets an empty body. */
+  function stubFetch(players: { playerId: string; characterName: string }[]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => ({
+        ok: true,
+        json: async () => (url.endsWith('/players') ? { players } : {}),
+      }))
+    );
+  }
+
+  function lootEntry(id: string, name: string): MarkerLootEntry {
+    return {
+      id,
+      itemKind: 'inventory',
+      item: {
+        id: `item-${id}`,
+        name,
+        category: 'treasure',
+        quantity: 1,
+        tags: [],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      quantity: 1,
+      claimedQuantity: 0,
+    };
+  }
+
+  function renderLootPanel(
+    lootDetail: Partial<MarkerDetail>,
+    onSave: (patch: unknown) => void = () => {}
+  ) {
+    return render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        campaignCode="ABC123"
+        dmId="dm-1"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+          detail: detail(lootDetail),
+        }}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+  }
+
+  it('adds the same library item twice from the add-picker', async () => {
+    stubFetch([]);
+    const customItem: CustomMagicItem = {
+      id: 'custom-1',
+      name: 'Ring of Warmth',
+      category: 'ring',
+      rarity: 'uncommon',
+      description: 'Keeps the cold out.',
+      properties: [],
+      requiresAttunement: true,
+      isAttuned: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      campaignCode: 'ABC123',
+      tags: [],
+    };
+    useMagicItemLibraryStore.setState({
+      itemsByCampaign: { ABC123: [customItem] },
+    });
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    renderLootPanel({ loot: [] }, onSave);
+
+    const picker = screen.getByRole('combobox', {
+      name: 'Add from campaign item library',
+    });
+    for (let pick = 0; pick < 2; pick += 1) {
+      await user.click(picker);
+      await user.click(screen.getByRole('option', { name: 'Ring of Warmth' }));
+      expect(picker).toHaveTextContent(/^Choose an item…$/);
+    }
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const { loot } = onSave.mock.calls[0][0] as { loot: MarkerLootEntry[] };
+    expect(loot).toHaveLength(2);
+    expect(loot.map(entry => entry.itemKind)).toEqual(['magic', 'magic']);
+    expect(loot.map(entry => entry.item.name)).toEqual([
+      'Ring of Warmth',
+      'Ring of Warmth',
+    ]);
+  });
+
+  it('keeps recipients per row and gates Give', async () => {
+    stubFetch([{ playerId: 'p1', characterName: 'Aria' }]);
+    const user = userEvent.setup();
+    renderLootPanel({
+      loot: [lootEntry('loot-a', 'Rope'), lootEntry('loot-b', 'Lantern')],
+    });
+
+    const ropeRecipient = screen.getByRole('combobox', {
+      name: 'Recipient for Rope',
+    });
+    const lanternRecipient = screen.getByRole('combobox', {
+      name: 'Recipient for Lantern',
+    });
+    await user.click(ropeRecipient);
+    await user.click(
+      await screen.findByRole('option', { name: 'Aria (player)' })
+    );
+
+    expect(ropeRecipient).toHaveTextContent(/^Aria \(player\)$/);
+    expect(lanternRecipient).toHaveTextContent(/^Give one to…$/);
+    const [ropeGive, lanternGive] = screen.getAllByRole('button', {
+      name: 'Give',
+    });
+    expect(ropeGive).toBeEnabled();
+    expect(lanternGive).toBeDisabled();
+  });
+
+  it('player access is a segmented pair', () => {
+    stubFetch([]);
+    renderLootPanel({ loot: [], lootAccess: 'locked' });
+
+    const group = screen.getByRole('group', { name: 'Player access' });
+    const locked = within(group).getByRole('button', { name: 'Locked' });
+    const open = within(group).getByRole('button', { name: 'Open' });
+    expect(locked).toHaveAttribute('aria-pressed', 'true');
+    expect(open).toHaveAttribute('aria-pressed', 'false');
+    expect(locked).toHaveAttribute('data-variant', 'secondary');
+    expect(open).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('lists loot under the Loot contents heading', () => {
+    stubFetch([]);
+    renderLootPanel({ loot: [lootEntry('loot-a', 'Rope')] });
+
+    const heading = screen.getByRole('heading', {
+      name: 'Loot contents',
+      level: 4,
+    });
+    const section = required(heading.closest('section'), 'loot section');
+    expect(within(section).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(section).getByText('1 of 1 available')).toBeInTheDocument();
   });
 });
