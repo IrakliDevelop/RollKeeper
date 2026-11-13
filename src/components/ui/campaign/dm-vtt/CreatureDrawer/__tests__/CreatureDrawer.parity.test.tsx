@@ -188,7 +188,7 @@ describe('CreatureDrawer parity — players row', () => {
     });
 
     await user.click(
-      screen.getByTitle('Name visible to players — click to hide')
+      screen.getByRole('button', { name: 'Hide name from players' })
     );
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, { isHidden: true });
 

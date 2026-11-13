@@ -1,11 +1,44 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  within,
+} from '@testing-library/react';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { CreaturePlayersRow } from '../CreaturePlayersRow';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
-afterEach(() => cleanup());
+// The row's Tooltips need the provider CreatureSheet wraps around it, and
+// Radix measures the trigger with ResizeObserver.
+function render(ui: ReactElement) {
+  const result = rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
+  return {
+    ...result,
+    rerender: (next: ReactElement) =>
+      result.rerender(<TooltipProvider>{next}</TooltipProvider>),
+  };
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function makeEntity(overrides: Partial<EncounterEntity> = {}): EncounterEntity {
   return {
@@ -63,12 +96,14 @@ describe('CreaturePlayersRow', () => {
     });
   });
 
-  it('sets playerDisposition when a segment is clicked, aria-pressed on the active one', () => {
+  it('groups disposition with aria-pressed', () => {
     const actions = makeActions();
     render(<CreaturePlayersRow entity={makeEntity()} actions={actions} />);
-    const ally = screen.getByRole('button', { name: 'Ally' });
-    const enemy = screen.getByRole('button', { name: 'Enemy' });
-    expect(enemy).toHaveAttribute('aria-pressed', 'true');
+    const group = screen.getByRole('group', { name: 'Player disposition' });
+    const ally = within(group).getByRole('button', { name: 'Ally' });
+    expect(
+      within(group).getByRole('button', { name: 'Enemy' })
+    ).toHaveAttribute('aria-pressed', 'true');
     expect(ally).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(ally);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
@@ -76,26 +111,68 @@ describe('CreaturePlayersRow', () => {
     });
   });
 
-  it('toggles isHidden', () => {
+  it('labels the name toggle by what it will do', () => {
     const actions = makeActions();
-    render(<CreaturePlayersRow entity={makeEntity()} actions={actions} />);
-    fireEvent.click(
-      screen.getByTitle('Name visible to players — click to hide')
+    const { rerender } = render(
+      <CreaturePlayersRow entity={makeEntity()} actions={actions} />
     );
+    const hide = screen.getByRole('button', { name: 'Hide name from players' });
+    expect(hide).not.toHaveAttribute('data-selected');
+    expect(hide).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(hide);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', { isHidden: true });
+
+    rerender(
+      <CreaturePlayersRow
+        entity={makeEntity({ isHidden: true })}
+        actions={actions}
+      />
+    );
+    const show = screen.getByRole('button', { name: 'Show name to players' });
+    expect(show).toHaveAttribute('data-selected', 'true');
+    expect(show).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(show);
+    expect(actions.onUpdate).toHaveBeenCalledWith('e1', { isHidden: false });
   });
 
-  it('toggles hpVisibleToPlayers with the same aria-label as HeaderControls', () => {
+  it('labels the HP toggle by what it will do', () => {
     const actions = makeActions();
-    render(<CreaturePlayersRow entity={makeEntity()} actions={actions} />);
-    const toggle = screen.getByRole('button', {
+    const { rerender } = render(
+      <CreaturePlayersRow entity={makeEntity()} actions={actions} />
+    );
+    const show = screen.getByRole('button', {
       name: 'Show exact HP to players',
     });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(toggle);
+    expect(show).not.toHaveAttribute('data-selected');
+    expect(show).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(show);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
       hpVisibleToPlayers: true,
     });
+
+    rerender(
+      <CreaturePlayersRow
+        entity={makeEntity({ hpVisibleToPlayers: true })}
+        actions={actions}
+      />
+    );
+    const hide = screen.getByRole('button', { name: 'Hide HP from players' });
+    expect(hide).toHaveAttribute('data-selected', 'true');
+    expect(hide).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(hide);
+    expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
+      hpVisibleToPlayers: false,
+    });
+  });
+
+  it('heads the row and previews what players see', () => {
+    render(
+      <CreaturePlayersRow entity={makeEntity()} actions={makeActions()} />
+    );
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Players' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Players see:/)).toBeInTheDocument();
   });
 
   it('commits a trimmed-or-undefined alias on blur', () => {
@@ -157,28 +234,6 @@ describe('CreaturePlayersRow', () => {
     expect(screen.getByPlaceholderText('Alias players see…')).toHaveValue(
       'Wraith'
     );
-  });
-
-  it('exposes the hidden-name toggle state and label', () => {
-    const { rerender } = render(
-      <CreaturePlayersRow entity={makeEntity()} actions={makeActions()} />
-    );
-    expect(
-      screen.getByRole('button', {
-        name: 'Name visible to players — click to hide',
-      })
-    ).toHaveAttribute('aria-pressed', 'false');
-    rerender(
-      <CreaturePlayersRow
-        entity={makeEntity({ isHidden: true })}
-        actions={makeActions()}
-      />
-    );
-    expect(
-      screen.getByRole('button', {
-        name: 'Name hidden from players — click to reveal',
-      })
-    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('commits the alias on Enter', () => {
