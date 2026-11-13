@@ -915,6 +915,35 @@ describe('MarkerDetailPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('puts Title, Body and DM notes before the kind sections on a trap form', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    const status = screen.getByRole('combobox', { name: 'Status' });
+    const title = screen.getByLabelText('Title');
+    const dmNotes = screen.getByLabelText('DM notes — never shown to players');
+    const discovery = screen.getByRole('heading', {
+      name: 'Discovery',
+      level: 4,
+    });
+    const follows = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(status, title)).toBe(true);
+    expect(follows(title, dmNotes)).toBe(true);
+    expect(follows(dmNotes, discovery)).toBe(true);
+  });
+
   it('shows the DM label as typed and NPC for an unlabelled npc', () => {
     const labelled = render(
       <MarkerDetailPanel

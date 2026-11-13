@@ -239,6 +239,36 @@ function EditForm({
           </SelectItem>
         ))}
       </SelectField>
+      <div className="space-y-1.5">
+        <p className="type-ui text-heading">Title</p>
+        <CompactRichTextEditor
+          content={title}
+          onChange={setTitle}
+          placeholder="Marker title…"
+          minHeight="44px"
+          ariaLabel="Title"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <p className="type-ui text-heading">Body</p>
+        <CompactRichTextEditor
+          content={body}
+          onChange={setBody}
+          placeholder="What players can learn…"
+          ariaLabel="Body"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <p className="type-ui text-heading">
+          DM notes — never shown to players
+        </p>
+        <CompactRichTextEditor
+          content={dmNotes}
+          onChange={setDmNotes}
+          placeholder="Private notes…"
+          ariaLabel="DM notes — never shown to players"
+        />
+      </div>
       {(kind === 'trap' || kind === 'secret') && (
         <Section
           heading="Discovery"
@@ -334,36 +364,6 @@ function EditForm({
           }}
         />
       )}
-      <div className="space-y-1.5">
-        <p className="type-ui text-heading">Title</p>
-        <CompactRichTextEditor
-          content={title}
-          onChange={setTitle}
-          placeholder="Marker title…"
-          minHeight="44px"
-          ariaLabel="Title"
-        />
-      </div>
-      <div className="space-y-1.5">
-        <p className="type-ui text-heading">Body</p>
-        <CompactRichTextEditor
-          content={body}
-          onChange={setBody}
-          placeholder="What players can learn…"
-          ariaLabel="Body"
-        />
-      </div>
-      <div className="space-y-1.5">
-        <p className="type-ui text-heading">
-          DM notes — never shown to players
-        </p>
-        <CompactRichTextEditor
-          content={dmNotes}
-          onChange={setDmNotes}
-          placeholder="Private notes…"
-          ariaLabel="DM notes — never shown to players"
-        />
-      </div>
       {portalState && (
         <Section
           heading="Destination"
@@ -419,9 +419,9 @@ function EditForm({
           {portalState.resolved?.status === 'ready' && (
             <div className="flex items-center gap-2">
               {portalState.target?.kind === 'battlemap' ? (
-                <Map className="text-muted h-4 w-4 flex-shrink-0" />
+                <Map className="text-muted size-4 shrink-0" />
               ) : (
-                <MapPin className="text-muted h-4 w-4 flex-shrink-0" />
+                <MapPin className="text-muted size-4 shrink-0" />
               )}
               <span className="type-ui text-body">
                 {portalState.resolved.name}
@@ -433,7 +433,7 @@ function EditForm({
             <Button variant="secondary" size="sm" asChild>
               <Link href={portalState.resolved.href}>
                 Open destination
-                <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                <ExternalLink className="size-3.5" />
               </Link>
             </Button>
           )}
@@ -608,6 +608,7 @@ function ReadOnlyView({
                       </span>
                       <Button
                         variant="secondary"
+                        size="sm"
                         className="flex-1"
                         disabled={soldOut || claimingEntryId !== null}
                         onClick={() => void handleClaim(entry.id, requested)}

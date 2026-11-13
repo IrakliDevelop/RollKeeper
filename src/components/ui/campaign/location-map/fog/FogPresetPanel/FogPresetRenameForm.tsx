@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import type { FogPresetControls } from '../useFogPresetControls';
 import type { FogPresetV1 } from '@/types/fogMaterial';
 
 /** Mounted only while a row is being renamed, so its local draft/error state
- * resets for free each time editing starts on a (possibly different) row. */
+ * resets for free each time editing starts on a (possibly different) row.
+ * Takes focus on mount because the Rename button that opened it has just
+ * unmounted; `FogPresetManager` moves focus back to that row when it closes. */
 export function FogPresetRenameForm({
   preset,
   controls,
@@ -19,10 +21,13 @@ export function FogPresetRenameForm({
 }) {
   const [name, setName] = useState(preset.name);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => inputRef.current?.focus(), []);
 
   return (
     <>
       <Input
+        ref={inputRef}
         aria-label={`New name for ${preset.name}`}
         value={name}
         error={error ?? undefined}

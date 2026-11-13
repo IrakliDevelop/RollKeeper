@@ -403,6 +403,7 @@ describe('attachPingInput', () => {
       new KeyboardEvent('keydown', { key: 'p', bubbles: true })
     );
     expect(sent).toHaveLength(0);
+    trigger.remove();
   });
 
   it('the hotkey is ignored while a Radix select list is open', () => {
@@ -420,6 +421,7 @@ describe('attachPingInput', () => {
       new KeyboardEvent('keydown', { key: 'p', bubbles: true })
     );
     expect(sent).toHaveLength(0);
+    listbox.remove();
   });
 
   it('the hotkey still pings from a plain focused button', () => {
@@ -433,6 +435,7 @@ describe('attachPingInput', () => {
     );
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ kind: 'ping', x: 12, y: 34 });
+    button.remove();
   });
 
   it('modified or repeated hotkey presses are ignored', () => {

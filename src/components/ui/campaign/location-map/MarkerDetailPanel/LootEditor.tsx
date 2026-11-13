@@ -221,7 +221,7 @@ export function LootEditor({
             selected={access === 'locked'}
             size="sm"
             aria-pressed={access === 'locked'}
-            leftIcon={<Lock size={14} />}
+            leftIcon={<Lock size={16} />}
             onClick={() => onAccessChange('locked')}
           >
             Locked
@@ -389,7 +389,7 @@ export function LootEditor({
                   <Button
                     variant="secondary"
                     size="sm"
-                    leftIcon={<Gift size={15} />}
+                    leftIcon={<Gift size={16} />}
                     disabled={
                       !dmId ||
                       !recipients[loot.id] ||

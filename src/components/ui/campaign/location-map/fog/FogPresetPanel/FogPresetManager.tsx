@@ -42,6 +42,19 @@ export function FogPresetManager({
   const renameRefs = useRef(new Map<string, HTMLButtonElement>());
   const deleteRefs = useRef(new Map<string, HTMLButtonElement>());
   const contentRef = useRef<HTMLDivElement>(null);
+  // Save name / Cancel unmount the rename form, so focus would drop to <body>.
+  // The row's callback ref re-registers its Rename button during commit,
+  // before this effect runs, so it finds the remounted button; the dialog is
+  // the fallback for a row removed mid-rename.
+  const renameReturnRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (renamingId !== null) return;
+    const id = renameReturnRef.current;
+    if (id === null) return;
+    renameReturnRef.current = null;
+    (renameRefs.current.get(id) ?? contentRef.current)?.focus();
+  }, [renamingId]);
 
   useEffect(() => {
     const previous = previousPendingRef.current;
@@ -50,7 +63,8 @@ export function FogPresetManager({
     const intent = intentRef.current;
     intentRef.current = null;
     if (intent === 'cancel') {
-      deleteRefs.current.get(previous)?.focus();
+      // The armed row's Delete may have unmounted (row renamed or removed).
+      (deleteRefs.current.get(previous) ?? contentRef.current)?.focus();
     } else if (intent === 'confirm') {
       // Skip the deleted id in case the library has not caught up yet.
       const next = library.find(preset => preset.id !== previous);
@@ -90,7 +104,10 @@ export function FogPresetManager({
                   controls={controls}
                   renaming={renamingId === preset.id}
                   onStartRename={() => setRenamingId(preset.id)}
-                  onStopRename={() => setRenamingId(null)}
+                  onStopRename={() => {
+                    renameReturnRef.current = preset.id;
+                    setRenamingId(null);
+                  }}
                   renameButtonRef={trackButton(renameRefs.current, preset.id)}
                   deleteButtonRef={trackButton(deleteRefs.current, preset.id)}
                 />
