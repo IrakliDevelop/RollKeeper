@@ -11,6 +11,8 @@ import {
   Map as MapIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { useDraggableY } from '@/hooks/useDraggableY';
 import { getHpBarColor, getHpTierTextColor } from '@/utils/hpColor';
 import { resolveEntryHpMode } from '@/utils/hpState';
@@ -140,206 +142,225 @@ export function InitiativePanel({
       )
     : undefined;
 
+  const handleLabel = isOpen ? 'Hide initiative' : 'Show initiative';
+
   return (
-    <div
-      ref={containerRef}
-      className="fixed right-0 z-[55] flex"
-      style={{ top: renderedTop }}
-    >
-      {/* Toggle tab — sticks out to the left of the panel */}
-      <button
-        onClick={() => setIsOpen(o => !o)}
-        aria-label={isOpen ? 'Hide initiative' : 'Show initiative'}
-        title={isOpen ? 'Hide initiative' : 'Show initiative'}
-        className={`relative self-center rounded-l-lg border-y-2 border-l-2 px-2.5 py-5 shadow-md transition-colors ${
-          isMyTurn
-            ? 'border-brass-border bg-brass-bg text-brass-text'
-            : isOpen
-              ? 'border-divider-strong bg-surface-elevated text-heading'
-              : 'border-divider bg-surface-raised text-muted hover:text-body hover:bg-surface-secondary'
-        }`}
-      >
-        <Swords size={20} />
-        {!isOpen && (
-          <span className="bg-surface-elevated text-heading border-divider absolute -top-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border px-1 text-[10px] font-bold">
-            {state.round}
-          </span>
-        )}
-      </button>
-
-      {/* Panel wrapper — collapses width when closed */}
+    <TooltipProvider>
       <div
-        className="overflow-hidden transition-[width] duration-300 ease-in-out"
-        style={{ width: isOpen ? '240px' : '0px' }}
+        ref={containerRef}
+        className="fixed right-0 z-[55] flex"
+        style={{ top: renderedTop }}
       >
-        <div
-          className="border-divider bg-surface-raised flex w-[240px] flex-col overflow-hidden rounded-l-xl border-y-2 border-l-2 shadow-lg"
-          style={{ maxHeight: panelMaxHeight }}
-        >
-          {/* Header — also the vertical drag handle */}
-          <div
-            onPointerDown={startDrag}
-            className="border-divider flex flex-shrink-0 cursor-grab touch-none items-center gap-2 border-b px-3 py-2.5 select-none active:cursor-grabbing"
+        {/* Toggle tab — sticks out to the left of the panel */}
+        <Tooltip content={handleLabel} side="left">
+          <button
+            type="button"
+            onClick={() => setIsOpen(o => !o)}
+            aria-label={handleLabel}
+            aria-expanded={isOpen}
+            className={`flex flex-col items-center gap-1 self-center rounded-md rounded-r-none border border-r-0 px-2.5 py-5 transition-colors pointer-coarse:min-w-11 ${
+              isMyTurn
+                ? 'border-brass-border bg-brass-bg text-brass-text'
+                : isOpen
+                  ? 'border-divider bg-surface-elevated text-heading'
+                  : 'border-divider bg-surface-elevated text-muted hover:text-body'
+            }`}
           >
-            <Swords size={14} className="text-muted" />
-            <span className="text-heading text-sm font-semibold">
-              Combat · Round {state.round}
-            </span>
-          </div>
+            <Swords size={20} aria-hidden />
+            {!isOpen && (
+              <span className="type-small font-semibold tabular-nums">
+                {state.round}
+              </span>
+            )}
+          </button>
+        </Tooltip>
 
-          {/* Battle map shortcut — the join banner hides once joined */}
-          {battleMapHref && (
-            <Link
-              href={battleMapHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="border-divider text-accent-emerald-text hover:bg-accent-emerald-bg flex min-h-[36px] flex-shrink-0 items-center gap-2 border-b px-3 text-xs font-medium"
+        {/* Panel wrapper — collapses width when closed */}
+        <div
+          className={`overflow-hidden transition-[width] duration-180 ease-out ${
+            isOpen ? `${OVERLAY_SURFACE} rounded-r-none border-r-0` : ''
+          }`}
+          style={{ width: isOpen ? '241px' : '0px' }}
+        >
+          <div
+            className="flex w-[240px] flex-col overflow-hidden"
+            style={{ maxHeight: panelMaxHeight }}
+          >
+            {/* Header — also the vertical drag handle */}
+            <div
+              onPointerDown={startDrag}
+              className="border-divider flex flex-shrink-0 cursor-grab touch-none items-center gap-2 border-b px-3 py-2.5 select-none active:cursor-grabbing"
             >
-              <MapIcon size={14} />
-              Open battle map
-            </Link>
-          )}
+              <Swords size={14} className="text-muted" aria-hidden />
+              <span className="type-ui text-heading font-semibold">
+                Combat · Round {state.round}
+              </span>
+            </div>
 
-          {/* Turn order */}
-          <ul className="flex-1 overflow-y-auto py-1">
-            {state.turnOrder.map(entry => {
-              const isCurrent = entry.entityId === effectiveCurrentId;
-              const isYou = entry.playerCharacterId === characterId;
-              const isPlayer = entry.type === 'player';
-              const isDead = entry.isDead === true;
-              // Player-facing allegiance (disguise): colour + icon by side.
-              const disposition = entry.disposition ?? 'enemy';
-              const dispoColor =
-                disposition === 'ally'
-                  ? 'text-accent-emerald-text'
-                  : disposition === 'neutral'
+            {/* Battle map shortcut — the join banner hides once joined */}
+            {battleMapHref && (
+              <Link
+                href={battleMapHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-divider text-body hover:bg-surface-hover type-small flex min-h-9 flex-shrink-0 items-center gap-2 border-b px-3 font-medium pointer-coarse:min-h-11"
+              >
+                <MapIcon size={14} className="text-muted" aria-hidden />
+                Open battle map
+              </Link>
+            )}
+
+            {/* Turn order */}
+            <ul className="flex-1 overflow-y-auto py-1">
+              {state.turnOrder.map(entry => {
+                const isCurrent = entry.entityId === effectiveCurrentId;
+                const isYou = entry.playerCharacterId === characterId;
+                const isPlayer = entry.type === 'player';
+                const isDead = entry.isDead === true;
+                const isCurrentAlive = isCurrent && !isDead;
+                // Player-facing allegiance (disguise): icon by side.
+                const disposition = entry.disposition ?? 'enemy';
+                const hp = entry.currentHp;
+                const maxHp = entry.maxHp;
+                const hasHp = hp !== undefined && maxHp !== undefined;
+                // A DM per-entity override on the entry wins over the
+                // campaign-wide mode.
+                const hpMode = resolveEntryHpMode(entry, state.enemyHpMode);
+                // Right-aligned HP summary. Dead overrides everything.
+                const hpText = isDead
+                  ? isPlayer
+                    ? 'Down'
+                    : 'Defeated'
+                  : hasHp
+                    ? `${hp}/${maxHp}`
+                    : entry.hpPercent !== undefined && hpMode === 'percent'
+                      ? `${entry.hpPercent}%`
+                      : (entry.hpState ?? null);
+                // Colour: dead = blood; an exact-HP bar carries its own colour
+                // (muted text), otherwise tint the text by health tier.
+                const hpTextColor = isDead
+                  ? 'text-blood-text font-medium'
+                  : hasHp
                     ? 'text-muted'
-                    : 'text-accent-red-text-muted';
-              const hp = entry.currentHp;
-              const maxHp = entry.maxHp;
-              const hasHp = hp !== undefined && maxHp !== undefined;
-              // A DM per-entity override on the entry wins over the
-              // campaign-wide mode.
-              const hpMode = resolveEntryHpMode(entry, state.enemyHpMode);
-              // Right-aligned HP summary. Dead overrides everything.
-              const hpText = isDead
-                ? isPlayer
-                  ? 'Down'
-                  : 'Defeated'
-                : hasHp
-                  ? `${hp}/${maxHp}`
-                  : entry.hpPercent !== undefined && hpMode === 'percent'
-                    ? `${entry.hpPercent}%`
-                    : (entry.hpState ?? null);
-              // Colour: dead = red; an exact-HP bar carries its own colour
-              // (neutral text), otherwise tint the text by health tier.
-              const hpTextColor = isDead
-                ? 'text-accent-red-text font-medium'
-                : hasHp
-                  ? 'text-faint'
-                  : entry.hpTier
-                    ? getHpTierTextColor(entry.hpTier)
-                    : 'text-faint';
-              // Bar for players (real HP) and enemy 'bar' mode (%). Hidden when dead.
-              const barPercent = isDead
-                ? null
-                : hasHp
-                  ? maxHp > 0
-                    ? Math.min(100, (hp / maxHp) * 100)
-                    : 0
-                  : !isPlayer &&
-                      hpMode === 'bar' &&
-                      entry.hpPercent !== undefined
-                    ? entry.hpPercent
-                    : null;
-              return (
-                <li
-                  key={entry.entityId}
-                  className={`flex flex-col gap-1 px-3 py-1.5 ${
-                    isCurrent && !isDead
-                      ? 'bg-accent-amber-bg border-accent-amber-border border-l-2'
-                      : 'border-l-2 border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {isDead ? (
-                      <Skull
-                        size={13}
-                        className="text-accent-red-text shrink-0"
-                      />
-                    ) : isPlayer ? (
-                      <User
-                        size={13}
-                        className="text-accent-blue-text shrink-0"
-                      />
-                    ) : disposition === 'ally' ? (
-                      <Shield size={13} className={`shrink-0 ${dispoColor}`} />
-                    ) : disposition === 'neutral' ? (
-                      <CircleDot
-                        size={13}
-                        className={`shrink-0 ${dispoColor}`}
-                      />
-                    ) : (
-                      <Skull size={13} className={`shrink-0 ${dispoColor}`} />
-                    )}
-                    {isCurrent && !isDead && (
-                      <span aria-hidden className="text-accent-amber-text">
-                        ▶
+                    : entry.hpTier
+                      ? getHpTierTextColor(entry.hpTier)
+                      : 'text-muted';
+                // Bar for players (real HP) and enemy 'bar' mode (%). Hidden when dead.
+                const barPercent = isDead
+                  ? null
+                  : hasHp
+                    ? maxHp > 0
+                      ? Math.min(100, (hp / maxHp) * 100)
+                      : 0
+                    : !isPlayer &&
+                        hpMode === 'bar' &&
+                        entry.hpPercent !== undefined
+                      ? entry.hpPercent
+                      : null;
+                return (
+                  <li
+                    key={entry.entityId}
+                    aria-current={isCurrentAlive ? 'true' : undefined}
+                    className={`flex flex-col gap-1 border-l-2 px-3 py-1.5 ${
+                      isCurrentAlive
+                        ? 'bg-brass-bg border-brass-border'
+                        : 'border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isDead ? (
+                        <Skull
+                          size={13}
+                          className="text-blood-text shrink-0"
+                          aria-hidden
+                        />
+                      ) : isPlayer ? (
+                        <User
+                          size={13}
+                          className="text-muted shrink-0"
+                          aria-hidden
+                        />
+                      ) : disposition === 'ally' ? (
+                        <Shield
+                          size={13}
+                          className="text-muted shrink-0"
+                          role="img"
+                          aria-label="Ally"
+                        />
+                      ) : disposition === 'neutral' ? (
+                        <CircleDot
+                          size={13}
+                          className="text-muted shrink-0"
+                          role="img"
+                          aria-label="Neutral"
+                        />
+                      ) : (
+                        <Skull
+                          size={13}
+                          className="text-muted shrink-0"
+                          role="img"
+                          aria-label="Enemy"
+                        />
+                      )}
+                      <span
+                        className={`type-ui truncate ${
+                          isDead
+                            ? 'text-muted line-through'
+                            : isCurrent
+                              ? 'text-heading font-semibold'
+                              : isPlayer
+                                ? 'text-heading font-medium'
+                                : 'text-heading'
+                        }`}
+                      >
+                        {entry.displayName}
+                        {isYou && (
+                          <span className="text-muted ml-1 font-normal">
+                            (you)
+                          </span>
+                        )}
                       </span>
-                    )}
-                    <span
-                      className={`truncate text-sm ${
-                        isDead
-                          ? 'text-faint line-through'
-                          : isCurrent
-                            ? 'text-accent-amber-text font-semibold'
-                            : isPlayer
-                              ? 'text-heading font-medium'
-                              : dispoColor
-                      }`}
-                    >
-                      {entry.displayName}
-                      {isYou && (
-                        <span className="text-muted ml-1 font-normal">
-                          (you)
+                      {hpText && (
+                        <span
+                          className={`type-small ml-auto whitespace-nowrap ${hpTextColor}`}
+                        >
+                          {hpText}
                         </span>
                       )}
-                    </span>
-                    {hpText && (
-                      <span
-                        className={`ml-auto text-xs whitespace-nowrap ${hpTextColor}`}
-                      >
-                        {hpText}
+                    </div>
+                    {isCurrentAlive && (
+                      <span className="type-small text-brass-text ml-[21px]">
+                        Current turn
                       </span>
                     )}
-                  </div>
-                  {barPercent !== null && (
-                    <div className="bg-surface-secondary ml-[21px] h-1.5 overflow-hidden rounded-full">
-                      <div
-                        className={`h-full rounded-full transition-all ${getHpBarColor(barPercent, 100)}`}
-                        style={{ width: `${barPercent}%` }}
-                      />
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    {barPercent !== null && (
+                      <span className="bg-divider ml-[21px] block h-1">
+                        <span
+                          className={`block h-full transition-[width] ${getHpBarColor(barPercent, 100)}`}
+                          style={{ width: `${barPercent}%` }}
+                        />
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
 
-          {/* End my turn — only on the open character's turn */}
-          {isMyTurn && (
-            <div className="border-divider flex-shrink-0 border-t p-2">
-              <Button
-                variant="primary"
-                className="w-full"
-                onClick={handleEndTurnClick}
-              >
-                End my turn
-              </Button>
-            </div>
-          )}
+            {/* End my turn — only on the open character's turn */}
+            {isMyTurn && (
+              <div className="border-divider flex-shrink-0 border-t p-2">
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  onClick={handleEndTurnClick}
+                >
+                  End my turn
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

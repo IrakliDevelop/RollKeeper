@@ -1,19 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  RefreshCw,
-  ChevronDown,
-  Link2,
-  Link2Off,
-  Wifi,
-  WifiOff,
-  Heart,
-  Eye,
-} from 'lucide-react';
+import * as Popover from '@radix-ui/react-popover';
+import { RefreshCw, ChevronDown, Link2, Link2Off, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
 import { Button } from '@/components/ui/forms/button';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { CharacterState } from '@/types/character';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
@@ -34,8 +27,7 @@ interface SyncIndicatorProps {
   onSharePartyViewChange: (enabled: boolean) => void;
 }
 
-function formatSyncTime(dateString: string | null): string {
-  if (!dateString) return 'Never';
+function formatSyncTime(dateString: string): string {
   const seconds = Math.floor(
     (Date.now() - new Date(dateString).getTime()) / 1000
   );
@@ -46,17 +38,31 @@ function formatSyncTime(dateString: string | null): string {
   return `${Math.floor(minutes / 60)}h ago`;
 }
 
-function getStatusColor(status: string): string {
-  switch (status) {
-    case 'synced':
-      return 'bg-green-500';
-    case 'syncing':
-      return 'bg-blue-500 animate-pulse';
-    case 'error':
-      return 'bg-red-500';
-    default:
-      return 'bg-gray-400';
+function syncStateLabel(
+  status: SyncIndicatorProps['syncStatus'],
+  lastSyncedAt: string | null
+): { short: string; full: string } {
+  if (status === 'syncing') return { short: 'Syncing…', full: 'Syncing…' };
+  if (status === 'error') return { short: 'Sync failed', full: 'Sync failed' };
+  if (lastSyncedAt === null) {
+    return { short: 'Not synced', full: 'Not synced' };
   }
+  return { short: 'Synced', full: `Synced ${formatSyncTime(lastSyncedAt)}` };
+}
+
+function StatusGlyph({ status }: { status: SyncIndicatorProps['syncStatus'] }) {
+  if (status === 'syncing') {
+    return (
+      <Loader2 size={14} className="text-muted animate-spin" aria-hidden />
+    );
+  }
+  const color =
+    status === 'synced'
+      ? 'bg-verdigris-fill'
+      : status === 'error'
+        ? 'bg-blood-fill'
+        : 'bg-divider-strong';
+  return <span className={`size-2 rounded-full ${color}`} aria-hidden />;
 }
 
 export function SyncIndicator({
@@ -75,79 +81,76 @@ export function SyncIndicator({
   sharePartyView,
   onSharePartyViewChange,
 }: SyncIndicatorProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [displayTime, setDisplayTime] = useState(formatSyncTime(lastSyncedAt));
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [, setTick] = useState(0);
+  const state = syncStateLabel(syncStatus, lastSyncedAt);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setDisplayTime(formatSyncTime(lastSyncedAt));
-    }, 5000);
+    const timer = setInterval(() => setTick(t => t + 1), 5000);
     return () => clearInterval(timer);
-  }, [lastSyncedAt]);
-
-  useEffect(() => {
-    setDisplayTime(formatSyncTime(lastSyncedAt));
-  }, [lastSyncedAt]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
+  }, []);
 
   if (!syncEnabled || !campaignCode) return null;
 
   return (
-    <div className="relative" ref={menuRef}>
-      <button
-        ref={triggerRef}
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(!menuOpen)}
-        className="border-divider bg-surface-secondary hover:bg-surface-hover focus-visible:outline-ring flex min-h-6 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-      >
-        <div className={`h-2 w-2 rounded-full ${getStatusColor(syncStatus)}`} />
-        <Link2 size={14} className="text-muted" />
-        <span className="text-body sr-only max-w-[120px] truncate text-xs sm:not-sr-only">
-          {campaignName || campaignCode}
-        </span>
-        <span className="text-muted sr-only text-xs sm:not-sr-only">
-          {syncStatus === 'syncing' ? 'Syncing...' : displayTime}
-        </span>
-        <ChevronDown size={12} className="text-muted hidden sm:block" />
-      </button>
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          ref={triggerRef}
+          type="button"
+          variant="ghost"
+          size="sm"
+          selected={open}
+          // Tighter than size="sm" so the state word fits the phone header.
+          className="gap-1.5 px-3 sm:gap-2"
+        >
+          <StatusGlyph status={syncStatus} />
+          <Link2 size={14} className="text-muted hidden sm:block" aria-hidden />
+          <span className="type-small text-body sr-only max-w-[120px] truncate sm:not-sr-only">
+            {campaignName || campaignCode}
+          </span>
+          <span className="type-small text-body sm:hidden" aria-hidden>
+            {state.short}
+          </span>
+          <span className="type-small text-muted sr-only sm:not-sr-only">
+            {state.full}
+          </span>
+          <ChevronDown
+            size={14}
+            className="text-muted hidden sm:block"
+            aria-hidden
+          />
+        </Button>
+      </Popover.Trigger>
 
-      {menuOpen && (
-        <div className="border-divider bg-surface-raised absolute right-0 z-50 mt-1 w-64 rounded-lg border-2 p-3 shadow-xl">
+      <Popover.Portal>
+        <Popover.Content
+          aria-label="Campaign sync"
+          align="end"
+          sideOffset={8}
+          collisionPadding={8}
+          className={`${OVERLAY_SURFACE} z-[60] w-64 max-w-[calc(100vw-1rem)] p-3`}
+        >
           <div className="mb-3">
             <div className="flex items-center gap-2">
-              <Badge variant="info" size="sm" className="font-mono">
+              <Badge variant="neutral" size="sm" className="font-mono">
                 {campaignCode}
               </Badge>
-              <span className="text-body truncate text-xs">{campaignName}</span>
+              <span className="type-small text-body truncate">
+                {campaignName}
+              </span>
             </div>
+            <p className="type-small text-muted mt-1">{state.full}</p>
           </div>
 
           <div className="border-divider space-y-3 border-t pt-3">
-            {/* Auto-sync toggle */}
-            <div className="flex items-center justify-between pointer-coarse:min-h-11">
-              <div className="flex items-center gap-2">
-                {autoSync ? (
-                  <Wifi size={14} className="text-green-500" />
-                ) : (
-                  <WifiOff size={14} className="text-muted" />
-                )}
-                <span className="text-heading text-sm">Auto-sync</span>
-              </div>
-              <Switch checked={autoSync} onCheckedChange={onToggleAutoSync} />
-            </div>
+            <Switch
+              label="Auto-sync"
+              checked={autoSync}
+              onCheckedChange={onToggleAutoSync}
+            />
 
-            {/* Manual sync button */}
             {!autoSync && (
               <Button
                 variant="secondary"
@@ -161,78 +164,54 @@ export function SyncIndicator({
                 }
                 onClick={() => {
                   onSyncNow(characterData);
-                  setMenuOpen(false);
+                  setOpen(false);
                 }}
                 disabled={syncStatus === 'syncing'}
               >
-                Sync Now
+                Sync now
               </Button>
             )}
 
-            {/* Share HP with party toggle */}
-            <div className="flex items-center justify-between pointer-coarse:min-h-11">
-              <div className="flex items-center gap-2">
-                <Heart
-                  size={14}
-                  className={
-                    shareHpWithParty ? 'text-accent-red-text' : 'text-muted'
-                  }
-                />
-                <span className="text-heading text-sm">Share HP</span>
-              </div>
-              <Switch
-                checked={shareHpWithParty}
-                onCheckedChange={onToggleShareHp}
-                aria-label="Share HP with party"
-              />
-            </div>
+            <Switch
+              label="Share HP with party"
+              checked={shareHpWithParty}
+              onCheckedChange={onToggleShareHp}
+            />
 
-            {/* Share sheet with party toggle */}
-            <div
-              className="flex items-center justify-between pointer-coarse:min-h-11"
-              title="Let party members open a limited view of this character on the battle map"
-            >
-              <div className="flex items-center gap-2">
-                <Eye
-                  size={14}
-                  className={
-                    sharePartyView ? 'text-accent-blue-text' : 'text-muted'
-                  }
-                />
-                <span className="text-heading text-sm">Share sheet</span>
-              </div>
-              <Switch
-                checked={sharePartyView}
-                onCheckedChange={onSharePartyViewChange}
-                aria-label="Share sheet with party"
-              />
-            </div>
+            <Switch
+              label="Share sheet with party"
+              description="Let party members open a limited view of this character on the battle map"
+              checked={sharePartyView}
+              onCheckedChange={onSharePartyViewChange}
+            />
 
-            {/* Leave campaign */}
-            <button
+            <Button
+              variant="danger"
+              size="sm"
+              fullWidth
+              leftIcon={<Link2Off size={14} />}
               onClick={async () => {
-                // Close the menu first: the dialog is outside it, so the
-                // menu's click-outside handler would close it anyway. Focus
-                // the trigger first so the dialog returns focus to it, not to
-                // the menu button that is about to unmount.
+                // Focus the trigger before closing so the confirm dialog
+                // records it as the element to return focus to; Radix's own
+                // focus return runs a tick later, after the dialog has
+                // already taken focus.
                 triggerRef.current?.focus();
-                setMenuOpen(false);
+                setOpen(false);
                 const confirmed = await confirmDialog({
                   title: 'Leave this campaign?',
                   message:
                     'Your character stays on this device. You can rejoin with the campaign code.',
                   confirmLabel: 'Leave campaign',
+                  tone: 'danger',
                 });
                 if (confirmed) onLeaveCampaign();
               }}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
             >
-              <Link2Off size={14} />
-              Leave Campaign
-            </button>
+              Leave campaign
+            </Button>
           </div>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
