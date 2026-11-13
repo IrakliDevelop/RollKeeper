@@ -496,6 +496,7 @@ describe('DmLocationToolbar tool chrome', () => {
     ['connecting', 'Connecting…'],
     ['offline', 'Offline'],
     ['denied', 'Denied'],
+    ['unsupported', 'Sync unavailable'],
     ['disabled', 'Sync off'],
   ] as const)(
     'renders the live chip as a word with no pill: %s',

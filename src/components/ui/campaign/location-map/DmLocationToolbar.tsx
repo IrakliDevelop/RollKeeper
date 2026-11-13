@@ -12,7 +12,6 @@ import {
   Move,
   Eye,
   EyeOff,
-  Loader2,
   CloudFog,
 } from 'lucide-react';
 import { useActiveTool, useHistory } from '@fieldnotes/react';
@@ -20,6 +19,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import DmLocationGridPopover from './DmLocationGridPopover';
 import { DisableableTooltip } from './ToolOptionControls';
+import { LiveSyncChip } from './LiveSyncChip';
 import DmOnlyToggle from './DmOnlyToggle';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import { mapToolDefs } from './mapToolDefs';
@@ -78,51 +78,6 @@ function formatSyncTime(iso: string): string {
   const diffHrs = Math.floor(diffMin / 60);
   if (diffHrs < 24) return `${diffHrs}h ago`;
   return date.toLocaleDateString();
-}
-
-function LiveSyncChip({
-  status,
-}: {
-  status: DmLocationToolbarProps['syncStatus'];
-}) {
-  if (status === 'disabled') {
-    return (
-      <span
-        data-testid="live-sync-chip"
-        className="type-small text-muted flex items-center gap-1.5"
-      >
-        Sync off
-      </span>
-    );
-  }
-  return (
-    <span
-      data-testid="live-sync-chip"
-      className="type-small text-body flex items-center gap-1.5"
-    >
-      {status === 'connecting' ? (
-        <Loader2 aria-hidden size={14} className="text-muted animate-spin" />
-      ) : (
-        <span
-          aria-hidden
-          className={`size-2 rounded-full ${
-            status === 'live'
-              ? 'bg-verdigris-fill'
-              : status === 'denied'
-                ? 'bg-blood-fill'
-                : 'bg-divider-strong'
-          }`}
-        />
-      )}
-      {status === 'live'
-        ? 'Live'
-        : status === 'connecting'
-          ? 'Connecting…'
-          : status === 'offline'
-            ? 'Offline'
-            : 'Denied'}
-    </span>
-  );
 }
 
 export default function DmLocationToolbar({

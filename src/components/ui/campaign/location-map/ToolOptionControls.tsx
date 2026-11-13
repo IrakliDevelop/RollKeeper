@@ -26,6 +26,8 @@ interface SegmentedGroupProps<T extends string> {
   options: readonly SegmentedOption<T>[];
   value: T | undefined;
   onChange: (value: T) => void;
+  /** Button size; `xs` in tool option rows, `sm` beside 36px dock tools. */
+  size?: 'xs' | 'sm';
 }
 
 /** A row of outline buttons choosing one value; the chosen one is `selected`. */
@@ -34,6 +36,7 @@ export function SegmentedGroup<T extends string>({
   options,
   value,
   onChange,
+  size = 'xs',
 }: SegmentedGroupProps<T>) {
   return (
     <div role="group" aria-label={label} className="flex gap-1">
@@ -44,7 +47,7 @@ export function SegmentedGroup<T extends string>({
           <Button
             key={option.value}
             variant="secondary"
-            size="xs"
+            size={size}
             selected={on}
             aria-pressed={on}
             aria-label={option.ariaLabel}
