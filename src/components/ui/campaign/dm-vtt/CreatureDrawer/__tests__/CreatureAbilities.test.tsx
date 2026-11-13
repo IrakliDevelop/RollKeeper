@@ -125,6 +125,11 @@ describe('CreatureAbilities read-only', () => {
     // DEX is proficient via the "DEX +5" override.
     const save = screen.getByText('+5');
     expect(save).toBeVisible();
+    // The ProficiencyDot sits right before the save text, hidden from
+    // assistive tech because the text already carries the value.
+    const dot = save.previousElementSibling;
+    expect(dot).toHaveAttribute('data-level', 'proficient');
+    expect(dot).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
