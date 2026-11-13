@@ -126,14 +126,23 @@ describe('DmLocationToolbar', () => {
     }
   });
 
-  it('collapses grid controls into the popover (no inline sliders)', () => {
-    render(<DmLocationToolbar {...baseProps} gridEnabled={true} />);
+  it('collapses grid controls into the popover (no inline sliders)', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <DmLocationToolbar {...baseProps} gridEnabled={true} />
+    );
     // Trigger present, inline strip gone even with grid enabled.
-    expect(screen.getByTitle('Grid settings')).toBeInTheDocument();
-    expect(screen.queryByTitle('Grid cell size')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Grid:/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('slider', { name: 'Grid cell size' })
+    ).not.toBeInTheDocument();
     // Opening the popover reveals the controls.
-    fireEvent.click(screen.getByTitle('Grid settings'));
-    expect(screen.getByTitle('Grid cell size')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Grid:/ }));
+    expect(
+      screen.getByRole('slider', { name: 'Grid cell size' })
+    ).toBeInTheDocument();
+    // No title attribute is left anywhere in the toolbar.
+    expect(container.querySelectorAll('[title]')).toHaveLength(0);
   });
 
   it('wraps instead of clipping (flex-wrap on the container)', () => {
