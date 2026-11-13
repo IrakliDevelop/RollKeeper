@@ -102,6 +102,8 @@ export function SyncIndicator({
           variant="ghost"
           size="sm"
           selected={open}
+          // Tighter than size="sm" so the state word fits the phone header.
+          className="gap-1.5 px-3 sm:gap-2"
         >
           <StatusGlyph status={syncStatus} />
           <Link2 size={14} className="text-muted hidden sm:block" aria-hidden />
