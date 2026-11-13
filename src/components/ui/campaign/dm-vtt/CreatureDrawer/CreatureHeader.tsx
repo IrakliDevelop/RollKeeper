@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Pencil, Swords, Zap } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
+import { Button } from '@/components/ui/forms/button';
+import { Input } from '@/components/ui/forms/input';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import { Badge } from '@/components/ui/layout/badge';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
@@ -19,15 +22,6 @@ export interface CreatureHeaderProps {
   onToggleEditing: () => void;
   onClose: () => void;
 }
-
-const TONE_CLASSES: Record<ReturnType<typeof creatureBadge>['tone'], string> = {
-  purple:
-    'bg-accent-purple-bg text-accent-purple-text border-accent-purple-border',
-  amber: 'bg-accent-amber-bg text-accent-amber-text border-accent-amber-border',
-  blue: 'bg-accent-blue-bg text-accent-blue-text border-accent-blue-border',
-  emerald:
-    'bg-accent-emerald-bg text-accent-emerald-text border-accent-emerald-border',
-};
 
 /** Drawer header: avatar, rename, kind/CR/turn/concentration badges, meta line, and the action buttons. */
 export function CreatureHeader({
@@ -54,6 +48,7 @@ export function CreatureHeader({
     setIsEditingName(false);
   };
 
+  // Disposition ring: a data colour, drawn inline rather than as a shadow class.
   const ringStyle = { boxShadow: `0 0 0 2px ${ringColor}` };
 
   return (
@@ -70,7 +65,7 @@ export function CreatureHeader({
             />
           ) : (
             <div
-              className="bg-surface-raised text-heading flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold"
+              className="bg-surface-raised type-subheading text-heading flex h-12 w-12 items-center justify-center rounded-full"
               style={ringStyle}
             >
               {entity.name.charAt(0).toUpperCase()}
@@ -80,8 +75,8 @@ export function CreatureHeader({
 
         <div className="min-w-0 flex-1">
           {isEditingName ? (
-            <input
-              type="text"
+            <Input
+              size="sm"
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onBlur={commitName}
@@ -89,58 +84,56 @@ export function CreatureHeader({
                 if (e.key === 'Enter') commitName();
                 if (e.key === 'Escape') setIsEditingName(false);
               }}
-              className="font-display text-heading bg-surface-raised border-divider w-full rounded border px-2 py-0.5 text-xl leading-tight font-bold"
               aria-label="Combatant name"
               autoFocus
             />
           ) : (
             <div className="flex items-center gap-1">
-              <h2 className="font-display text-heading min-w-0 truncate text-xl leading-tight font-bold">
+              <h2 className="type-heading text-heading min-w-0 truncate">
                 {entity.name}
               </h2>
-              <button
-                type="button"
+              {/* SideDrawer auto-focuses the first tabbable on open; a Radix
+                  Tooltip here would open on every open. `title` keeps today's
+                  hover hint. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-9 shrink-0 px-0"
+                aria-label={`Rename ${entity.name}`}
+                title={`Rename ${entity.name}`}
                 onClick={() => {
                   setNameInput(entity.name);
                   setIsEditingName(true);
                 }}
-                aria-label={`Rename ${entity.name}`}
-                title={`Rename ${entity.name}`}
-                className="text-faint hover:text-body hover:bg-surface-raised flex h-8 w-8 shrink-0 items-center justify-center rounded transition-colors"
               >
-                <Pencil size={14} />
-              </button>
+                <Pencil size={16} aria-hidden />
+              </Button>
             </div>
           )}
 
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span
-              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${TONE_CLASSES[badge.tone]}`}
-            >
+            <Badge variant="neutral" size="sm">
               {badge.label}
-            </span>
+            </Badge>
             {cr && (
-              <span className="bg-surface-raised text-muted rounded-full px-2 py-0.5 text-[11px] font-medium">
+              <Badge variant="neutral" size="sm">
                 CR {cr}
-              </span>
+              </Badge>
             )}
             {isTurn && (
-              <Badge
-                variant="success"
-                size="sm"
-                leftIcon={<Swords size={11} />}
-              >
-                Their turn
+              <Badge variant="primary" size="sm">
+                Current turn
               </Badge>
             )}
             {entity.concentrationSpell && (
-              <Badge variant="info" size="sm" leftIcon={<Zap size={11} />}>
-                {entity.concentrationSpell}
-              </Badge>
+              <ConditionChip
+                kind="concentration"
+                name={entity.concentrationSpell}
+              />
             )}
           </div>
 
-          {meta && <p className="text-muted mt-0.5 text-xs">{meta}</p>}
+          {meta && <p className="type-small text-muted mt-0.5">{meta}</p>}
         </div>
 
         <CreatureHeaderActions

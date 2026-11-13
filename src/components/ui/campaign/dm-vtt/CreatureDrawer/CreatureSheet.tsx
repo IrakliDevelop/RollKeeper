@@ -5,6 +5,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { Activity, Castle, LockOpen, ScrollText, Swords } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { useStatBlockEditDialog } from '@/components/ui/encounter/combat-screen/detail/StatBlockEditDialog';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 import type { EncounterEntity } from '@/types/encounter';
@@ -75,84 +76,91 @@ export function CreatureSheet({
       ];
   const tabProps = { entity, actions, editing };
 
+  // The drawer mounts outside DmVttScreen's toolbar TooltipProvider.
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-divider shrink-0 border-b">
-        <CreatureHeader
-          entity={entity}
-          actions={actions}
-          isTurn={isTurn}
-          editing={editing}
-          onToggleEditing={() => setEditing(e => !e)}
-          onClose={onClose}
-        />
-        <div className="px-4 pb-3">
-          <CreaturePlayersRow entity={entity} actions={actions} />
+    <TooltipProvider>
+      <div className="flex h-full flex-col">
+        <div className="border-divider shrink-0 border-b">
+          <CreatureHeader
+            entity={entity}
+            actions={actions}
+            isTurn={isTurn}
+            editing={editing}
+            onToggleEditing={() => setEditing(e => !e)}
+            onClose={onClose}
+          />
+          <div className="px-4 pb-3">
+            <CreaturePlayersRow entity={entity} actions={actions} />
+          </div>
         </div>
-      </div>
 
-      <Tabs.Root
-        value={activeTab}
-        onValueChange={v => setActiveTab(v as CreatureTabId)}
-        className="min-h-0 flex-1 overflow-y-auto"
-      >
-        {!isLair && (
-          <div className="space-y-3 px-5 py-4">
-            <CreatureHpCard {...tabProps} />
-            <CreatureStatTiles {...tabProps} />
-            <CreatureStatusRow {...tabProps} />
-            <CreatureAbilities {...tabProps} />
-          </div>
-        )}
+        <Tabs.Root
+          value={activeTab}
+          onValueChange={v => setActiveTab(v as CreatureTabId)}
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
+          {!isLair && (
+            <div className="space-y-3 px-5 py-4">
+              <CreatureHpCard {...tabProps} />
+              <CreatureStatTiles {...tabProps} />
+              <CreatureStatusRow {...tabProps} />
+              <CreatureAbilities {...tabProps} />
+            </div>
+          )}
 
-        <CreatureTabBar tabs={tabs} activeTab={activeTab} />
+          <CreatureTabBar tabs={tabs} activeTab={activeTab} />
 
-        {editing && (
-          <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex flex-wrap items-center gap-2 border-b px-5 py-2 text-xs">
-            <LockOpen className="h-3.5 w-3.5 shrink-0" />
-            <span className="flex-1">
-              {entity.npcSourceId
-                ? 'Editing this combatant. Changes also sync back to the NPC library record.'
-                : 'Editing this combatant. Changes stay on this combatant.'}
-            </span>
-            {openEditor && (
-              <Button variant="outline" size="sm" onClick={openEditor}>
-                Full stat block editor
+          {editing && (
+            <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex flex-wrap items-center gap-2 border-b px-5 py-2 text-xs">
+              <LockOpen className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">
+                {entity.npcSourceId
+                  ? 'Editing this combatant. Changes also sync back to the NPC library record.'
+                  : 'Editing this combatant. Changes stay on this combatant.'}
+              </span>
+              {openEditor && (
+                <Button variant="outline" size="sm" onClick={openEditor}>
+                  Full stat block editor
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(false)}
+              >
+                Done
               </Button>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-              Done
-            </Button>
-          </div>
-        )}
+            </div>
+          )}
 
-        {isLair ? (
-          <Tabs.Content value="lair" className={TAB_CONTENT_CLASS}>
-            <LairTab
-              {...tabProps}
-              onTokenIdentityChange={onTokenIdentityChange}
-            />
-          </Tabs.Content>
-        ) : (
-          <>
-            <Tabs.Content value="actions" className={TAB_CONTENT_CLASS}>
-              <ActionsTab {...tabProps} />
-            </Tabs.Content>
-            <Tabs.Content value="statblock" className={TAB_CONTENT_CLASS}>
-              <StatBlockTab
+          {isLair ? (
+            <Tabs.Content value="lair" className={TAB_CONTENT_CLASS}>
+              <LairTab
                 {...tabProps}
-                onOpenEditor={openEditor}
                 onTokenIdentityChange={onTokenIdentityChange}
               />
             </Tabs.Content>
-            <Tabs.Content value="effects" className={TAB_CONTENT_CLASS}>
-              <EffectsTab {...tabProps} />
-            </Tabs.Content>
-          </>
-        )}
-      </Tabs.Root>
+          ) : (
+            <>
+              <Tabs.Content value="actions" className={TAB_CONTENT_CLASS}>
+                <ActionsTab {...tabProps} />
+              </Tabs.Content>
+              <Tabs.Content value="statblock" className={TAB_CONTENT_CLASS}>
+                <StatBlockTab
+                  {...tabProps}
+                  onOpenEditor={openEditor}
+                  onTokenIdentityChange={onTokenIdentityChange}
+                />
+              </Tabs.Content>
+              <Tabs.Content value="effects" className={TAB_CONTENT_CLASS}>
+                <EffectsTab {...tabProps} />
+              </Tabs.Content>
+            </>
+          )}
+        </Tabs.Root>
 
-      {editor.dialog}
-    </div>
+        {editor.dialog}
+      </div>
+    </TooltipProvider>
   );
 }

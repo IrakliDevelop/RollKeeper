@@ -13,16 +13,14 @@ export type CreatureTabProps = CreatureVitalsProps;
 
 export interface CreatureBadge {
   label: 'Monster' | 'NPC' | 'Summon' | 'Lair';
-  tone: 'purple' | 'amber' | 'blue' | 'emerald';
 }
 
 /** Kind badge for the creature drawer header — summon beats type, lair beats NPC. */
 export function creatureBadge(entity: EncounterEntity): CreatureBadge {
-  if (entity.summonId) return { label: 'Summon', tone: 'blue' };
-  if (entity.type === 'lair') return { label: 'Lair', tone: 'emerald' };
-  if (entity.type === 'npc' || entity.npcSourceId)
-    return { label: 'NPC', tone: 'amber' };
-  return { label: 'Monster', tone: 'purple' };
+  if (entity.summonId) return { label: 'Summon' };
+  if (entity.type === 'lair') return { label: 'Lair' };
+  if (entity.type === 'npc' || entity.npcSourceId) return { label: 'NPC' };
+  return { label: 'Monster' };
 }
 
 /** Size · type · alignment line — same expression as `DetailHeader`. */
@@ -33,7 +31,7 @@ export function creatureMetaLine(entity: EncounterEntity): string | null {
 }
 
 /**
- * The entity the top-center "Sheet · name" pill offers, or null: the
+ * The entity the top-center "Open {name} sheet" pill offers, or null: the
  * selected non-player combatant, only while the drawer is closed and no token
  * placement is pending (`PlacementBanner` sits in the same spot).
  */

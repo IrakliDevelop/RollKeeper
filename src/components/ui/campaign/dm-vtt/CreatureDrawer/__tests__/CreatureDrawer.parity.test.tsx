@@ -119,9 +119,19 @@ function rowOf(text: string, depth: number): HTMLElement {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 beforeEach(() => {
+  // CreatureSheet's Tooltips: Radix measures the trigger with ResizeObserver.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
   useEncounterStore.setState({
     encounters: [
       createMockEncounter({
