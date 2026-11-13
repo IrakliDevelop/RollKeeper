@@ -316,7 +316,9 @@ export default function DmLocationToolOptions({
         activeTool === 'path' ||
         activeTool === 'template'));
 
-  const meta = MAP_TOOL_META[activeTool];
+  // A pending fog confirm shows the fog options under whichever tool is
+  // active, so the row is named for the fog tool while it is up.
+  const meta = showFogOptions ? MAP_TOOL_META.fog : MAP_TOOL_META[activeTool];
   if (!hasOptions && !meta) return null;
 
   // The shared strip carries CSS colour STRINGS for the SDK tools listed in
@@ -344,7 +346,18 @@ export default function DmLocationToolOptions({
                   ? pencilOpts?.color
                   : activeTool === 'measure'
                     ? measureOpts?.color
-                    : '#334155';
+                    : activeTool === 'template'
+                      ? templateOpts?.strokeColor
+                      : '#334155';
+
+  const colorStripLabel =
+    activeTool === 'shape'
+      ? 'Stroke'
+      : activeTool === 'note'
+        ? 'Background'
+        : activeTool === 'template'
+          ? 'Outline'
+          : 'Color';
 
   const handleColorChange = (color: string) => {
     if (activeTool === 'shape') setShapeOpts({ strokeColor: color });
@@ -397,16 +410,9 @@ export default function DmLocationToolOptions({
 
             {showColorStrip && (
               <>
-                <OptionLabel>
-                  {activeTool === 'shape'
-                    ? 'Stroke'
-                    : activeTool === 'note'
-                      ? 'Background'
-                      : activeTool === 'template'
-                        ? 'Outline'
-                        : 'Color'}
-                </OptionLabel>
+                <OptionLabel>{colorStripLabel}</OptionLabel>
                 <SwatchStrip
+                  label={colorStripLabel}
                   colors={COLOR_SWATCHES}
                   names={COLOR_SWATCH_NAMES}
                   isSelected={color => activeColor === color}
@@ -439,6 +445,7 @@ export default function DmLocationToolOptions({
               <>
                 <OptionLabel>Text</OptionLabel>
                 <SwatchStrip
+                  label="Text"
                   colors={NOTE_TEXT_COLORS}
                   names={NOTE_TEXT_COLOR_NAMES}
                   isSelected={color => noteOpts.textColor === color}
@@ -450,20 +457,23 @@ export default function DmLocationToolOptions({
             {activeTool === 'shape' && shapeOpts && (
               <>
                 <OptionLabel>Fill</OptionLabel>
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  selected={shapeOpts.fillColor === 'transparent'}
-                  aria-pressed={shapeOpts.fillColor === 'transparent'}
-                  onClick={() => setShapeOpts({ fillColor: 'transparent' })}
-                >
-                  None
-                </Button>
                 <SwatchStrip
+                  label="Fill"
                   colors={FILL_SWATCHES}
                   names={COLOR_SWATCH_NAMES}
                   isSelected={color => shapeOpts.fillColor === color}
                   onSelect={color => setShapeOpts({ fillColor: color })}
+                  leading={
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      selected={shapeOpts.fillColor === 'transparent'}
+                      aria-pressed={shapeOpts.fillColor === 'transparent'}
+                      onClick={() => setShapeOpts({ fillColor: 'transparent' })}
+                    >
+                      None
+                    </Button>
+                  }
                 />
                 <OptionLabel>Width</OptionLabel>
                 <RangeField
@@ -566,23 +576,34 @@ export default function DmLocationToolOptions({
 }
 
 interface SwatchStripProps {
+  /** The group's accessible name: the same word as the visible label. */
+  label: string;
   colors: readonly string[];
   names: Readonly<Record<string, string>>;
   isSelected: (color: string) => boolean;
   onSelect: (color: string) => void;
+  /** A control before the swatches (the shape fill's "None"). */
+  leading?: ReactNode;
   /** Trailing controls in the strip (the custom colour picker). */
   children?: ReactNode;
 }
 
 function SwatchStrip({
+  label,
   colors,
   names,
   isSelected,
   onSelect,
+  leading,
   children,
 }: SwatchStripProps) {
   return (
-    <div className="flex flex-wrap items-center">
+    <div
+      role="group"
+      aria-label={label}
+      className="flex flex-wrap items-center"
+    >
+      {leading}
       {colors.map(color => (
         <SwatchButton
           key={color}
@@ -790,6 +811,7 @@ function TemplateOptions({
       />
       <OptionLabel>Fill</OptionLabel>
       <SwatchStrip
+        label="Fill"
         colors={FILL_SWATCHES}
         names={COLOR_SWATCH_NAMES}
         // Template fills are the swatch at 50% alpha (`80`).

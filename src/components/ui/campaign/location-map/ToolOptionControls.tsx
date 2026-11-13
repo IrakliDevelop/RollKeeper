@@ -117,7 +117,7 @@ interface CustomColorButtonProps {
 export function CustomColorButton({ value, onChange }: CustomColorButtonProps) {
   return (
     <Tooltip content="Custom color">
-      <label className="hover:bg-surface-hover focus-within:outline-ring relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm focus-within:outline-2 pointer-coarse:size-11">
+      <label className="hover:bg-surface-hover has-[:focus-visible]:outline-ring relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 pointer-coarse:size-11">
         <input
           type="color"
           aria-label="Custom color"

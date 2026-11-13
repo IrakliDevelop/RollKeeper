@@ -54,6 +54,8 @@ function expectNameOnly(container: HTMLElement, name: string) {
   ).toBe(0);
 }
 
+const COLOR_SWATCH_COUNT = 9;
+
 const MARKER_KIND_TEXT: Record<(typeof MARKER_KINDS)[number], string> = {
   door: 'Door',
   trap: 'Trap',
@@ -800,6 +802,11 @@ describe('DmLocationToolOptions named options row', () => {
       'aria-pressed',
       'true'
     );
+    expect(
+      within(screen.getByRole('group', { name: 'Color' })).getAllByRole(
+        'button'
+      )
+    ).toHaveLength(COLOR_SWATCH_COUNT);
     const custom = screen.getByLabelText('Custom color');
     expect(custom).toHaveAttribute('type', 'color');
     expect(custom).toHaveValue('#3b82f6');
@@ -820,7 +827,17 @@ describe('DmLocationToolOptions named options row', () => {
     expect(screen.getByText('Text')).toBeInTheDocument();
     const ink = screen.getByRole('button', { name: 'Ink' });
     expect(ink).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Violet' })[1]);
+    expect(
+      within(screen.getByRole('group', { name: 'Background' })).getByRole(
+        'button',
+        { name: 'Yellow' }
+      )
+    ).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Text' })).getByRole('button', {
+        name: 'Violet',
+      })
+    );
     expect(setOptionsSpies['note']).toHaveBeenCalledWith({
       textColor: '#7c3aed',
     });
@@ -942,17 +959,75 @@ describe('DmLocationToolOptions named options row', () => {
       template: { templateShape: 'circle', fillColor: '#3b82f680' },
     };
     render(<DmLocationToolOptions mode="battlemap" />);
-    // The outline strip comes first, the fill swatches second.
-    const blues = screen.getAllByRole('button', { name: 'Blue' });
-    expect(blues).toHaveLength(2);
-    expect(blues[1]).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Green' })[1]);
+    const fill = screen.getByRole('group', { name: 'Fill' });
+    expect(within(fill).getByRole('button', { name: 'Blue' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    fireEvent.click(within(fill).getByRole('button', { name: 'Green' }));
     expect(setOptionsSpies['template']).toHaveBeenCalledWith({
       fillColor: '#22c55e80',
     });
     expect(screen.getByRole('slider', { name: 'Feet per cell' })).toHaveValue(
       '5'
     );
+  });
+
+  it('groups each colour strip under its visible label', () => {
+    mockActiveTool = 'shape';
+    mockToolOptions = {
+      shape: {
+        shape: 'rectangle',
+        strokeColor: '#ef4444',
+        fillColor: 'transparent',
+      },
+    };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    const stroke = screen.getByRole('group', { name: 'Stroke' });
+    const fill = screen.getByRole('group', { name: 'Fill' });
+    expect(within(stroke).getAllByRole('button', { name: 'Red' })).toHaveLength(
+      1
+    );
+    expect(within(fill).getAllByRole('button', { name: 'Red' })).toHaveLength(
+      1
+    );
+    expect(within(stroke).getByLabelText('Custom color')).toBeInTheDocument();
+    expect(within(fill).getByRole('button', { name: 'None' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
+  it('highlights the template outline colour', () => {
+    mockActiveTool = 'template';
+    mockToolOptions = {
+      template: { templateShape: 'circle', strokeColor: '#ef4444' },
+    };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    const outline = screen.getByRole('group', { name: 'Outline' });
+    expect(
+      within(outline).getByRole('button', { name: 'Red' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      within(outline).getByRole('button', { name: 'Slate' })
+    ).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('names the fog tool while a fog confirm is pending under another tool', () => {
+    mockActiveTool = 'hand';
+    const { container } = render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        fogControls={makeFogControls({ pendingAction: 'enable' })}
+      />
+    );
+
+    const nameCell = (container.firstChild as HTMLElement).firstElementChild;
+    expect(nameCell).toHaveTextContent(/^Fog of war$/);
+    expect(screen.queryByText('Pan')).toBeNull();
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
   });
 
   it('diagonals are a segmented pair', () => {
