@@ -115,6 +115,16 @@ describe('DmVttToolbar', () => {
     );
   });
 
+  it('does not scroll again when a rerender keeps the same active tool', () => {
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const { rerender } = render(<DmVttToolbar {...baseProps} />);
+    spy.mockClear();
+
+    rerender(<DmVttToolbar {...baseProps} hiddenElementCount={3} />);
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   it('Clear drawings is a danger icon button', () => {
     render(<DmVttToolbar {...baseProps} />);
     expect(
@@ -443,6 +453,19 @@ describe('DmVttToolbar', () => {
     expect(markerToggle.getAttribute('aria-label')).toContain(
       MARKER_SHARE_REVEALS_CLASSIFICATION
     );
+
+    // The one allowed class assertion: jsdom computes no widths, and the
+    // Radix popper sets `min-width: max-content`, so without a max width the
+    // ~260-character marker copy renders as one unwrapped line.
+    await user.hover(markerToggle);
+    const markerTooltip = await screen.findByRole('tooltip');
+    expect(markerTooltip).toHaveTextContent(
+      MARKER_SHARE_REVEALS_CLASSIFICATION
+    );
+    expect(
+      (markerTooltip.closest('[data-side]') as HTMLElement).className
+    ).toContain('max-w-xs');
+    await user.unhover(markerToggle);
     unmount();
 
     // Positive control: a non-marker selection keeps the shipped copy.

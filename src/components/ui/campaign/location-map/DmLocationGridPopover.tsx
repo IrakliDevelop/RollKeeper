@@ -61,7 +61,7 @@ export default function DmLocationGridPopover({
           variant="ghost"
           size="sm"
           selected={open}
-          leftIcon={<Grid3x3 size={15} />}
+          leftIcon={<Grid3x3 size={16} />}
         >
           Grid: {stateLabel}
         </Button>
@@ -69,6 +69,7 @@ export default function DmLocationGridPopover({
 
       <Popover.Portal>
         <Popover.Content
+          aria-label="Grid"
           align="end"
           sideOffset={8}
           collisionPadding={8}

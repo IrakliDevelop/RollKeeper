@@ -280,21 +280,30 @@ export default function DmLocationToolOptions({
     PingToolOptions & Record<string, unknown>
   >('ping');
 
+  // A pending fog confirm takes the whole row under whichever tool is active:
+  // the row is named for the fog tool and shows only the confirm, so every
+  // other branch below is gated on `!showFogOptions`.
+  const showFogOptions =
+    fogControls !== undefined &&
+    (activeTool === 'fog' || fogControls.pendingAction !== null);
+
   // Single source of truth for whether the select-tool branch renders — used
   // both to decide if the row has options at all and, below, to gate the
   // branch itself, so the two conditions can't drift apart.
   const showSelectionOptions =
-    selectionControls === true && activeTool === 'select' && selectedCount > 0;
+    !showFogOptions &&
+    selectionControls === true &&
+    activeTool === 'select' &&
+    selectedCount > 0;
 
   // Requiring the prop is what keeps the row honest: without it a surface
   // that activates the marker tool but wires no controls would show a picker
   // that does nothing. Same defensive shape as `pencilOpts !== undefined` and
   // `selectedCount > 0` above.
   const showMarkerOptions =
-    activeTool === MARKER_TOOL_NAME && markerControls !== undefined;
-  const showFogOptions =
-    fogControls !== undefined &&
-    (activeTool === 'fog' || fogControls.pendingAction !== null);
+    !showFogOptions &&
+    activeTool === MARKER_TOOL_NAME &&
+    markerControls !== undefined;
 
   // Mirrors DmLocationToolbar's PRESENCE_TOOL_DEFS gate.
   const presenceToolsEnabled = mode === 'battlemap' || liveSyncConfigured;
@@ -316,8 +325,6 @@ export default function DmLocationToolOptions({
         activeTool === 'path' ||
         activeTool === 'template'));
 
-  // A pending fog confirm shows the fog options under whichever tool is
-  // active, so the row is named for the fog tool while it is up.
   const meta = showFogOptions ? MAP_TOOL_META.fog : MAP_TOOL_META[activeTool];
   if (!hasOptions && !meta) return null;
 
@@ -388,7 +395,7 @@ export default function DmLocationToolOptions({
           <>
             {showSelectionOptions && <DmSelectionOptions />}
 
-            {activeTool === 'shape' && shapeOpts && (
+            {!showFogOptions && activeTool === 'shape' && shapeOpts && (
               <SegmentedGroup
                 label="Shape"
                 options={SHAPE_OPTIONS}
@@ -426,7 +433,7 @@ export default function DmLocationToolOptions({
               </>
             )}
 
-            {activeTool === 'pencil' && pencilOpts && (
+            {!showFogOptions && activeTool === 'pencil' && pencilOpts && (
               <>
                 <OptionLabel>Width</OptionLabel>
                 <RangeField
@@ -441,7 +448,7 @@ export default function DmLocationToolOptions({
               </>
             )}
 
-            {activeTool === 'note' && noteOpts && (
+            {!showFogOptions && activeTool === 'note' && noteOpts && (
               <>
                 <OptionLabel>Text</OptionLabel>
                 <SwatchStrip
@@ -454,7 +461,7 @@ export default function DmLocationToolOptions({
               </>
             )}
 
-            {activeTool === 'shape' && shapeOpts && (
+            {!showFogOptions && activeTool === 'shape' && shapeOpts && (
               <>
                 <OptionLabel>Fill</OptionLabel>
                 <SwatchStrip
@@ -487,7 +494,7 @@ export default function DmLocationToolOptions({
               </>
             )}
 
-            {activeTool === 'text' && textOpts && (
+            {!showFogOptions && activeTool === 'text' && textOpts && (
               <>
                 <OptionLabel>Size</OptionLabel>
                 <RangeField
@@ -508,7 +515,8 @@ export default function DmLocationToolOptions({
               </>
             )}
 
-            {mode === 'battlemap' &&
+            {!showFogOptions &&
+              mode === 'battlemap' &&
               activeTool === 'measure' &&
               measureOpts && (
                 <>
@@ -532,35 +540,38 @@ export default function DmLocationToolOptions({
                 </>
               )}
 
-            {mode === 'battlemap' && activeTool === 'path' && (
-              <>
-                <OptionLabel>Diagonals</OptionLabel>
-                <SegmentedGroup
-                  label="Diagonal rule"
-                  options={DIAGONAL_OPTIONS}
-                  value={pathOpts?.diagonalRule ?? 'chebyshev'}
-                  onChange={diagonalRule => setPathOpts({ diagonalRule })}
-                />
-                {movementControls && (
-                  <Switch
-                    checked={movementControls.dash.enabled}
-                    onCheckedChange={movementControls.dash.onChange}
-                    label="Dash"
-                    wrapperClassName="items-center"
+            {!showFogOptions &&
+              mode === 'battlemap' &&
+              activeTool === 'path' && (
+                <>
+                  <OptionLabel>Diagonals</OptionLabel>
+                  <SegmentedGroup
+                    label="Diagonal rule"
+                    options={DIAGONAL_OPTIONS}
+                    value={pathOpts?.diagonalRule ?? 'chebyshev'}
+                    onChange={diagonalRule => setPathOpts({ diagonalRule })}
                   />
-                )}
-                {movementControls?.sharing && (
-                  <Switch
-                    checked={movementControls.sharing.enabled}
-                    onCheckedChange={movementControls.sharing.onChange}
-                    label="Share movement with players"
-                    wrapperClassName="items-center"
-                  />
-                )}
-              </>
-            )}
+                  {movementControls && (
+                    <Switch
+                      checked={movementControls.dash.enabled}
+                      onCheckedChange={movementControls.dash.onChange}
+                      label="Dash"
+                      wrapperClassName="items-center"
+                    />
+                  )}
+                  {movementControls?.sharing && (
+                    <Switch
+                      checked={movementControls.sharing.enabled}
+                      onCheckedChange={movementControls.sharing.onChange}
+                      label="Share movement with players"
+                      wrapperClassName="items-center"
+                    />
+                  )}
+                </>
+              )}
 
-            {mode === 'battlemap' &&
+            {!showFogOptions &&
+              mode === 'battlemap' &&
               activeTool === 'template' &&
               templateOpts && (
                 <TemplateOptions

@@ -211,6 +211,8 @@ export default function DmLocationToolbar({
               <DisableableTooltip
                 content={fogControls.disabledReason ?? 'Fog of war'}
                 disabled={fogControls.disabled}
+                focusable
+                className="max-w-xs"
               >
                 <Button
                   variant="ghost"
@@ -295,6 +297,7 @@ export default function DmLocationToolbar({
             <DisableableTooltip
               content="Add map image"
               disabled={arrangeMapsActive === true}
+              focusable
             >
               <Button
                 variant="ghost"
@@ -352,6 +355,7 @@ export default function DmLocationToolbar({
               </Tooltip>
               <DisableableTooltip
                 disabled={hiddenElementCount === 0}
+                focusable
                 content={
                   hiddenElementCount === 0
                     ? 'No hidden elements to reveal'

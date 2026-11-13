@@ -77,14 +77,6 @@ describe('DmSelectionOptions', () => {
     rotateCCW.mockClear();
     removeElements.mockClear();
     applyStyle.mockClear();
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.unstubAllGlobals();
-  });
-
-  beforeEach(() => {
     // Radix Popover (the Align menu) and Tooltip measure with ResizeObserver.
     vi.stubGlobal(
       'ResizeObserver',
@@ -94,6 +86,11 @@ describe('DmSelectionOptions', () => {
         disconnect() {}
       }
     );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
   });
 
   it('renders nothing when nothing is selected', () => {
@@ -394,6 +391,19 @@ describe('DmSelectionOptions', () => {
       expect(
         screen.getByRole('slider', { name: 'Font size (mixed)' })
       ).toBeInTheDocument();
+    });
+
+    it('shows a dash, not the fallback value, beside a mixed slider', () => {
+      mockDetails = detailsWith(
+        ['strokeWidth', 'fontSize'],
+        { strokeWidth: 7, fontSize: 24 },
+        ['strokeWidth', 'fontSize']
+      );
+      render(<DmSelectionOptions />);
+      expect(screen.getAllByText('—')).toHaveLength(2);
+      for (const px of ['4px', '16px', '7px', '24px']) {
+        expect(screen.queryByText(px)).not.toBeInTheDocument();
+      }
     });
   });
 

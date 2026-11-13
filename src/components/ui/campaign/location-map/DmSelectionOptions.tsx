@@ -36,7 +36,7 @@ interface SwatchRowProps {
 function SwatchRow({ label, active, mixed, onSelect }: SwatchRowProps) {
   return (
     <div
-      className="flex items-center"
+      className="flex flex-wrap items-center"
       role="radiogroup"
       aria-label={mixed ? `${label} (mixed)` : label}
     >
@@ -163,7 +163,9 @@ export default function DmSelectionOptions() {
               max={12}
               value={strokeWidth}
               onChange={value => applyStyle({ strokeWidth: value })}
-              format={value => `${value}px`}
+              // The slider needs a number; the readout must not pass the
+              // fallback off as the selection's real value.
+              format={value => (isMixed('strokeWidth') ? '—' : `${value}px`)}
             />
           </>
         )}
@@ -178,39 +180,39 @@ export default function DmSelectionOptions() {
               max={72}
               value={fontSize}
               onChange={value => applyStyle({ fontSize: value })}
-              format={value => `${value}px`}
+              format={value => (isMixed('fontSize') ? '—' : `${value}px`)}
             />
           </>
         )}
         <DmLocationAlignMenu />
         <ArrangeButton label="Rotate 90° counter-clockwise" onClick={rotateCCW}>
-          <RotateCcw size={15} />
+          <RotateCcw size={16} />
         </ArrangeButton>
         <ArrangeButton label="Rotate 90° clockwise" onClick={rotateCW}>
-          <RotateCw size={15} />
+          <RotateCw size={16} />
         </ArrangeButton>
         {canGroup && (
           <ArrangeButton label="Group" onClick={group}>
-            <Group size={15} />
+            <Group size={16} />
           </ArrangeButton>
         )}
         {canUngroup && (
           <ArrangeButton label="Ungroup" onClick={ungroup}>
-            <Ungroup size={15} />
+            <Ungroup size={16} />
           </ArrangeButton>
         )}
         <ArrangeButton
           label={isLocked === true ? 'Unlock' : 'Lock'}
           onClick={toggleLock}
         >
-          {isLocked === true ? <LockOpen size={15} /> : <Lock size={15} />}
+          {isLocked === true ? <LockOpen size={16} /> : <Lock size={16} />}
         </ArrangeButton>
         <ArrangeButton
           label="Delete selected"
           variant="danger"
           onClick={() => viewport.removeElements(selectedIds)}
         >
-          <Trash2 size={15} />
+          <Trash2 size={16} />
         </ArrangeButton>
       </div>
     </TooltipProvider>

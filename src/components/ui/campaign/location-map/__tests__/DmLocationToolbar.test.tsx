@@ -364,7 +364,7 @@ describe('DmLocationToolbar marker chrome', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('the DM-only toggle warns that a shared marker publishes its kind, label and colour', () => {
+  it('the DM-only toggle warns that a shared marker publishes its kind, label and colour', async () => {
     render(
       <DmLocationToolbar
         {...baseProps}
@@ -377,6 +377,16 @@ describe('DmLocationToolbar marker chrome', () => {
     expect(toggle).not.toHaveAttribute('title');
     expect(toggle.getAttribute('aria-label')).toContain(
       MARKER_SHARE_REVEALS_CLASSIFICATION
+    );
+
+    // The one allowed class assertion: jsdom computes no widths, and the
+    // Radix popper sets `min-width: max-content`, so without a max width the
+    // ~260-character marker copy renders as one unwrapped line.
+    await userEvent.setup().hover(toggle);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent(MARKER_SHARE_REVEALS_CLASSIFICATION);
+    expect((tooltip.closest('[data-side]') as HTMLElement).className).toContain(
+      'max-w-xs'
     );
   });
 
@@ -661,6 +671,28 @@ describe('DmLocationToolbar disabled-button tooltips', () => {
     const wrapper = screen.getByRole('button', { name: 'Reveal all (2)' })
       .parentElement as HTMLElement;
     expect(wrapper).not.toHaveAttribute('tabindex');
+  });
+
+  it('gives disabled Undo and Redo no tab stop — their hint only repeats the name', () => {
+    render(<DmLocationToolbar {...baseProps} />);
+    for (const name of ['Undo', 'Redo']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      expect(button.parentElement).not.toHaveAttribute('tabindex');
+    }
+  });
+
+  it('keeps a tab stop on disabled Add map, whose hint explains the state', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        onPickMapImage={vi.fn()}
+        arrangeMapsActive
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Add map' });
+    expect(button).toBeDisabled();
+    expect(button.parentElement).toHaveAttribute('tabindex', '0');
   });
 });
 

@@ -80,7 +80,7 @@ export default function DmLocationAlignMenu() {
           size="sm"
           selected={open}
           disabled={!canAlign}
-          leftIcon={<AlignStartVertical size={15} />}
+          leftIcon={<AlignStartVertical size={16} />}
         >
           Align
         </Button>
@@ -88,6 +88,7 @@ export default function DmLocationAlignMenu() {
 
       <Popover.Portal>
         <Popover.Content
+          aria-label="Align"
           align="start"
           sideOffset={8}
           collisionPadding={8}

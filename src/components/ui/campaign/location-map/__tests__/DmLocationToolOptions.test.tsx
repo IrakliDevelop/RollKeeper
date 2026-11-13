@@ -1030,6 +1030,32 @@ describe('DmLocationToolOptions named options row', () => {
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
   });
 
+  it("hides the active tool's own controls while a fog confirm is pending", () => {
+    mockActiveTool = 'shape';
+    mockToolOptions = {
+      shape: {
+        shape: 'rectangle',
+        strokeColor: '#ef4444',
+        fillColor: 'transparent',
+        strokeWidth: 4,
+      },
+    };
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        fogControls={makeFogControls({ pendingAction: 'enable' })}
+      />
+    );
+
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Shape' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Rectangle' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ellipse' })).toBeNull();
+    expect(screen.queryByText('Stroke')).toBeNull();
+    expect(screen.queryByText('Fill')).toBeNull();
+    expect(screen.queryByLabelText('Shape stroke width')).toBeNull();
+  });
+
   it('diagonals are a segmented pair', () => {
     mockActiveTool = 'path';
     mockToolOptions = { path: { diagonalRule: 'chebyshev' } };

@@ -29,7 +29,9 @@ export default function DmOnlyToggle({
       : 'Visible to players';
 
   return (
-    <Tooltip content={label}>
+    // The marker copy runs to ~260 characters; without a max width the
+    // Radix popper's `min-width: max-content` lays it out as one line.
+    <Tooltip content={label} className="max-w-xs">
       <Button
         data-testid="dm-only-toggle"
         variant="ghost"

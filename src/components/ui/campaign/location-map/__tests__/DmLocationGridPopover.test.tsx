@@ -68,7 +68,7 @@ describe('DmLocationGridPopover', () => {
     const trigger = getTrigger();
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(trigger).toHaveAttribute('data-selected');
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('dialog', { name: 'Grid' });
     expect(document.body).toContainElement(dialog);
     expect(container).not.toContainElement(dialog);
   });

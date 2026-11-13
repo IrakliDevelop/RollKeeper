@@ -223,6 +223,8 @@ export function DmVttToolbar({
                 <DisableableTooltip
                   content={fogControls.disabledReason ?? 'Fog of war'}
                   disabled={fogControls.disabled}
+                  focusable
+                  className="max-w-xs"
                 >
                   <Button
                     ref={setToolRef('fog')}
@@ -256,7 +258,8 @@ export function DmVttToolbar({
                 size="sm"
                 selected={hiddenPlacementActive}
                 onClick={onToggleHiddenPlacement}
-                className="px-2"
+                // An icon button like its neighbours until the words show.
+                className="w-9 px-0 xl:w-auto xl:px-2"
                 aria-label="Place hidden elements"
                 aria-pressed={hiddenPlacementActive}
               >
@@ -269,13 +272,14 @@ export function DmVttToolbar({
             <DisableableTooltip
               content={revealAllLabel}
               disabled={hiddenElementCount === 0}
+              focusable
             >
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onRevealAll}
                 disabled={hiddenElementCount === 0}
-                className="px-2"
+                className="w-9 px-0 xl:w-auto xl:px-2"
                 aria-label={`Reveal all hidden elements (${hiddenElementCount})`}
               >
                 <Eye size={16} />
@@ -285,7 +289,10 @@ export function DmVttToolbar({
               </Button>
             </DisableableTooltip>
             {selectedElementId && (
-              <Tooltip content={dmOnlyTooltip}>
+              // The marker copy runs to ~260 characters; without a max width
+              // the Radix popper's `min-width: max-content` lays it out as
+              // one line.
+              <Tooltip content={dmOnlyTooltip} className="max-w-xs">
                 <Button
                   data-testid="dm-vtt-dm-only-toggle"
                   variant="ghost"

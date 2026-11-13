@@ -78,7 +78,7 @@ describe('DmLocationAlignMenu', () => {
     const { container } = await openMenu();
     expect(getTrigger()).toHaveAttribute('aria-expanded', 'true');
     expect(getTrigger()).toHaveAttribute('data-selected');
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('dialog', { name: 'Align' });
     expect(document.body).toContainElement(dialog);
     expect(container).not.toContainElement(dialog);
   });
@@ -145,11 +145,13 @@ describe('DmLocationAlignMenu', () => {
     expect(tooltipBox().className).toContain('z-[70]');
     expect(tooltipBox().className).not.toContain('z-50');
 
-    // The disabled-distribute hint hangs on the focusable wrapper span.
+    // The disabled-distribute hint hangs on the wrapper span. It only repeats
+    // the button's name, so the span is no tab stop; hover still shows it.
     const distributeWrapper = screen.getByRole('button', {
       name: 'Distribute horizontally',
     }).parentElement as HTMLElement;
-    distributeWrapper.focus();
+    expect(distributeWrapper).not.toHaveAttribute('tabindex');
+    await user.hover(distributeWrapper);
     await waitFor(() =>
       expect(screen.getByRole('tooltip')).toHaveTextContent(
         'Distribute horizontally'

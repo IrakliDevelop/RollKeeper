@@ -181,23 +181,34 @@ interface DisableableTooltipProps {
   children: ReactNode;
   /** Forwarded to the `Tooltip` content (e.g. a higher z class inside a popover). */
   className?: string;
+  /**
+   * Make the wrapper a tab stop while the button is disabled, so keyboard
+   * users can reach the hint. Only for hints that explain the disabled state
+   * (a reason, a count); a hint that just repeats the button's name would be
+   * a nameless tab stop. Default false.
+   */
+  focusable?: boolean;
 }
 
 /**
  * Radix never fires a Tooltip whose trigger is a disabled button, so a button
- * that can be disabled hangs its tooltip on a wrapper span. The span is a tab
- * stop only while the button is disabled, so keyboard users can still reach
- * the hint and an enabled button keeps a single tab stop.
+ * that can be disabled hangs its tooltip on a wrapper span. With `focusable`
+ * the span is a tab stop only while the button is disabled; an enabled button
+ * always keeps a single tab stop.
  */
 export function DisableableTooltip({
   content,
   disabled,
   children,
   className,
+  focusable = false,
 }: DisableableTooltipProps) {
   return (
     <Tooltip content={content} className={className}>
-      <span className="inline-flex" tabIndex={disabled ? 0 : undefined}>
+      <span
+        className="inline-flex"
+        tabIndex={disabled && focusable ? 0 : undefined}
+      >
         {children}
       </span>
     </Tooltip>
