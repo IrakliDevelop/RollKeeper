@@ -260,14 +260,14 @@ describe('CreatureDrawer parity — vitals', () => {
     });
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, { tempAc: 3 });
 
-    fireEvent.change(screen.getByLabelText('Initiative Mod'), {
+    fireEvent.change(screen.getByLabelText('Initiative modifier'), {
       target: { value: '5' },
     });
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, {
       initiativeModifier: 5,
     });
 
-    fireEvent.change(screen.getByLabelText('Proficiency Bonus'), {
+    fireEvent.change(screen.getByLabelText('Proficiency bonus'), {
       target: { value: '4' },
     });
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, { proficiencyBonus: 4 });

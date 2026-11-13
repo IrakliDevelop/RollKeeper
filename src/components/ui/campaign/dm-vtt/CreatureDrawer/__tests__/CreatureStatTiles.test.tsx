@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { CreatureStatTiles } from '../CreatureStatTiles';
 import type { EncounterEntity, MonsterStatBlock } from '@/types/encounter';
@@ -96,6 +97,25 @@ function baseProps(
 }
 
 describe('CreatureStatTiles read-only', () => {
+  it('renders a "Stats" level-4 heading', () => {
+    render(<CreatureStatTiles {...baseProps()} />);
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Stats' })
+    ).toBeInTheDocument();
+  });
+
+  it('lists AC, Init, Speed and PB · PP as visible terms', () => {
+    render(<CreatureStatTiles {...baseProps()} />);
+    const terms = screen.getAllByRole('term');
+    expect(terms).toHaveLength(4);
+    expect(terms.map(t => t.textContent)).toEqual([
+      'AC',
+      'Init',
+      'Speed',
+      'PB · PP',
+    ]);
+  });
+
   it('shows effective AC with a temp-AC subline', () => {
     render(
       <CreatureStatTiles
@@ -115,7 +135,7 @@ describe('CreatureStatTiles read-only', () => {
   it('shows initiative value with signed modifier subline', () => {
     render(<CreatureStatTiles {...baseProps()} />);
     expect(screen.getByText('14')).toBeInTheDocument();
-    expect(screen.getByText('INIT +2')).toBeInTheDocument();
+    expect(screen.getByText('Init +2')).toBeInTheDocument();
   });
 
   it('shows speed from the stat block', () => {
@@ -137,6 +157,32 @@ describe('CreatureStatTiles read-only', () => {
 });
 
 describe('CreatureStatTiles editing', () => {
+  it('names each editor as a textbox', () => {
+    render(<CreatureStatTiles {...baseProps({ editing: true })} />);
+    for (const name of [
+      'Armor class',
+      'Temporary AC bonus',
+      'Initiative modifier',
+      'Proficiency bonus',
+      'Speed',
+    ]) {
+      expect(screen.getByRole('textbox', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('commits armor class live on each keystroke', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(<CreatureStatTiles {...baseProps({ actions, editing: true })} />);
+    const ac = screen.getByRole('textbox', { name: 'Armor class' });
+    await user.clear(ac);
+    await user.type(ac, '18');
+    expect(actions.onUpdate).toHaveBeenLastCalledWith('e1', {
+      armorClass: 18,
+    });
+    expect(ac).toHaveFocus();
+  });
+
   it('patches armor class and temp AC', () => {
     const actions = makeActions();
     render(<CreatureStatTiles {...baseProps({ actions, editing: true })} />);
@@ -154,7 +200,7 @@ describe('CreatureStatTiles editing', () => {
   it('patches initiative modifier', () => {
     const actions = makeActions();
     render(<CreatureStatTiles {...baseProps({ actions, editing: true })} />);
-    fireEvent.change(screen.getByLabelText('Initiative Mod'), {
+    fireEvent.change(screen.getByLabelText('Initiative modifier'), {
       target: { value: '5' },
     });
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
@@ -212,7 +258,7 @@ describe('CreatureStatTiles editing', () => {
   it('patches proficiency bonus', () => {
     const actions = makeActions();
     render(<CreatureStatTiles {...baseProps({ actions, editing: true })} />);
-    fireEvent.change(screen.getByLabelText('Proficiency Bonus'), {
+    fireEvent.change(screen.getByLabelText('Proficiency bonus'), {
       target: { value: '4' },
     });
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {

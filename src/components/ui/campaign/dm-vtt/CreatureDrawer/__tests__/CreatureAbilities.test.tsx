@@ -106,6 +106,28 @@ describe('CreatureAbilities', () => {
 });
 
 describe('CreatureAbilities read-only', () => {
+  it('renders an "Ability scores" level-4 heading', () => {
+    render(<CreatureAbilities {...baseProps()} />);
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Ability scores' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the six abbreviations as visible text', () => {
+    render(<CreatureAbilities {...baseProps()} />);
+    for (const abbr of ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']) {
+      expect(screen.getByText(abbr)).toBeVisible();
+    }
+  });
+
+  it('shows the proficient save text next to a decorative dot', () => {
+    render(<CreatureAbilities {...baseProps()} />);
+    // DEX is proficient via the "DEX +5" override.
+    const save = screen.getByText('+5');
+    expect(save).toBeVisible();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('shows abbreviation, score, and modifier for each ability', () => {
     render(<CreatureAbilities {...baseProps()} />);
     expect(screen.getByText('STR')).toBeInTheDocument();
@@ -178,6 +200,7 @@ describe('CreatureAbilities editing', () => {
     );
     const button = screen.getByLabelText('STR save proficiency');
     expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).not.toHaveAttribute('data-selected');
     fireEvent.click(button);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
       monsterStatBlock: expect.objectContaining({
@@ -204,6 +227,7 @@ describe('CreatureAbilities editing', () => {
     );
     const button = screen.getByLabelText('DEX save proficiency');
     expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button).toHaveAttribute('data-selected', 'true');
     fireEvent.click(button);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
       monsterStatBlock: expect.objectContaining({
@@ -229,7 +253,10 @@ describe('CreatureAbilities editing', () => {
         })}
       />
     );
-    const resetButton = screen.getByLabelText('Reset DEX saving throw');
+    const resetButton = screen.getByRole('button', {
+      name: 'Reset DEX saving throw',
+    });
+    expect(resetButton).toHaveAttribute('data-variant', 'link');
     fireEvent.click(resetButton);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
       monsterStatBlock: expect.objectContaining({

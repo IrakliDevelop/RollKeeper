@@ -2,18 +2,21 @@
 
 import React from 'react';
 
-import { NumberField } from '@/components/ui/forms/NumberInput';
+import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Section } from '@/components/ui/layout/section';
 import { signed } from '@/components/ui/encounter/combat-screen/detail/DetailAbilityScores.utils';
 import { effectiveAc } from '@/utils/calculations';
-import {
-  HEADING_CLASS,
-  SECTION_CLASS,
-} from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 
 import { useDraftValue } from './useDraftValue';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
 
-function StatTile({
+const VALUE_CLASS = 'type-num-lg text-heading tabular-nums';
+const SUB_LINE_CLASS = 'type-small text-muted';
+const EDITOR_CLASS = 'px-1 text-center tabular-nums';
+
+/** One term of the stats list: its label, then its value and sub-line `dd`s. */
+function StatCell({
   label,
   children,
 }: {
@@ -21,14 +24,14 @@ function StatTile({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-surface-secondary rounded-lg p-2.5">
-      <p className="text-faint text-[10px] font-bold uppercase">{label}</p>
+    <div>
+      <dt className="type-small text-muted">{label}</dt>
       {children}
     </div>
   );
 }
 
-/** 2x2 grid of AC / Init / Speed / PB·PP tiles, editable inline in editing mode. */
+/** "Stats" section: AC / Init / Speed / PB·PP, editable inline in editing mode. */
 export function CreatureStatTiles({
   entity,
   actions,
@@ -47,23 +50,25 @@ export function CreatureStatTiles({
   };
 
   return (
-    <div className={SECTION_CLASS}>
-      <p className={HEADING_CLASS}>Stats</p>
-      <div className="grid grid-cols-2 gap-2">
-        <StatTile label="AC">
+    <Section level={4} heading="Stats">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        <StatCell label="AC">
           {editing ? (
-            <div className="flex items-center gap-1">
-              <NumberField
+            <dd className="flex items-center gap-1">
+              <NumberInput
+                size="sm"
                 value={entity.armorClass}
                 onChange={v =>
                   actions.onUpdate(entity.id, { armorClass: v ?? 0 })
                 }
                 min={0}
-                className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
+                wrapperClassName="w-14"
+                className={EDITOR_CLASS}
                 aria-label="Armor class"
               />
-              <span className="text-faint text-xs">+</span>
-              <NumberField
+              <span className="type-small text-muted">+</span>
+              <NumberInput
+                size="sm"
                 value={entity.tempAc}
                 onChange={v =>
                   actions.onUpdate(entity.id, {
@@ -72,95 +77,97 @@ export function CreatureStatTiles({
                 }
                 min={0}
                 allowEmpty
-                className="bg-surface-raised text-accent-blue-text w-10 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
+                wrapperClassName="w-12"
+                className={`${EDITOR_CLASS} text-heading`}
                 aria-label="Temporary AC bonus"
               />
-            </div>
+            </dd>
           ) : (
             <>
-              <p className="text-heading text-xl font-bold tabular-nums">
+              <dd className={VALUE_CLASS}>
                 {effectiveAc(entity.armorClass, entity.tempAc)}
-              </p>
+              </dd>
               {tempAc > 0 && (
-                <p className="text-faint text-[11px]">
+                <dd className={SUB_LINE_CLASS}>
                   {entity.armorClass} + {tempAc}
-                </p>
+                </dd>
               )}
             </>
           )}
-        </StatTile>
+        </StatCell>
 
-        <StatTile label="Init">
+        <StatCell label="Init">
           {editing ? (
-            <NumberField
-              value={entity.initiativeModifier}
-              onChange={v => {
-                if (v !== undefined)
-                  actions.onUpdate(entity.id, { initiativeModifier: v });
-              }}
-              className="bg-surface-raised text-heading w-14 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
-              aria-label="Initiative Mod"
-            />
+            <dd>
+              <NumberInput
+                size="sm"
+                value={entity.initiativeModifier}
+                onChange={v => {
+                  if (v !== undefined)
+                    actions.onUpdate(entity.id, { initiativeModifier: v });
+                }}
+                wrapperClassName="w-14"
+                className={EDITOR_CLASS}
+                aria-label="Initiative modifier"
+              />
+            </dd>
           ) : (
             <>
-              <p className="text-heading text-xl font-bold tabular-nums">
-                {entity.initiative ?? '—'}
-              </p>
-              <p className="text-faint text-[11px]">
-                INIT {signed(entity.initiativeModifier)}
-              </p>
+              <dd className={VALUE_CLASS}>{entity.initiative ?? '—'}</dd>
+              <dd className={SUB_LINE_CLASS}>
+                Init {signed(entity.initiativeModifier)}
+              </dd>
             </>
           )}
-        </StatTile>
+        </StatCell>
 
-        <StatTile label="Speed">
+        <StatCell label="Speed">
           {editing && sb ? (
-            <input
-              type="text"
-              value={speed}
-              onChange={e => setSpeed(e.target.value)}
-              onBlur={commitSpeed}
-              className="bg-surface-raised border-divider text-body w-full rounded border px-2 py-0.5 text-xs"
-              aria-label="Speed"
-            />
+            <dd>
+              <Input
+                size="sm"
+                value={speed}
+                onChange={e => setSpeed(e.target.value)}
+                onBlur={commitSpeed}
+                aria-label="Speed"
+              />
+            </dd>
           ) : (
-            <p className="text-heading text-sm font-semibold">
-              {sb?.speed || '—'}
-            </p>
+            <dd className={VALUE_CLASS}>{sb?.speed || '—'}</dd>
           )}
-        </StatTile>
+        </StatCell>
 
-        <StatTile label="PB · PP">
+        <StatCell label="PB · PP">
           {editing ? (
-            <div className="flex items-center gap-1">
-              <NumberField
+            <dd className="flex items-center gap-1">
+              <NumberInput
+                size="sm"
                 value={entity.proficiencyBonus}
                 onChange={v => {
                   if (v !== undefined)
                     actions.onUpdate(entity.id, { proficiencyBonus: v });
                 }}
                 allowEmpty
-                className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
-                aria-label="Proficiency Bonus"
+                wrapperClassName="w-14"
+                className={EDITOR_CLASS}
+                aria-label="Proficiency bonus"
               />
               {sb?.passivePerception != null && (
-                <span className="text-faint text-xs">
-                  · {sb.passivePerception}
-                </span>
+                <span className={SUB_LINE_CLASS}>· {sb.passivePerception}</span>
               )}
-            </div>
+            </dd>
           ) : (
-            <p className="text-heading text-xl font-bold tabular-nums">
+            <dd className={VALUE_CLASS}>
               {signed(entity.proficiencyBonus ?? 2)}
               {sb?.passivePerception != null && (
-                <span className="text-faint ml-1 text-xs font-normal">
+                <span className={`${SUB_LINE_CLASS} ml-1`}>
                   · PP {sb.passivePerception}
                 </span>
               )}
-            </p>
+            </dd>
           )}
-        </StatTile>
-      </div>
-    </div>
+        </StatCell>
+      </dl>
+    </Section>
   );
 }
