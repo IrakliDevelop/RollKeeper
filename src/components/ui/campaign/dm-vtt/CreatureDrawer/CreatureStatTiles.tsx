@@ -7,7 +7,6 @@ import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Section } from '@/components/ui/layout/section';
 import { signed } from '@/components/ui/encounter/combat-screen/detail/DetailAbilityScores.utils';
 import { effectiveAc } from '@/utils/calculations';
-import { cn } from '@/utils/cn';
 
 import { useDraftValue } from './useDraftValue';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
@@ -79,7 +78,7 @@ export function CreatureStatTiles({
                 min={0}
                 allowEmpty
                 wrapperClassName="w-12"
-                className={cn(EDITOR_CLASS, 'text-heading')}
+                className={EDITOR_CLASS}
                 aria-label="Temporary AC bonus"
               />
             </dd>

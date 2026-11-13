@@ -287,7 +287,9 @@ describe('CreatureHeader', () => {
       />
     );
     expect(
-      screen.getByText('Bane').closest('[data-kind="concentration"]')
+      screen
+        .getByText('Concentrating on Bane')
+        .closest('[data-kind="concentration"]')
     ).not.toBeNull();
   });
 

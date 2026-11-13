@@ -89,7 +89,7 @@ export function CreatureSheet({
             onToggleEditing={() => setEditing(e => !e)}
             onClose={onClose}
           />
-          <div className="px-4 pb-3">
+          <div className="px-5 pb-3">
             <CreaturePlayersRow entity={entity} actions={actions} />
           </div>
         </div>

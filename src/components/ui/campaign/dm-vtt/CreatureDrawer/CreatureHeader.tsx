@@ -52,7 +52,7 @@ export function CreatureHeader({
   const ringStyle = { boxShadow: `0 0 0 2px ${ringColor}` };
 
   return (
-    <div className="space-y-2 p-4">
+    <div className="space-y-2 px-5 py-4">
       <div className="flex items-start gap-3">
         <div className="h-12 w-12 shrink-0 self-start">
           {entity.avatarUrl ? (
@@ -128,7 +128,7 @@ export function CreatureHeader({
             {entity.concentrationSpell && (
               <ConditionChip
                 kind="concentration"
-                name={entity.concentrationSpell}
+                name={`Concentrating on ${entity.concentrationSpell}`}
               />
             )}
           </div>
