@@ -1,11 +1,42 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { useState, type ReactElement } from 'react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { groupRosterEntities } from '@/components/ui/campaign/dm-vtt/rosterGroups';
 import { RosterTray } from '@/components/ui/campaign/dm-vtt/RosterTray';
 
 import type { EncounterEntity } from '@/types/encounter';
 import type { RosterTrayProps } from '@/components/ui/campaign/dm-vtt/RosterTray';
+
+// RosterTray's Tooltips need the provider DmVttScreen wraps around the
+// floating panels, and Radix measures the trigger with ResizeObserver.
+function render(ui: ReactElement) {
+  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function makeEntity(overrides: Partial<EncounterEntity>): EncounterEntity {
   return {
@@ -59,8 +90,6 @@ describe('groupRosterEntities', () => {
 });
 
 describe('RosterTray', () => {
-  afterEach(() => cleanup());
-
   it('shows a no-encounter prompt when hasLinkedEncounter is false', () => {
     render(<RosterTray {...baseProps({ hasLinkedEncounter: false })} />);
     expect(
@@ -81,11 +110,17 @@ describe('RosterTray', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders group labels and first-word names for each entity', () => {
+  it('renders group headings and first-word names for each entity', () => {
     render(<RosterTray {...baseProps()} />);
-    expect(screen.getByText('PLAYERS')).toBeInTheDocument();
-    expect(screen.getByText('NPCS')).toBeInTheDocument();
-    expect(screen.getByText('MONSTERS')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Roster' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Players' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'NPCs' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Monsters' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/PLAYERS|NPCS|MONSTERS/)).not.toBeInTheDocument();
     expect(screen.getByText('Aria')).toBeInTheDocument();
     expect(screen.getByText('Barkeep')).toBeInTheDocument();
     expect(screen.getByText('Goblin')).toBeInTheDocument();
@@ -100,7 +135,7 @@ describe('RosterTray', () => {
     expect(panel.style.maxHeight).toContain('70dvh');
   });
 
-  it('dims a placed row and shows "On map"; clicking it calls onSelectEntity', () => {
+  it('shows "On map" on a placed row; clicking it calls onSelectEntity', () => {
     const onSelectEntity = vi.fn();
     const onArmPlacement = vi.fn();
     const placedIndex = new Map([['m1', ['token-1']]]);
@@ -114,7 +149,7 @@ describe('RosterTray', () => {
     expect(label).toBeInTheDocument();
     const row = label.closest('button');
     expect(row).not.toBeNull();
-    expect(row?.className).toMatch(/opacity-60/);
+    expect(row).not.toHaveAttribute('aria-pressed');
 
     fireEvent.click(row!);
     expect(onSelectEntity).toHaveBeenCalledWith('m1');
@@ -144,31 +179,90 @@ describe('RosterTray', () => {
     expect(onDragStart.mock.calls[0][0]).toEqual(monster);
   });
 
-  it('highlights the armed row with the accent-blue classes', () => {
-    render(<RosterTray {...baseProps({ armedEntityId: 'm1' })} />);
-    const row = screen.getByText('Goblin').closest('button')!;
-    expect(row.className).toMatch(/bg-accent-blue-bg/);
-    expect(row.className).toMatch(/border-accent-blue-border/);
+  it('labels unplaced rows "Place on map"', () => {
+    render(<RosterTray {...baseProps({ entities: [monster] })} />);
+    expect(screen.getByText('Place on map')).toBeInTheDocument();
+    expect(screen.queryByText(/Tap/)).not.toBeInTheDocument();
   });
 
-  it('renders a collapsed pill and expands on click', () => {
+  it('marks the armed row pressed and other unplaced rows not pressed', () => {
+    const placedIndex = new Map([['p1', ['token-1']]]);
+    render(<RosterTray {...baseProps({ armedEntityId: 'm1', placedIndex })} />);
+    expect(screen.getByText('Goblin').closest('button')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByText('Barkeep').closest('button')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByText('Aria').closest('button')).not.toHaveAttribute(
+      'aria-pressed'
+    );
+  });
+
+  it('renders a collapsed "Roster" pill that expands on click', () => {
     const onToggleCollapsed = vi.fn();
     render(
       <RosterTray {...baseProps({ collapsed: true, onToggleCollapsed })} />
     );
 
-    const pill = screen.getByText('ROSTER').closest('button')!;
-    expect(pill).toBeInTheDocument();
-    expect(screen.queryByText('PLAYERS')).not.toBeInTheDocument();
+    const pill = screen.getByRole('button', { name: 'Roster' });
+    expect(pill).toHaveAttribute('aria-expanded', 'false');
+    expect(pill).not.toHaveAttribute('title');
+    expect(
+      screen.queryByRole('heading', { name: 'Players' })
+    ).not.toBeInTheDocument();
 
     fireEvent.click(pill);
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
   });
+
+  it('collapses from an expanded "Collapse roster" button', () => {
+    const onToggleCollapsed = vi.fn();
+    render(<RosterTray {...baseProps({ onToggleCollapsed })} />);
+
+    const collapse = screen.getByRole('button', { name: 'Collapse roster' });
+    expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    expect(collapse).toHaveAttribute('data-variant', 'ghost');
+
+    fireEvent.click(collapse);
+    expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RosterTray focus across collapse', () => {
+  function Harness() {
+    const [collapsed, setCollapsed] = useState(false);
+    return (
+      <RosterTray
+        {...baseProps({
+          collapsed,
+          onToggleCollapsed: () => setCollapsed(c => !c),
+        })}
+      />
+    );
+  }
+
+  it('moves focus to the pill after collapsing and back after expanding', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByRole('button', { name: 'Collapse roster' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Roster' })).toHaveFocus()
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Roster' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Collapse roster' })
+      ).toHaveFocus()
+    );
+  });
 });
 
 describe('RosterRow player eye button', () => {
-  afterEach(() => cleanup());
-
   const playerWithPc = makeEntity({
     id: 'p2',
     type: 'player',
@@ -182,7 +276,10 @@ describe('RosterRow player eye button', () => {
       <RosterTray {...baseProps({ entities: [playerWithPc], onViewPlayer })} />
     );
 
-    fireEvent.click(screen.getByLabelText('View Aria details'));
+    const eye = screen.getByRole('button', { name: 'View Aria details' });
+    expect(eye).toHaveAttribute('data-variant', 'ghost');
+    expect(eye).not.toHaveAttribute('title');
+    fireEvent.click(eye);
     expect(onViewPlayer).toHaveBeenCalledWith('char-9');
   });
 
