@@ -12,6 +12,8 @@ import {
 import { hpPercent, hpStatus, hpTier, HP_STATUS_LABELS } from '@/utils/hpState';
 import { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 
 const STORAGE_KEY = 'rollkeeper-party-hp-sidebar';
 const POS_KEY = 'rollkeeper-party-hp-sidebar-y';
@@ -24,7 +26,7 @@ function DeathSavesDisplay({
   return (
     <div className="mt-1 flex items-center gap-2">
       <div className="flex items-center gap-0.5">
-        <span className="text-faint text-xs">S</span>
+        <span className="type-small text-muted">S</span>
         {[0, 1, 2].map(i => (
           <div
             key={`s-${i}`}
@@ -37,7 +39,7 @@ function DeathSavesDisplay({
         ))}
       </div>
       <div className="flex items-center gap-0.5">
-        <span className="text-faint text-xs">F</span>
+        <span className="type-small text-muted">F</span>
         {[0, 1, 2].map(i => (
           <div
             key={`f-${i}`}
@@ -50,7 +52,9 @@ function DeathSavesDisplay({
         ))}
       </div>
       {deathSaves.isStabilized && (
-        <span className="text-verdigris-text text-xs font-medium">Stable</span>
+        <span className="type-small text-verdigris-text font-medium">
+          Stable
+        </span>
       )}
     </div>
   );
@@ -68,7 +72,7 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
           {member.avatar ? (
             <Image
               src={member.avatar}
-              alt={member.characterName}
+              alt=""
               fill
               className="object-cover"
               sizes="28px"
@@ -80,10 +84,10 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-heading truncate text-sm leading-tight font-medium">
+          <div className="type-ui text-heading truncate font-medium">
             {member.characterName}
           </div>
-          <div className="text-muted truncate text-xs">
+          <div className="type-small text-muted truncate">
             {member.className} {member.level}
           </div>
         </div>
@@ -91,22 +95,22 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
 
       {/* AC + HP Section */}
       <div className="mb-1 flex items-center gap-1.5">
-        <Shield size={11} className="text-muted flex-shrink-0" />
-        <span className="text-body text-xs font-medium">
+        <Shield size={11} className="text-muted flex-shrink-0" aria-hidden />
+        <span className="type-small text-body font-medium">
           {member.armorClass}
         </span>
       </div>
 
       {hp === null ? (
-        <div className="text-faint flex items-center gap-1.5 text-xs">
-          <EyeOff size={11} />
+        <div className="type-small text-muted flex items-center gap-1.5">
+          <EyeOff size={11} aria-hidden />
           HP hidden
         </div>
       ) : isDown ? (
         <div>
           <div className="flex items-center gap-1.5">
-            <Skull size={12} className="text-blood-text" />
-            <span className="text-blood-text text-xs font-medium">
+            <Skull size={12} className="text-blood-text" aria-hidden />
+            <span className="type-small text-blood-text font-medium">
               {HP_STATUS_LABELS.down} ({hp.current}/{hp.max})
             </span>
           </div>
@@ -116,24 +120,24 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
         <div>
           {/* HP Bar */}
           <div className="mb-0.5 flex items-center gap-2">
-            <Heart size={11} className="text-muted flex-shrink-0" />
-            <div className="bg-surface-secondary h-2 flex-1 overflow-hidden rounded-full">
-              <div
-                className={`h-full rounded-full transition-all ${getHpBarColor(hp.current, hp.max)}`}
+            <Heart size={11} className="text-muted flex-shrink-0" aria-hidden />
+            <span className="bg-divider block h-1 flex-1">
+              <span
+                className={`block h-full transition-[width] ${getHpBarColor(hp.current, hp.max)}`}
                 style={{
                   width: `${hp.max > 0 ? Math.min(100, (hp.current / hp.max) * 100) : 0}%`,
                 }}
               />
-            </div>
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-1 pl-5">
             <span
-              className={`${getHpNumberColor(hp.current, hp.max)} text-xs font-medium`}
+              className={`${getHpNumberColor(hp.current, hp.max)} type-small font-medium`}
             >
               {hp.current}/{hp.max}
             </span>
             <span
-              className={`${getHpTierTextColor(hpTier(hpPercent(hp.current, hp.max)))} text-xs`}
+              className={`${getHpTierTextColor(hpTier(hpPercent(hp.current, hp.max)))} type-small`}
             >
               {HP_STATUS_LABELS[hpStatus(hp.current, hp.max)]}
             </span>
@@ -141,7 +145,7 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
               <Badge
                 variant="neutral"
                 size="sm"
-                className="text-frost-text text-xs"
+                className="type-small text-frost-text"
               >
                 +{hp.temporary}
               </Badge>
@@ -217,76 +221,83 @@ export function PartyHPSidebar({
   // Don't render anything if not in a campaign
   if (!campaignCode) return null;
 
-  return (
-    <div
-      ref={sidebarRef}
-      className={`fixed left-0 z-[55] hidden lg:flex ${
-        topPx === null ? 'top-1/2 -translate-y-1/2' : ''
-      }`}
-      style={topPx !== null ? { top: topPx } : undefined}
-    >
-      {/* Panel Wrapper — collapses width when closed */}
-      <div
-        className="overflow-hidden transition-[width] duration-300 ease-in-out"
-        style={{ width: isOpen ? '240px' : '0px' }}
-      >
-        <div className="border-divider bg-surface-raised max-h-[70vh] w-[240px] overflow-hidden rounded-r-xl border-y-2 border-r-2 shadow-lg">
-          {/* Header — also the vertical drag handle */}
-          <div
-            onPointerDown={startDrag}
-            className="border-divider cursor-grab touch-none border-b px-3 py-2.5 select-none active:cursor-grabbing"
-          >
-            <div className="text-heading flex items-center gap-2 text-sm font-semibold">
-              <Users size={14} className="text-muted" />
-              Party HP
-              <span className="text-faint text-xs font-normal">
-                ({partyMembers.length})
-              </span>
-            </div>
-          </div>
+  const handleLabel = isOpen ? 'Hide party HP' : 'Show party HP';
 
-          {/* Members List */}
+  return (
+    <TooltipProvider>
+      <div
+        ref={sidebarRef}
+        className={`fixed left-0 z-[55] hidden lg:flex ${
+          topPx === null ? 'top-1/2 -translate-y-1/2' : ''
+        }`}
+        style={topPx !== null ? { top: topPx } : undefined}
+      >
+        {/* Panel Wrapper — collapses width when closed */}
+        <div
+          className="overflow-hidden transition-[width] duration-180 ease-out"
+          style={{ width: isOpen ? '240px' : '0px' }}
+        >
           <div
-            className="overflow-y-auto"
-            style={{ maxHeight: 'calc(70vh - 40px)' }}
+            className={`${OVERLAY_SURFACE} max-h-[70vh] w-[240px] overflow-hidden rounded-l-none border-l-0`}
           >
-            {loading ? (
-              <div className="text-muted px-3 py-4 text-center text-sm">
-                Loading...
+            {/* Header — also the vertical drag handle */}
+            <div
+              onPointerDown={startDrag}
+              className="border-divider cursor-grab touch-none border-b px-3 py-2.5 select-none active:cursor-grabbing"
+            >
+              <div className="type-ui text-heading flex items-center gap-2 font-semibold">
+                <Users size={14} className="text-muted" aria-hidden />
+                Party HP
+                <span className="text-muted font-normal">
+                  ({partyMembers.length})
+                </span>
               </div>
-            ) : partyMembers.length === 0 ? (
-              <div className="px-3 py-4 text-center">
-                <Users size={20} className="text-faint mx-auto mb-1.5" />
-                <div className="text-muted text-xs">
+            </div>
+
+            {/* Members List */}
+            <div
+              className="overflow-y-auto"
+              style={{ maxHeight: 'calc(70vh - 40px)' }}
+            >
+              {loading ? (
+                <div className="type-small text-muted px-3 py-4 text-center">
+                  Loading party…
+                </div>
+              ) : partyMembers.length === 0 ? (
+                <div className="type-small text-muted px-3 py-4 text-center">
                   No party members synced
                 </div>
-              </div>
-            ) : (
-              partyMembers.map(member => (
-                <PartyMemberRow key={member.characterId} member={member} />
-              ))
-            )}
+              ) : (
+                partyMembers.map(member => (
+                  <PartyMemberRow key={member.characterId} member={member} />
+                ))
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`relative self-center rounded-r-lg border-y-2 border-r-2 px-2.5 py-5 shadow-md transition-colors ${
-          isOpen
-            ? 'border-divider-strong bg-surface-elevated text-heading'
-            : 'border-divider bg-surface-raised text-muted hover:text-body hover:bg-surface-secondary'
-        }`}
-        title={isOpen ? 'Hide party HP' : 'Show party HP'}
-      >
-        <Users size={20} />
-        {!isOpen && partyMembers.length > 0 && (
-          <div className="bg-surface-elevated text-heading border-divider absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border text-xs font-bold">
-            {partyMembers.length}
-          </div>
-        )}
-      </button>
-    </div>
+        {/* Toggle handle */}
+        <Tooltip content={handleLabel} side="right">
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-label={handleLabel}
+            aria-expanded={isOpen}
+            className={`flex flex-col items-center gap-1 self-center rounded-md rounded-l-none border border-l-0 px-2.5 py-5 transition-colors pointer-coarse:min-w-11 ${
+              isOpen
+                ? 'border-divider bg-surface-elevated text-heading'
+                : 'border-divider bg-surface-elevated text-muted hover:text-body'
+            }`}
+          >
+            <Users size={20} aria-hidden />
+            {!isOpen && partyMembers.length > 0 && (
+              <span className="type-small font-semibold tabular-nums">
+                {partyMembers.length}
+              </span>
+            )}
+          </button>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   );
 }
