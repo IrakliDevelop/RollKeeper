@@ -308,7 +308,7 @@ describe('DmLocationEditor wiring', () => {
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent(
-      "Couldn't sync to players. They still see the map as you last synced it."
+      "Couldn't sync to players. They still see the last synced map. Try Sync to players again."
     );
     expect(alert).not.toHaveTextContent('500');
   });

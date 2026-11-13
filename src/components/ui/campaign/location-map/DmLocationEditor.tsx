@@ -275,7 +275,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             >
               <AlertCircle size={14} aria-hidden className="shrink-0" />
               {
-                "Couldn't sync to players. They still see the map as you last synced it."
+                "Couldn't sync to players. They still see the last synced map. Try Sync to players again."
               }
             </p>
           )}
