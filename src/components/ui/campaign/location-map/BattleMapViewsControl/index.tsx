@@ -1,7 +1,7 @@
 'use client';
 
-import { useLayoutEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
 import type { CameraView, FocusAudience } from '@fieldnotes/core';
 import { Check, ChevronDown, MapPin, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
@@ -11,12 +11,18 @@ import {
   RadioGroupField,
   RadioGroupItem,
 } from '@/components/ui/forms/radio-group';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import type { SavedCameraView } from '@/types/battlemap';
 import {
   useBattleMapViewsControl,
   type CameraCaptureViewport,
 } from './BattleMapViewsControl.hooks';
-import { ViewRow, ICON_BUTTON } from './BattleMapViewsControl.ViewRow';
+import {
+  ViewRow,
+  ICON_BUTTON,
+  POPOVER_TOOLTIP_CLASS,
+} from './BattleMapViewsControl.ViewRow';
 
 export interface BattleMapViewsControlProps {
   getViewport: () => CameraCaptureViewport | null;
@@ -51,10 +57,9 @@ export function BattleMapViewsControl({
 }: BattleMapViewsControlProps) {
   const [audience, setAudience] = useState<FocusAudience>('all');
   const {
-    rootRef,
-    popoverRef,
     open,
-    toggleOpen,
+    setOpen,
+    resetTransientState,
     renamingId,
     renameValue,
     setRenameValue,
@@ -78,26 +83,20 @@ export function BattleMapViewsControl({
     onRenameView,
     onDeleteView,
   });
-  const [popoverPosition, setPopoverPosition] = useState({ top: 0, right: 8 });
 
-  useLayoutEffect(() => {
-    if (!open) return;
-    const updatePosition = () => {
-      const rect = rootRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setPopoverPosition({
-        top: rect.bottom + 8,
-        right: Math.max(8, window.innerWidth - rect.right),
-      });
-    };
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [open, rootRef]);
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) resetTransientState();
+  };
+
+  // The one Escape gate: an open edit (save field, rename, armed delete)
+  // cancels first and keeps the popover open; the next Escape closes it.
+  const handleEscapeKeyDown = (event: KeyboardEvent) => {
+    if (savingView !== null || renamingId !== null || armedDeleteId !== null) {
+      event.preventDefault();
+      resetTransientState();
+    }
+  };
 
   const handleBringToMyView = () => {
     if (!sharingEnabled) return;
@@ -106,25 +105,30 @@ export function BattleMapViewsControl({
   };
 
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant={open ? 'primary' : 'ghost'}
-        onClick={toggleOpen}
-        aria-expanded={open}
-        className="flex h-11 items-center gap-1.5 px-3 text-xs"
-      >
-        Views
-        <ChevronDown size={14} />
-      </Button>
+    <Popover.Root open={open} onOpenChange={handleOpenChange}>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          selected={open}
+          rightIcon={<ChevronDown size={14} aria-hidden />}
+        >
+          Views
+        </Button>
+      </Popover.Trigger>
 
-      {open &&
-        createPortal(
-          <div
-            ref={popoverRef}
-            data-testid="battle-map-views-popover"
-            className="bg-surface-raised border-divider fixed z-50 w-72 rounded-xl border p-3 shadow-xl"
-            style={popoverPosition}
-          >
+      <Popover.Portal>
+        <Popover.Content
+          aria-label="Views"
+          data-testid="battle-map-views-popover"
+          align="end"
+          sideOffset={8}
+          collisionPadding={8}
+          onEscapeKeyDown={handleEscapeKeyDown}
+          className={`${OVERLAY_SURFACE} z-[60] w-72 max-w-[calc(100vw-1rem)] p-3`}
+        >
+          <TooltipProvider>
             {savingView ? (
               <div className="flex items-center gap-1">
                 <Input
@@ -134,35 +138,48 @@ export function BattleMapViewsControl({
                   onChange={e => setSaveName(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter') commitSave();
-                    if (e.key === 'Escape') cancelSave();
                   }}
-                  className="h-11 flex-1"
+                  className="flex-1"
                   autoFocus
                 />
-                <Button
-                  variant="ghost"
-                  aria-label="Confirm save"
-                  onClick={commitSave}
-                  className={ICON_BUTTON}
+                <Tooltip
+                  content="Confirm save"
+                  className={POPOVER_TOOLTIP_CLASS}
                 >
-                  <Check size={16} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  aria-label="Cancel save"
-                  onClick={cancelSave}
-                  className={ICON_BUTTON}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Confirm save"
+                    onClick={commitSave}
+                    className={ICON_BUTTON}
+                  >
+                    <Check size={16} />
+                  </Button>
+                </Tooltip>
+                <Tooltip
+                  content="Cancel save"
+                  className={POPOVER_TOOLTIP_CLASS}
                 >
-                  <X size={16} />
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Cancel save"
+                    onClick={cancelSave}
+                    className={ICON_BUTTON}
+                  >
+                    <X size={16} />
+                  </Button>
+                </Tooltip>
               </div>
             ) : (
               <Button
                 variant="ghost"
+                size="sm"
+                fullWidth
                 onClick={startSave}
-                className="flex h-11 w-full items-center justify-start gap-2 text-sm"
+                className="justify-start"
+                leftIcon={<Plus size={16} />}
               >
-                <Plus size={16} />
                 Save current view
               </Button>
             )}
@@ -210,36 +227,26 @@ export function BattleMapViewsControl({
               disabled={!sharingEnabled}
               wrapperClassName="mt-2"
             >
-              <RadioGroupItem
-                value="all"
-                label="All"
-                wrapperClassName="min-h-[44px] items-center"
-              />
-              <RadioGroupItem
-                value="players"
-                label="Players"
-                wrapperClassName="min-h-[44px] items-center"
-              />
-              <RadioGroupItem
-                value="display"
-                label="Display"
-                wrapperClassName="min-h-[44px] items-center"
-              />
+              <RadioGroupItem value="all" label="All" />
+              <RadioGroupItem value="players" label="Players" />
+              <RadioGroupItem value="display" label="Display" />
             </RadioGroupField>
 
             <Button
               variant="primary"
+              size="sm"
+              fullWidth
               onClick={handleBringToMyView}
               disabled={!sharingEnabled}
-              className="mt-2 flex h-11 w-full items-center justify-center gap-2 text-sm"
+              className="mt-2"
+              leftIcon={<MapPin size={16} />}
             >
-              <MapPin size={16} />
               Bring them to my view
             </Button>
-          </div>,
-          document.body
-        )}
-    </div>
+          </TooltipProvider>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

@@ -1,5 +1,11 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BattleMapViewsControl } from '../BattleMapViewsControl';
 import type { SavedCameraView } from '@/types/battlemap';
@@ -33,40 +39,55 @@ async function openSaveInput() {
   );
 }
 
-afterEach(() => cleanup());
+function getTrigger() {
+  return screen.getByRole('button', { name: /^views$/i });
+}
+
+function getDialog() {
+  return screen.getByRole('dialog', { name: 'Views' });
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('BattleMapViewsControl', () => {
-  it('portals the popover outside a cramped overflow toolbar and anchors it to the trigger', async () => {
+  it('opens a named Radix popover from an outline trigger', async () => {
     const { container } = render(
       <div data-testid="cramped-toolbar" className="overflow-hidden">
         <BattleMapViewsControl {...baseProps} />
       </div>
     );
-    const trigger = screen.getByRole('button', { name: /views/i });
-    const anchor = trigger.parentElement;
-    if (!anchor) throw new Error('Views trigger has no anchor element');
-    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
-      x: 900,
-      y: 10,
-      top: 10,
-      right: 980,
-      bottom: 54,
-      left: 900,
-      width: 80,
-      height: 44,
-      toJSON: () => ({}),
-    });
+    const trigger = getTrigger();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveAttribute('data-variant', 'ghost');
+    expect(trigger).not.toHaveAttribute('data-selected');
 
     await userEvent.click(trigger);
-    const popover = screen.getByTestId('battle-map-views-popover');
+    const popover = getDialog();
+    expect(popover).toHaveAttribute('data-testid', 'battle-map-views-popover');
     expect(document.body.contains(popover)).toBe(true);
     expect(container.contains(popover)).toBe(false);
-    expect(popover).toHaveStyle({ top: '62px' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger).toHaveAttribute('data-selected', 'true');
+    expect(trigger).toHaveAttribute('data-variant', 'ghost');
 
     await userEvent.click(
       within(popover).getByRole('button', { name: /save current view/i })
     );
-    expect(popover).toBeInTheDocument();
+    expect(getDialog()).toBeInTheDocument();
   });
 
   it('opens the popover on trigger click and closes on outside click', async () => {
@@ -79,9 +100,11 @@ describe('BattleMapViewsControl', () => {
       screen.getByRole('button', { name: /goblin ambush/i })
     ).toBeInTheDocument();
     await userEvent.click(document.body);
-    expect(
-      screen.queryByRole('button', { name: /goblin ambush/i })
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: /goblin ambush/i })
+      ).not.toBeInTheDocument()
+    );
   });
 
   describe('inline save', () => {
@@ -173,11 +196,7 @@ describe('BattleMapViewsControl', () => {
       expect(name.trim().length).toBeGreaterThan(0);
     });
 
-    it('dismisses without saving on Escape', async () => {
-      // Escape bubbles to the popover's own document-level handler, which
-      // closes the whole menu (same as it already does for outside clicks) —
-      // the inline field's own Escape handler ensures that closing never
-      // saves the in-progress name.
+    it('Escape cancels the open save field before closing the popover', async () => {
       const onSaveView = vi.fn();
       render(<BattleMapViewsControl {...baseProps} onSaveView={onSaveView} />);
       await openPopover();
@@ -192,8 +211,16 @@ describe('BattleMapViewsControl', () => {
         screen.queryByRole('textbox', { name: /view name/i })
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: /save current view/i })
-      ).not.toBeInTheDocument();
+        screen.getByRole('button', { name: /save current view/i })
+      ).toBeInTheDocument();
+      expect(getDialog()).toBeInTheDocument();
+
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+      await waitFor(() => expect(getTrigger()).toHaveFocus());
+      expect(onSaveView).not.toHaveBeenCalled();
     });
 
     it('dismisses without saving on cancel click', async () => {
@@ -234,7 +261,7 @@ describe('BattleMapViewsControl', () => {
       await openPopover();
       const row = screen.getByRole('group', { name: /goblin ambush/i });
       await userEvent.click(
-        within(row).getByRole('button', { name: /delete/i })
+        within(row).getByRole('button', { name: /^delete view$/i })
       );
       expect(onDeleteView).not.toHaveBeenCalled();
     });
@@ -247,10 +274,10 @@ describe('BattleMapViewsControl', () => {
       await openPopover();
       const row = screen.getByRole('group', { name: /goblin ambush/i });
       await userEvent.click(
-        within(row).getByRole('button', { name: /delete/i })
+        within(row).getByRole('button', { name: /^delete view$/i })
       );
       await userEvent.click(
-        within(row).getByRole('button', { name: /confirm delete/i })
+        within(row).getByRole('button', { name: 'Delete' })
       );
       expect(onDeleteView).toHaveBeenCalledTimes(1);
       expect(onDeleteView).toHaveBeenCalledWith('v1');
@@ -265,10 +292,10 @@ describe('BattleMapViewsControl', () => {
       const rowA = screen.getByRole('group', { name: /goblin ambush/i });
       const rowB = screen.getByRole('group', { name: /throne room/i });
       await userEvent.click(
-        within(rowA).getByRole('button', { name: /delete/i })
+        within(rowA).getByRole('button', { name: /^delete view$/i })
       );
       await userEvent.click(
-        within(rowB).getByRole('button', { name: /delete/i })
+        within(rowB).getByRole('button', { name: /^delete view$/i })
       );
       expect(onDeleteView).not.toHaveBeenCalled();
       // Row A should have disarmed back to its single delete button.
@@ -277,7 +304,7 @@ describe('BattleMapViewsControl', () => {
       ).toBeInTheDocument();
       // Row B is now armed and needs a second click to confirm.
       await userEvent.click(
-        within(rowB).getByRole('button', { name: /confirm delete/i })
+        within(rowB).getByRole('button', { name: 'Delete' })
       );
       expect(onDeleteView).toHaveBeenCalledTimes(1);
       expect(onDeleteView).toHaveBeenCalledWith('v2');
@@ -291,15 +318,195 @@ describe('BattleMapViewsControl', () => {
       await openPopover();
       const row = screen.getByRole('group', { name: /goblin ambush/i });
       await userEvent.click(
-        within(row).getByRole('button', { name: /delete/i })
+        within(row).getByRole('button', { name: /^delete view$/i })
       );
       await userEvent.click(
-        within(row).getByRole('button', { name: /cancel delete/i })
+        within(row).getByRole('button', { name: 'Cancel' })
       );
       expect(onDeleteView).not.toHaveBeenCalled();
       expect(
         within(row).getByRole('button', { name: /^delete view$/i })
       ).toBeInTheDocument();
+    });
+
+    it('arms delete as text buttons', async () => {
+      const onDeleteView = vi.fn();
+      render(
+        <BattleMapViewsControl
+          {...baseProps}
+          sharingEnabled
+          onDeleteView={onDeleteView}
+        />
+      );
+      await openPopover();
+      const row = screen.getByRole('group', { name: /goblin ambush/i });
+      const trash = within(row).getByRole('button', { name: 'Delete view' });
+      expect(trash).toHaveAttribute('data-variant', 'danger');
+      await userEvent.click(trash);
+
+      const confirm = within(row).getByRole('button', { name: 'Delete' });
+      expect(confirm).toHaveAttribute('data-variant', 'danger-solid');
+      expect(confirm).toHaveTextContent('Delete');
+      const cancel = within(row).getByRole('button', { name: 'Cancel' });
+      expect(cancel).toHaveTextContent('Cancel');
+      expect(
+        within(row).queryByRole('button', { name: 'Send view' })
+      ).not.toBeInTheDocument();
+      expect(
+        within(row).queryByRole('button', { name: 'Rename view' })
+      ).not.toBeInTheDocument();
+      expect(
+        within(row).queryByRole('button', { name: 'Delete view' })
+      ).not.toBeInTheDocument();
+      // The view's own button stays so the DM can see what they are deleting.
+      expect(
+        within(row).getByRole('button', { name: /goblin ambush/i })
+      ).toBeInTheDocument();
+
+      await userEvent.click(cancel);
+      expect(onDeleteView).not.toHaveBeenCalled();
+      expect(
+        within(row).getByRole('button', { name: 'Send view' })
+      ).toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: 'Rename view' })
+      ).toBeInTheDocument();
+      expect(
+        within(row).queryByRole('button', { name: 'Delete' })
+      ).not.toBeInTheDocument();
+
+      await userEvent.click(
+        within(row).getByRole('button', { name: 'Delete view' })
+      );
+      await userEvent.click(
+        within(row).getByRole('button', { name: 'Delete' })
+      );
+      expect(onDeleteView).toHaveBeenCalledTimes(1);
+      expect(onDeleteView).toHaveBeenCalledWith('v1');
+    });
+  });
+
+  describe('Escape and closing', () => {
+    it('Escape cancels an open rename before closing', async () => {
+      const onRenameView = vi.fn();
+      render(
+        <BattleMapViewsControl {...baseProps} onRenameView={onRenameView} />
+      );
+      await openPopover();
+      const row = screen.getByRole('group', { name: /throne room/i });
+      await userEvent.click(
+        within(row).getByRole('button', { name: 'Rename view' })
+      );
+      expect(
+        screen.getByRole('textbox', { name: 'Rename view' })
+      ).toBeInTheDocument();
+
+      await userEvent.keyboard('{Escape}');
+      expect(
+        screen.queryByRole('textbox', { name: 'Rename view' })
+      ).not.toBeInTheDocument();
+      expect(getDialog()).toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: 'Rename view' })
+      ).toBeInTheDocument();
+
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+      await waitFor(() => expect(getTrigger()).toHaveFocus());
+      expect(onRenameView).not.toHaveBeenCalled();
+    });
+
+    it('Escape disarms an armed delete before closing', async () => {
+      const onDeleteView = vi.fn();
+      render(
+        <BattleMapViewsControl {...baseProps} onDeleteView={onDeleteView} />
+      );
+      await openPopover();
+      const row = screen.getByRole('group', { name: /goblin ambush/i });
+      await userEvent.click(
+        within(row).getByRole('button', { name: 'Delete view' })
+      );
+      expect(
+        within(row).getByRole('button', { name: 'Delete' })
+      ).toBeInTheDocument();
+
+      await userEvent.keyboard('{Escape}');
+      expect(
+        within(row).queryByRole('button', { name: 'Delete' })
+      ).not.toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: 'Delete view' })
+      ).toBeInTheDocument();
+      expect(getDialog()).toBeInTheDocument();
+
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+      await waitFor(() => expect(getTrigger()).toHaveFocus());
+      expect(onDeleteView).not.toHaveBeenCalled();
+    });
+
+    it('closing by an outside click clears an open rename', async () => {
+      render(<BattleMapViewsControl {...baseProps} />);
+      await openPopover();
+      const row = screen.getByRole('group', { name: /throne room/i });
+      await userEvent.click(
+        within(row).getByRole('button', { name: 'Rename view' })
+      );
+      expect(
+        screen.getByRole('textbox', { name: 'Rename view' })
+      ).toBeInTheDocument();
+
+      await userEvent.click(document.body);
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+
+      await openPopover();
+      expect(getDialog()).toBeInTheDocument();
+      expect(
+        screen.queryByRole('textbox', { name: 'Rename view' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Delete' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('closing from the trigger clears an armed delete and an open save field', async () => {
+      render(<BattleMapViewsControl {...baseProps} />);
+      await openPopover();
+      await openSaveInput();
+      const row = screen.getByRole('group', { name: /goblin ambush/i });
+      await userEvent.click(
+        within(row).getByRole('button', { name: 'Delete view' })
+      );
+      // Arming the delete leaves the save field alone; both are open.
+      expect(
+        screen.getByRole('textbox', { name: /view name/i })
+      ).toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: 'Delete' })
+      ).toBeInTheDocument();
+
+      await userEvent.click(getTrigger());
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+
+      await openPopover();
+      expect(getDialog()).toBeInTheDocument();
+      expect(
+        screen.queryByRole('textbox', { name: /view name/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Delete' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('textbox', { name: 'Rename view' })
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -384,10 +591,10 @@ describe('BattleMapViewsControl opt-in gate', () => {
 
       const row = screen.getByRole('group', { name: /throne room/i });
       await userEvent.click(
-        within(row).getByRole('button', { name: /delete/i })
+        within(row).getByRole('button', { name: /^delete view$/i })
       );
       await userEvent.click(
-        within(row).getByRole('button', { name: /confirm delete/i })
+        within(row).getByRole('button', { name: 'Delete' })
       );
       expect(onDeleteView).toHaveBeenCalledWith('v2');
 
@@ -395,18 +602,61 @@ describe('BattleMapViewsControl opt-in gate', () => {
     }
   });
 
-  it('meets the 44px touch-target minimum on every interactive element', async () => {
+  it('Send stays disabled while sharing is off', async () => {
+    const onSend = vi.fn();
+    render(<BattleMapViewsControl {...baseProps} onSend={onSend} />);
+    await openPopover();
+    const row = screen.getByRole('group', { name: /goblin ambush/i });
+    const send = within(row).getByRole('button', { name: 'Send view' });
+    expect(send).toBeDisabled();
+    await userEvent.click(send);
+    expect(onSend).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('button', { name: /bring them to my view/i })
+    ).toBeDisabled();
+
+    // Rename and an armed delete hide Send for the row; it never fires.
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'Rename view' })
+    );
+    expect(
+      within(row).queryByRole('button', { name: 'Send view' })
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'Cancel rename' })
+    );
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'Delete view' })
+    );
+    expect(
+      within(row).queryByRole('button', { name: 'Send view' })
+    ).not.toBeInTheDocument();
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('every popover button is a design-system Button', async () => {
     render(<BattleMapViewsControl {...baseProps} sharingEnabled />);
     await openPopover();
-    for (const el of screen.getAllByRole('button')) {
-      expect(el.className).toMatch(/h-11|h-12|min-h-\[44px\]/);
-    }
+    const expectAllButtonsHaveVariant = () => {
+      for (const button of within(getDialog()).getAllByRole('button')) {
+        expect(button).toHaveAttribute('data-variant');
+      }
+    };
+    expectAllButtonsHaveVariant();
+
     await openSaveInput();
-    expect(
-      screen.getByRole('textbox', { name: /view name/i }).className
-    ).toMatch(/h-11|h-12|min-h-\[44px\]/);
-    for (const el of screen.getAllByRole('button')) {
-      expect(el.className).toMatch(/h-11|h-12|min-h-\[44px\]/);
-    }
+    const row = screen.getByRole('group', { name: /throne room/i });
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'Rename view' })
+    );
+    expectAllButtonsHaveVariant();
+
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'Cancel rename' })
+    );
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'Delete view' })
+    );
+    expectAllButtonsHaveVariant();
   });
 });
