@@ -33,7 +33,9 @@ export function TurnControl({
       )}
     >
       <div className="flex max-w-24 min-w-0 flex-col leading-tight lg:max-w-48">
-        <span className="type-small text-muted">Round {round}</span>
+        <span className="type-small text-muted whitespace-nowrap">
+          Round {round}
+        </span>
         <span className="type-ui text-heading truncate">{activeName}</span>
       </div>
 
@@ -54,6 +56,7 @@ export function TurnControl({
         size="sm"
         onClick={onNext}
         rightIcon={<Play size={16} />}
+        className="shrink-0 whitespace-nowrap"
       >
         Next turn
       </Button>

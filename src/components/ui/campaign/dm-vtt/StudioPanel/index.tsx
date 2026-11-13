@@ -122,7 +122,7 @@ export function StudioPanel({
       data-active-tab={activeTab}
     >
       <div className="border-divider flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-2 py-1.5">
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {TABS.map(({ key, icon, label }) => (
             <Button
               key={key}
