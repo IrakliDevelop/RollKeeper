@@ -187,7 +187,7 @@ export default function DmLocationToolbar({
     <TooltipProvider>
       <div className="border-divider bg-surface-raised flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-2 py-1">
         {/* Left group: Tool buttons */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex flex-wrap items-center gap-0.5">
           {toolDefs.map(({ name, label, Icon }) => (
             <Tooltip key={name} content={label}>
               <Button
@@ -242,7 +242,7 @@ export default function DmLocationToolbar({
         <div aria-hidden className="bg-divider mx-1 h-6 w-px" />
 
         {/* Center group: History + destructive actions */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex flex-wrap items-center gap-0.5">
           <DisableableTooltip content="Undo" disabled={!canUndo}>
             <Button
               variant="ghost"
@@ -332,7 +332,7 @@ export default function DmLocationToolbar({
         )}
 
         {/* Right group */}
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex flex-wrap items-center gap-1">
           {liveControls && (
             <>
               <Tooltip
@@ -404,7 +404,7 @@ export default function DmLocationToolbar({
           />
 
           {/* Sync status indicator */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {mode !== 'battlemap' &&
               (lastSyncedAt ? (
                 hasUnsyncedChanges ? (
