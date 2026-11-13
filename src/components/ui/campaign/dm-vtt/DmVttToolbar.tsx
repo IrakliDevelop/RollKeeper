@@ -345,7 +345,8 @@ export function DmVttToolbar({
             {presenceControl}
           </div>
         </div>
-        <div className="border-divider w-full border-t empty:hidden">
+        {/* The dock's own border-b is the bottom edge; the row's would double it. */}
+        <div className="border-divider w-full border-t empty:hidden [&>div]:border-b-0">
           <DmLocationToolOptions
             mode="battlemap"
             selectionControls
