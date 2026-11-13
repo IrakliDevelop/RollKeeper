@@ -1,14 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/forms/button';
+import { useRef, useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
+import { Download } from 'lucide-react';
 import type { FogStateV1, FogStyle } from '@fieldnotes/vtt';
+import { Button } from '@/components/ui/forms/button';
+import {
+  RadioGroupField,
+  RadioGroupItem,
+} from '@/components/ui/forms/radio-group';
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import {
   downloadBlob,
   exportBattleMap,
   type ExportCapableViewport,
 } from './battleMapExport';
+import { DisableableTooltip } from './ToolOptionControls';
+import { useFocusAfterEdit } from './BattleMapViewsControl/BattleMapViewsControl.hooks';
 
 export interface BattleMapExportControlProps {
   getViewport: () => ExportCapableViewport | null;
@@ -40,25 +49,14 @@ export function BattleMapExportControl({
   const [bounds, setBounds] = useState<'map' | 'view'>('map');
   const [format, setFormat] = useState<'png' | 'jpeg'>('png');
   const [busy, setBusy] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
+  // Non-modal popover: the Export button disables while busy, and a browser
+  // that blurs a disabled button leaves focus on <body>, where the next Tab
+  // would dismiss the popover. A failed export keeps the popover open, so
+  // focus goes back to the button; a successful one closes it and Radix
+  // returns focus to the trigger (the ref is null by then).
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
+  useFocusAfterEdit(busy, exportButtonRef);
 
   const handleExport = async () => {
     const vp = getViewport();
@@ -90,113 +88,94 @@ export function BattleMapExportControl({
     }
   };
 
-  const radioRow = (
-    id: string,
-    checked: boolean,
-    onChange: () => void,
-    label: string
-  ) => (
-    <label className="text-body flex min-h-[44px] items-center gap-2 text-xs">
-      <input
-        type="radio"
-        name={id}
-        checked={checked}
-        onChange={onChange}
-        disabled={busy}
-      />
-      {label}
-    </label>
-  );
-
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant={open ? 'primary' : 'ghost'}
-        onClick={() => setOpen(o => !o)}
-        aria-label="Export map"
-        aria-expanded={open}
-        disabled={busy}
-        className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 px-2 py-1 text-xs"
-      >
-        <Download size={16} />
-      </Button>
-
-      {open && (
-        <div className="bg-surface-raised border-divider absolute top-full right-0 z-30 mt-2 w-56 rounded-xl border p-3 shadow-xl">
-          <div className="flex flex-col gap-2">
-            {getDmOnlyElements && (
-              <div role="radiogroup" aria-label="Audience">
-                <div className="text-muted mb-1 text-[11px] font-semibold uppercase">
-                  Audience
-                </div>
-                {radioRow(
-                  'export-audience',
-                  audience === 'full',
-                  () => setAudience('full'),
-                  'Full map'
-                )}
-                {radioRow(
-                  'export-audience',
-                  audience === 'player',
-                  () => setAudience('player'),
-                  'Player view'
-                )}
-              </div>
-            )}
-
-            <div role="radiogroup" aria-label="Bounds">
-              <div className="text-muted mb-1 text-[11px] font-semibold uppercase">
-                Bounds
-              </div>
-              {radioRow(
-                'export-bounds',
-                bounds === 'map',
-                () => setBounds('map'),
-                'Whole map'
-              )}
-              {radioRow(
-                'export-bounds',
-                bounds === 'view',
-                () => setBounds('view'),
-                'Current view'
-              )}
-            </div>
-
-            <div role="radiogroup" aria-label="Format">
-              <div className="text-muted mb-1 text-[11px] font-semibold uppercase">
-                Format
-              </div>
-              {radioRow(
-                'export-format',
-                format === 'png',
-                () => setFormat('png'),
-                'PNG'
-              )}
-              {radioRow(
-                'export-format',
-                format === 'jpeg',
-                () => setFormat('jpeg'),
-                'JPEG'
-              )}
-            </div>
-
+    <TooltipProvider>
+      <Popover.Root open={open} onOpenChange={setOpen}>
+        <DisableableTooltip content="Export map" disabled={busy}>
+          <Popover.Trigger asChild>
             <Button
-              variant="primary"
-              onClick={handleExport}
+              type="button"
+              variant="ghost"
+              size="sm"
+              selected={open}
+              className="w-9 shrink-0 px-0"
+              aria-label="Export map"
               disabled={busy}
-              aria-label="Export"
-              className="mt-1 flex min-h-[44px] w-full items-center justify-center gap-2"
             >
-              {busy ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Download size={16} />
-              )}
-              Export
+              <Download size={16} />
             </Button>
-          </div>
-        </div>
-      )}
-    </div>
+          </Popover.Trigger>
+        </DisableableTooltip>
+
+        <Popover.Portal>
+          <Popover.Content
+            aria-label="Export map"
+            align="end"
+            sideOffset={8}
+            collisionPadding={8}
+            className={`${OVERLAY_SURFACE} z-[60] w-56 max-w-[calc(100vw-1rem)] p-3`}
+          >
+            <div className="flex flex-col gap-3">
+              {getDmOnlyElements && (
+                <RadioGroupField
+                  label="Audience"
+                  value={audience}
+                  onValueChange={value =>
+                    setAudience(value as 'full' | 'player')
+                  }
+                >
+                  <RadioGroupItem
+                    value="full"
+                    label="Full map"
+                    disabled={busy}
+                  />
+                  <RadioGroupItem
+                    value="player"
+                    label="Player view"
+                    disabled={busy}
+                  />
+                </RadioGroupField>
+              )}
+
+              <RadioGroupField
+                label="Bounds"
+                value={bounds}
+                onValueChange={value => setBounds(value as 'map' | 'view')}
+              >
+                <RadioGroupItem value="map" label="Whole map" disabled={busy} />
+                <RadioGroupItem
+                  value="view"
+                  label="Current view"
+                  disabled={busy}
+                />
+              </RadioGroupField>
+
+              <RadioGroupField
+                label="Format"
+                value={format}
+                onValueChange={value => setFormat(value as 'png' | 'jpeg')}
+              >
+                <RadioGroupItem value="png" label="PNG" disabled={busy} />
+                <RadioGroupItem value="jpeg" label="JPEG" disabled={busy} />
+              </RadioGroupField>
+
+              <Button
+                ref={exportButtonRef}
+                type="button"
+                variant="primary"
+                size="sm"
+                fullWidth
+                className="mt-1"
+                onClick={handleExport}
+                loading={busy}
+                leftIcon={<Download size={16} />}
+              >
+                Export
+              </Button>
+            </div>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+    </TooltipProvider>
   );
 }
