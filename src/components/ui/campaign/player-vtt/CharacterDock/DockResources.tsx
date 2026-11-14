@@ -1,4 +1,8 @@
+import { Minus, Plus } from 'lucide-react';
+
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 
 import type { ActiveClassResource } from '@/utils/classResources';
 
@@ -11,7 +15,9 @@ export interface DockResourcesProps {
 /**
  * Compact class-resource rows (Rage, Ki, Bardic Inspiration…) for the VTT
  * dock — all active resources, no cap (unlike the sheet HUD's four-chip
- * limit). Renders nothing when the class has none.
+ * limit). Renders nothing when the class has none. Its two Tooltips per row
+ * need the `TooltipProvider` that `PlayerVttScreen` wraps around the floating
+ * panels.
  */
 export function DockResources({
   resources,
@@ -21,53 +27,56 @@ export function DockResources({
   if (resources.length === 0) return null;
 
   return (
-    <div>
-      <div className="text-faint mb-1.5 text-xs font-bold tracking-wider uppercase">
-        Resources
-      </div>
-      <div className="space-y-1.5">
+    <Section level={4} heading="Resources">
+      <ul className="divide-divider divide-y">
         {resources.map(resource => {
           const { definition, maxUses, usesRemaining, die } = resource;
           return (
-            <div
+            <li
               key={definition.id}
-              className="border-divider flex min-h-[44px] items-center justify-between gap-2 rounded-lg border px-2.5 py-1"
+              className="flex items-center justify-between gap-2 py-1 pointer-coarse:min-h-11"
             >
               <div className="min-w-0">
-                <span className="text-heading block truncate text-sm font-semibold">
+                <p className="type-ui text-heading truncate">
                   {definition.name}
                   {die && (
-                    <span className="text-muted ml-1 text-xs">{die}</span>
+                    <span className="type-small text-muted ml-1">{die}</span>
                   )}
-                </span>
-                <span className="text-heading text-xs font-semibold">
+                </p>
+                <p className="type-small text-heading tabular-nums">
                   {usesRemaining}/{maxUses}
-                </span>
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => onSpend(definition.id)}
-                  disabled={usesRemaining === 0}
-                  aria-label={`Spend ${definition.name}`}
-                >
-                  −
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => onRestore(definition.id)}
-                  disabled={usesRemaining === maxUses}
-                  aria-label={`Restore ${definition.name}`}
-                >
-                  +
-                </Button>
+                <Tooltip content={`Spend ${definition.name}`}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-9 shrink-0 px-0"
+                    aria-label={`Spend ${definition.name}`}
+                    disabled={usesRemaining === 0}
+                    onClick={() => onSpend(definition.id)}
+                  >
+                    <Minus size={16} aria-hidden />
+                  </Button>
+                </Tooltip>
+                <Tooltip content={`Restore ${definition.name}`}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-9 shrink-0 px-0"
+                    aria-label={`Restore ${definition.name}`}
+                    disabled={usesRemaining === maxUses}
+                    onClick={() => onRestore(definition.id)}
+                  >
+                    <Plus size={16} aria-hidden />
+                  </Button>
+                </Tooltip>
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ul>
+    </Section>
   );
 }

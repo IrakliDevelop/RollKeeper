@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import { Input } from '@/components/ui/forms/input';
-import { AppIcon } from '@/components/ui/icons';
+import { Section } from '@/components/ui/layout/section';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import type { ToastData } from '@/components/ui/feedback/Toast';
@@ -84,13 +84,14 @@ export function DockSpells(props: DockSpellsProps) {
 
   if (castableSpells.length === 0) {
     return (
-      <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
-        <AppIcon name="spell" className="text-muted mx-auto mb-3 h-12 w-12" />
-        <p className="text-heading text-lg font-semibold">No spells prepared</p>
-        <p className="text-muted mt-2 text-sm">
-          Prepare spells in the Spellcasting tab to see them here.
-        </p>
-      </div>
+      <Section level={4} heading="Spells">
+        <div className="py-6 text-center">
+          <p className="type-ui text-heading">No spells prepared</p>
+          <p className="type-small text-muted mt-1">
+            Prepare spells on your sheet&apos;s Spells tab to cast them here.
+          </p>
+        </div>
+      </Section>
     );
   }
 
@@ -104,7 +105,7 @@ export function DockSpells(props: DockSpellsProps) {
   };
 
   return (
-    <div className="space-y-2">
+    <Section level={4} heading="Spells" contentClassName="space-y-3">
       <SpellcastingStatsRow
         spellAttackBonus={spellAttackBonus}
         spellSaveDC={spellSaveDC}
@@ -167,6 +168,6 @@ export function DockSpells(props: DockSpellsProps) {
           characterLevel={getTotalLevel(character)}
         />
       )}
-    </div>
+    </Section>
   );
 }

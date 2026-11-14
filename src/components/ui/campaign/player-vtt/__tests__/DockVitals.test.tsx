@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  cleanup,
+} from '@testing-library/react';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { DockVitals } from '@/components/ui/campaign/player-vtt/CharacterDock/DockVitals';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState } from '@/types/character';
@@ -16,14 +23,42 @@ function seedCharacter(overrides: Partial<CharacterState> = {}) {
   } as CharacterState);
 }
 
+function seedHp(current: number, max: number) {
+  seedCharacter({
+    hitPoints: {
+      ...useCharacterStore.getState().character.hitPoints,
+      current,
+      max,
+      temporary: 0,
+    },
+  });
+}
+
 const getChar = () => useCharacterStore.getState().character;
+
+// QuickCombatStrip's Tooltips need the provider PlayerVttScreen wraps around
+// the floating panels, and Radix measures the trigger with ResizeObserver.
+function render(ui: ReactElement) {
+  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
+}
 
 describe('DockVitals', () => {
   beforeEach(() => {
     seedCharacter();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('applies damage temp-first', () => {
     render(<DockVitals addToast={vi.fn()} />);
@@ -96,6 +131,84 @@ describe('DockVitals', () => {
     expect(getChar().hitPoints.current).toBe(20);
   });
 
+  // Green before 3-10 too (string parse was a no-op); guards NumberInput min={0} against a min={1} clamp on blur.
+  it('is a no-op on a typed zero, and keeps the zero in the field', () => {
+    const addToast = vi.fn();
+    render(<DockVitals addToast={addToast} />);
+    const input = screen.getByRole('textbox', { name: /hp amount/i });
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.blur(input);
+    expect(input).toHaveValue('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /^damage$/i }));
+
+    expect(getChar().hitPoints.current).toBe(20);
+    expect(addToast).not.toHaveBeenCalled();
+    expect(input).toHaveValue('0');
+  });
+
+  // Green before 3-10 too (string parse was a no-op); guards NumberInput min={0} against a min={1} clamp on blur.
+  it('is a no-op on an empty field', () => {
+    const addToast = vi.fn();
+    render(<DockVitals addToast={addToast} />);
+    fireEvent.click(screen.getByRole('button', { name: /^heal$/i }));
+
+    expect(getChar().hitPoints.current).toBe(20);
+    expect(addToast).not.toHaveBeenCalled();
+  });
+
+  it('shows the HP status word for each tier', () => {
+    seedHp(30, 40);
+    const { unmount } = render(<DockVitals addToast={vi.fn()} />);
+    expect(screen.getByText('Healthy')).toBeInTheDocument();
+    unmount();
+
+    seedHp(8, 40);
+    const second = render(<DockVitals addToast={vi.fn()} />);
+    expect(screen.getByText('Critical')).toBeInTheDocument();
+    second.unmount();
+
+    seedHp(0, 40);
+    render(<DockVitals addToast={vi.fn()} />);
+    expect(screen.getByText('Down')).toBeInTheDocument();
+  });
+
+  it('shows no status word at max 0 and does not throw', () => {
+    seedHp(0, 0);
+    render(<DockVitals addToast={vi.fn()} />);
+    for (const word of ['Healthy', 'Bloodied', 'Critical', 'Down']) {
+      expect(screen.queryByText(word)).toBeNull();
+    }
+  });
+
+  it('shows temp HP as plain text', () => {
+    render(<DockVitals addToast={vi.fn()} />);
+    expect(screen.getByText('+5 temp')).toBeInTheDocument();
+  });
+
+  it('renders the exact readout as three adjacent spans', () => {
+    seedHp(30, 40);
+    render(<DockVitals addToast={vi.fn()} />);
+    expect(
+      screen.getByText(
+        (_, el) => el?.textContent === '30/40' && el.children.length === 3
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('toggles the reaction with a constant name and aria-pressed', () => {
+    render(<DockVitals addToast={vi.fn()} />);
+    const reaction = screen.getByRole('button', { name: 'Reaction used' });
+    expect(reaction).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(reaction);
+
+    expect(
+      screen.getByRole('button', { name: 'Reaction used' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Used')).toBeNull();
+  });
+
   it('disables the Use button at 0 heroic inspiration', () => {
     seedCharacter({ heroicInspiration: { count: 0, maxCount: 3 } });
     render(<DockVitals addToast={vi.fn()} />);
@@ -120,7 +233,7 @@ describe('DockVitals', () => {
 
     expect(getChar().heroicInspiration.count).toBe(1);
     expect(addToast).toHaveBeenCalledTimes(1);
-    expect(addToast.mock.calls[0][0].title).toMatch(/Heroic Inspiration:/);
+    expect(addToast.mock.calls[0][0].title).toMatch(/Heroic inspiration:/);
   });
 
   it('disables the + stepper once maxCount is reached', () => {
@@ -172,9 +285,11 @@ describe('DockVitals', () => {
   it('opens the armor class editor from the AC card', () => {
     render(<DockVitals addToast={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /edit armor class/i }));
-    // Both the dialog title and ArmorClassManager's own heading say
-    // "Armor Class" — asserting the dialog itself is unambiguous.
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    // The dialog is named by its title; ArmorClassManager's own heading
+    // inside it is a separate element.
+    expect(
+      screen.getByRole('dialog', { name: 'Armor class' })
+    ).toBeInTheDocument();
     expect(
       screen.getAllByRole('heading', { name: /armor class/i }).length
     ).toBeGreaterThan(0);
