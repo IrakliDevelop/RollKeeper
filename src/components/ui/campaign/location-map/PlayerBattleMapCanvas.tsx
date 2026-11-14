@@ -5,6 +5,7 @@ import type { SharedInitiativeState } from '@/types/sharedState';
 import React, {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -12,21 +13,16 @@ import React, {
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Hand,
-  MousePointer2,
   CircleUserRound,
-  Pencil,
-  MoveUpRight,
-  Ruler,
-  Footprints,
-  Circle,
   Trash2,
   Eye,
   Minus,
   EyeOff,
+  type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { cn } from '@/utils/cn';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 import {
   FieldNotesCanvas,
@@ -59,7 +55,11 @@ import {
   getAppliedFogAppearance,
   startFogAppearancePoll,
 } from './fog/fogAppearancePoll';
-import DmLocationToolOptions from './DmLocationToolOptions';
+import DmLocationToolOptions, {
+  type MovementControls,
+} from './DmLocationToolOptions';
+import { LiveSyncChip } from './LiveSyncChip';
+import { mapToolDefs } from './mapToolDefs';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import {
   isCombatantToken,
@@ -133,8 +133,10 @@ interface PlayerBattleMapCanvasProps {
   onPoke?: (feature: string) => void;
   /** Mutable config consumed by the registered SpellTemplateTool. */
   spellTemplateConfigRef?: React.MutableRefObject<SpellTemplateConfig | null>;
-  /** Hide the built-in back-button (the VTT screen renders its own top-left chrome). */
+  /** Hide the island's Back to sheet link. */
   hideBackButton?: boolean;
+  /** Hangs below the island and the movement strip (the casting banner). */
+  toolControlsFooter?: React.ReactNode;
   /** Show/hide/compact toggle for the token decoration overlay (optional — non-VTT routes render no toggle). */
   tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
   /** Surfaces export-control failures; the host owns the toast container. */
@@ -167,20 +169,13 @@ interface PlayerBattleMapCanvasProps {
 const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
 const EMPTY_APPLIED_TRANSFER_IDS: string[] = [];
 
-const PLAYER_TOOLS: {
-  name: string;
-  label: string;
-  Icon: typeof Hand;
-}[] = [
-  { name: 'hand', label: 'Pan', Icon: Hand },
-  { name: 'select', label: 'Select', Icon: MousePointer2 },
+const PLAYER_TOOLS: { name: string; label: string; Icon: LucideIcon }[] = [
+  ...mapToolDefs(['hand', 'select']),
   { name: 'token', label: 'Place token', Icon: CircleUserRound },
-  { name: 'pencil', label: 'Draw', Icon: Pencil },
-  { name: 'arrow', label: 'Arrow', Icon: MoveUpRight },
-  { name: 'measure', label: 'Measure', Icon: Ruler },
-  { name: 'path', label: 'Move', Icon: Footprints },
-  { name: 'template', label: 'Spell template', Icon: Circle },
+  ...mapToolDefs(['pencil', 'arrow', 'measure', 'path', 'template']),
 ];
+
+const ICON_BUTTON_CLASS = 'w-9 shrink-0 px-0';
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
   full: Eye,
@@ -213,6 +208,8 @@ export function PlayerToolbar({
   tokenInfoToggle,
   characterId,
   exportControl,
+  showBackLink,
+  movementControls,
 }: {
   status: BattleMapConnectionStatus;
   hasSelection: boolean;
@@ -220,6 +217,8 @@ export function PlayerToolbar({
   tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
   characterId: string;
   exportControl?: React.ReactNode;
+  showBackLink: boolean;
+  movementControls?: MovementControls;
 }) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = tokenInfoToggle
@@ -229,77 +228,135 @@ export function PlayerToolbar({
   useOwnTokenBackfill(characterId);
   const needsTokenHint =
     status === 'live' && !hasOwnToken && activeTool !== 'token';
+  const hintId = useId();
+  const toolRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  const setToolRef = (name: string) => (node: HTMLButtonElement | null) => {
+    if (node) toolRefs.current.set(name, node);
+    else toolRefs.current.delete(name);
+  };
+
+  // The tool row scrolls sideways on narrow screens; keep the active tool on
+  // screen without moving the page.
+  useEffect(() => {
+    toolRefs.current.get(activeTool)?.scrollIntoView?.({
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  }, [activeTool]);
+
   return (
-    <div
-      data-testid="player-toolbar"
-      className="bg-surface-raised border-divider pointer-events-auto relative z-10 flex max-w-full min-w-0 items-center gap-3 rounded-xl border p-1 shadow-lg"
-    >
-      <div className="scrollbar-thin flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain">
-        {PLAYER_TOOLS.map(({ name, label, Icon }) => {
-          const isTokenHint = name === 'token' && needsTokenHint;
-          return (
-            <Button
-              key={name}
-              variant={activeTool === name ? 'primary' : 'ghost'}
-              onClick={() => setTool(name)}
-              className={cn(
-                'min-h-[44px] min-w-[44px] shrink-0 p-0',
-                isTokenHint &&
-                  'bg-accent-emerald-bg text-accent-emerald-text animate-pulse'
-              )}
-              title={isTokenHint ? 'Place your token on the map' : label}
-              aria-label={isTokenHint ? 'Place your token on the map' : label}
-            >
-              <Icon size={16} />
-            </Button>
-          );
-        })}
-      </div>
-      {(hasSelection ||
-        (tokenInfoToggle && TokenInfoIcon) ||
-        exportControl) && (
-        <div className="flex shrink-0 items-center gap-1">
-          {hasSelection && (
-            <Button
-              variant="danger"
-              onClick={onDeleteSelected}
-              className="min-h-[44px] min-w-[44px] p-0"
-              title="Delete selected"
-              aria-label="Delete selected"
-            >
-              <Trash2 size={16} />
-            </Button>
-          )}
-          {tokenInfoToggle && TokenInfoIcon && (
-            <Button
-              variant="ghost"
-              onClick={tokenInfoToggle.onCycle}
-              className="min-h-[44px] min-w-[44px] p-0"
-              title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-              aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-            >
-              <TokenInfoIcon size={16} />
-            </Button>
-          )}
-          {exportControl}
-        </div>
-      )}
-      <span
-        className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-          status === 'live'
-            ? 'bg-accent-emerald-bg text-accent-emerald-text'
-            : status === 'denied'
-              ? 'bg-accent-red-bg text-accent-red-text'
-              : 'bg-accent-amber-bg text-accent-amber-text'
-        }`}
+    <TooltipProvider>
+      <div
+        className={`${OVERLAY_SURFACE} pointer-events-auto flex max-w-full min-w-0 flex-col overflow-hidden`}
       >
-        {status === 'live'
-          ? 'Live'
-          : status === 'denied'
-            ? 'Access denied'
-            : 'Connecting…'}
-      </span>
-    </div>
+        <div
+          data-testid="player-toolbar"
+          className="flex items-center gap-2 p-1"
+        >
+          {showBackLink && (
+            <>
+              <Tooltip content="Back to sheet" side="bottom">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="w-9 shrink-0 gap-1.5 px-0 lg:w-auto lg:px-3"
+                  aria-label="Back to sheet"
+                >
+                  <Link href={`/player/characters/${characterId}`}>
+                    <ArrowLeft size={16} aria-hidden />
+                    <span className="hidden lg:inline">Back to sheet</span>
+                  </Link>
+                </Button>
+              </Tooltip>
+              <span aria-hidden className="bg-divider h-6 w-px shrink-0" />
+            </>
+          )}
+          <div className="scrollbar-thin flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain">
+            {PLAYER_TOOLS.map(({ name, label, Icon }) => (
+              <Tooltip key={name} content={label} side="bottom">
+                <Button
+                  ref={setToolRef(name)}
+                  variant="ghost"
+                  size="sm"
+                  selected={activeTool === name}
+                  aria-pressed={activeTool === name}
+                  onClick={() => setTool(name)}
+                  className={ICON_BUTTON_CLASS}
+                  aria-label={label}
+                  aria-describedby={
+                    name === 'token' && needsTokenHint ? hintId : undefined
+                  }
+                >
+                  <Icon size={16} aria-hidden />
+                </Button>
+              </Tooltip>
+            ))}
+          </div>
+          {(hasSelection ||
+            (tokenInfoToggle && TokenInfoIcon) ||
+            exportControl) && (
+            <>
+              <span aria-hidden className="bg-divider h-6 w-px shrink-0" />
+              <div className="flex shrink-0 items-center gap-1">
+                {hasSelection && (
+                  <Tooltip content="Delete selected" side="bottom">
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={onDeleteSelected}
+                      className={ICON_BUTTON_CLASS}
+                      aria-label="Delete selected"
+                    >
+                      <Trash2 size={16} aria-hidden />
+                    </Button>
+                  </Tooltip>
+                )}
+                {tokenInfoToggle && TokenInfoIcon && (
+                  <Tooltip
+                    content={
+                      TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']
+                    }
+                    side="bottom"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={tokenInfoToggle.onCycle}
+                      className={ICON_BUTTON_CLASS}
+                      aria-label={
+                        TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']
+                      }
+                    >
+                      <TokenInfoIcon size={16} aria-hidden />
+                    </Button>
+                  </Tooltip>
+                )}
+                {exportControl}
+              </div>
+            </>
+          )}
+          <span className="shrink-0 pr-2">
+            <LiveSyncChip status={status} />
+          </span>
+        </div>
+        {/* The island's own border is the bottom edge; the row's would double it. */}
+        <div className="border-divider w-full border-t empty:hidden [&>div]:border-b-0">
+          <DmLocationToolOptions
+            mode="battlemap"
+            movementControls={movementControls}
+            trailing={
+              needsTokenHint ? (
+                <span id={hintId} className="type-small text-body">
+                  Place your token on the map
+                </span>
+              ) : undefined
+            }
+          />
+        </div>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -315,6 +372,7 @@ export function PlayerBattleMapCanvas({
   onPoke,
   spellTemplateConfigRef,
   hideBackButton = false,
+  toolControlsFooter,
   tokenInfoToggle,
   onExportError,
   markers: suppliedMarkers = EMPTY_PUBLIC_MARKERS,
@@ -860,22 +918,20 @@ export function PlayerBattleMapCanvas({
         />
         <BattleMapBootstrapPrivacyCover status={status} />
         {viewport && (
-          <PlayerMapToolControls>
-            <BattleMapMovement
-              viewport={viewport}
-              campaignCode={campaignCode}
-              battleMapId={battleMapId}
-              characterId={characterId}
-              initiative={initiative}
-              dash={movementDash}
-              onDashChange={handleSetMovementDash}
-            />
+          <PlayerMapToolControls footer={toolControlsFooter}>
             <PlayerToolbar
               status={status}
               hasSelection={hasSelection}
               onDeleteSelected={handleDeleteSelected}
               tokenInfoToggle={tokenInfoToggle}
               characterId={characterId}
+              showBackLink={!hideBackButton}
+              movementControls={{
+                dash: {
+                  enabled: movementDash,
+                  onChange: handleSetMovementDash,
+                },
+              }}
               exportControl={
                 <BattleMapExportControl
                   getViewport={() => viewport}
@@ -888,31 +944,16 @@ export function PlayerBattleMapCanvas({
                 />
               }
             />
-            <div className="border-divider pointer-events-auto max-w-full overflow-x-auto overscroll-x-contain rounded-xl border shadow-lg">
-              <DmLocationToolOptions
-                mode="battlemap"
-                movementControls={{
-                  dash: {
-                    enabled: movementDash,
-                    onChange: handleSetMovementDash,
-                  },
-                }}
-              />
-            </div>
+            <BattleMapMovement
+              viewport={viewport}
+              campaignCode={campaignCode}
+              battleMapId={battleMapId}
+              characterId={characterId}
+              initiative={initiative}
+              dash={movementDash}
+              onDashChange={handleSetMovementDash}
+            />
           </PlayerMapToolControls>
-        )}
-        {!hideBackButton && (
-          <div className="absolute top-3 left-3 z-10">
-            <Link href={`/player/characters/${characterId}`}>
-              <Button
-                variant="ghost"
-                className="flex items-center gap-1.5 text-xs"
-              >
-                <ArrowLeft size={14} />
-                Back to sheet
-              </Button>
-            </Link>
-          </div>
         )}
         {viewport && <BattleMapMinimap defaultCollapsed />}
         {/* Mounted only while a marker is active. Painting and activation

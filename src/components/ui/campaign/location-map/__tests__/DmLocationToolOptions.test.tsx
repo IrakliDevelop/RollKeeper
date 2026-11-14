@@ -1125,3 +1125,32 @@ describe('DmLocationToolOptions named options row', () => {
     expect(screen.getByText('Dash')).toBeVisible();
   });
 });
+
+describe('DmLocationToolOptions trailing slot', () => {
+  beforeEach(() => {
+    mockToolOptions = {};
+  });
+
+  afterEach(() => cleanup());
+
+  it('renders the trailing node inside the row after the tool name', () => {
+    mockActiveTool = 'select';
+    const { container } = render(
+      <DmLocationToolOptions mode="battlemap" trailing={<span>hint</span>} />
+    );
+
+    const row = container.firstElementChild as HTMLElement;
+    expect(within(row).getByText('hint')).toBeInTheDocument();
+    expect(row.textContent).toBe('Selecthint');
+  });
+
+  it('renders no trailing node for a tool with no row', () => {
+    mockActiveTool = 'token';
+    const { container } = render(
+      <DmLocationToolOptions mode="battlemap" trailing={<span>hint</span>} />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText('hint')).not.toBeInTheDocument();
+  });
+});

@@ -1,10 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 
-import { Button } from '@/components/ui/forms/button';
 import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { usePlayerTokenDecorations } from '@/components/ui/campaign/token-overlay/usePlayerTokenDecorations';
@@ -135,7 +132,6 @@ export function PlayerVttScreen({
       characterId={characterId}
       characterName={character.name}
       characterAvatar={character.avatar}
-      hideBackButton
       onStatus={setConnectionStatus}
       onPoke={handlePoke}
       spellTemplateConfigRef={spellTemplateConfigRef}
@@ -161,17 +157,6 @@ export function PlayerVttScreen({
         />
       )}
       <div className="pointer-events-none absolute inset-0 z-10">
-        <div className="pointer-events-auto fixed top-3 left-3 z-10">
-          <Link href={`/player/characters/${characterId}`}>
-            <Button
-              variant="ghost"
-              className="flex items-center gap-1.5 text-xs"
-            >
-              <ArrowLeft size={14} />
-              Back to sheet
-            </Button>
-          </Link>
-        </div>
         <CombatPanel
           state={liveInitiative}
           characterId={characterId}

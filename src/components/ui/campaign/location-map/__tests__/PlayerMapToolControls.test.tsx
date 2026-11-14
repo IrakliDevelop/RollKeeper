@@ -38,7 +38,7 @@ function renderControls() {
   return render(
     <PlayerMapToolControls>
       <button>Place token</button>
-      <button>Spell template</button>
+      <button>Template</button>
     </PlayerMapToolControls>
   );
 }
@@ -106,11 +106,53 @@ describe('PlayerMapToolControls', () => {
     vi.stubGlobal('visualViewport', undefined);
     renderControls();
     expect(screen.getByRole('button', { name: 'Place token' })).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Spell template' })
-    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Template' })).toBeVisible();
     expect(screen.getByTestId('player-map-tool-controls')).not.toHaveAttribute(
       'style'
     );
+  });
+
+  it('publishes the panel-top variable on mount even without VisualViewport', () => {
+    vi.stubGlobal('visualViewport', undefined);
+    renderControls();
+    expect(
+      document.documentElement.style.getPropertyValue('--player-vtt-panel-top')
+    ).toMatch(/^\d+px$/);
+  });
+
+  it('recomputes the panel-top variable when the visual viewport moves', () => {
+    const { viewport, flushFrame } = setupViewport();
+    renderControls();
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      bottom: 100,
+    } as DOMRect);
+    viewport.dispatchEvent(new Event('scroll'));
+    flushFrame();
+    expect(
+      document.documentElement.style.getPropertyValue('--player-vtt-panel-top')
+    ).toBe('112px');
+  });
+
+  it('removes the panel-top variable on unmount', () => {
+    vi.stubGlobal('visualViewport', undefined);
+    const { unmount } = renderControls();
+    unmount();
+    expect(
+      document.documentElement.style.getPropertyValue('--player-vtt-panel-top')
+    ).toBe('');
+  });
+
+  it('renders the footer outside the measured children wrapper', () => {
+    vi.stubGlobal('visualViewport', undefined);
+    render(
+      <PlayerMapToolControls footer={<p>banner</p>}>
+        <button>Place token</button>
+      </PlayerMapToolControls>
+    );
+    const root = screen.getByTestId('player-map-tool-controls');
+    expect(screen.getByText('banner').parentElement).toBe(root);
+    expect(
+      screen.getByRole('button', { name: 'Place token' }).parentElement
+    ).not.toBe(root);
   });
 });
