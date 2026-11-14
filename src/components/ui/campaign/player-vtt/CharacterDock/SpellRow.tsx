@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/forms/button';
-import { Badge } from '@/components/ui/layout/badge';
 import type { Spell } from '@/types/character';
 
 import { AOE_GLYPHS } from './DockSpells.utils';
@@ -12,46 +11,46 @@ export interface SpellRowProps {
   onCast: () => void;
 }
 
-/** Single spell line in the dock's spell list: name/badges + a ≥44px Cast button. */
+/**
+ * Single spell line in the dock's spell list: name and tags, plus a Cast
+ * button. Renders no Tooltip: the sheet drawer mounts it without a provider.
+ */
 export function SpellRow({ spell, onView, onCast }: SpellRowProps) {
+  const tags = [
+    spell.concentration && 'Concentration',
+    spell.ritual && 'Ritual',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <div className="border-divider flex items-center gap-2 rounded-lg border p-2">
+    <li className="flex items-center gap-2 py-1.5">
       <button
         type="button"
         onClick={onView}
-        className="min-w-0 flex-1 text-left"
+        className="focus-visible:outline-ring min-w-0 flex-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
       >
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="text-body truncate text-sm font-medium">
-            {spell.name}
-          </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="type-ui text-heading truncate">{spell.name}</span>
           {spell.aoe && (
             <span
-              className="text-accent-purple-text-muted shrink-0 text-xs"
+              className="text-muted shrink-0 text-xs"
               aria-label={`${spell.aoe.shape} area of effect`}
             >
               {AOE_GLYPHS[spell.aoe.shape]}
             </span>
           )}
-        </div>
-        {(spell.concentration || spell.ritual) && (
-          <div className="mt-0.5 flex gap-1">
-            {spell.concentration && (
-              <Badge variant="warning" size="sm">
-                Con
-              </Badge>
-            )}
-            {spell.ritual && (
-              <Badge variant="info" size="sm">
-                Ritual
-              </Badge>
-            )}
-          </div>
-        )}
+        </span>
+        {tags && <span className="type-caption text-muted block">{tags}</span>}
       </button>
-      <Button variant="primary" size="lg" onClick={onCast}>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="shrink-0"
+        onClick={onCast}
+      >
         Cast
       </Button>
-    </div>
+    </li>
   );
 }
