@@ -34,11 +34,13 @@ export interface CharacterDockProps {
 /**
  * Below `xl` the status tray shares the strip under the tool island, so the
  * panel and its pill sit beneath it (`--player-vtt-tray-height`); from `xl`
- * the tray sits beside the panel column. Both variables fall back to today's
- * position, so nothing moves before the map mounts.
+ * the tray sits at `top-3` in the same right-hand column, so they sit under
+ * whichever is lower, the island or the tray (the island shrinks while a
+ * spell is aimed). Both variables fall back to today's position, so nothing
+ * moves before the map mounts.
  */
 const PANEL_TOP =
-  'top-[calc(var(--player-vtt-panel-top,78px)+var(--player-vtt-tray-height,0px))] xl:top-[var(--player-vtt-panel-top,78px)]';
+  'top-[calc(var(--player-vtt-panel-top,78px)+var(--player-vtt-tray-height,0px))] xl:top-[max(var(--player-vtt-panel-top,78px),calc(0.75rem+var(--player-vtt-tray-height,0px)))]';
 
 /**
  * Right-edge player VTT panel: avatar/name header + `DockVitals` (HP editor,
