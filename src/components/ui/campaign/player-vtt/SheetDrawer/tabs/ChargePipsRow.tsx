@@ -14,7 +14,7 @@ export interface ChargePipsRowProps {
   onRestore: () => void;
 }
 
-const PIP_BUTTON_CLASS =
+export const PIP_BUTTON_CLASS =
   'focus-visible:outline-ring inline-flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11';
 
 /** Tappable charge pips: filled pips spend a charge, empty pips restore one. */

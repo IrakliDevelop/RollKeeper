@@ -56,7 +56,7 @@ export function SpellListRow({
         </Tooltip>
       ) : (
         <span
-          className="type-small text-muted flex size-9 shrink-0 items-center justify-center"
+          className="type-small text-muted flex size-9 shrink-0 items-center justify-center pointer-coarse:size-11"
           aria-hidden="true"
         >
           {showsCheck ? <Check size={16} /> : '—'}

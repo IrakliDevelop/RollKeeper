@@ -1,23 +1,20 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-
 import { ChevronDown } from 'lucide-react';
 
 import { CLASS_RESOURCE_STYLE } from '@/components/ui/character/classResourceStyles';
 import { Badge } from '@/components/ui/layout/badge';
-import { useCharacterStore } from '@/store/characterStore';
 import { Section } from '@/components/ui/layout/section';
+import { useCharacterStore } from '@/store/characterStore';
 import { cn } from '@/utils/cn';
 
 import { buildFeatureGroups } from '../SheetTabs.utils';
+import { PIP_BUTTON_CLASS } from './ChargePipsRow';
 import { FavoriteStar } from './FavoriteStar';
 import { useFeatureUses } from './useFeatureUses';
 
 import type { FeatureRowView } from '../SheetDrawer.types';
-
-const PIP_BUTTON_CLASS =
-  'focus-visible:outline-ring inline-flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11';
 
 /** Use/restore pips for a feature's remaining uses, shared with the Overview tab's pinned favorites. */
 export function FeaturePips({

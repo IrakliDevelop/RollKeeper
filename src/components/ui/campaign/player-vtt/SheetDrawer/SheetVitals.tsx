@@ -20,7 +20,7 @@ export interface SheetVitalsProps {
 // the value above its label.
 const CELL_CLASS = 'flex flex-col-reverse';
 const LABEL_CLASS = 'type-small text-muted';
-const VALUE_CLASS = 'type-num-lg text-heading tabular-nums';
+const VALUE_CLASS = 'type-num-lg text-heading';
 
 export function SheetVitals({ addToast, roll }: SheetVitalsProps) {
   const character = useCharacterStore(s => s.character);

@@ -12,7 +12,7 @@ import { hpPercent, hpTier } from '@/utils/hpState';
 // the value above its label.
 const CELL_CLASS = 'flex flex-col-reverse';
 const LABEL_CLASS = 'type-small text-muted';
-const VALUE_CLASS = 'type-num-lg text-heading tabular-nums';
+const VALUE_CLASS = 'type-num-lg text-heading';
 
 export function ConditionCard({
   member,

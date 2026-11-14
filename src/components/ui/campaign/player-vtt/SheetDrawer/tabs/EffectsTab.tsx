@@ -123,7 +123,7 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
               <Minus size={16} aria-hidden />
             </Button>
           </Tooltip>
-          <span className="type-num-lg text-heading min-w-6 text-center tabular-nums">
+          <span className="type-num-lg text-heading min-w-6 text-center">
             {exhaustion.level}
           </span>
           <Tooltip content="Increase exhaustion">

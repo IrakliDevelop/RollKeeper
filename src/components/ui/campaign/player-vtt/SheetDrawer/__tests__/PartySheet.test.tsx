@@ -40,8 +40,8 @@ describe('PartySheet', () => {
     expect(screen.getByText('Bloodied')).toBeInTheDocument();
     expect(screen.getByText('20/30')).toBeInTheDocument();
     expect(
-      screen.getByText("Concentrating on Hunter's Mark")
-    ).toBeInTheDocument();
+      screen.getByText("Concentrating on Hunter's Mark").closest('[data-kind]')
+    ).toHaveAttribute('data-kind', 'concentration');
     expect(screen.getByText('Prone')).toBeInTheDocument();
 
     expect(screen.getByText('16')).toBeInTheDocument();

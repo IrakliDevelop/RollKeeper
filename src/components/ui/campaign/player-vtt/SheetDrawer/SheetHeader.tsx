@@ -5,8 +5,8 @@ import { Coffee, Moon, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
-import { Badge } from '@/components/ui/layout/badge';
 import { ConditionChip } from '@/components/ui/game/ConditionChip';
+import { Badge } from '@/components/ui/layout/badge';
 import { useCharacterStore } from '@/store/characterStore';
 
 import { buildHeaderView } from './SheetDrawer.utils';

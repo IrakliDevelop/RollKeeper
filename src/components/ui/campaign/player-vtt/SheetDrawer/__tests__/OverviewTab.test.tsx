@@ -16,13 +16,13 @@ function casting(): SheetSpellCastingProps {
 }
 
 function seed(overrides: Partial<CharacterState> = {}) {
+  useCharacterStore.getState().resetCharacter();
   const base = useCharacterStore.getState().character;
   // `migrateToMulticlass` (run by `loadCharacterState`) recomputes
   // `hitDicePools` from the legacy single-class fields whenever `classes`
   // is empty, which would silently discard the `hitDicePools` override
-  // below. Pin `classes` (carrying it forward once set) so the override
-  // sticks — a real store interaction the brief's verbatim seed doesn't
-  // account for.
+  // below. Pin `classes` so the override sticks — a real store interaction
+  // the brief's verbatim seed doesn't account for.
   const classes =
     base.classes && base.classes.length > 0
       ? base.classes
@@ -129,7 +129,6 @@ describe('OverviewTab', () => {
   });
 
   it('disables hit die spend when none remain', () => {
-    cleanup();
     seed({ hitDicePools: { d10: { max: 2, used: 2 } } });
     renderWithTooltips(
       <OverviewTab addToast={vi.fn()} spellCasting={casting()} />
@@ -138,7 +137,6 @@ describe('OverviewTab', () => {
   });
 
   it('draws slot pips for each level and for pact slots on a caster', () => {
-    cleanup();
     const base = useCharacterStore.getState().character;
     seed({
       spellSlots: { ...base.spellSlots, 1: { max: 4, used: 1 } },

@@ -123,9 +123,7 @@ export function OverviewTab({ addToast, spellCasting }: OverviewTabProps) {
           {passives.map(p => (
             <div key={p.label} className="flex flex-col-reverse">
               <dt className="type-small text-muted">{p.label}</dt>
-              <dd className="type-num-lg text-heading tabular-nums">
-                {p.value}
-              </dd>
+              <dd className="type-num-lg text-heading">{p.value}</dd>
             </div>
           ))}
         </dl>

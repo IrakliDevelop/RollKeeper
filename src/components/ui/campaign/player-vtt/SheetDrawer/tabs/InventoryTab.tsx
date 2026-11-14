@@ -94,7 +94,7 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
               aria-pressed={viewMode === 'list'}
               onClick={() => setViewMode('list')}
             >
-              <List className="h-4 w-4" />
+              <List className="h-4 w-4" aria-hidden />
             </Button>
           </Tooltip>
           <Tooltip content="Grid view">
@@ -107,7 +107,7 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
               aria-pressed={viewMode === 'grid'}
               onClick={() => setViewMode('grid')}
             >
-              <LayoutGrid className="h-4 w-4" />
+              <LayoutGrid className="h-4 w-4" aria-hidden />
             </Button>
           </Tooltip>
         </div>

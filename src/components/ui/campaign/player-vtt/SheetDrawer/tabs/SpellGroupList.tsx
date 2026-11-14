@@ -5,19 +5,6 @@ import type { Spell, SpellSlots } from '@/types/character';
 import type { SpellGroupView } from '../SheetDrawer.types';
 import { SpellListRow } from './SpellListRow';
 
-export const SLOT_ORDINAL = [
-  '0th',
-  '1st',
-  '2nd',
-  '3rd',
-  '4th',
-  '5th',
-  '6th',
-  '7th',
-  '8th',
-  '9th',
-];
-
 export interface SpellGroupListProps {
   spellsCount: number;
   search: string;

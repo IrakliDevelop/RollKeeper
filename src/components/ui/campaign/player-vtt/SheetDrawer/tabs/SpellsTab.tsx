@@ -17,8 +17,21 @@ import { SpellcastingStatsRow } from '../../CharacterDock/SpellcastingStatsRow';
 import { MaybeRollElement } from '../MaybeRollElement';
 import { buildSpellGroups } from '../SheetTabs.utils';
 import type { SheetRoll, SheetSpellCastingProps } from '../SheetDrawer.types';
-import { SLOT_ORDINAL, SpellGroupList } from './SpellGroupList';
+import { SpellGroupList } from './SpellGroupList';
 import { SpellsTabModals } from './SpellsTabModals';
+
+const SLOT_ORDINAL = [
+  '0th',
+  '1st',
+  '2nd',
+  '3rd',
+  '4th',
+  '5th',
+  '6th',
+  '7th',
+  '8th',
+  '9th',
+];
 
 export interface SpellsTabProps {
   locked: boolean;

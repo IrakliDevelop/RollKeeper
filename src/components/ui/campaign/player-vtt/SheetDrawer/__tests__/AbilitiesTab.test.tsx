@@ -11,6 +11,7 @@ function getChar() {
 }
 
 function seed(overrides: Partial<CharacterState> = {}) {
+  useCharacterStore.getState().resetCharacter();
   const base = useCharacterStore.getState().character;
   // `migrateToMulticlass` (run by `loadCharacterState`) recomputes
   // `hitDicePools`/multiclass fields from legacy single-class fields
@@ -105,12 +106,6 @@ describe('AbilitiesTab', () => {
   });
 
   it('toggles save proficiency when unlocked', () => {
-    seed({
-      savingThrows: {
-        ...getChar().savingThrows,
-        wisdom: { proficient: false },
-      },
-    });
     renderWithTooltips(<AbilitiesTab locked={false} />);
     const dot = screen.getByRole('button', { name: 'Wisdom save proficiency' });
     expect(dot).toHaveAttribute('aria-pressed', 'false');
@@ -119,16 +114,6 @@ describe('AbilitiesTab', () => {
   });
 
   it('leaves a skill dot without a pressed state or a hover hint', () => {
-    seed({
-      skills: {
-        ...getChar().skills,
-        stealth: {
-          ...getChar().skills.stealth,
-          proficient: false,
-          expertise: false,
-        },
-      },
-    });
     renderWithTooltips(<AbilitiesTab locked={false} />);
     const dot = screen.getByRole('button', {
       name: 'Stealth proficiency: none',
@@ -145,12 +130,6 @@ describe('AbilitiesTab', () => {
   });
 
   it('shows a locked save dot as an image with no button and no hover hint', () => {
-    seed({
-      savingThrows: {
-        ...getChar().savingThrows,
-        wisdom: { proficient: false },
-      },
-    });
     renderWithTooltips(<AbilitiesTab locked />);
     expect(
       screen.getByRole('img', { name: 'Wisdom save proficiency: none' })
