@@ -148,7 +148,9 @@ export function StatBlockEntriesEditor({
               : `Delete unnamed ${title} entry`;
 
             return (
-              // Entries carry no id (schema), so the index is the key.
+              // `id` is optional and unset on rows added here until the store
+              // normalises them; keying by it would remount a row mid-edit, so
+              // the index is the key.
               <li key={i} className="space-y-2 py-3">
                 <div className="flex items-center gap-2">
                   <Input
