@@ -29,7 +29,7 @@ export function AcEditDialog({ open, onOpenChange }: AcEditDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Armor Class</DialogTitle>
+          <DialogTitle>Armor class</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <ArmorClassManager

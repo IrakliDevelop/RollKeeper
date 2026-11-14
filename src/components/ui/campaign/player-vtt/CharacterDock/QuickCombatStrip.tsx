@@ -1,5 +1,9 @@
+import { Minus, Plus } from 'lucide-react';
+
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
+import { cn } from '@/utils/cn';
 
 export interface QuickCombatStripProps {
   hasUsedReaction: boolean;
@@ -13,9 +17,10 @@ export interface QuickCombatStripProps {
 }
 
 /**
- * One-row action-economy strip below the AC/Init grid: reaction toggle chip
- * (left) + heroic inspiration chip with award/correct stepper (right).
- * Replaces the old full-height `HeroicInspirationRow`.
+ * One-row action-economy strip below the AC/Init readouts: reaction toggle
+ * (left) + heroic inspiration button with award/correct steppers (right).
+ * Same recipe as the sheet HUD. Its three Tooltips need the
+ * `TooltipProvider` that `PlayerVttScreen` wraps around the floating panels.
  */
 export function QuickCombatStrip({
   hasUsedReaction,
@@ -29,59 +34,61 @@ export function QuickCombatStrip({
 }: QuickCombatStripProps) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <button
-        onClick={onToggleReaction}
+      <Button
+        variant="secondary"
+        size="sm"
         aria-pressed={hasUsedReaction}
-        aria-label={
-          hasUsedReaction ? 'Reaction used — tap to reset' : 'Use reaction'
-        }
-        className={`min-h-[44px] rounded-lg border px-2 text-xs font-bold tracking-wider uppercase ${
-          hasUsedReaction
-            ? 'border-divider text-faint'
-            : 'bg-accent-emerald-bg text-accent-emerald-text border-accent-emerald-border'
-        }`}
+        aria-label="Reaction used"
+        leftIcon={<AppIcon name="reaction" className="size-4" />}
+        onClick={onToggleReaction}
+        className={cn(
+          'w-full',
+          hasUsedReaction && 'border-input-border bg-surface-inset text-heading'
+        )}
       >
-        <span className="flex items-center justify-center gap-1">
-          <AppIcon name="reaction" className="h-4 w-4" />
-          {hasUsedReaction ? 'Used' : 'Reaction'}
-        </span>
-      </button>
+        Reaction
+      </Button>
 
       <div className="flex items-center gap-1">
-        <button
-          onClick={onUse}
-          disabled={count === 0}
-          aria-label="Use heroic inspiration"
-          className={`min-h-[44px] flex-1 rounded-lg border px-2 text-xs font-bold tracking-wider uppercase ${
-            count > 0
-              ? 'bg-accent-amber-bg text-accent-amber-text border-accent-amber-border'
-              : 'border-divider text-faint'
-          }`}
-        >
-          <span className="flex items-center justify-center gap-1">
-            <AppIcon name="inspiration" className="h-4 w-4" />
-            {stackable ? `×${count}` : ''}
-          </span>
-        </button>
-        {count > 0 && (
+        <Tooltip content="Use heroic inspiration">
           <Button
-            variant="outline"
-            size="lg"
-            onClick={onDecrement}
-            aria-label="Remove heroic inspiration"
+            variant="secondary"
+            size="sm"
+            selected={count > 0}
+            disabled={count === 0}
+            aria-label="Use heroic inspiration"
+            leftIcon={<AppIcon name="inspiration" className="size-4" />}
+            onClick={onUse}
+            className="min-w-0 flex-1"
           >
-            −
+            {stackable ? `×${count}` : null}
           </Button>
+        </Tooltip>
+        {count > 0 && (
+          <Tooltip content="Remove heroic inspiration">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-9 shrink-0 px-0"
+              aria-label="Remove heroic inspiration"
+              onClick={onDecrement}
+            >
+              <Minus size={16} aria-hidden />
+            </Button>
+          </Tooltip>
         )}
         {count < maxCount && (
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={onIncrement}
-            aria-label="Add heroic inspiration"
-          >
-            +
-          </Button>
+          <Tooltip content="Add heroic inspiration">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-9 shrink-0 px-0"
+              aria-label="Add heroic inspiration"
+              onClick={onIncrement}
+            >
+              <Plus size={16} aria-hidden />
+            </Button>
+          </Tooltip>
         )}
       </div>
     </div>

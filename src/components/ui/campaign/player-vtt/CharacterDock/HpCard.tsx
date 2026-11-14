@@ -1,26 +1,28 @@
 'use client';
 
+import { HPBar } from '@/components/shared/combat/HPBar';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
-import { Badge } from '@/components/ui/layout/badge';
-import { getHpBarColor } from '@/utils/hpColor';
-import { getHpCardClasses } from './DockVitals.utils';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { cn } from '@/utils/cn';
+import { getHpNumberColor, getHpTierTextColor } from '@/utils/hpColor';
+import { HP_STATUS_LABELS, hpStatus, hpTier } from '@/utils/hpState';
 
 interface HpCardProps {
   hpCurrent: number;
   hpMax: number;
   hpTemp: number;
   hpPercent: number;
-  amount: string;
-  onAmountChange: (value: string) => void;
+  amount: number | undefined;
+  onAmountChange: (value: number | undefined) => void;
   onDamage: () => void;
   onHeal: () => void;
   onTemp: () => void;
 }
 
-/** Compact HP card: readout, bar, and the damage/heal/temp editor in one
- * tinted card. Fixed input column + three equal flexible buttons so
- * everything always fits the dock's width (a plain flex row clipped Temp). */
+/** Compact HP block: readout with status word, bar, and the damage/heal/temp
+ * editor. Fixed input column + three equal flexible buttons so everything
+ * always fits the dock's width. Renders no Tooltip: the map sheet drawer
+ * shares it and mounts it without a TooltipProvider in its tests. */
 export function HpCard({
   hpCurrent,
   hpMax,
@@ -33,47 +35,73 @@ export function HpCard({
   onTemp,
 }: HpCardProps) {
   return (
-    <div className={`rounded-xl border p-3 ${getHpCardClasses(hpPercent)}`}>
-      <div className="flex items-baseline gap-2">
-        <span className="text-heading text-2xl font-bold">
-          {hpCurrent}/{hpMax}
-        </span>
-        {hpTemp > 0 && <Badge variant="info">+{hpTemp} temp</Badge>}
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <div className="flex items-baseline gap-1">
+          <span
+            className={cn(
+              'type-num-xl tabular-nums',
+              getHpNumberColor(hpCurrent, hpMax)
+            )}
+          >
+            {hpCurrent}
+          </span>
+          <span className="type-ui text-muted">/</span>
+          <span className="type-ui text-muted tabular-nums">{hpMax}</span>
+        </div>
+        {hpTemp > 0 && (
+          <span className="type-small text-frost-text">+{hpTemp} temp</span>
+        )}
+        {hpMax > 0 && (
+          <span
+            className={cn(
+              'type-small ml-auto',
+              getHpTierTextColor(hpTier(hpPercent))
+            )}
+          >
+            {HP_STATUS_LABELS[hpStatus(hpCurrent, hpMax)]}
+          </span>
+        )}
       </div>
-      <div className="bg-surface-secondary mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
-        <div
-          className={`h-full rounded-full ${getHpBarColor(hpCurrent, hpMax)}`}
-          style={{ width: `${Math.min(100, Math.max(0, hpPercent))}%` }}
-        />
-      </div>
-      <div className="mt-2 grid grid-cols-[3.5rem_repeat(3,minmax(0,1fr))] items-center gap-1.5">
-        <Input
-          aria-label="HP amount"
-          inputMode="numeric"
+      <HPBar
+        current={hpCurrent}
+        max={hpMax}
+        temp={hpTemp}
+        size="sm"
+        showLabel={false}
+        className="w-full"
+      />
+      <div className="grid grid-cols-[3.5rem_repeat(3,minmax(0,1fr))] items-center gap-1.5">
+        <NumberInput
+          size="sm"
+          allowEmpty
+          min={0}
           value={amount}
-          onChange={e => onAmountChange(e.target.value)}
-          className="w-full min-w-0"
+          onChange={onAmountChange}
+          aria-label="HP amount"
+          wrapperClassName="min-w-0"
+          className="px-1 text-center tabular-nums"
         />
         <Button
-          variant="danger"
-          size="lg"
-          className="min-w-0 px-1 text-xs"
+          variant="secondary"
+          size="sm"
+          className="text-blood-text min-w-0 px-1"
           onClick={onDamage}
         >
           Damage
         </Button>
         <Button
-          variant="success"
-          size="lg"
-          className="min-w-0 px-1 text-xs"
+          variant="secondary"
+          size="sm"
+          className="text-verdigris-text min-w-0 px-1"
           onClick={onHeal}
         >
           Heal
         </Button>
         <Button
           variant="secondary"
-          size="lg"
-          className="min-w-0 px-1 text-xs"
+          size="sm"
+          className="min-w-0 px-1"
           onClick={onTemp}
         >
           Temp
