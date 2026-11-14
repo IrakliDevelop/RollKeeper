@@ -97,7 +97,6 @@
     "src/components/ui/forms/NumberInput.tsx": 2
   },
   "raw-hue": {
-    "src/app/dice-components-demo/page.tsx": 36,
     "src/app/prototype/fieldnotes/page.tsx": 7,
     "src/app/test-error/page.tsx": 11,
     "src/components/auth/AccountHeaderEntry.tsx": 3,
@@ -108,17 +107,13 @@
     "src/components/ui/character/ExtendedFeatures/FeatureModal.tsx": 5,
     "src/components/ui/feedback/ErrorPage.tsx": 37,
     "src/components/ui/feedback/NotHydrated.tsx": 6,
-    "src/components/ui/game/DiceButton.tsx": 11,
-    "src/components/ui/game/DiceResultDisplay.tsx": 18,
-    "src/components/ui/game/DiceRoller.tsx": 36,
     "src/components/ui/layout/DragHandle.tsx": 2,
     "src/examples/DragDropExamples.tsx": 39,
     "src/hooks/useDragAndDrop.ts": 2,
     "src/prototypes/notes-module/FieldNotesCanvas.tsx": 54,
     "src/prototypes/notes-module/FieldNotesDemoPanels.tsx": 215,
     "src/utils/bestiaryUtils.ts": 16,
-    "src/utils/constants.ts": 28,
-    "src/utils/diceUtils.ts": 3
+    "src/utils/constants.ts": 28
   },
   "sparkles": {
     "src/components/feats/FeatCard.tsx": 1,

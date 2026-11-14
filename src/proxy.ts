@@ -2,11 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { refreshAuthSession } from '@/lib/supabase/proxy';
 
-const DEV_ONLY_PREFIXES = [
-  '/dice-test',
-  '/dice-components-demo',
-  '/test-error',
-];
+const DEV_ONLY_PREFIXES = ['/test-error'];
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (process.env.NODE_ENV === 'production') {
