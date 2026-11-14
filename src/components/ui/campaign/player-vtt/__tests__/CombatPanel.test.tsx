@@ -1,11 +1,13 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   render as rtlRender,
   screen,
   fireEvent,
   cleanup,
+  waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { CombatPanel } from '@/components/ui/campaign/player-vtt/CombatPanel';
@@ -444,6 +446,37 @@ describe('CombatPanel', () => {
     expect(collapse).toHaveAttribute('aria-expanded', 'true');
     fireEvent.click(collapse);
     expect(handleToggleCollapsed).toHaveBeenCalledTimes(2);
+  });
+
+  it('moves focus to the Combat pill after collapsing and back to the collapse button after expanding', async () => {
+    function Harness() {
+      const [collapsed, setCollapsed] = useState(false);
+      return (
+        <CombatPanel
+          state={buildState()}
+          characterId={CHARACTER_ID}
+          onEndTurn={noop}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setCollapsed(c => !c)}
+        />
+      );
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Collapse combat panel' })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Combat' })).toHaveFocus()
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Combat' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Collapse combat panel' })
+      ).toHaveFocus()
+    );
   });
 
   it('renders numeric HP for an enemy the DM toggled visible while the global mode is off', () => {

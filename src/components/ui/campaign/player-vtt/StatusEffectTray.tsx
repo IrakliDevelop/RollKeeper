@@ -80,6 +80,7 @@ export function StatusEffectTray() {
             <Button
               variant="ghost"
               size="sm"
+              className="h-auto min-h-9 px-2 py-1.5 text-left"
               leftIcon={
                 <AppIcon
                   name="concentration"

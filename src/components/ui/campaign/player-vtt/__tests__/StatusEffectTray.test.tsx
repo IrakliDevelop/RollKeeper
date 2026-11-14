@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  act,
   render as rtlRender,
   screen,
   fireEvent,
@@ -158,5 +159,32 @@ describe('StatusEffectTray', () => {
 
     unmount();
     expect(root.getPropertyValue('--player-vtt-tray-height')).toBe('');
+  });
+
+  it('re-measures when the tray resizes', () => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ height: 50 } as DOMRect);
+    let captured: (() => void) | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: () => void) {}
+        observe() {
+          captured = this.callback;
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    render(<StatusEffectTray />);
+
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue('--player-vtt-tray-height')).toBe('58px');
+
+    rect.mockReturnValue({ height: 80 } as DOMRect);
+    expect(captured).toBeDefined();
+    act(() => captured?.());
+    expect(root.getPropertyValue('--player-vtt-tray-height')).toBe('88px');
   });
 });

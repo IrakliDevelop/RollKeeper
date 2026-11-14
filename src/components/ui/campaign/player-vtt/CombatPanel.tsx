@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { focusWasLost } from '@/components/ui/campaign/location-map/useRestoreLostFocus';
 import { cn } from '@/utils/cn';
 import type { SharedInitiativeState } from '@/types/sharedState';
 
@@ -43,11 +45,24 @@ export function CombatPanel({
   collapsed,
   onToggleCollapsed,
 }: CombatPanelProps) {
+  const pillRef = useRef<HTMLButtonElement>(null);
+  const collapseRef = useRef<HTMLButtonElement>(null);
+  const prevCollapsed = useRef(collapsed);
+
+  // The pill and the collapse button each unmount on click, which drops
+  // focus to <body>; hand it to the control that replaced them.
+  useEffect(() => {
+    if (prevCollapsed.current === collapsed) return;
+    prevCollapsed.current = collapsed;
+    if (focusWasLost()) (collapsed ? pillRef : collapseRef).current?.focus();
+  }, [collapsed]);
+
   if (!state || !state.isActive) return null;
 
   if (collapsed) {
     return (
       <Button
+        ref={pillRef}
         variant="secondary"
         size="sm"
         aria-expanded={false}
@@ -80,6 +95,7 @@ export function CombatPanel({
         </div>
         <Tooltip content="Collapse combat panel">
           <Button
+            ref={collapseRef}
             variant="ghost"
             size="sm"
             className="w-9 shrink-0 px-0"

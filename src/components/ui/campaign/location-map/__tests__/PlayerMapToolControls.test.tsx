@@ -133,6 +133,50 @@ describe('PlayerMapToolControls', () => {
     ).toBe('112px');
   });
 
+  it('re-measures the panel-top variable when the island resizes', () => {
+    vi.stubGlobal('visualViewport', undefined);
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ bottom: 100 } as DOMRect);
+    let captured: (() => void) | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: () => void) {}
+        observe() {
+          captured = this.callback;
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    renderControls();
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue('--player-vtt-panel-top')).toBe('112px');
+
+    rect.mockReturnValue({ bottom: 200 } as DOMRect);
+    expect(captured).toBeDefined();
+    act(() => captured?.());
+    expect(root.getPropertyValue('--player-vtt-panel-top')).toBe('212px');
+  });
+
+  it('re-measures the panel-top variable on window resize', () => {
+    vi.stubGlobal('visualViewport', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ bottom: 100 } as DOMRect);
+    renderControls();
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue('--player-vtt-panel-top')).toBe('112px');
+
+    rect.mockReturnValue({ bottom: 200 } as DOMRect);
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(root.getPropertyValue('--player-vtt-panel-top')).toBe('212px');
+  });
+
   it('removes the panel-top variable on unmount', () => {
     vi.stubGlobal('visualViewport', undefined);
     const { unmount } = renderControls();
