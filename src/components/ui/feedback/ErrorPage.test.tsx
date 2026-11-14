@@ -109,7 +109,14 @@ describe('ErrorPage', () => {
   });
 
   it('shows no message line for an empty, blank or missing message', () => {
-    for (const error of [undefined, new Error(''), new Error('   ')]) {
+    // A boundary can catch a non-Error throw (`throw 'oops'`), whose message is undefined.
+    const nonError = 'oops' as unknown as Error;
+    for (const error of [
+      undefined,
+      new Error(''),
+      new Error('   '),
+      nonError,
+    ]) {
       const { container, unmount } = render(
         <ErrorPage kind="route" error={error} onRetry={() => {}} />
       );

@@ -41,7 +41,8 @@ export const ERROR_PAGE_COPY: Record<
 export default function ErrorPage({ kind, error, onRetry }: ErrorPageProps) {
   const copy = ERROR_PAGE_COPY[kind];
   const canRetry = kind !== 'not-found' && onRetry !== undefined;
-  const message = error?.message.trim();
+  const rawMessage: unknown = error?.message;
+  const message = typeof rawMessage === 'string' ? rawMessage.trim() : '';
 
   return (
     <main className="bg-surface text-body flex min-h-screen flex-col items-center justify-center px-4 py-12 text-center">
