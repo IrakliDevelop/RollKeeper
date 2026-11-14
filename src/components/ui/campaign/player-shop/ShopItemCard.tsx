@@ -4,7 +4,6 @@ import { Minus, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
-import { Card } from '@/components/ui/layout/card';
 import { cn } from '@/utils/cn';
 import {
   canAfford,
@@ -13,10 +12,6 @@ import {
 } from '@/utils/currency';
 import { formatShortfall } from './PlayerShopDialog.utils';
 import type { ShopItemCardProps } from './PlayerShopDialog.types';
-
-/** Matches artboard 1b's 48x48 stepper buttons. */
-const STEPPER_BUTTON_CLASS = 'h-12 w-12 shrink-0 rounded-lg p-0';
-const BUY_BUTTON_CLASS = 'h-12 shrink-0 sm:w-44';
 
 /**
  * One row of the player shop dialog (artboard 1b) — affordable / unaffordable
@@ -47,19 +42,12 @@ export function ShopItemCard({
     : totalCostCopper - purseToCopper(purse);
 
   return (
-    <Card
-      className={cn(
-        'flex flex-col gap-3 border-2 p-3.5 sm:flex-row sm:items-center',
-        affordable
-          ? 'border-accent-emerald-border bg-accent-emerald-bg'
-          : 'border-divider bg-surface-secondary'
-      )}
-    >
+    <li className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              'text-lg font-bold',
+              'type-subheading',
               soldOut ? 'text-muted' : 'text-heading'
             )}
           >
@@ -67,7 +55,7 @@ export function ShopItemCard({
           </span>
           {soldOut && <Badge variant="neutral">Sold out</Badge>}
         </span>
-        <span className="text-body text-sm">
+        <span className="type-small text-body">
           {formatCurrencyFromCopper(item.priceCopper)} each ·{' '}
           {soldOut ? 'none left' : `${item.remainingQuantity} left`}
         </span>
@@ -78,11 +66,10 @@ export function ShopItemCard({
         )}
         {resultMessage && (
           <span
+            role={resultTone === 'error' ? 'alert' : 'status'}
             className={cn(
-              'text-sm font-medium',
-              resultTone === 'error'
-                ? 'text-accent-red-text'
-                : 'text-accent-emerald-text'
+              'type-small',
+              resultTone === 'error' ? 'text-blood-text' : 'text-verdigris-text'
             )}
           >
             {resultMessage}
@@ -90,59 +77,58 @@ export function ShopItemCard({
         )}
       </div>
 
-      <div
-        className={cn(
-          'flex shrink-0 items-center justify-center gap-2',
-          soldOut && 'opacity-45'
-        )}
-      >
+      <div className="flex shrink-0 items-center justify-center gap-2">
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
+          size="sm"
           aria-label={`Fewer ${item.name}`}
-          className={STEPPER_BUTTON_CLASS}
+          className="w-9 shrink-0 px-0"
           disabled={soldOut || quantity <= 1}
           onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
         >
-          <Minus size={20} />
+          <Minus size={16} aria-hidden />
         </Button>
-        <span className="text-heading min-w-8 text-center text-lg font-bold tabular-nums">
+        <span className="type-ui text-heading min-w-8 text-center tabular-nums">
           {soldOut ? 0 : quantity}
         </span>
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
+          size="sm"
           aria-label={`More ${item.name}`}
-          className={STEPPER_BUTTON_CLASS}
+          className="w-9 shrink-0 px-0"
           disabled={soldOut || quantity >= maxQuantity}
           onClick={() => onQuantityChange(Math.min(maxQuantity, quantity + 1))}
         >
-          <Plus size={20} />
+          <Plus size={16} aria-hidden />
         </Button>
       </div>
 
       {soldOut ? (
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
+          size="sm"
           disabled
-          className={BUY_BUTTON_CLASS}
+          className="shrink-0 sm:min-w-36"
         >
           Sold out
         </Button>
       ) : (
         <Button
           type="button"
-          variant="primary"
+          variant="secondary"
+          size="sm"
           disabled={!affordable || purchasing}
           onClick={onBuy}
-          className={BUY_BUTTON_CLASS}
+          className="shrink-0 sm:min-w-36"
         >
           {purchasing
             ? 'Buying…'
             : `Buy · ${formatCurrencyFromCopper(totalCostCopper)}`}
         </Button>
       )}
-    </Card>
+    </li>
   );
 }

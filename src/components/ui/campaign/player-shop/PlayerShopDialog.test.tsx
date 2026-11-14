@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { PlayerShopDialog } from './index';
@@ -95,6 +101,35 @@ afterEach(() => {
 });
 
 describe('PlayerShopDialog card states', () => {
+  it('lists items as rows', async () => {
+    const items = [
+      makeItem(),
+      makeItem({ id: 'potion', name: 'Potion of Healing' }),
+    ];
+    renderDialog(makeShop(items));
+    await screen.findByText('Halvard Brenn');
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('list')).toBeInTheDocument();
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(items.length);
+  });
+
+  it('uses secondary buttons for Buy and the quantity steppers', async () => {
+    renderDialog(makeShop([makeItem()]));
+    await screen.findByText('Halvard Brenn');
+
+    expect(screen.getByRole('button', { name: 'Buy · 1 gp' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    for (const name of ['Fewer Arrows (20)', 'More Arrows (20)']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'data-variant',
+        'secondary'
+      );
+    }
+  });
+
   it('renders an affordable item with its price/stock line and an active Buy button', async () => {
     renderDialog(makeShop([makeItem()]));
     await screen.findByText('Halvard Brenn');
@@ -348,11 +383,9 @@ describe('committed spend (owned by the caller) corrects affordability across mu
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
     await waitFor(() =>
-      expect(
-        screen.getByText(
-          'Bought. The item will appear on your character shortly.'
-        )
-      ).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
     );
 
     // Only 10 gp of the 50 gp purse remains uncommitted; the 30 gp Shield
@@ -373,11 +406,9 @@ describe('committed spend (owned by the caller) corrects affordability across mu
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
     await waitFor(() =>
-      expect(
-        screen.getByText(
-          'Bought. The item will appear on your character shortly.'
-        )
-      ).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
     );
 
     // Close: unmount the dialog entirely, exactly like
@@ -463,18 +494,18 @@ describe('purchase flow', () => {
     const buyButton = screen.getByRole('button', { name: 'Buy · 1 gp' });
     await user.click(buyButton);
     await waitFor(() =>
-      expect(
-        screen.getByText('Could not complete that purchase.')
-      ).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not complete that purchase.'
+      )
     );
     await user.click(screen.getByRole('button', { name: 'Buy · 1 gp' }));
     await waitFor(() =>
-      expect(
-        screen.getByText(
-          'Bought. The item will appear on your character shortly.'
-        )
-      ).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
     );
+    // The new result replaces the old one in the row's single result slot.
+    expect(screen.queryByRole('alert')).toBeNull();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const firstBody = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -543,9 +574,9 @@ describe('purchase flow', () => {
     await user.click(screen.getByRole('button', { name: 'Buy · 1 gp' }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText('Someone bought the last one.')
-      ).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Someone bought the last one.'
+      )
     );
   });
 });
