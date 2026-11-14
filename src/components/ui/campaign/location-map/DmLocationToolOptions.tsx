@@ -221,6 +221,8 @@ interface DmLocationToolOptionsProps {
   /** Location mode only: the relay is configured, so the laser/ping tools
    *  exist and their colour rows must render. */
   liveSyncConfigured?: boolean;
+  /** Shown after the row's last control, behind a separator. Not rendered when the active tool has no row. */
+  trailing?: ReactNode;
 }
 
 /**
@@ -237,6 +239,7 @@ export default function DmLocationToolOptions({
   fogControls,
   fogPresetControls,
   liveSyncConfigured = false,
+  trailing,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   // Read unconditionally (both DM surfaces render this component inside
@@ -574,6 +577,13 @@ export default function DmLocationToolOptions({
                   setOptions={setTemplateOpts}
                 />
               )}
+          </>
+        )}
+
+        {trailing && (
+          <>
+            <OptionSeparator />
+            {trailing}
           </>
         )}
       </div>

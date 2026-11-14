@@ -1,3 +1,4 @@
+import type { ComponentProps, ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 
@@ -10,6 +11,12 @@ import { PLAYER_TOKEN_KIND } from '@/components/ui/campaign/location-map/PlayerT
 import type { CanvasElement } from '@fieldnotes/core';
 
 let mockElements: CanvasElement[] = [];
+
+vi.mock('@/components/ui/campaign/location-map/DmLocationToolOptions', () => ({
+  default: ({ trailing }: { trailing?: ReactNode }) => (
+    <div data-testid="options-row">{trailing}</div>
+  ),
+}));
 
 vi.mock('@fieldnotes/react', () => ({
   useActiveTool: () => ['select', vi.fn()] as const,
@@ -42,71 +49,131 @@ function ownTokenEl(characterId: string): CanvasElement {
   } as unknown as CanvasElement;
 }
 
+const TOOL_NAMES = [
+  'Pan',
+  'Select',
+  'Place token',
+  'Draw',
+  'Arrow',
+  'Measure',
+  'Move',
+  'Template',
+];
+
+function renderToolbar(
+  overrides: Partial<ComponentProps<typeof PlayerToolbar>> = {}
+) {
+  return render(
+    <PlayerToolbar
+      status="live"
+      hasSelection={false}
+      onDeleteSelected={vi.fn()}
+      characterId="char-1"
+      showBackLink={false}
+      {...overrides}
+    />
+  );
+}
+
 describe('PlayerToolbar', () => {
   beforeEach(() => {
     mockElements = [];
-  });
-
-  afterEach(() => cleanup());
-
-  it('pulses the token button with an intact class list when the player has no own token yet', () => {
-    render(
-      <PlayerToolbar
-        status="live"
-        hasSelection={false}
-        onDeleteSelected={vi.fn()}
-        characterId="char-1"
-      />
-    );
-    const btn = screen.getByTitle('Place your token on the map');
-    expect(btn.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(['p-0', 'animate-pulse', 'bg-accent-emerald-bg'])
+    // Radix Tooltip measures its trigger; jsdom has no ResizeObserver.
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
     );
   });
 
-  it('shows the plain label with no pulse once the player has placed their own token', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('describes the token button with visible hint text when the player has no own token yet', () => {
+    renderToolbar();
+    const btn = screen.getByRole('button', { name: 'Place token' });
+    const hint = screen.getByText('Place your token on the map');
+    expect(btn).toHaveAttribute('aria-describedby', hint.id);
+    expect(screen.getByTestId('options-row')).toContainElement(hint);
+  });
+
+  it('shows no hint once the player has placed their own token', () => {
     mockElements = [ownTokenEl('char-1')];
-    render(
-      <PlayerToolbar
-        status="live"
-        hasSelection={false}
-        onDeleteSelected={vi.fn()}
-        characterId="char-1"
-      />
-    );
+    renderToolbar();
     expect(
-      screen.queryByTitle('Place your token on the map')
+      screen.queryByText('Place your token on the map')
     ).not.toBeInTheDocument();
-    const btn = screen.getByTitle('Place token');
-    expect(btn.className).not.toContain('animate-pulse');
+    expect(
+      screen.getByRole('button', { name: 'Place token' })
+    ).not.toHaveAttribute('aria-describedby');
   });
 
-  it('does not pulse the token button while still connecting', () => {
-    render(
-      <PlayerToolbar
-        status="connecting"
-        hasSelection={false}
-        onDeleteSelected={vi.fn()}
-        characterId="char-1"
-      />
-    );
+  it('shows no hint while still connecting', () => {
+    renderToolbar({ status: 'connecting' });
     expect(
-      screen.queryByTitle('Place your token on the map')
+      screen.queryByText('Place your token on the map')
     ).not.toBeInTheDocument();
-    const btn = screen.getByTitle('Place token');
-    expect(btn.className).not.toContain('animate-pulse');
+    expect(
+      screen.getByRole('button', { name: 'Place token' })
+    ).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('names every tool and marks only the active one pressed, with no title attributes', () => {
+    const { container } = renderToolbar();
+    for (const name of TOOL_NAMES) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'aria-pressed',
+        name === 'Select' ? 'true' : 'false'
+      );
+    }
+    expect(container.querySelector('[title]')).toBeNull();
+    const toolbar = screen.getByTestId('player-toolbar');
+    for (const name of TOOL_NAMES) {
+      expect(toolbar).toContainElement(screen.getByRole('button', { name }));
+    }
+  });
+
+  it('keeps Delete selected outside the scrolling tool row', () => {
+    renderToolbar({ hasSelection: true });
+    const scroller = screen.getByRole('button', { name: 'Pan' }).parentElement!;
+    expect(
+      scroller.contains(screen.getByRole('button', { name: 'Delete selected' }))
+    ).toBe(false);
+  });
+
+  it('links back to the sheet only when showBackLink is set', () => {
+    const { unmount } = renderToolbar({ showBackLink: true });
+    expect(screen.getByRole('link', { name: 'Back to sheet' })).toHaveAttribute(
+      'href',
+      '/player/characters/char-1'
+    );
+    unmount();
+    renderToolbar({ showBackLink: false });
+    expect(
+      screen.queryByRole('link', { name: 'Back to sheet' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the sync state as a chip, with the denied wording', () => {
+    const { unmount } = renderToolbar();
+    expect(screen.getByTestId('live-sync-chip')).toHaveTextContent('Live');
+    unmount();
+    renderToolbar({ status: 'denied' });
+    expect(screen.getByTestId('live-sync-chip')).toHaveTextContent(
+      'Sync denied'
+    );
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
   });
 
   it('renders the export control passed via the exportControl prop', () => {
-    render(
-      <PlayerToolbar
-        status="live"
-        hasSelection={false}
-        onDeleteSelected={vi.fn()}
-        characterId="char-1"
-        exportControl={<button aria-label="Export map">Export</button>}
-      />
-    );
+    renderToolbar({
+      exportControl: <button aria-label="Export map">Export</button>,
+    });
     expect(screen.getByLabelText('Export map')).toBeInTheDocument();
   });
 
@@ -120,14 +187,7 @@ describe('PlayerToolbar', () => {
   // targeting the TV moving every player's camera instead — is covered
   // separately by PlayerBattleMapCanvas.focusOptions.test.ts.
   it('renders no views control — players never send camera focus requests', () => {
-    render(
-      <PlayerToolbar
-        status="live"
-        hasSelection={false}
-        onDeleteSelected={vi.fn()}
-        characterId="char-1"
-      />
-    );
+    renderToolbar();
     expect(screen.queryByRole('button', { name: /views/i })).toBeNull();
   });
 
