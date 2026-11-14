@@ -1,1 +1,0 @@
-export { AbilityScoreDisplay } from './AbilityScoreDisplay';
