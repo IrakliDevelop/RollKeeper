@@ -58,29 +58,29 @@ function makeStatBlock(
 }
 
 describe('creatureBadge', () => {
-  it('badges a summon Summon/blue even if it also has a type', () => {
+  it('badges a summon Summon even if it also has a type', () => {
     const entity = makeEntity({ type: 'monster', summonId: 'summon-1' });
-    expect(creatureBadge(entity)).toEqual({ label: 'Summon', tone: 'blue' });
+    expect(creatureBadge(entity)).toEqual({ label: 'Summon' });
   });
 
-  it('badges a lair entity Lair/emerald', () => {
+  it('badges a lair entity Lair', () => {
     const entity = makeEntity({ type: 'lair' });
-    expect(creatureBadge(entity)).toEqual({ label: 'Lair', tone: 'emerald' });
+    expect(creatureBadge(entity)).toEqual({ label: 'Lair' });
   });
 
-  it('badges type npc NPC/amber', () => {
+  it('badges type npc NPC', () => {
     const entity = makeEntity({ type: 'npc' });
-    expect(creatureBadge(entity)).toEqual({ label: 'NPC', tone: 'amber' });
+    expect(creatureBadge(entity)).toEqual({ label: 'NPC' });
   });
 
-  it('badges a monster with an npcSourceId (custom monster) NPC/amber', () => {
+  it('badges a monster with an npcSourceId (custom monster) NPC', () => {
     const entity = makeEntity({ type: 'monster', npcSourceId: 'npc-1' });
-    expect(creatureBadge(entity)).toEqual({ label: 'NPC', tone: 'amber' });
+    expect(creatureBadge(entity)).toEqual({ label: 'NPC' });
   });
 
-  it('badges a plain monster Monster/purple', () => {
+  it('badges a plain monster Monster', () => {
     const entity = makeEntity({ type: 'monster' });
-    expect(creatureBadge(entity)).toEqual({ label: 'Monster', tone: 'purple' });
+    expect(creatureBadge(entity)).toEqual({ label: 'Monster' });
   });
 });
 

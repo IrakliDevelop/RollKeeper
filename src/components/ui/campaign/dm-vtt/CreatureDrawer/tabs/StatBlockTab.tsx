@@ -3,12 +3,9 @@
 import React from 'react';
 
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
 import { DetailCombatInfo } from '@/components/ui/encounter/combat-screen/detail/DetailCombatInfo';
 import { TokenSettings } from '@/components/ui/campaign/dm-vtt/StudioPanel/TokenSettings';
-import {
-  HEADING_CLASS,
-  SECTION_CLASS,
-} from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 import type { EncounterEntity } from '@/types/encounter';
 
 import type { CreatureTabProps } from '../CreatureDrawer.utils';
@@ -39,14 +36,13 @@ export function StatBlockTab({
   onTokenIdentityChange,
 }: StatBlockTabProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <DetailCombatInfo entity={entity} actions={actions} readOnly={!editing} />
-      <div className={SECTION_CLASS}>
-        <h3 className={HEADING_CLASS}>Source</h3>
-        <p className="text-body text-sm">{sourceLabel(entity)}</p>
+      <Section level={4} heading="Source">
+        <p className="type-body text-body">{sourceLabel(entity)}</p>
         {onOpenEditor && (
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="mt-2"
             onClick={onOpenEditor}
@@ -54,7 +50,7 @@ export function StatBlockTab({
             Full stat block editor
           </Button>
         )}
-      </div>
+      </Section>
       {onTokenIdentityChange && (
         <TokenSettings entity={entity} onChange={onTokenIdentityChange} />
       )}

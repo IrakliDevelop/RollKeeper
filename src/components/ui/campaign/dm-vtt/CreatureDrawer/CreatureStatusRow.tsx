@@ -3,6 +3,8 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 
+import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
 import { ConcentrationReaction } from '@/components/ui/encounter/combat-screen/detail/ConcentrationReaction';
 import { DeathSaves } from '@/components/ui/encounter/combat-screen/detail/DeathSaves';
 import {
@@ -10,19 +12,14 @@ import {
   showDeathSaves,
   spendHitDie,
 } from '@/components/ui/encounter/combat-screen/detail/hitDie';
-import {
-  HEADING_CLASS,
-  SECTION_CLASS,
-} from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 
 import { CreatureConcentrationBanner } from './CreatureConcentrationBanner';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
 
-/** Concentration/reaction, death saves (when applicable), and the Spend Hit Die control. */
+/** "Status" section: concentration/reaction, death saves (when applicable), and Spend hit die. */
 export function CreatureStatusRow({ entity, actions }: CreatureVitalsProps) {
   return (
-    <div className={`${SECTION_CLASS} space-y-2`}>
-      <p className={HEADING_CLASS}>Status</p>
+    <Section level={4} heading="Status" contentClassName="space-y-2">
       <ConcentrationReaction entity={entity} actions={actions} />
       <CreatureConcentrationBanner entity={entity} />
 
@@ -31,14 +28,15 @@ export function CreatureStatusRow({ entity, actions }: CreatureVitalsProps) {
       )}
 
       {canSpendHitDie(entity) && (
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<Plus size={14} />}
           onClick={() => spendHitDie(entity, actions)}
-          className="text-accent-purple-text bg-accent-purple-bg hover:bg-accent-purple-bg-strong flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
         >
-          <Plus size={11} aria-hidden />
-          Spend Hit Die ({entity.hitDice?.dieType})
-        </button>
+          Spend hit die ({entity.hitDice?.dieType})
+        </Button>
       )}
-    </div>
+    </Section>
   );
 }

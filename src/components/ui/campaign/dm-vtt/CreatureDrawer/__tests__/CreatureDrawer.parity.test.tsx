@@ -119,9 +119,19 @@ function rowOf(text: string, depth: number): HTMLElement {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 beforeEach(() => {
+  // CreatureSheet's Tooltips: Radix measures the trigger with ResizeObserver.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
   useEncounterStore.setState({
     encounters: [
       createMockEncounter({
@@ -178,7 +188,7 @@ describe('CreatureDrawer parity — players row', () => {
     });
 
     await user.click(
-      screen.getByTitle('Name visible to players — click to hide')
+      screen.getByRole('button', { name: 'Hide name from players' })
     );
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, { isHidden: true });
 
@@ -250,14 +260,14 @@ describe('CreatureDrawer parity — vitals', () => {
     });
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, { tempAc: 3 });
 
-    fireEvent.change(screen.getByLabelText('Initiative Mod'), {
+    fireEvent.change(screen.getByLabelText('Initiative modifier'), {
       target: { value: '5' },
     });
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, {
       initiativeModifier: 5,
     });
 
-    fireEvent.change(screen.getByLabelText('Proficiency Bonus'), {
+    fireEvent.change(screen.getByLabelText('Proficiency bonus'), {
       target: { value: '4' },
     });
     expect(actions.onUpdate).toHaveBeenCalledWith(ID, { proficiencyBonus: 4 });
@@ -554,7 +564,7 @@ describe('CreatureDrawer parity — variants', () => {
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(1);
     expect(tabs[0]).toHaveTextContent('Lair');
-    expect(screen.queryByText('Hit Points')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hit points')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /^damage$/i })
     ).not.toBeInTheDocument();
@@ -579,7 +589,7 @@ describe('CreatureDrawer parity — variants', () => {
 
   it('summons show no Damage/Heal controls', () => {
     renderDrawer(SUMMON);
-    expect(screen.getByText('Hit Points')).toBeInTheDocument();
+    expect(screen.getByText('Hit points')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /^damage$/i })
     ).not.toBeInTheDocument();

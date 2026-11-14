@@ -20,7 +20,7 @@ export function LairTab({
   onTokenIdentityChange,
 }: LairTabProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <LairActionsSection entity={entity} actions={actions} />
       <RegionalEffects effects={entity.regionalEffects ?? []} />
       {onTokenIdentityChange && (

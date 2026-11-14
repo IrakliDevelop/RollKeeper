@@ -170,7 +170,7 @@ export const FULL_CREATURE: EncounterEntity = {
   },
 };
 
-/** Same creature, standing (HP > 0 and below max) so Spend Hit Die shows. */
+/** Same creature, standing (HP > 0 and below max) so Spend hit die shows. */
 export const FULL_CREATURE_STANDING: EncounterEntity = {
   ...FULL_CREATURE,
   currentHp: 20,
