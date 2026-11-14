@@ -2,7 +2,11 @@
 
 import { useMemo } from 'react';
 
+import { Minus, Plus } from 'lucide-react';
+
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 
 import { DockBuffs } from '../../CharacterDock/DockBuffs';
 import { EffectsConcentration } from './EffectsConcentration';
@@ -19,8 +23,6 @@ import {
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import type { SheetRoll } from '../SheetDrawer.types';
-
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 
 export interface EffectsTabProps {
   addToast: (t: Omit<ToastData, 'id'>) => void;
@@ -70,7 +72,7 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <EffectsConcentration
         character={character}
         roll={roll}
@@ -78,13 +80,10 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
       />
 
       {buffs.length > 0 && (
-        <div className={SECTION_CLASS}>
-          <DockBuffs buffs={buffs} onToggleBuff={handleToggleBuff} />
-        </div>
+        <DockBuffs buffs={buffs} onToggleBuff={handleToggleBuff} />
       )}
 
-      <div className={SECTION_CLASS}>
-        <h3 className={HEADING_CLASS}>Conditions</h3>
+      <Section heading="Conditions" level={4}>
         <div className="grid grid-cols-3 gap-2">
           {conditionToggles.map(toggle => (
             <Button
@@ -102,43 +101,50 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
             </Button>
           ))}
         </div>
-        <p className="text-faint mt-2 text-[10px]">Also shows on your token.</p>
-      </div>
+        <p className="type-caption text-muted mt-2">
+          Also shows on your token.
+        </p>
+      </Section>
 
       <EffectsOtherList effects={otherEffects} onRemove={removeCondition} />
 
-      <div className={SECTION_CLASS}>
-        <h3 className={HEADING_CLASS}>Exhaustion</h3>
+      <Section heading="Exhaustion" level={4}>
         <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label="Decrease exhaustion"
-            disabled={exhaustion.level === 0}
-            onClick={() => exhaustion.decrement()}
-          >
-            −
-          </Button>
-          <span className="text-heading min-w-[1.5rem] text-center text-lg font-bold">
+          <Tooltip content="Decrease exhaustion">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-9 px-0"
+              aria-label="Decrease exhaustion"
+              disabled={exhaustion.level === 0}
+              onClick={() => exhaustion.decrement()}
+            >
+              <Minus size={16} aria-hidden />
+            </Button>
+          </Tooltip>
+          <span className="type-num-lg text-heading min-w-6 text-center tabular-nums">
             {exhaustion.level}
           </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label="Increase exhaustion"
-            disabled={exhaustion.level >= 6}
-            onClick={() => void exhaustion.increment()}
-          >
-            +
-          </Button>
-          <span className="text-muted text-xs">/ 6</span>
+          <Tooltip content="Increase exhaustion">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-9 px-0"
+              aria-label="Increase exhaustion"
+              disabled={exhaustion.level >= 6}
+              onClick={() => void exhaustion.increment()}
+            >
+              <Plus size={16} aria-hidden />
+            </Button>
+          </Tooltip>
+          <span className="type-small text-muted">/ 6</span>
         </div>
-        <p className="text-muted mt-2 text-xs">
+        <p className="type-small text-muted mt-2">
           {exhaustionRulesText(exhaustion.level, exhaustion.variant)}
         </p>
-      </div>
+      </Section>
     </div>
   );
 }
