@@ -174,7 +174,7 @@ describe.each(FLAG_SETS)('blocked browser storage (%s)', (_label, env) => {
 
     await renderRoot(route);
 
-    expect(screen.queryByText(/Reality\.exe|has stopped working/i)).toBeNull();
+    expect(screen.queryByText(/hit an error/i)).toBeNull();
     expect(errors).not.toHaveBeenCalledWith(
       expect.objectContaining({ name: 'SecurityError' })
     );
@@ -202,6 +202,6 @@ describe('blocked browser storage that cannot be replaced', () => {
       }
     );
     await expect(renderRoot(ROUTES[2])).resolves.toBeUndefined();
-    expect(screen.queryByText(/Reality\.exe|has stopped working/i)).toBeNull();
+    expect(screen.queryByText(/hit an error/i)).toBeNull();
   });
 });

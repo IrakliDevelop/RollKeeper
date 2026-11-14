@@ -35,11 +35,9 @@ export default class ErrorBoundary extends Component<Props, State> {
 
       return (
         <ErrorPage
+          kind="route"
           error={this.state.error}
-          reset={() => this.setState({ hasError: false, error: undefined })}
-          title="Component Spell Failed!"
-          description={this.state.error?.message}
-          showHome={false}
+          onRetry={() => this.setState({ hasError: false, error: undefined })}
         />
       );
     }
