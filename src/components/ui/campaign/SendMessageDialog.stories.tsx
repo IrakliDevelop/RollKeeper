@@ -23,9 +23,6 @@ const meta: Meta<typeof SendMessageDialog> = {
       test: 'error',
       context: {
         include: ['body'],
-        // The node after the editor content is RichTextEditor's own
-        // `text-faint` placeholder (2.92:1). It is outside this PR's scope.
-        exclude: ['.rich-text-editor-content + div'],
       },
     },
   },
@@ -39,7 +36,7 @@ function body(canvasElement: HTMLElement) {
   return within(canvasElement.ownerDocument.body);
 }
 
-// The editor shows "Loading editor..." until it mounts, so wait for it.
+// The editor mounts after the first render, so wait for its textbox.
 async function expectEditor(screen: ReturnType<typeof body>) {
   await screen.findByRole('textbox', { name: 'Message (optional)' });
   await screen.findByText('Meet at the Rusty Anchor after the session.');

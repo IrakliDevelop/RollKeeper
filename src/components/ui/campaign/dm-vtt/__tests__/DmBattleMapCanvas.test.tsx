@@ -260,7 +260,7 @@ describe('DmBattleMapCanvas wiring', () => {
     // mode="dm" reaches the panel: the DM edit form (and only it) carries the
     // dmNotes field.
     expect(
-      screen.getByLabelText(/DM notes — never shown to players/)
+      screen.getByLabelText('DM notes — never shown to players')
     ).toHaveTextContent('DC 15');
   });
 

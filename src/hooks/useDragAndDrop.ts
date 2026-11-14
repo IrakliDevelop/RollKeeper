@@ -41,21 +41,16 @@ export function useDragAndDrop({
       setDraggedIndex(index);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', String(index));
-      (e.currentTarget as HTMLElement).style.opacity = '0.5';
     },
     [disabled]
   );
 
-  const handleDragEnd = useCallback(
-    (e: React.DragEvent) => {
-      if (disabled) return;
+  const handleDragEnd = useCallback(() => {
+    if (disabled) return;
 
-      (e.currentTarget as HTMLElement).style.opacity = '1';
-      setDraggedIndex(null);
-      setDragOverIndex(null);
-    },
-    [disabled]
-  );
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  }, [disabled]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent, index: number) => {
@@ -92,7 +87,7 @@ export function useDragAndDrop({
   const getDragOverStyles = useCallback(
     (index: number): string => {
       return dragOverIndex === index
-        ? 'border-blue-400 border-2 bg-blue-50'
+        ? 'outline-2 -outline-offset-2 outline-brass-border'
         : '';
     },
     [dragOverIndex]
