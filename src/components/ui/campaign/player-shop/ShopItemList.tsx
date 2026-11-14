@@ -23,7 +23,7 @@ export function ShopItemList({
   onBuy: (item: PublicShopItem) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3">
+    <ul className="divide-divider divide-y">
       {items.map(item => {
         const maxQuantity = Math.max(1, item.remainingQuantity);
         const quantity = Math.min(quantities[item.id] ?? 1, maxQuantity);
@@ -41,6 +41,6 @@ export function ShopItemList({
           />
         );
       })}
-    </div>
+    </ul>
   );
 }

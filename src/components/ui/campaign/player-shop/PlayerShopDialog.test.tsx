@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { PlayerShopDialog } from './index';
@@ -95,6 +101,35 @@ afterEach(() => {
 });
 
 describe('PlayerShopDialog card states', () => {
+  it('lists items as rows', async () => {
+    const items = [
+      makeItem(),
+      makeItem({ id: 'potion', name: 'Potion of Healing' }),
+    ];
+    renderDialog(makeShop(items));
+    await screen.findByText('Halvard Brenn');
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('list')).toBeInTheDocument();
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(items.length);
+  });
+
+  it('uses secondary buttons for Buy and the quantity steppers', async () => {
+    renderDialog(makeShop([makeItem()]));
+    await screen.findByText('Halvard Brenn');
+
+    expect(screen.getByRole('button', { name: 'Buy · 1 gp' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    for (const name of ['Fewer Arrows (20)', 'More Arrows (20)']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'data-variant',
+        'secondary'
+      );
+    }
+  });
+
   it('renders an affordable item with its price/stock line and an active Buy button', async () => {
     renderDialog(makeShop([makeItem()]));
     await screen.findByText('Halvard Brenn');
@@ -150,6 +185,70 @@ describe('PlayerShopDialog card states', () => {
     expect(
       screen.getByRole('button', { name: 'Fewer Chain Shirt' })
     ).toBeDisabled();
+  });
+});
+
+describe('shop shell states', () => {
+  it('reports a shop load error as an alert', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValueOnce(new Error('network down'))
+    );
+    render(
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        purse={PURSE}
+        committedCopper={0}
+        onPurchaseCommitted={() => {}}
+      />
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load this shop.'
+    );
+  });
+
+  it('treats a `{ shop: null }` response as a closed merchant, not an error', async () => {
+    mockFetchSequence([{ body: { shop: null } }]);
+    render(
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        purse={PURSE}
+        committedCopper={0}
+        onPurchaseCommitted={() => {}}
+      />
+    );
+    expect(
+      await screen.findByText("This merchant isn't trading right now.")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
+  });
+
+  it('shows the purse as a summary list', async () => {
+    renderDialog(makeShop([makeItem({ remainingQuantity: 10 })]));
+    await screen.findByText('Halvard Brenn');
+
+    const purseTerm = screen.getByText('Your purse');
+    expect(purseTerm.tagName).toBe('DT');
+    expect(purseTerm.nextElementSibling?.tagName).toBe('DD');
+    expect(purseTerm.nextElementSibling).toHaveTextContent(
+      '34 gp · 6 sp · 12 cp'
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'More Arrows (20)' }));
+
+    const afterTerm = screen.getByText('After buying 2 Arrows (20) — 2 gp');
+    expect(afterTerm.tagName).toBe('DT');
+    expect(afterTerm.nextElementSibling?.tagName).toBe('DD');
   });
 });
 
@@ -348,11 +447,9 @@ describe('committed spend (owned by the caller) corrects affordability across mu
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
     await waitFor(() =>
-      expect(
-        screen.getByText(
-          'Bought. The item will appear on your character shortly.'
-        )
-      ).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
     );
 
     // Only 10 gp of the 50 gp purse remains uncommitted; the 30 gp Shield
@@ -373,11 +470,9 @@ describe('committed spend (owned by the caller) corrects affordability across mu
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
     await waitFor(() =>
-      expect(
-        screen.getByText(
-          'Bought. The item will appear on your character shortly.'
-        )
-      ).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
     );
 
     // Close: unmount the dialog entirely, exactly like
@@ -398,6 +493,191 @@ describe('committed spend (owned by the caller) corrects affordability across mu
       3000 - purseToCopper(spendCopper(FIFTY_GOLD_PURSE, 4000)!);
     expect(screen.getByText(formatShortfall(shortfall))).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).toBeDisabled();
+  });
+});
+
+describe('stale stock clamps the row', () => {
+  function renderSeeded(shop: PublicShop) {
+    vi.stubGlobal('fetch', vi.fn());
+    return render(
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        initialShop={shop}
+        purse={PURSE}
+        committedCopper={0}
+        onPurchaseCommitted={() => {}}
+      />
+    );
+  }
+
+  it('drops a larger selected quantity to what is left after a purchase shrinks the stock', async () => {
+    renderDialog(makeShop([makeItem({ remainingQuantity: 10 })]));
+    await screen.findByText('Halvard Brenn');
+    const row = screen.getByRole('listitem');
+
+    const user = userEvent.setup();
+    const more = screen.getByRole('button', { name: 'More Arrows (20)' });
+    for (let i = 0; i < 4; i += 1) await user.click(more);
+    expect(within(row).getByText('5')).toBeInTheDocument();
+
+    // The receipt reports only 3 left (another player bought in between).
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            entryId: 'arrows',
+            grantedQuantity: 5,
+            costCopper: 500,
+            remainingQuantity: 3,
+          }),
+      })
+    );
+    await user.click(screen.getByRole('button', { name: 'Buy · 5 gp' }));
+    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
+
+    expect(screen.getByText('1 gp each · 3 left')).toBeInTheDocument();
+    expect(within(row).getByText('3')).toBeInTheDocument();
+    expect(within(row).queryByText('5')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Buy · 3 gp' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'More Arrows (20)' })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Fewer Arrows (20)' })
+    ).toBeEnabled();
+  });
+
+  it('shows 0 with every control disabled once a row with a stale selection sells out', async () => {
+    const { rerender } = renderSeeded(
+      makeShop([makeItem({ remainingQuantity: 2 })])
+    );
+    const row = screen.getByRole('listitem');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'More Arrows (20)' }));
+    expect(within(row).getByText('2')).toBeInTheDocument();
+
+    rerender(
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        initialShop={makeShop([makeItem({ remainingQuantity: 0 })])}
+        purse={PURSE}
+        committedCopper={0}
+        onPurchaseCommitted={() => {}}
+      />
+    );
+
+    expect(screen.getByText('1 gp each · none left')).toBeInTheDocument();
+    expect(within(row).getByText('0')).toBeInTheDocument();
+    expect(within(row).queryByText('2')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Fewer Arrows (20)' })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'More Arrows (20)' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Sold out' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /^Buy/ })).toBeNull();
+  });
+});
+
+describe('result messages reset', () => {
+  function mockBoughtArrows(quantity: number) {
+    return vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          entryId: 'arrows',
+          grantedQuantity: quantity,
+          costCopper: 100 * quantity,
+          remainingQuantity: 10 - quantity,
+        }),
+    });
+  }
+
+  it("clears a row's result when that row's quantity changes", async () => {
+    renderDialog(makeShop([makeItem({ remainingQuantity: 10 })]));
+    await screen.findByText('Halvard Brenn');
+
+    vi.stubGlobal('fetch', mockBoughtArrows(1));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Buy · 1 gp' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More Arrows (20)' }));
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('clears every result and selection when the dialog closes and reopens', async () => {
+    const shop = makeShop([makeItem({ remainingQuantity: 10 })]);
+    function dialogAt(open: boolean) {
+      return (
+        <PlayerShopDialog
+          open={open}
+          onOpenChange={() => {}}
+          campaignCode="ABCD"
+          npcId="npc-1"
+          playerId="player-1"
+          purse={PURSE}
+          committedCopper={0}
+          onPurchaseCommitted={() => {}}
+        />
+      );
+    }
+
+    mockFetchSequence([{ body: { shop } }]);
+    const { rerender } = render(dialogAt(true));
+    await screen.findByText('Halvard Brenn');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'More Arrows (20)' }));
+    vi.stubGlobal('fetch', mockBoughtArrows(2));
+    await user.click(screen.getByRole('button', { name: 'Buy · 2 gp' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
+    );
+
+    // Close via the `open` prop only — the component itself stays mounted,
+    // so any state it failed to reset would survive into the next open.
+    rerender(dialogAt(false));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    mockFetchSequence([{ body: { shop } }]);
+    rerender(dialogAt(true));
+    await screen.findByText('Halvard Brenn');
+
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    const row = screen.getByRole('listitem');
+    expect(within(row).getByText('1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buy · 1 gp' })).toBeEnabled();
+    // The footer preview falls back to the first row at quantity 1, so the
+    // stale "2 Arrows" preview from before the close must be gone.
+    expect(
+      screen.getByText('After buying 1 Arrows (20) — 1 gp')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('After buying 2 Arrows (20) — 2 gp')).toBeNull();
   });
 });
 
@@ -463,18 +743,18 @@ describe('purchase flow', () => {
     const buyButton = screen.getByRole('button', { name: 'Buy · 1 gp' });
     await user.click(buyButton);
     await waitFor(() =>
-      expect(
-        screen.getByText('Could not complete that purchase.')
-      ).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not complete that purchase.'
+      )
     );
     await user.click(screen.getByRole('button', { name: 'Buy · 1 gp' }));
     await waitFor(() =>
-      expect(
-        screen.getByText(
-          'Bought. The item will appear on your character shortly.'
-        )
-      ).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Bought. The item will appear on your character shortly.'
+      )
     );
+    // The new result replaces the old one in the row's single result slot.
+    expect(screen.queryByRole('alert')).toBeNull();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const firstBody = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -543,9 +823,9 @@ describe('purchase flow', () => {
     await user.click(screen.getByRole('button', { name: 'Buy · 1 gp' }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText('Someone bought the last one.')
-      ).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Someone bought the last one.'
+      )
     );
   });
 });
