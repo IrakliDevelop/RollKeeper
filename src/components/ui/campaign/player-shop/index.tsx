@@ -140,12 +140,14 @@ export function PlayerShopDialog({
           merchantAvatarUrl={merchantAvatarUrl}
         />
 
-        {loading && <p className="text-muted text-sm">Loading the shop…</p>}
+        {loading && <p className="type-small text-muted">Loading the shop…</p>}
         {!loading && error && (
-          <p className="text-accent-red-text text-sm">{error}</p>
+          <p role="alert" className="type-small text-blood-text">
+            {error}
+          </p>
         )}
         {!loading && !error && !shop && (
-          <p className="text-muted text-sm">
+          <p className="type-small text-muted">
             This merchant isn&apos;t trading right now.
           </p>
         )}

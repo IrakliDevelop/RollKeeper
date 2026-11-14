@@ -45,8 +45,6 @@
     "src/components/ui/campaign/legacy/LegacyBannerUpload.tsx": 1,
     "src/components/ui/campaign/legacy/LegacyCampaignHero.tsx": 19,
     "src/components/ui/campaign/location-map/PlayerBattleMapCanvas.tsx": 8,
-    "src/components/ui/campaign/player-shop/PlayerShopFooter.tsx": 1,
-    "src/components/ui/campaign/player-shop/index.tsx": 1,
     "src/components/ui/campaign/player-vtt/CastingBanner.tsx": 3,
     "src/components/ui/campaign/player-vtt/CharacterDock/DockBuffs.tsx": 3,
     "src/components/ui/campaign/player-vtt/CharacterDock/DockVitals.utils.ts": 6,

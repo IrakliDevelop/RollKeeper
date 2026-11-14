@@ -188,6 +188,49 @@ describe('PlayerShopDialog card states', () => {
   });
 });
 
+describe('shop shell states', () => {
+  it('reports a shop load error as an alert', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValueOnce(new Error('network down'))
+    );
+    render(
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        purse={PURSE}
+        committedCopper={0}
+        onPurchaseCommitted={() => {}}
+      />
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load this shop.'
+    );
+  });
+
+  it('shows the purse as a summary list', async () => {
+    renderDialog(makeShop([makeItem({ remainingQuantity: 10 })]));
+    await screen.findByText('Halvard Brenn');
+
+    const purseTerm = screen.getByText('Your purse');
+    expect(purseTerm.tagName).toBe('DT');
+    expect(purseTerm.nextElementSibling?.tagName).toBe('DD');
+    expect(purseTerm.nextElementSibling).toHaveTextContent(
+      '34 gp · 6 sp · 12 cp'
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'More Arrows (20)' }));
+
+    const afterTerm = screen.getByText('After buying 2 Arrows (20) — 2 gp');
+    expect(afterTerm.tagName).toBe('DT');
+    expect(afterTerm.nextElementSibling?.tagName).toBe('DD');
+  });
+});
+
 describe('merchant header reads both name and description from the SAME shop record (controller review fix)', () => {
   it('shows merchantDescription from the fetched shop, not a separately-supplied prop', async () => {
     renderDialog(makeShop([makeItem()]));
