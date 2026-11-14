@@ -34,7 +34,7 @@ export function DeadGlyph({
   );
 }
 
-/** Amber reaction badge in the token's top-right corner. */
+/** Neutral reaction badge in the token's top-right corner. */
 export function ReactionUsedGlyph({
   rect,
   cell,
@@ -47,8 +47,9 @@ export function ReactionUsedGlyph({
   return (
     <span
       data-testid="reaction-used-glyph"
-      title="Reaction used"
-      className="bg-surface-secondary/90 border-accent-amber-border text-accent-amber-text absolute flex items-center justify-center rounded-full border"
+      role="img"
+      aria-label="Reaction used"
+      className="bg-surface-raised/90 border-divider text-body absolute flex items-center justify-center rounded-full border"
       style={{
         left: rect.x + rect.w - size - inset,
         top: rect.y + inset,
