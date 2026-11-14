@@ -142,6 +142,15 @@ export function PlayerVttScreen({
       pendingTransfers={sharedState?.transfers}
       onOpenOwnSheet={openSheet}
       onOpenPartySheet={openPartySheet}
+      toolControlsFooter={
+        pendingPlacement ? (
+          <CastingBanner
+            spellName={pendingPlacement.spellName}
+            aoe={pendingPlacement.aoe}
+            onCancel={cancelPlacement}
+          />
+        ) : null
+      }
     >
       <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
       <SpellPlacementController
@@ -149,13 +158,6 @@ export function PlayerVttScreen({
         configRef={spellTemplateConfigRef}
         onCancel={cancelPlacement}
       />
-      {pendingPlacement && (
-        <CastingBanner
-          spellName={pendingPlacement.spellName}
-          aoe={pendingPlacement.aoe}
-          onCancel={cancelPlacement}
-        />
-      )}
       <div className="pointer-events-none absolute inset-0 z-10">
         <CombatPanel
           state={liveInitiative}
