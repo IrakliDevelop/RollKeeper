@@ -30,7 +30,9 @@ export function ToolbarButton({
         variant="ghost"
         size="sm"
         type="button"
-        className="w-9 shrink-0 px-0"
+        // Offset 0: the frame clips overflow and the compact toolbar's
+        // padding is thinner than the Button's default 2px ring offset.
+        className="w-9 shrink-0 px-0 focus-visible:outline-offset-0"
         aria-label={label}
         selected={active ?? false}
         aria-pressed={active}

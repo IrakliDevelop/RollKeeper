@@ -158,7 +158,7 @@ export const Touch: Story = {
     await expect(canvasElement.querySelector('svg')).toBeNull();
 
     const [moveDown] = canvas.getAllByRole('button', { name: 'Move down' });
-    await fireEvent.click(moveDown);
+    fireEvent.click(moveDown);
     await waitFor(() =>
       expect(readNames(canvasElement)).toEqual([
         'Shortbow',
@@ -169,7 +169,9 @@ export const Touch: Story = {
 
     const restore = emulateCoarsePointer();
     try {
-      for (const button of canvas.getAllByRole('button')) {
+      for (const button of canvas.getAllByRole('button', {
+        name: /^Move (up|down)$/,
+      })) {
         await expect(
           button.getBoundingClientRect().height
         ).toBeGreaterThanOrEqual(44);

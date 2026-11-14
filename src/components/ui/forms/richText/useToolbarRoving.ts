@@ -40,6 +40,7 @@ export function useToolbarRoving<T extends HTMLElement>(): {
     }
   });
 
+  // Re-applies tabindex imperatively: an arrow move focuses without a render.
   const onFocus = useCallback((e: FocusEvent<T>) => {
     const root = ref.current;
     const button = (e.target as HTMLElement).closest('button');
@@ -53,6 +54,8 @@ export function useToolbarRoving<T extends HTMLElement>(): {
   const onKeyDown = useCallback((e: KeyboardEvent<T>) => {
     const root = ref.current;
     if (!root) return;
+    // Alt+←/→ (history) and Ctrl+Home/End belong to the browser.
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     const buttons = enabledButtons(root);
     if (buttons.length === 0) return;
     const index = buttons.indexOf(document.activeElement as HTMLButtonElement);

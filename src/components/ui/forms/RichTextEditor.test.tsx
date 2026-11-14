@@ -179,6 +179,25 @@ describe('roving focus', () => {
     expect(textbox).toHaveFocus();
   });
 
+  it('lets modified arrow keys through to the browser', async () => {
+    const user = userEvent.setup();
+    renderEditor({ content: '<p></p>' });
+    await screen.findByRole('textbox', { name: 'Note content' });
+    const bold = tool('Bold');
+    // React handles the event at the root, so listen past it on document.
+    const prevented: boolean[] = [];
+    const record = (e: Event) => prevented.push(e.defaultPrevented);
+    document.addEventListener('keydown', record);
+    try {
+      act(() => bold.focus());
+      await user.keyboard('{Alt>}{ArrowRight}{/Alt}');
+    } finally {
+      document.removeEventListener('keydown', record);
+    }
+    expect(bold).toHaveFocus();
+    expect(prevented).toEqual([false, false]);
+  });
+
   it('moves the tab stop when the focused tool disappears', async () => {
     const user = userEvent.setup();
     renderEditor();

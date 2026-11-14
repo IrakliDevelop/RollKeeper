@@ -59,33 +59,37 @@ interface RichTextEditorProps {
   minHeight?: string;
 }
 
-const selectToolbarState = (e: Editor) => ({
-  isBold: e.isActive('bold'),
-  isItalic: e.isActive('italic'),
-  isUnderline: e.isActive('underline'),
-  isStrike: e.isActive('strike'),
-  isCode: e.isActive('code'),
-  isH1: e.isActive('heading', { level: 1 }),
-  isH2: e.isActive('heading', { level: 2 }),
-  isH3: e.isActive('heading', { level: 3 }),
-  isBulletList: e.isActive('bulletList'),
-  isOrderedList: e.isActive('orderedList'),
-  isQuote: e.isActive('blockquote'),
-  canBold: e.can().toggleBold(),
-  canItalic: e.can().toggleItalic(),
-  canUnderline: e.can().toggleUnderline(),
-  canStrike: e.can().toggleStrike(),
-  canCode: e.can().toggleCode(),
-  canUndo: e.can().undo(),
-  canRedo: e.can().redo(),
-  inTable: e.isActive('table'),
-  canAddColumn: e.can().addColumnAfter(),
-  canAddRow: e.can().addRowAfter(),
-  canMerge: e.can().mergeCells(),
-  canSplit: e.can().splitCell(),
-  canDeleteTable: e.can().deleteTable(),
-  isEmpty: e.isEmpty,
-});
+const selectToolbarState = (e: Editor) => {
+  // The cell tools only render inside a table; skip their dry runs elsewhere.
+  const inTable = e.isActive('table');
+  return {
+    isBold: e.isActive('bold'),
+    isItalic: e.isActive('italic'),
+    isUnderline: e.isActive('underline'),
+    isStrike: e.isActive('strike'),
+    isCode: e.isActive('code'),
+    isH1: e.isActive('heading', { level: 1 }),
+    isH2: e.isActive('heading', { level: 2 }),
+    isH3: e.isActive('heading', { level: 3 }),
+    isBulletList: e.isActive('bulletList'),
+    isOrderedList: e.isActive('orderedList'),
+    isQuote: e.isActive('blockquote'),
+    canBold: e.can().toggleBold(),
+    canItalic: e.can().toggleItalic(),
+    canUnderline: e.can().toggleUnderline(),
+    canStrike: e.can().toggleStrike(),
+    canCode: e.can().toggleCode(),
+    canUndo: e.can().undo(),
+    canRedo: e.can().redo(),
+    inTable,
+    canAddColumn: inTable && e.can().addColumnAfter(),
+    canAddRow: inTable && e.can().addRowAfter(),
+    canMerge: inTable && e.can().mergeCells(),
+    canSplit: inTable && e.can().splitCell(),
+    canDeleteTable: inTable && e.can().deleteTable(),
+    isEmpty: e.isEmpty,
+  };
+};
 
 type StateKey = keyof ReturnType<typeof selectToolbarState>;
 

@@ -54,6 +54,8 @@ export const NpcLore: Story = {
     await waitFor(() => expect(textbox).toHaveFocus());
     bold.focus();
     await expect(bold).toHaveFocus();
+    // The frame clips overflow: the ring has to sit inside the thin padding.
+    await expect(getComputedStyle(bold).outlineOffset).toBe('0px');
     await userEvent.keyboard('{ArrowRight}');
     await expect(canvas.getByRole('button', { name: 'Italic' })).toHaveFocus();
   },
