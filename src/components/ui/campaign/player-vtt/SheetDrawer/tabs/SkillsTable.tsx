@@ -2,12 +2,17 @@
 
 import { useMemo } from 'react';
 
+import { Section } from '@/components/ui/layout/section';
+import {
+  ProficiencyDot,
+  ProficiencyDotButton,
+  type ProficiencyLevel,
+} from '@/components/ui/game/ProficiencyDot';
 import { useCharacterStore } from '@/store/characterStore';
 import { formatModifier } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
 
 import { MaybeRollElement } from '../MaybeRollElement';
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import { buildSkillRows, nextSkillLevel } from '../SheetTabs.utils';
 import type {
   SheetRoll,
@@ -21,20 +26,9 @@ export interface SkillsTableProps {
   roll?: SheetRoll;
 }
 
-const DOT_LABEL = ['Not proficient', 'Proficient', 'Expertise'];
-const LEVEL_NAME = ['none', 'proficient', 'expertise'];
+const LEVEL_NAME: ProficiencyLevel[] = ['none', 'proficient', 'expertise'];
 /** Shared by header and rows so the columns line up. */
-const GRID_CLASS = 'grid grid-cols-[1.25rem_1fr_2.5rem_3rem_2.5rem] gap-2';
-
-function dotClassName(level: SkillProfLevel): string {
-  if (level === 2) {
-    return 'bg-accent-emerald-text-muted ring-2 ring-accent-emerald-border';
-  }
-  if (level === 1) {
-    return 'bg-accent-emerald-text-muted';
-  }
-  return 'border border-divider';
-}
+const GRID_CLASS = 'grid grid-cols-[1.5rem_1fr_3rem_3rem_3.25rem] gap-2';
 
 export function SkillsTable({ locked, roll }: SkillsTableProps) {
   const character = useCharacterStore(s => s.character);
@@ -58,19 +52,13 @@ export function SkillsTable({ locked, roll }: SkillsTableProps) {
   };
 
   return (
-    <div className={SECTION_CLASS}>
-      <h3 className={HEADING_CLASS}>Skills</h3>
-      <div
-        className={cn(
-          GRID_CLASS,
-          'text-faint mb-2 text-xs font-bold uppercase'
-        )}
-      >
+    <Section heading="Skills" level={4}>
+      <div className={cn(GRID_CLASS, 'type-caption text-muted mb-2')}>
         <span />
         <span>Skill</span>
-        <span>Abl</span>
+        <span>Ability</span>
         <span className="text-right">Mod</span>
-        <span className="text-right">Pass</span>
+        <span className="text-right">Passive</span>
       </div>
       <div className="space-y-1">
         {rows.map(row => (
@@ -83,7 +71,7 @@ export function SkillsTable({ locked, roll }: SkillsTableProps) {
           />
         ))}
       </div>
-    </div>
+    </Section>
   );
 }
 
@@ -98,39 +86,31 @@ function SkillRow({
   roll?: SheetRoll;
   onCycle: () => void;
 }) {
-  const dotClass = cn('h-2.5 w-2.5 rounded-full', dotClassName(row.level));
+  const level = LEVEL_NAME[row.level];
+  const label = `${row.name} proficiency: ${level}`;
   return (
-    <div className={cn(GRID_CLASS, 'items-center text-sm')}>
+    <div className={cn(GRID_CLASS, 'items-center pointer-coarse:min-h-11')}>
       {locked ? (
-        <span
-          role="img"
-          className="flex h-5 w-5 items-center justify-center"
-          aria-label={`${row.name} proficiency: ${LEVEL_NAME[row.level]}`}
-          title={`${DOT_LABEL[row.level]} · unlock to change`}
-        >
-          <span className={dotClass} />
-        </span>
+        <ProficiencyDot level={level} label={label} />
       ) : (
-        <button
-          type="button"
-          aria-label={`${row.name} proficiency: ${LEVEL_NAME[row.level]}`}
-          title="Tap to cycle proficiency"
+        <ProficiencyDotButton
+          level={level}
+          aria-label={label}
           onClick={onCycle}
-          className="flex h-5 w-5 items-center justify-center"
-        >
-          <span className={dotClass} />
-        </button>
+        />
       )}
-      <span className="text-body">{row.name}</span>
-      <span className="text-faint text-xs uppercase">{row.abilityAbbr}</span>
+      <span className="type-ui text-body">{row.name}</span>
+      <span className="type-small text-muted">{row.abilityAbbr}</span>
       <MaybeRollElement
         ariaLabel={`Roll ${row.name}`}
-        className="text-heading text-right font-semibold"
+        className="type-ui text-heading text-right tabular-nums"
         onRoll={roll ? () => roll(row.name, row.modifier) : undefined}
       >
         {formatModifier(row.modifier)}
       </MaybeRollElement>
-      <span className="text-muted text-right">{row.passive}</span>
+      <span className="type-ui text-muted text-right tabular-nums">
+        {row.passive}
+      </span>
     </div>
   );
 }

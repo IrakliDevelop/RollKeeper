@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { screen, fireEvent, cleanup } from '@testing-library/react';
 
 import { SheetResources } from '../SheetResources';
+import { renderWithTooltips, stubResizeObserver } from './renderWithTooltips';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState } from '@/types/character';
 
@@ -43,23 +44,38 @@ function paladin(level: number) {
   });
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
+  stubResizeObserver();
   seed({ classes: [] });
 });
 
 describe('SheetResources', () => {
   it('renders nothing when there are no active resources', () => {
     seed({ classes: [] });
-    const { container } = render(<SheetResources />);
+    const { container } = renderWithTooltips(<SheetResources />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('titles the section at level 4 and gives the reset a tooltip, not a title', () => {
+    fighter(1);
+    renderWithTooltips(<SheetResources />);
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Class resources' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /reset second wind/i })
+    ).not.toHaveAttribute('title');
   });
 
   it('spends and restores a pips resource through the store', () => {
     fighter(1); // Second Wind, max 2
 
-    render(<SheetResources />);
+    renderWithTooltips(<SheetResources />);
     const spendButtons = screen.getAllByRole('button', {
       name: /spend second wind/i,
     });
@@ -83,7 +99,7 @@ describe('SheetResources', () => {
   it('spends and restores a pool resource by 1 and by 5 when max is at least 20', () => {
     paladin(4); // Lay on Hands, max 20
 
-    render(<SheetResources />);
+    renderWithTooltips(<SheetResources />);
     fireEvent.click(
       screen.getByRole('button', { name: /spend 1 lay on hands/i })
     );
@@ -120,7 +136,7 @@ describe('SheetResources', () => {
   it('hides the ±5 buttons for a pool resource under 20 max uses', () => {
     paladin(1); // Lay on Hands, max 5
 
-    render(<SheetResources />);
+    renderWithTooltips(<SheetResources />);
     expect(
       screen.queryByRole('button', { name: /spend 5 lay on hands/i })
     ).toBeNull();
@@ -148,7 +164,7 @@ describe('SheetResources', () => {
       classResources: { 'second-wind': { usesExpended: 2 } },
     });
 
-    render(<SheetResources />);
+    renderWithTooltips(<SheetResources />);
     fireEvent.click(screen.getByRole('button', { name: /reset second wind/i }));
     expect(
       useCharacterStore.getState().character.classResources?.['second-wind']
@@ -172,7 +188,7 @@ describe('SheetResources', () => {
       classResources: { 'lay-on-hands': { usesExpended: 20 } },
     });
 
-    render(<SheetResources />);
+    renderWithTooltips(<SheetResources />);
     expect(
       screen.getByRole('button', { name: /spend 1 lay on hands/i })
     ).toBeDisabled();
@@ -200,7 +216,7 @@ describe('SheetResources', () => {
       classResources: { 'second-wind': { usesExpended: 2 } },
     });
 
-    render(<SheetResources />);
+    renderWithTooltips(<SheetResources />);
     expect(
       screen.queryByRole('button', { name: /spend second wind/i })
     ).toBeNull();
@@ -211,7 +227,7 @@ describe('SheetResources', () => {
 
   it('uses the brass pool bar fill independent of the resource stored hue', () => {
     paladin(4);
-    const { container } = render(<SheetResources />);
+    const { container } = renderWithTooltips(<SheetResources />);
     expect(container.querySelector('[data-resource-bar-fill]')).toHaveClass(
       'bg-brass-fill'
     );

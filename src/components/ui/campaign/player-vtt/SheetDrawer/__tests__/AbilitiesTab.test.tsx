@@ -1,13 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  render,
-  screen,
-  fireEvent,
-  cleanup,
-  within,
-} from '@testing-library/react';
+import { screen, fireEvent, cleanup } from '@testing-library/react';
 
 import { AbilitiesTab } from '../tabs/AbilitiesTab';
+import { renderWithTooltips, stubResizeObserver } from './renderWithTooltips';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState } from '@/types/character';
 
@@ -38,26 +33,32 @@ function seed(overrides: Partial<CharacterState> = {}) {
   } as CharacterState);
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('AbilitiesTab', () => {
-  beforeEach(() => seed());
+  beforeEach(() => {
+    stubResizeObserver();
+    seed();
+  });
 
   it('shows skill modifiers as plain values when rolls are off', () => {
-    render(<AbilitiesTab locked />);
+    renderWithTooltips(<AbilitiesTab locked />);
     expect(screen.getByText('Stealth')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /roll stealth/i })).toBeNull();
   });
 
   it('does not change proficiency while locked', () => {
-    render(<AbilitiesTab locked />);
+    renderWithTooltips(<AbilitiesTab locked />);
     expect(
       screen.queryByRole('button', { name: /stealth proficiency/i })
     ).toBeNull();
   });
 
   it('cycles skill proficiency none → proficient → expertise → none when unlocked', () => {
-    render(<AbilitiesTab locked={false} />);
+    renderWithTooltips(<AbilitiesTab locked={false} />);
     const btn = () =>
       screen.getByRole('button', { name: /stealth proficiency/i });
     fireEvent.click(btn());
@@ -78,7 +79,7 @@ describe('AbilitiesTab', () => {
   });
 
   it('announces the current skill proficiency level', () => {
-    render(<AbilitiesTab locked={false} />);
+    renderWithTooltips(<AbilitiesTab locked={false} />);
     expect(
       screen.getByRole('button', { name: 'Stealth proficiency: none' })
     ).toBeInTheDocument();
@@ -91,7 +92,7 @@ describe('AbilitiesTab', () => {
   });
 
   it('labels locked proficiency dots as images and shows a Skills heading', () => {
-    render(<AbilitiesTab locked />);
+    renderWithTooltips(<AbilitiesTab locked />);
     expect(
       screen.getByRole('img', { name: /stealth proficiency: /i })
     ).toBeInTheDocument();
@@ -99,38 +100,70 @@ describe('AbilitiesTab', () => {
       screen.getByRole('img', { name: /wisdom save proficiency: /i })
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
-    ).toEqual(['Saving Throws', 'Proficiencies & Languages', 'Skills']);
+      screen.getAllByRole('heading', { level: 4 }).map(h => h.textContent)
+    ).toEqual(['Saving throws', 'Proficiencies & languages', 'Skills']);
   });
 
   it('toggles save proficiency when unlocked', () => {
-    render(<AbilitiesTab locked={false} />);
-    fireEvent.click(
-      screen.getByRole('button', { name: /wisdom save proficiency/i })
-    );
-    expect(getChar().savingThrows.wisdom.proficient).toBe(true);
-  });
-
-  it('shows an explanatory title on the locked save proficiency dot', () => {
     seed({
       savingThrows: {
         ...getChar().savingThrows,
         wisdom: { proficient: false },
       },
     });
-    render(<AbilitiesTab locked />);
+    renderWithTooltips(<AbilitiesTab locked={false} />);
+    const dot = screen.getByRole('button', { name: 'Wisdom save proficiency' });
+    expect(dot).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(dot);
+    expect(getChar().savingThrows.wisdom.proficient).toBe(true);
+  });
+
+  it('leaves a skill dot without a pressed state or a hover hint', () => {
+    seed({
+      skills: {
+        ...getChar().skills,
+        stealth: {
+          ...getChar().skills.stealth,
+          proficient: false,
+          expertise: false,
+        },
+      },
+    });
+    renderWithTooltips(<AbilitiesTab locked={false} />);
+    const dot = screen.getByRole('button', {
+      name: 'Stealth proficiency: none',
+    });
+    expect(dot).not.toHaveAttribute('aria-pressed');
+    expect(dot).not.toHaveAttribute('title');
+  });
+
+  it('spells out the skills table header', () => {
+    renderWithTooltips(<AbilitiesTab locked />);
+    expect(screen.getByText('Ability')).toBeInTheDocument();
+    expect(screen.getByText('Passive')).toBeInTheDocument();
+    expect(screen.queryByText('Abl')).toBeNull();
+  });
+
+  it('shows a locked save dot as an image with no button and no hover hint', () => {
+    seed({
+      savingThrows: {
+        ...getChar().savingThrows,
+        wisdom: { proficient: false },
+      },
+    });
+    renderWithTooltips(<AbilitiesTab locked />);
     expect(
-      screen.queryByRole('button', { name: /wisdom save proficiency/i })
-    ).toBeNull();
-    const wisdomRow = screen.getByText('Wisdom').parentElement as HTMLElement;
-    expect(
-      within(wisdomRow).getByTitle('Not proficient · unlock to change')
+      screen.getByRole('img', { name: 'Wisdom save proficiency: none' })
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Wisdom save proficiency' })
+    ).toBeNull();
+    expect(document.querySelector('[title]')).toBeNull();
   });
 
   it('rolls a skill when a roll function is provided', () => {
     const roll = vi.fn().mockResolvedValue(undefined);
-    render(<AbilitiesTab locked roll={roll} />);
+    renderWithTooltips(<AbilitiesTab locked roll={roll} />);
     fireEvent.click(screen.getByRole('button', { name: /roll stealth/i }));
     expect(roll).toHaveBeenCalledWith('Stealth', expect.any(Number));
   });
@@ -139,7 +172,7 @@ describe('AbilitiesTab', () => {
     seed({
       languages: [{ id: 'l1', name: 'Elvish', createdAt: '', updatedAt: '' }],
     });
-    render(<AbilitiesTab locked />);
+    renderWithTooltips(<AbilitiesTab locked />);
     expect(screen.getByText('Elvish')).toBeInTheDocument();
   });
 });

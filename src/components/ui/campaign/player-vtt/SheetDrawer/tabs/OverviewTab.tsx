@@ -5,6 +5,8 @@ import { Star } from 'lucide-react';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
+import { SlotPips } from '@/components/ui/game/SlotPips';
 import { useCharacterStore } from '@/store/characterStore';
 import { cn } from '@/utils/cn';
 
@@ -14,7 +16,6 @@ import {
   buildSlotSummary,
 } from '../SheetDrawer.utils';
 import { SheetResources } from '../SheetResources';
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import type { SheetSpellCastingProps } from '../SheetDrawer.types';
 import { OverviewFavorites } from './OverviewFavorites';
 
@@ -35,18 +36,17 @@ export function OverviewTab({ addToast, spellCasting }: OverviewTabProps) {
   const inspired = (character.heroicInspiration?.count ?? 0) > 0;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <OverviewFavorites addToast={addToast} spellCasting={spellCasting} />
 
       <SheetResources />
 
       {hitDice.length > 0 && (
-        <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Hit Dice</h3>
+        <Section heading="Hit dice" level={4}>
           <div className="space-y-2">
             {hitDice.map(d => (
               <div key={d.dieType} className="flex items-center gap-2">
-                <span className="text-heading w-10 shrink-0 text-sm font-semibold uppercase">
+                <span className="type-num-md text-heading w-10 shrink-0">
                   {d.dieType}
                 </span>
                 <div className="flex flex-1 flex-wrap gap-1">
@@ -54,16 +54,14 @@ export function OverviewTab({ addToast, spellCasting }: OverviewTabProps) {
                     <span
                       key={index}
                       className={cn(
-                        'h-2.5 w-2.5 rounded-full border',
-                        index < d.remaining
-                          ? 'bg-accent-emerald-text-muted border-accent-emerald-border'
-                          : 'border-divider'
+                        'border-divider-strong size-3 rounded-full border',
+                        index < d.remaining && 'bg-heading'
                       )}
                     />
                   ))}
                 </div>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="xs"
                   disabled={d.remaining === 0}
                   aria-label={`Spend ${d.dieType}`}
@@ -81,74 +79,57 @@ export function OverviewTab({ addToast, spellCasting }: OverviewTabProps) {
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
       {slotSummary.length > 0 && (
-        <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Spell Slots</h3>
+        <Section heading="Spell slots" level={4}>
           <div className="flex flex-wrap gap-3">
             {slotSummary.map(slot => (
               <div key={slot.label} className="flex items-center gap-1.5">
-                <span className="text-muted text-xs font-semibold">
-                  {slot.label}
-                </span>
-                <div className="flex gap-1">
-                  {Array.from({ length: slot.max }, (_, index) => (
-                    <span
-                      key={index}
-                      className={cn(
-                        'h-2.5 w-2.5 rounded-full border',
-                        index < slot.remaining
-                          ? 'bg-accent-blue-text-muted border-accent-blue-border'
-                          : 'border-divider'
-                      )}
-                    />
-                  ))}
-                </div>
+                <span className="type-small text-muted">{slot.label}</span>
+                <SlotPips
+                  total={slot.max}
+                  available={slot.remaining}
+                  level={slot.level}
+                />
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
-      <div className={SECTION_CLASS}>
-        <button
-          type="button"
-          aria-label="Heroic inspiration"
-          aria-pressed={inspired}
-          onClick={() =>
-            inspired ? spendHeroicInspiration() : addHeroicInspiration(1)
-          }
-          className="flex w-full items-center justify-between"
-        >
-          <span className={HEADING_CLASS + ' mb-0'}>Heroic Inspiration</span>
-          <span
-            className={cn(
-              'flex items-center gap-1 text-sm font-semibold',
-              inspired ? 'text-accent-amber-text' : 'text-muted'
-            )}
-          >
-            <Star className={cn('h-3.5 w-3.5', inspired && 'fill-current')} />
-            {inspired ? 'Ready' : 'None'}
-          </span>
-        </button>
-      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        selected={inspired}
+        aria-pressed={inspired}
+        leftIcon={
+          <Star
+            size={16}
+            className={cn(inspired && 'fill-current')}
+            aria-hidden
+          />
+        }
+        onClick={() =>
+          inspired ? spendHeroicInspiration() : addHeroicInspiration(1)
+        }
+      >
+        Heroic inspiration
+      </Button>
 
-      <div className={SECTION_CLASS}>
-        <h3 className={HEADING_CLASS}>Senses & Passives</h3>
-        <div className="flex flex-wrap gap-2">
+      <Section heading="Senses & passives" level={4}>
+        <dl className="grid grid-cols-3 gap-x-3">
           {passives.map(p => (
-            <span
-              key={p.label}
-              className="border-divider text-muted rounded-full border px-2 py-0.5 text-xs"
-            >
-              {p.label}{' '}
-              <span className="text-heading font-semibold">{p.value}</span>
-            </span>
+            <div key={p.label} className="flex flex-col-reverse">
+              <dt className="type-small text-muted">{p.label}</dt>
+              <dd className="type-num-lg text-heading tabular-nums">
+                {p.value}
+              </dd>
+            </div>
           ))}
-        </div>
-      </div>
+        </dl>
+      </Section>
     </div>
   );
 }

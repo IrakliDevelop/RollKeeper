@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { screen, fireEvent, cleanup } from '@testing-library/react';
 
 import { OverviewFavorites } from '../tabs/OverviewFavorites';
+import { renderWithTooltips, stubResizeObserver } from './renderWithTooltips';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState, Spell } from '@/types/character';
 import type { SheetSpellCastingProps } from '../SheetDrawer.types';
@@ -18,6 +19,14 @@ const FIRE_BOLT: Spell = {
   description: 'Test spell.',
   createdAt: '',
   updatedAt: '',
+};
+
+const MAGIC_MISSILE: Spell = {
+  ...FIRE_BOLT,
+  id: 'magicmissile',
+  name: 'Magic Missile',
+  level: 1,
+  isPrepared: false,
 };
 
 function seed(overrides: Partial<CharacterState> = {}) {
@@ -79,24 +88,32 @@ function casting(
   };
 }
 
-beforeEach(() => seed());
+beforeEach(() => {
+  stubResizeObserver();
+  seed();
+});
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('OverviewFavorites', () => {
   it('shows a pinned spell with a working Cast button', () => {
     const addToast = vi.fn();
-    render(<OverviewFavorites addToast={addToast} spellCasting={casting()} />);
+    renderWithTooltips(
+      <OverviewFavorites addToast={addToast} spellCasting={casting()} />
+    );
     fireEvent.click(screen.getByRole('button', { name: /cast fire bolt/i }));
     expect(addToast).toHaveBeenCalled();
   });
 
   it('uses a pinned consumable, decrementing quantity', () => {
     const addToast = vi.fn();
-    render(<OverviewFavorites addToast={addToast} spellCasting={casting()} />);
+    renderWithTooltips(
+      <OverviewFavorites addToast={addToast} spellCasting={casting()} />
+    );
     fireEvent.click(screen.getByRole('button', { name: /use ration/i }));
     expect(
       getChar().inventoryItems.find(i => i.id === 'ration1')!.quantity
@@ -107,12 +124,16 @@ describe('OverviewFavorites', () => {
   });
 
   it('shows the consumable quantity next to a pinned consumable row', () => {
-    render(<OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(screen.getByText('consumable · ×3')).toBeInTheDocument();
   });
 
   it('spends a pinned feature use via its pip', () => {
-    render(<OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
     fireEvent.click(screen.getByRole('button', { name: /use second wind/i }));
     expect(getChar().extendedFeatures.find(f => f.id === 'sw')!.usedUses).toBe(
       1
@@ -120,7 +141,9 @@ describe('OverviewFavorites', () => {
   });
 
   it('removes a row when its star is unpinned', () => {
-    render(<OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Unpin Fire Bolt' }));
     expect(screen.queryByText('Fire Bolt')).toBeNull();
@@ -139,9 +162,79 @@ describe('OverviewFavorites', () => {
         favoriteSpells: [],
       },
     });
-    render(<OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(
       screen.getByText(/nothing pinned\. tap the star/i)
     ).toBeInTheDocument();
+  });
+
+  it('titles the section at level 4 and drops the always-on hint', () => {
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Favorites' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Star anything in other tabs to pin it here')
+    ).toBeNull();
+  });
+
+  it('casts with a secondary button', () => {
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Cast Fire Bolt' })
+    ).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('says why a pinned spell cannot be cast in a visible caption, not a title', () => {
+    seed({
+      spells: [FIRE_BOLT, MAGIC_MISSILE],
+      sheetFavorites: [
+        { kind: 'spell', id: 'firebolt' },
+        { kind: 'spell', id: 'magicmissile' },
+      ],
+      spellbook: {
+        ...useCharacterStore.getState().character.spellbook,
+        favoriteSpells: ['firebolt', 'magicmissile'],
+      },
+    });
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
+    const cast = screen.getByRole('button', { name: 'Cast Magic Missile' });
+    expect(cast).toBeDisabled();
+    expect(cast).not.toHaveAttribute('title');
+    expect(screen.getAllByText('Not prepared or no slots left')).toHaveLength(
+      1
+    );
+  });
+
+  it('keeps Equipped as text on a pinned weapon', () => {
+    seed({
+      weapons: [
+        {
+          id: 'sword1',
+          name: 'Longsword',
+          category: 'martial',
+          weaponType: ['melee'],
+          damage: [{ dice: '1d8', type: 'slashing' }],
+          enhancementBonus: 0,
+          properties: [],
+          isEquipped: true,
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      sheetFavorites: [{ kind: 'item', id: 'sword1' }],
+    } as Partial<CharacterState>);
+    renderWithTooltips(
+      <OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />
+    );
+    expect(screen.getByText('Equipped')).toBeInTheDocument();
   });
 });
