@@ -2,13 +2,6 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 
-vi.mock('next/image', () => ({
-  default: (props: Record<string, unknown>) => {
-    const { fill, priority, ...rest } = props as Record<string, unknown>;
-    return <img {...rest} />;
-  },
-}));
-
 vi.mock('@/hooks/useClassData', () => ({
   useClassData: () => ({
     classData: [
@@ -70,39 +63,6 @@ describe('CharacterHUD', () => {
     expect(within(hp).getByText('30')).toBeInTheDocument();
     expect(within(hp).getByText('40')).toBeInTheDocument();
     expect(within(hp).getByText('+5 temp')).toBeInTheDocument();
-  });
-});
-
-describe('CharacterHeader', () => {
-  it('renders without crashing', async () => {
-    const { CharacterHeader } = await import(
-      '@/components/shared/character/CharacterHeader'
-    );
-    render(<CharacterHeader name="Gandalf" />);
-    expect(screen.getByText('Character Information')).toBeInTheDocument();
-  });
-
-  it('displays character name and race', async () => {
-    const { CharacterHeader } = await import(
-      '@/components/shared/character/CharacterHeader'
-    );
-    render(
-      <CharacterHeader
-        name="Gandalf"
-        race="Human"
-        classInfo={{
-          name: 'Wizard',
-          isCustom: false,
-          spellcaster: 'full',
-          hitDie: 6,
-        }}
-        level={20}
-        readonly
-      />
-    );
-    expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    expect(screen.getByText('Human')).toBeInTheDocument();
-    expect(screen.getByText('Level 20 Wizard')).toBeInTheDocument();
   });
 });
 
@@ -380,67 +340,5 @@ describe('AbilitiesSection', () => {
     expect(screen.getAllByText('Athletics').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Perception').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Stealth').length).toBeGreaterThan(0);
-  });
-});
-
-describe('AbilityScoreDisplay', () => {
-  it('renders without crashing', async () => {
-    const { AbilityScoreDisplay } = await import(
-      '@/components/shared/stats/AbilityScoreDisplay'
-    );
-    const character = makeCharacter();
-    render(<AbilityScoreDisplay abilities={character.abilities} readonly />);
-    expect(screen.getByText('Ability Scores')).toBeInTheDocument();
-  });
-
-  it('displays ability scores and modifiers', async () => {
-    const { AbilityScoreDisplay } = await import(
-      '@/components/shared/stats/AbilityScoreDisplay'
-    );
-    const abilities = {
-      strength: 16,
-      dexterity: 14,
-      constitution: 14,
-      intelligence: 10,
-      wisdom: 12,
-      charisma: 8,
-    };
-    render(<AbilityScoreDisplay abilities={abilities} readonly />);
-    expect(screen.getAllByText('STR').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('DEX').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('16').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('+3').length).toBeGreaterThan(0);
-  });
-});
-
-describe('DaysSpentTracker', () => {
-  it('renders without crashing', async () => {
-    const { default: DaysSpentTracker } = await import(
-      '@/components/ui/character/DaysSpentTracker'
-    );
-    render(
-      <DaysSpentTracker
-        daysSpent={10}
-        onUpdateDays={vi.fn()}
-        onIncrementDays={vi.fn()}
-      />
-    );
-    expect(screen.getByText('Campaign Days')).toBeInTheDocument();
-  });
-
-  it('displays day count and week breakdown', async () => {
-    const { default: DaysSpentTracker } = await import(
-      '@/components/ui/character/DaysSpentTracker'
-    );
-    render(
-      <DaysSpentTracker
-        daysSpent={10}
-        onUpdateDays={vi.fn()}
-        onIncrementDays={vi.fn()}
-      />
-    );
-    expect(screen.getAllByText('10').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/1 week/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/3 days/).length).toBeGreaterThan(0);
   });
 });

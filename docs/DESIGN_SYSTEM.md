@@ -230,9 +230,6 @@ input, card, dialog or toggle. Most have stories in both themes.
 | A number inside an ornament or in a tight spot | `AnchoredEditor` (a popover from 640px, a bottom sheet below) |
 | A hint on hover | `Tooltip`, never the only place the information appears |
 
-The older `CustomCheckbox`, `CustomSwitcher` and `FancySelect` still exist;
-don't use them in new code.
-
 ## Editing model
 
 Values are sorted by when they change:
