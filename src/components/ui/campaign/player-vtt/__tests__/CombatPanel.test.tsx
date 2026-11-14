@@ -132,9 +132,9 @@ describe('CombatPanel', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Combat' })).toBeInTheDocument();
-    expect(screen.getByText('Round 2 · 3 in order')).toBeInTheDocument();
+    expect(screen.getByText('Round 2')).toBeInTheDocument();
     expect(screen.queryByText(/ROUND/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/IN ORDER/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/in order/i)).not.toBeInTheDocument();
 
     const rows = screen.getAllByRole('listitem');
     expect(rows).toHaveLength(3);
