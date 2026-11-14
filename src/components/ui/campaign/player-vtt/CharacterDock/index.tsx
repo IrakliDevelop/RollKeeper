@@ -1,13 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { BookOpen, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
-import { AppIcon } from '@/components/ui/icons';
 import type { ToastData } from '@/components/ui/feedback/Toast';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { focusWasLost } from '@/components/ui/campaign/location-map/useRestoreLostFocus';
 import { useCharacterStore } from '@/store/characterStore';
 import { getActiveClassResources } from '@/utils/classResources';
+import { cn } from '@/utils/cn';
 import type { SpellAoe } from '@/types/spellAoe';
 
 import { DockBuffs } from './DockBuffs';
@@ -29,8 +32,19 @@ export interface CharacterDockProps {
 }
 
 /**
+ * Below `xl` the status tray shares the strip under the tool island, so the
+ * panel and its pill sit beneath it (`--player-vtt-tray-height`); from `xl`
+ * the tray sits beside the panel column. Both variables fall back to today's
+ * position, so nothing moves before the map mounts.
+ */
+const PANEL_TOP =
+  'top-[calc(var(--player-vtt-panel-top,78px)+var(--player-vtt-tray-height,0px))] xl:top-[var(--player-vtt-panel-top,78px)]';
+
+/**
  * Right-edge player VTT panel: avatar/name header + `DockVitals` (HP editor,
  * AC/Init, heroic inspiration) + `DockSpells` (search, cast flow, slot pips).
+ * An overlay surface; its Tooltip needs the `TooltipProvider` that
+ * `PlayerVttScreen` wraps around the floating panels.
  */
 export function CharacterDock({
   collapsed,
@@ -52,20 +66,38 @@ export function CharacterDock({
     state => state.restoreClassResource
   );
 
+  const pillRef = useRef<HTMLButtonElement>(null);
+  const collapseRef = useRef<HTMLButtonElement>(null);
+  const prevCollapsed = useRef(collapsed);
+
   const resources = useMemo(
     () => getActiveClassResources(character),
     [character]
   );
 
+  // The pill and the collapse button each unmount on click, which drops
+  // focus to <body>; hand it to the control that replaced them.
+  useEffect(() => {
+    if (prevCollapsed.current === collapsed) return;
+    prevCollapsed.current = collapsed;
+    if (focusWasLost()) (collapsed ? pillRef : collapseRef).current?.focus();
+  }, [collapsed]);
+
   if (collapsed) {
     return (
-      <button
+      <Button
+        ref={pillRef}
+        variant="secondary"
+        size="sm"
+        aria-expanded={false}
         onClick={onToggleCollapsed}
-        title="Expand character dock"
-        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[78px] right-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
+        className={cn(
+          'bg-surface-elevated pointer-events-auto fixed right-4',
+          PANEL_TOP
+        )}
       >
-        <AppIcon name="character" className="h-4 w-4" /> CHAR
-      </button>
+        Character
+      </Button>
     );
   }
 
@@ -100,55 +132,66 @@ export function CharacterDock({
   };
 
   const level = character.totalLevel || character.level;
-  const className = character.class?.name || 'Unknown Class';
+  const className = character.class?.name || 'Unknown class';
   const initial = character.name?.charAt(0)?.toUpperCase() || '?';
 
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] right-4 bottom-6 flex w-[338px] flex-col overflow-hidden rounded-2xl border shadow-xl">
-      <div className="border-divider flex shrink-0 items-center gap-3 border-b px-3 py-2.5">
+    <div
+      className={cn(
+        OVERLAY_SURFACE,
+        'pointer-events-auto fixed right-4 bottom-6 flex w-[338px] flex-col overflow-hidden',
+        PANEL_TOP
+      )}
+    >
+      <div className="border-divider flex shrink-0 items-center gap-3 border-b px-3 py-2">
         {character.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={character.avatar}
             alt={character.name}
-            className="h-10 w-10 shrink-0 rounded-full object-cover"
+            className="size-10 shrink-0 rounded-full object-cover"
           />
         ) : (
-          <div className="bg-surface-secondary text-heading flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold">
+          <div className="bg-surface-secondary text-heading type-subheading flex size-10 shrink-0 items-center justify-center rounded-full">
             {initial}
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-heading truncate text-sm font-semibold">
-            {character.name}
-          </div>
-          <div className="text-faint truncate text-xs">
-            {character.race} · {className} {level}
-          </div>
+          <h2 className="type-ui text-heading truncate">{character.name}</h2>
+          <p className="type-small text-muted truncate">
+            {[character.race, `${className} ${level}`]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         </div>
         {onOpenSheet && (
           <Button
             ref={sheetButtonRef}
-            variant="outline"
+            variant="secondary"
             size="sm"
-            onClick={onOpenSheet}
-            title="Open character sheet"
+            leftIcon={<BookOpen size={16} aria-hidden />}
             aria-label="Open character sheet"
+            onClick={onOpenSheet}
           >
-            <BookOpen className="mr-1 h-3.5 w-3.5" /> Sheet
+            Sheet
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="lg"
-          onClick={onToggleCollapsed}
-          aria-label="Collapse character dock"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        <Tooltip content="Collapse character dock">
+          <Button
+            ref={collapseRef}
+            variant="ghost"
+            size="sm"
+            className="w-9 shrink-0 px-0"
+            aria-label="Collapse character dock"
+            aria-expanded={true}
+            onClick={onToggleCollapsed}
+          >
+            <ChevronRight size={16} aria-hidden />
+          </Button>
+        </Tooltip>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3">
+      <div className="flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-3 py-3">
         <DockVitals addToast={addToast} />
 
         <DockBuffs
