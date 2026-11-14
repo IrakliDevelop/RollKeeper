@@ -341,8 +341,11 @@ export function PlayerToolbar({
             <LiveSyncChip status={status} />
           </span>
         </div>
-        {/* The island's own border is the bottom edge; the row's would double it. */}
-        <div className="border-divider w-full border-t empty:hidden [&>div]:border-b-0">
+        {/* The island's own border is the bottom edge; the row's would double it.
+            Width 0 so the options row never widens the island (tools would
+            shift on every tool switch); min-w-full stretches it back to the
+            tool row's width and the row wraps. */}
+        <div className="border-divider w-0 min-w-full border-t empty:hidden [&>div]:border-b-0">
           <DmLocationToolOptions
             mode="battlemap"
             movementControls={movementControls}
