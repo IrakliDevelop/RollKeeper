@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Input } from '@/components/ui/forms/input';
-import { NumberField } from '@/components/ui/forms/NumberInput';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import type { MonsterStatBlock } from '@/types/encounter';
 import type { DetailSectionProps } from './DetailHeader';
 
@@ -10,34 +10,35 @@ interface InfoRowProps {
   label: string;
   value?: string;
   editable?: boolean;
-  type?: 'text' | 'number';
+  numeric?: boolean;
   onChange?: (v: string) => void;
+  onNumberChange?: (v: number) => void;
 }
 
 function InfoRow({
   label,
   value,
   editable,
-  type = 'text',
+  numeric,
   onChange,
+  onNumberChange,
 }: InfoRowProps) {
   if (!editable && !value) return null;
   return (
     <div className="flex items-start gap-3 py-1">
-      <span className="text-muted w-36 shrink-0 text-xs font-semibold">
-        {label}
-      </span>
+      <span className="type-small text-muted w-36 shrink-0">{label}</span>
       {editable ? (
-        type === 'number' ? (
-          <NumberField
+        numeric ? (
+          <NumberInput
+            size="sm"
+            live={false}
+            min={0}
+            wrapperClassName="min-w-0 flex-1"
+            aria-label={label}
             value={value == null ? undefined : Number(value)}
             onChange={v => {
-              if (v !== undefined) onChange?.(String(v));
+              if (v !== undefined) onNumberChange?.(v);
             }}
-            min={0}
-            live={false}
-            className="bg-surface border-divider text-body min-w-0 flex-1 rounded-sm border px-2 py-1 text-base pointer-coarse:min-h-11"
-            aria-label={label}
           />
         ) : (
           <Input
@@ -49,7 +50,7 @@ function InfoRow({
           />
         )
       ) : (
-        <span className="text-body text-xs">{value}</span>
+        <span className="type-small text-body">{value}</span>
       )}
     </div>
   );
@@ -59,10 +60,8 @@ function StaticRow({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
   return (
     <div className="flex items-start gap-3 py-1">
-      <span className="text-muted w-36 shrink-0 text-xs font-semibold">
-        {label}
-      </span>
-      <span className="text-body text-xs">{value}</span>
+      <span className="type-small text-muted w-36 shrink-0">{label}</span>
+      <span className="type-small text-body">{value}</span>
     </div>
   );
 }
@@ -118,10 +117,8 @@ export function DetailCombatInfo({
     });
   };
 
-  const updatePassivePerception = (value: string) => {
+  const updatePassivePerception = (num: number) => {
     if (!sb) return;
-    const num = parseInt(value, 10);
-    if (Number.isNaN(num)) return;
     actions.onUpdate(entity.id, {
       monsterStatBlock: { ...sb, passivePerception: num },
     });
@@ -195,8 +192,8 @@ export function DetailCombatInfo({
             label="Passive perception"
             value={passivePerceptionValue}
             editable
-            type="number"
-            onChange={updatePassivePerception}
+            numeric
+            onNumberChange={updatePassivePerception}
           />
         </>
       ) : (
