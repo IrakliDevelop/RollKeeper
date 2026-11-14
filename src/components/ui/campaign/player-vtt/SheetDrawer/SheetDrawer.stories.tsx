@@ -545,7 +545,7 @@ export const SpellsTabStory: Story = {
       )
     );
     await expect(
-      screen.getByRole('heading', { name: 'Cantrips', level: 3 })
+      screen.getByRole('heading', { name: 'Cantrips', level: 4 })
     ).toBeInTheDocument();
   },
 };
@@ -641,9 +641,9 @@ export const OverviewFavoritesStory: Story = {
     // this same tab, so an unscoped query would match both.
     const favoritesHeading = screen.getByRole('heading', {
       name: 'Favorites',
-      level: 3,
+      level: 4,
     });
-    const favorites = within(favoritesHeading.closest('div')!);
+    const favorites = within(favoritesHeading.closest('section')!);
     await expect(favorites.getByText('Longbow')).toBeInTheDocument();
     await expect(favorites.getByText('Guidance')).toBeInTheDocument();
     await expect(favorites.getByText('Second Wind')).toBeInTheDocument();
@@ -666,7 +666,9 @@ export const Party: Story = {
     );
     await expect(screen.getByText(/played by priya/i)).toBeInTheDocument();
     await expect(screen.getByText('Bloodied')).toBeInTheDocument();
-    await expect(screen.getByText('Bless')).toBeInTheDocument();
+    await expect(
+      screen.getByText('Concentrating on Bless')
+    ).toBeInTheDocument();
     await expect(screen.getByText('Holy Symbol')).toBeInTheDocument();
     // This fixture has shareHpWithParty on (hitPoints non-null), so the exact
     // reading renders alongside the coarse word.

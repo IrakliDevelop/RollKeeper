@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { screen, fireEvent, cleanup, within } from '@testing-library/react';
 
 import { useCharacterStore } from '@/store/characterStore';
+import { calculateCarryingCapacity } from '@/utils/calculations';
 import type {
   ArmorItem,
   CharacterState,
@@ -12,6 +13,7 @@ import type {
 
 import { InventoryTab } from '../tabs/InventoryTab';
 import { INVENTORY_VIEW_STORAGE_KEY } from '../SheetDrawer.types';
+import { renderWithTooltips, stubResizeObserver } from './renderWithTooltips';
 
 function weapon(overrides: Partial<Weapon> = {}): Weapon {
   return {
@@ -88,6 +90,8 @@ function seed(overrides: Partial<CharacterState> = {}) {
 const getChar = () => useCharacterStore.getState().character;
 
 beforeEach(() => {
+  stubResizeObserver();
+  useCharacterStore.getState().resetCharacter();
   seed();
   try {
     window.localStorage.clear();
@@ -98,17 +102,18 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('InventoryTab', () => {
   it('renders inventory groups with entries', () => {
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     expect(screen.getByText('Longsword')).toBeInTheDocument();
     expect(screen.getByText('Ring of Protection')).toBeInTheDocument();
     expect(screen.getByText('Rope, 50ft')).toBeInTheDocument();
     expect(
-      screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
+      screen.getAllByRole('heading', { level: 4 }).map(h => h.textContent)
     ).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Weapons'),
@@ -119,7 +124,9 @@ describe('InventoryTab', () => {
   });
 
   it('adjusts an inventory item quantity with the +/- controls', () => {
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
+    expect(screen.queryByText('−')).toBeNull();
+    expect(screen.queryByText('+')).toBeNull();
     fireEvent.click(
       screen.getByRole('button', { name: 'Increase Rope, 50ft' })
     );
@@ -136,7 +143,7 @@ describe('InventoryTab', () => {
 
   it('uses a consumable item, decrementing quantity and toasting', () => {
     const addToast = vi.fn();
-    render(<InventoryTab locked addToast={addToast} />);
+    renderWithTooltips(<InventoryTab locked addToast={addToast} />);
     fireEvent.click(screen.getByRole('button', { name: 'Use Ration' }));
     expect(
       getChar().inventoryItems.find(i => i.id === 'ration1')!.quantity
@@ -157,12 +164,12 @@ describe('InventoryTab', () => {
         }),
       ],
     });
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Use Ration' })).toBeDisabled();
   });
 
   it('equips a weapon', () => {
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     const button = screen.getByRole('button', { name: 'Equip Longsword' });
     expect(button).toHaveAttribute('aria-pressed', 'false');
 
@@ -190,7 +197,7 @@ describe('InventoryTab', () => {
         }),
       ],
     });
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     expect(
       screen.getByRole('group', { name: 'Blink charges: 1 of 2' })
     ).toBeInTheDocument();
@@ -199,7 +206,7 @@ describe('InventoryTab', () => {
   });
 
   it('shows the quantity stepper for a consumable item alongside its Use button', () => {
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     expect(
       screen.getByRole('button', { name: 'Use Ration' })
     ).toBeInTheDocument();
@@ -222,16 +229,18 @@ describe('InventoryTab', () => {
         magicItem({ id: 'm2', name: 'Cloak of Elvenkind', isAttuned: false }),
       ],
     });
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     const button = screen.getByRole('button', {
       name: 'Attune Cloak of Elvenkind',
     });
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('title', 'All attunement slots are in use');
+    expect(button).not.toHaveAttribute('title');
   });
 
   it('shows plain currency values when locked, and an editable field when unlocked', () => {
-    const { rerender } = render(<InventoryTab locked addToast={vi.fn()} />);
+    const { rerender } = renderWithTooltips(
+      <InventoryTab locked addToast={vi.fn()} />
+    );
     expect(screen.queryByLabelText('Gold pieces')).toBeNull();
     expect(screen.getByText('10')).toBeInTheDocument();
 
@@ -240,7 +249,7 @@ describe('InventoryTab', () => {
   });
 
   it('commits a currency change against live store state (10 -> 15 gold)', () => {
-    render(<InventoryTab locked={false} addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked={false} addToast={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Gold pieces'), {
       target: { value: '15' },
     });
@@ -248,7 +257,7 @@ describe('InventoryTab', () => {
   });
 
   it('commits a currency decrease against live store state (10 -> 4 gold)', () => {
-    render(<InventoryTab locked={false} addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked={false} addToast={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Gold pieces'), {
       target: { value: '4' },
     });
@@ -266,7 +275,7 @@ describe('InventoryTab', () => {
     const subtractSpy = vi
       .spyOn(useCharacterStore.getState(), 'subtractCurrency')
       .mockImplementation(() => {});
-    render(<InventoryTab locked={false} addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked={false} addToast={vi.fn()} />);
     const input = screen.getByLabelText('Gold pieces');
     fireEvent.focus(input);
     for (const value of ['1', '15', '150']) {
@@ -288,7 +297,7 @@ describe('InventoryTab', () => {
     const subtractSpy = vi
       .spyOn(useCharacterStore.getState(), 'subtractCurrency')
       .mockImplementation(() => {});
-    render(<InventoryTab locked={false} addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked={false} addToast={vi.fn()} />);
     const input = screen.getByLabelText('Gold pieces');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '-5' } });
@@ -303,7 +312,7 @@ describe('InventoryTab', () => {
   });
 
   it('filters entries by search', () => {
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     fireEvent.change(
       screen.getByRole('searchbox', { name: /search inventory/i }),
       {
@@ -315,7 +324,7 @@ describe('InventoryTab', () => {
   });
 
   it('shows a no-matches empty state on an unmatched search', () => {
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     fireEvent.change(
       screen.getByRole('searchbox', { name: /search inventory/i }),
       {
@@ -329,7 +338,7 @@ describe('InventoryTab', () => {
 
   it('shows no pin star on usable consumable grid tiles, even when pinned', () => {
     seed({ sheetFavorites: [{ kind: 'item', id: 'ration1' }] });
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
     const useTile = screen.getByRole('button', { name: 'Use Ration' });
     expect(useTile.querySelector('svg')).toBeNull();
@@ -338,7 +347,7 @@ describe('InventoryTab', () => {
   });
 
   it('persists the view toggle to localStorage and grid Use works', () => {
-    render(<InventoryTab locked addToast={vi.fn()} />);
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
     expect(window.localStorage.getItem(INVENTORY_VIEW_STORAGE_KEY)).toBe(
       'grid'
@@ -348,5 +357,101 @@ describe('InventoryTab', () => {
     expect(
       getChar().inventoryItems.find(i => i.id === 'ration1')!.quantity
     ).toBe(2);
+  });
+
+  it('captions a grid tile with equipped, rarity and quantity', () => {
+    seed({ weapons: [weapon({ isEquipped: true })] });
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+    expect(
+      within(screen.getByRole('button', { name: 'Pin Longsword' })).getByText(
+        'Equipped'
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole('button', { name: 'Pin Ring of Protection' })
+      ).getByText('rare')
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('button', { name: 'Pin Rope, 50ft' })).getByText(
+        '×2'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('renders no empty caption on a common, unequipped, single grid tile', () => {
+    seed({
+      inventoryItems: [
+        inventoryItem({ id: 'torch', name: 'Torch', quantity: 1 }),
+      ],
+    });
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+    expect(screen.getByRole('button', { name: 'Pin Torch' })).toHaveTextContent(
+      /^Torch$/
+    );
+  });
+
+  it('shows the rarity as a plain badge in the list view', () => {
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
+    expect(screen.getByText('rare')).toBeInTheDocument();
+  });
+
+  it('flags encumbrance only above carrying capacity', () => {
+    const cap = calculateCarryingCapacity(getChar());
+    const zeroCoins = {
+      copper: 0,
+      silver: 0,
+      electrum: 0,
+      gold: 0,
+      platinum: 0,
+    };
+    seed({
+      currency: zeroCoins,
+      inventoryItems: [
+        inventoryItem({ id: 'anvil', name: 'Anvil', quantity: 1, weight: cap }),
+      ],
+    });
+    const { unmount } = renderWithTooltips(
+      <InventoryTab locked addToast={vi.fn()} />
+    );
+    expect(screen.queryByText('Encumbered')).toBeNull();
+    unmount();
+
+    seed({
+      currency: zeroCoins,
+      inventoryItems: [
+        inventoryItem({
+          id: 'anvil',
+          name: 'Anvil',
+          quantity: 1,
+          weight: cap + 1,
+        }),
+      ],
+    });
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
+    expect(screen.getByText('Encumbered')).toBeInTheDocument();
+  });
+
+  it('draws one pip button per charge', () => {
+    seed({
+      weapons: [
+        weapon({
+          charges: [
+            {
+              id: 'c2',
+              name: 'Bolt',
+              maxCharges: 12,
+              usedCharges: 0,
+              restType: 'long',
+            },
+          ],
+        }),
+      ],
+    });
+    renderWithTooltips(<InventoryTab locked addToast={vi.fn()} />);
+    const group = screen.getByRole('group', { name: 'Bolt charges: 12 of 12' });
+    expect(within(group).getAllByRole('button')).toHaveLength(12);
   });
 });

@@ -2,14 +2,13 @@
 
 import { Star } from 'lucide-react';
 
+import { Section } from '@/components/ui/layout/section';
 import { useCharacterStore } from '@/store/characterStore';
 import { isSheetFavorite } from '@/utils/sheetFavorites';
 import { cn } from '@/utils/cn';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
 
-import { rarityBadgeVariant } from '../InventoryTabs.utils';
-import { HEADING_CLASS } from '../sheetSectionStyles';
 import type {
   InventoryEntryView,
   InventoryGroupView,
@@ -20,17 +19,6 @@ export interface InventoryGridProps {
   groups: InventoryGroupView[];
   addToast: (t: Omit<ToastData, 'id'>) => void;
 }
-
-const TILE_CLASS: Record<
-  'neutral' | 'success' | 'info' | 'warning' | 'danger',
-  string
-> = {
-  neutral: 'bg-surface-secondary border-divider',
-  success: 'bg-accent-emerald-bg border-accent-emerald-border',
-  info: 'bg-accent-blue-bg border-accent-blue-border',
-  warning: 'bg-accent-amber-bg border-accent-amber-border',
-  danger: 'bg-accent-red-bg border-accent-red-border',
-};
 
 function InventoryGridTile({
   entry,
@@ -47,8 +35,13 @@ function InventoryGridTile({
 
   const quantity = entry.quantity ?? 0;
   const isUsable = entry.kind === 'item' && entry.consumable;
-  const tileClass =
-    TILE_CLASS[entry.rarity ? rarityBadgeVariant(entry.rarity) : 'neutral'];
+  const caption = [
+    entry.rarity && entry.rarity !== 'common' && entry.rarity,
+    entry.equipped && 'Equipped',
+    quantity > 1 && `×${quantity}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   // The whole tile is itself a button (for a single, large tap target), so a
   // separate FavoriteStar button can't be nested inside it — the tile's own
@@ -72,45 +65,35 @@ function InventoryGridTile({
       aria-label={label}
       disabled={isUsable && quantity <= 0}
       onClick={handleTap}
-      className={cn(
-        'relative flex min-h-16 flex-col items-start justify-between gap-1 rounded-lg border p-2 text-left',
-        tileClass
-      )}
+      className="border-divider bg-surface focus-visible:outline-ring relative flex min-h-16 flex-col items-start justify-between gap-1 rounded-md border p-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       {!isUsable && (
         <Star
           aria-hidden="true"
           className={cn(
-            'absolute top-1.5 right-1.5 h-3.5 w-3.5',
-            pinned ? 'text-accent-amber-text fill-current' : 'text-faint'
+            'absolute top-1.5 right-1.5 size-3.5',
+            pinned ? 'text-brass-text fill-current' : 'text-muted'
           )}
         />
       )}
-      {entry.equipped && (
-        <span
-          aria-hidden="true"
-          className="bg-accent-emerald-text-muted h-2 w-2 rounded-full"
-        />
-      )}
-      <span className="text-heading pr-4 text-xs font-semibold break-words">
+      <span className="type-small text-heading pr-4 break-words">
         {entry.name}
       </span>
-      {quantity > 1 && (
-        <span className="text-faint text-[10px]">×{quantity}</span>
-      )}
+      {caption && <span className="type-caption text-muted">{caption}</span>}
     </button>
   );
 }
 
-/** Rarity-tinted grid tiles for the Inventory tab's grid view. */
+/** Grid tiles for the Inventory tab's grid view. */
 export function InventoryGrid({ groups, addToast }: InventoryGridProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {groups.map(group => (
-        <div key={group.key}>
-          <h3 className={HEADING_CLASS}>
-            {group.label} ({group.entries.length})
-          </h3>
+        <Section
+          key={group.key}
+          level={4}
+          heading={`${group.label} (${group.entries.length})`}
+        >
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {group.entries.map(entry => (
               <InventoryGridTile
@@ -120,7 +103,7 @@ export function InventoryGrid({ groups, addToast }: InventoryGridProps) {
               />
             ))}
           </div>
-        </div>
+        </Section>
       ))}
     </div>
   );
