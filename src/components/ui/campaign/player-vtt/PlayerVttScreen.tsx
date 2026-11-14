@@ -9,6 +9,7 @@ import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useToke
 import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPrompt';
 import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { useReactionTurnReset } from '@/hooks/useReactionTurnReset';
 
 import { CastingBanner } from './CastingBanner';
@@ -159,48 +160,50 @@ export function PlayerVttScreen({
         onCancel={cancelPlacement}
       />
       <div className="pointer-events-none absolute inset-0 z-10">
-        <CombatPanel
-          state={liveInitiative}
-          characterId={characterId}
-          onEndTurn={handleEndTurn}
-          collapsed={combatCollapsed}
-          onToggleCollapsed={() => setCombatCollapsed(v => !v)}
-        />
-        <CharacterDock
-          collapsed={dockCollapsed}
-          onToggleCollapsed={() => setDockCollapsed(v => !v)}
-          addToast={addToast}
-          onCastPlacement={requestPlacement}
-          connectionLive={connectionStatus === 'live'}
-          hasPendingPlacement={pendingPlacement !== null}
-          onCancelPlacement={cancelPlacement}
-          onOpenSheet={sheetReady ? openSheetFromDock : undefined}
-          sheetButtonRef={sheetButtonRef}
-        />
-        <StatusEffectTray />
-        <SheetDrawer
-          open={sheetOpen}
-          onClose={closeSheet}
-          onCloseAutoFocus={handleSheetCloseAutoFocus}
-          addToast={addToast}
-          showAttackRoll={showAttackRoll}
-          onRested={handleRested}
-          spellCasting={spellCasting}
-          openTarget={openTarget}
-          partyMembers={partyMembers}
-        />
-        {initiativePrompt.showPrompt && initiativePrompt.request && (
-          <InitiativeRollPrompt
-            request={initiativePrompt.request}
-            modifier={
-              character.initiative.isOverridden
-                ? character.initiative.value
-                : Math.floor((character.abilities.dexterity - 10) / 2)
-            }
-            onSubmit={initiativePrompt.handleSubmit}
-            onDismiss={initiativePrompt.dismiss}
+        <TooltipProvider>
+          <CombatPanel
+            state={liveInitiative}
+            characterId={characterId}
+            onEndTurn={handleEndTurn}
+            collapsed={combatCollapsed}
+            onToggleCollapsed={() => setCombatCollapsed(v => !v)}
           />
-        )}
+          <CharacterDock
+            collapsed={dockCollapsed}
+            onToggleCollapsed={() => setDockCollapsed(v => !v)}
+            addToast={addToast}
+            onCastPlacement={requestPlacement}
+            connectionLive={connectionStatus === 'live'}
+            hasPendingPlacement={pendingPlacement !== null}
+            onCancelPlacement={cancelPlacement}
+            onOpenSheet={sheetReady ? openSheetFromDock : undefined}
+            sheetButtonRef={sheetButtonRef}
+          />
+          <StatusEffectTray />
+          <SheetDrawer
+            open={sheetOpen}
+            onClose={closeSheet}
+            onCloseAutoFocus={handleSheetCloseAutoFocus}
+            addToast={addToast}
+            showAttackRoll={showAttackRoll}
+            onRested={handleRested}
+            spellCasting={spellCasting}
+            openTarget={openTarget}
+            partyMembers={partyMembers}
+          />
+          {initiativePrompt.showPrompt && initiativePrompt.request && (
+            <InitiativeRollPrompt
+              request={initiativePrompt.request}
+              modifier={
+                character.initiative.isOverridden
+                  ? character.initiative.value
+                  : Math.floor((character.abilities.dexterity - 10) / 2)
+              }
+              onSubmit={initiativePrompt.handleSubmit}
+              onDismiss={initiativePrompt.dismiss}
+            />
+          )}
+        </TooltipProvider>
       </div>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </PlayerBattleMapCanvas>
