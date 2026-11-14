@@ -371,7 +371,7 @@ describe('InventoryTab', () => {
     expect(
       within(
         screen.getByRole('button', { name: 'Pin Ring of Protection' })
-      ).getByText('rare')
+      ).getByText('Rare')
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole('button', { name: 'Pin Rope, 50ft' })).getByText(

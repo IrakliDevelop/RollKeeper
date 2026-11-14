@@ -36,7 +36,9 @@ function InventoryGridTile({
   const quantity = entry.quantity ?? 0;
   const isUsable = entry.kind === 'item' && entry.consumable;
   const caption = [
-    entry.rarity && entry.rarity !== 'common' && entry.rarity,
+    entry.rarity &&
+      entry.rarity !== 'common' &&
+      entry.rarity.charAt(0).toUpperCase() + entry.rarity.slice(1),
     entry.equipped && 'Equipped',
     quantity > 1 && `×${quantity}`,
   ]
