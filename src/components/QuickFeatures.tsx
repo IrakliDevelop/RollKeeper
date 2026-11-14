@@ -55,13 +55,8 @@ export function QuickFeatures() {
         <FeatureModal
           feature={viewingFeature}
           isOpen={true}
-          mode="view"
           characterLevel={character.level}
           onClose={() => setViewingFeature(null)}
-          onUpdate={() => {}}
-          onDelete={() => {}}
-          onUse={() => spendFeature(viewingFeature.id)}
-          readonly
         />
       )}
     </>
