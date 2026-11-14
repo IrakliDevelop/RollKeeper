@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { Minus, Plus, RotateCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import { CLASS_RESOURCE_STYLE } from '@/components/ui/character/classResourceStyles';
 import { useCharacterStore } from '@/store/characterStore';
 import {
@@ -11,8 +13,6 @@ import {
   type ActiveClassResource,
 } from '@/utils/classResources';
 import { cn } from '@/utils/cn';
-
-import { HEADING_CLASS, SECTION_CLASS } from './sheetSectionStyles';
 
 /**
  * Class resources (Rage, Lay on Hands, Second Wind, …) for the map sheet's
@@ -33,9 +33,8 @@ export function SheetResources() {
   if (resources.length === 0) return null;
 
   return (
-    <div className={`${SECTION_CLASS} @container`}>
-      <h3 className={HEADING_CLASS}>Class resources</h3>
-      <div className="space-y-2.5">
+    <Section heading="Class resources" level={4} className="@container">
+      <ul className="divide-divider divide-y">
         {resources.map(resource => (
           <ResourceRow
             key={resource.definition.id}
@@ -49,8 +48,8 @@ export function SheetResources() {
             onReset={() => resetClassResource(resource.definition.id)}
           />
         ))}
-      </div>
-    </div>
+      </ul>
+    </Section>
   );
 }
 
@@ -72,33 +71,34 @@ function ResourceRow({
   const bigPool = isPool && maxUses >= 20;
 
   return (
-    <div className="border-divider rounded-lg border p-2.5">
+    <li className="py-2.5">
       <div className="flex flex-col gap-2 @min-[28rem]:flex-row @min-[28rem]:items-start @min-[28rem]:justify-between">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-heading text-sm font-semibold">{name}</span>
-              {die && <span className="text-muted text-xs">{die}</span>}
+              <span className="type-ui text-heading">{name}</span>
+              {die && <span className="type-small text-muted">{die}</span>}
             </div>
-            <div className="text-muted text-xs">
+            <div className="type-small text-muted">
               {definition.className} {classLevel}
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={onReset}
-            aria-label={`Reset ${name}`}
-            title="Reset (long rest)"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
+          <Tooltip content={`Reset ${name}`}>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={onReset}
+              aria-label={`Reset ${name}`}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+          </Tooltip>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-heading text-sm font-bold">
+          <span className="type-ui text-heading tabular-nums">
             {usesRemaining}
-            <span className="text-muted ml-0.5 font-normal">/{maxUses}</span>
+            <span className="type-small text-muted ml-0.5">/{maxUses}</span>
           </span>
 
           {isPool ? (
@@ -120,7 +120,7 @@ function ResourceRow({
                     type="button"
                     aria-label={filled ? `Spend ${name}` : `Restore ${name}`}
                     onClick={() => (filled ? onSpend(1) : onRestore(1))}
-                    className="focus-visible:outline-brass-border flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                    className="focus-visible:outline-ring flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   >
                     <span
                       aria-hidden="true"
@@ -140,10 +140,10 @@ function ResourceRow({
       </div>
 
       {isPool && (
-        <div className="bg-surface-secondary mt-2 h-1 w-full overflow-hidden rounded-full">
+        <div className="bg-divider mt-2 h-1 w-full">
           <div
             data-resource-bar-fill
-            className={cn('h-full rounded-full', CLASS_RESOURCE_STYLE.barFill)}
+            className={cn('h-full', CLASS_RESOURCE_STYLE.barFill)}
             style={{
               width: `${maxUses > 0 ? (usesRemaining / maxUses) * 100 : 0}%`,
             }}
@@ -152,9 +152,9 @@ function ResourceRow({
       )}
 
       {description && (
-        <div className="text-muted mt-1.5 text-xs">{description}</div>
+        <div className="type-small text-muted mt-1.5">{description}</div>
       )}
-    </div>
+    </li>
   );
 }
 

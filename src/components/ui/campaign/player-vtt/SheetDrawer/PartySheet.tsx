@@ -18,10 +18,10 @@ function CloseButton({ onClose }: { onClose: () => void }) {
       variant="ghost"
       size="sm"
       onClick={onClose}
+      className="w-9 px-0"
       aria-label="Close sheet"
-      title="Close (Esc)"
     >
-      <X className="h-4 w-4" />
+      <X size={16} aria-hidden="true" />
     </Button>
   );
 }
@@ -37,7 +37,7 @@ export function PartySheet({ member, onClose }: PartySheetProps) {
     return (
       <div className="flex h-full flex-col">
         <div className="border-divider flex items-center justify-between gap-3 border-b px-5 py-4">
-          <p className="text-muted text-sm">
+          <p className="type-body text-muted">
             This character isn&apos;t in the party list yet.
           </p>
           <CloseButton onClose={onClose} />
@@ -56,27 +56,27 @@ export function PartySheet({ member, onClose }: PartySheetProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-divider flex gap-3 border-b px-5 pt-4 pb-3">
-        <div className="h-14 w-14 shrink-0 self-start">
+        <div className="size-12 shrink-0 self-start">
           {member.avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={member.avatar}
               alt=""
-              className="h-14 w-14 rounded-xl object-cover"
+              className="size-12 rounded-full object-cover"
             />
           ) : (
-            <div className="bg-accent-blue-bg text-accent-blue-text flex h-14 w-14 items-center justify-center rounded-xl text-2xl font-bold">
+            <div className="bg-surface-raised type-subheading text-heading flex size-12 items-center justify-center rounded-full">
               {initial}
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-heading truncate text-xl font-bold">
+          <h2 className="type-heading text-heading truncate">
             {member.characterName}
           </h2>
-          <p className="text-muted truncate text-xs">{subtitle}</p>
-          <p className="text-faint mt-1.5 flex items-center gap-1 text-xs">
-            <Eye className="h-3 w-3" />
+          <p className="type-small text-muted truncate">{subtitle}</p>
+          <p className="type-small text-muted mt-1.5 flex items-center gap-1">
+            <Eye size={14} aria-hidden="true" />
             Limited view · played by {member.playerName}
           </p>
         </div>
@@ -85,9 +85,9 @@ export function PartySheet({ member, onClose }: PartySheetProps) {
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-4">
         {publicSheet === null ? (
-          <p className="text-muted text-sm">
+          <p className="type-body text-muted">
             {member.characterName} hasn&apos;t shared their sheet.
           </p>
         ) : (
@@ -104,7 +104,7 @@ export function PartySheet({ member, onClose }: PartySheetProps) {
               passivePerception={publicSheet.passivePerception}
             />
             <GearCard equippedGear={publicSheet.equippedGear} />
-            <p className="text-faint text-xs">
+            <p className="type-small text-muted">
               {member.playerName} controls this sheet. This view shows only what
               they share with the party.
             </p>

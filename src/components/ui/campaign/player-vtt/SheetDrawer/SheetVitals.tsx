@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Shield } from 'lucide-react';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
@@ -17,10 +16,11 @@ export interface SheetVitalsProps {
   roll?: (label: string, modifier: number) => Promise<void>;
 }
 
-const TILE_CLASS =
-  'border-divider bg-surface rounded-lg border p-2 text-center';
-const VALUE_CLASS = 'text-heading text-xl font-bold';
-const LABEL_CLASS = 'text-faint text-xs uppercase';
+// dt first keeps the markup a valid definition list; flex-col-reverse shows
+// the value above its label.
+const CELL_CLASS = 'flex flex-col-reverse';
+const LABEL_CLASS = 'type-small text-muted';
+const VALUE_CLASS = 'type-num-lg text-heading';
 
 export function SheetVitals({ addToast, roll }: SheetVitalsProps) {
   const character = useCharacterStore(s => s.character);
@@ -28,7 +28,7 @@ export function SheetVitals({ addToast, roll }: SheetVitalsProps) {
   const hpEditor = useHpAmountEditor(addToast);
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-3">
       <HpCard
         hpCurrent={view.hpCurrent}
         hpMax={view.hpMax}
@@ -40,35 +40,30 @@ export function SheetVitals({ addToast, roll }: SheetVitalsProps) {
         onHeal={hpEditor.onHeal}
         onTemp={hpEditor.onTemp}
       />
-      <div className="grid grid-cols-2 gap-2">
-        <div className={TILE_CLASS}>
-          <div
-            className={`${VALUE_CLASS} flex items-center justify-center gap-1`}
-          >
-            <Shield className="h-4 w-4" />
-            {view.ac}
-          </div>
-          <div className={LABEL_CLASS}>AC</div>
+      <dl className="grid grid-cols-4 gap-x-3">
+        <div className={CELL_CLASS}>
+          <dt className={LABEL_CLASS}>AC</dt>
+          <dd className={VALUE_CLASS}>{view.ac}</dd>
         </div>
         <MaybeRollElement
           ariaLabel="Roll initiative"
-          className={TILE_CLASS}
+          className={`${CELL_CLASS} text-left`}
           onRoll={roll ? () => roll('Initiative', view.initiative) : undefined}
         >
-          <div className={VALUE_CLASS}>{formatModifier(view.initiative)}</div>
-          <div className={LABEL_CLASS}>Init</div>
+          <dt className={LABEL_CLASS}>Init</dt>
+          <dd className={VALUE_CLASS}>{formatModifier(view.initiative)}</dd>
         </MaybeRollElement>
-        <div className={TILE_CLASS}>
-          <div className={VALUE_CLASS}>{view.speed} ft</div>
-          <div className={LABEL_CLASS}>Speed</div>
+        <div className={CELL_CLASS}>
+          <dt className={LABEL_CLASS}>Speed</dt>
+          <dd className={VALUE_CLASS}>{view.speed} ft</dd>
         </div>
-        <div className={TILE_CLASS}>
-          <div className={VALUE_CLASS}>
+        <div className={CELL_CLASS}>
+          <dt className={LABEL_CLASS}>Prof</dt>
+          <dd className={VALUE_CLASS}>
             {formatModifier(view.proficiencyBonus)}
-          </div>
-          <div className={LABEL_CLASS}>Prof</div>
+          </dd>
         </div>
-      </div>
+      </dl>
     </div>
   );
 }

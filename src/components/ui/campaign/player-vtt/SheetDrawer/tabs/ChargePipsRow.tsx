@@ -1,9 +1,8 @@
+import { CLASS_RESOURCE_STYLE } from '@/components/ui/character/classResourceStyles';
 import { cn } from '@/utils/cn';
 
-export interface SpellSlotPipsRowProps {
-  /** Optional leading label, e.g. "Pact slots (1st level)". */
-  heading?: string;
-  /** Group label prefix, e.g. "1st-level slots" → "1st-level slots: 3 of 4". */
+export interface ChargePipsRowProps {
+  /** Group label prefix, e.g. "Blink charges" → "Blink charges: 1 of 2". */
   groupLabel: string;
   max: number;
   used: number;
@@ -13,13 +12,13 @@ export interface SpellSlotPipsRowProps {
   restoreLabel: string;
   onSpend: () => void;
   onRestore: () => void;
-  /** Unit noun for the trailing count text, e.g. "slots" or "charges". */
-  unit?: string;
 }
 
-/** Tappable slot pips row: filled pips spend a slot, empty pips restore one. */
-export function SpellSlotPipsRow({
-  heading,
+export const PIP_BUTTON_CLASS =
+  'focus-visible:outline-ring inline-flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11';
+
+/** Tappable charge pips: filled pips spend a charge, empty pips restore one. */
+export function ChargePipsRow({
   groupLabel,
   max,
   used,
@@ -27,20 +26,16 @@ export function SpellSlotPipsRow({
   restoreLabel,
   onSpend,
   onRestore,
-  unit = 'slots',
-}: SpellSlotPipsRowProps) {
+}: ChargePipsRowProps) {
   if (max === 0) return null;
   const remaining = max - used;
 
   return (
     <div className="flex flex-wrap items-center gap-2 py-1">
-      {heading && (
-        <span className="text-muted text-xs font-semibold">{heading}</span>
-      )}
       <div
         role="group"
         aria-label={`${groupLabel}: ${remaining} of ${max}`}
-        className="flex"
+        className="flex flex-wrap"
       >
         {Array.from({ length: max }, (_, index) => {
           const filled = index < remaining;
@@ -50,22 +45,23 @@ export function SpellSlotPipsRow({
               type="button"
               aria-label={filled ? spendLabel : restoreLabel}
               onClick={filled ? onSpend : onRestore}
-              className="inline-flex h-6 w-6 items-center justify-center"
+              className={PIP_BUTTON_CLASS}
             >
               <span
+                aria-hidden="true"
                 className={cn(
-                  'h-3 w-3 rounded-full border',
+                  'size-3 rounded-full border',
                   filled
-                    ? 'bg-accent-purple-text-muted border-accent-purple-border'
-                    : 'border-divider'
+                    ? CLASS_RESOURCE_STYLE.pipOn
+                    : CLASS_RESOURCE_STYLE.pipOff
                 )}
               />
             </button>
           );
         })}
       </div>
-      <span className="text-faint text-xs">
-        {remaining} of {max} {unit}
+      <span className="type-small text-muted">
+        {remaining} of {max} charges
       </span>
     </div>
   );

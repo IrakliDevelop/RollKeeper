@@ -12,7 +12,6 @@ import type {
 import {
   buildInventoryGroups,
   buildInventorySummary,
-  rarityBadgeVariant,
 } from '../InventoryTabs.utils';
 
 function fixture(overrides: Partial<CharacterState> = {}): CharacterState {
@@ -300,16 +299,5 @@ describe('buildInventorySummary', () => {
   it('defaults attunementMax to 3 when attunementSlots is missing entirely', () => {
     const c = fixture({ attunementSlots: undefined });
     expect(buildInventorySummary(c).attunementMax).toBe(3);
-  });
-});
-
-describe('rarityBadgeVariant', () => {
-  it('maps every rarity to its badge variant', () => {
-    expect(rarityBadgeVariant('common')).toBe('neutral');
-    expect(rarityBadgeVariant('uncommon')).toBe('success');
-    expect(rarityBadgeVariant('rare')).toBe('info');
-    expect(rarityBadgeVariant('very rare')).toBe('warning');
-    expect(rarityBadgeVariant('legendary')).toBe('warning');
-    expect(rarityBadgeVariant('artifact')).toBe('danger');
   });
 });

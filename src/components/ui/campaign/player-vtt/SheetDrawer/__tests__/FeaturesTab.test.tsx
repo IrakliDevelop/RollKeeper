@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { screen, fireEvent, cleanup } from '@testing-library/react';
 
 import { FeaturesTab } from '../tabs/FeaturesTab';
+import { renderWithTooltips, stubResizeObserver } from './renderWithTooltips';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState } from '@/types/character';
 
@@ -55,15 +56,22 @@ function getChar() {
   return useCharacterStore.getState().character;
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('FeaturesTab', () => {
-  beforeEach(() => seed());
+  beforeEach(() => {
+    stubResizeObserver();
+    useCharacterStore.getState().resetCharacter();
+    seed();
+  });
 
   it('groups features by source', () => {
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     expect(
-      screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
+      screen.getAllByRole('heading', { level: 4 }).map(h => h.textContent)
     ).toEqual(
       expect.arrayContaining([
         'Class Features',
@@ -74,7 +82,7 @@ describe('FeaturesTab', () => {
   });
 
   it('spends and restores an extended feature use via pips', () => {
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     fireEvent.click(screen.getByRole('button', { name: /use second wind/i }));
     expect(getChar().extendedFeatures.find(f => f.id === 'sw')!.usedUses).toBe(
       1
@@ -88,7 +96,7 @@ describe('FeaturesTab', () => {
   });
 
   it('spends and restores a tracked trait', () => {
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     fireEvent.click(screen.getAllByRole('button', { name: /use lucky/i })[0]);
     expect(getChar().trackableTraits.find(t => t.id === 'luck')!.usedUses).toBe(
       2
@@ -102,22 +110,23 @@ describe('FeaturesTab', () => {
   });
 
   it('labels feature pips as a group with remaining of max', () => {
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     expect(
       screen.getByRole('group', { name: /^second wind uses: \d+ of \d+$/i })
     ).toBeInTheDocument();
   });
 
   it('expands a description', () => {
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     const toggle = screen.getByRole('button', { name: /^darkvision/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('See in the dark.')).toBeInTheDocument();
   });
 
   it('pins a feature via its star, mirroring the legacy favorite flag', () => {
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     fireEvent.click(screen.getByRole('button', { name: 'Pin Second Wind' }));
     expect(getChar().sheetFavorites).toContainEqual({
       kind: 'feature',
@@ -127,7 +136,7 @@ describe('FeaturesTab', () => {
   });
 
   it('does not offer a pin star for legacy tracked traits', () => {
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     expect(
       screen.getByRole('button', { name: /^(un)?pin second wind$/i })
     ).toBeInTheDocument();
@@ -137,7 +146,7 @@ describe('FeaturesTab', () => {
   it('shows an empty state', () => {
     cleanup();
     seed({ extendedFeatures: [], trackableTraits: [] });
-    render(<FeaturesTab />);
+    renderWithTooltips(<FeaturesTab />);
     expect(screen.getByText(/no features yet/i)).toBeInTheDocument();
   });
 });

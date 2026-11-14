@@ -39,7 +39,9 @@ describe('PartySheet', () => {
 
     expect(screen.getByText('Bloodied')).toBeInTheDocument();
     expect(screen.getByText('20/30')).toBeInTheDocument();
-    expect(screen.getByText("Hunter's Mark")).toBeInTheDocument();
+    expect(
+      screen.getByText("Concentrating on Hunter's Mark").closest('[data-kind]')
+    ).toHaveAttribute('data-kind', 'concentration');
     expect(screen.getByText('Prone')).toBeInTheDocument();
 
     expect(screen.getByText('16')).toBeInTheDocument();
@@ -57,6 +59,34 @@ describe('PartySheet', () => {
     expect(
       screen.getByRole('button', { name: /close sheet/i })
     ).toBeInTheDocument();
+  });
+
+  it('groups the view into three level-4 sections', () => {
+    render(<PartySheet member={SHARED_MEMBER} onClose={vi.fn()} />);
+    expect(
+      screen.getAllByRole('heading', { level: 4 }).map(h => h.textContent)
+    ).toEqual(['Condition', 'Stats', 'Equipped, visible to the party']);
+    expect(screen.getByText('Passive Perception').tagName).toBe('DT');
+  });
+
+  it('gives Close no hover title', () => {
+    render(<PartySheet member={SHARED_MEMBER} onClose={vi.fn()} />);
+    expect(
+      screen.getByRole('button', { name: /close sheet/i })
+    ).not.toHaveAttribute('title');
+  });
+
+  it('shows no concentration chip when the member is not concentrating', () => {
+    render(
+      <PartySheet
+        member={{
+          ...SHARED_MEMBER,
+          publicSheet: { ...SHARED_MEMBER.publicSheet!, concentration: null },
+        }}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.queryByText(/Concentrating/)).toBeNull();
   });
 
   it('renders repeated condition names without React key collisions', () => {

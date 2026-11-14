@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Activity, Award, Backpack, Dices, Sparkles, Star } from 'lucide-react';
 
 import { useCharacterStore } from '@/store/characterStore';
 import { isSpellcaster } from '@/utils/calculations';
@@ -46,16 +45,15 @@ export function useSheetTabs() {
   const tabs: SheetTabDefinition[] = useMemo(
     () =>
       [
-        { id: 'overview' as const, label: 'Overview', icon: Star },
-        { id: 'abilities' as const, label: 'Abilities', icon: Dices },
+        { id: 'overview' as const, label: 'Overview' },
+        { id: 'abilities' as const, label: 'Abilities' },
         showSpellsTab && {
           id: 'spells' as const,
           label: 'Spells',
-          icon: Sparkles,
         },
-        { id: 'inventory' as const, label: 'Inventory', icon: Backpack },
-        { id: 'features' as const, label: 'Features', icon: Award },
-        { id: 'effects' as const, label: 'Effects', icon: Activity },
+        { id: 'inventory' as const, label: 'Inventory' },
+        { id: 'features' as const, label: 'Features' },
+        { id: 'effects' as const, label: 'Effects' },
       ].filter((tab): tab is SheetTabDefinition => Boolean(tab)),
     [showSpellsTab]
   );

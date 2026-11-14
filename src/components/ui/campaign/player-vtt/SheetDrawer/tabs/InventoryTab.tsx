@@ -5,8 +5,9 @@ import { LayoutGrid, List } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { Section } from '@/components/ui/layout/section';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import { useCharacterStore } from '@/store/characterStore';
-import { cn } from '@/utils/cn';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
 
@@ -14,7 +15,6 @@ import {
   buildInventoryGroups,
   buildInventorySummary,
 } from '../InventoryTabs.utils';
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import {
   INVENTORY_VIEW_STORAGE_KEY,
   type InventoryViewMode,
@@ -73,7 +73,7 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
   const summary = useMemo(() => buildInventorySummary(character), [character]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Input
           type="search"
@@ -84,49 +84,54 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
           wrapperClassName="flex-1"
         />
         <div role="group" aria-label="Inventory view" className="flex gap-1">
-          <Button
-            type="button"
-            variant="outline"
-            selected={viewMode === 'list'}
-            size="sm"
-            aria-label="List view"
-            aria-pressed={viewMode === 'list'}
-            onClick={() => setViewMode('list')}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            selected={viewMode === 'grid'}
-            size="sm"
-            aria-label="Grid view"
-            aria-pressed={viewMode === 'grid'}
-            onClick={() => setViewMode('grid')}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
+          <Tooltip content="List view">
+            <Button
+              type="button"
+              variant="outline"
+              selected={viewMode === 'list'}
+              size="sm"
+              aria-label="List view"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4" aria-hidden />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Grid view">
+            <Button
+              type="button"
+              variant="outline"
+              selected={viewMode === 'grid'}
+              size="sm"
+              aria-label="Grid view"
+              aria-pressed={viewMode === 'grid'}
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden />
+            </Button>
+          </Tooltip>
         </div>
       </div>
 
       <InventorySummary locked={locked} summary={summary} />
 
       {groups.length === 0 ? (
-        <div className={cn(SECTION_CLASS, 'text-muted text-sm')}>
+        <p className="type-body text-muted py-6 text-center">
           {hasAnyItems
             ? `No items match “${search}”.`
             : 'No items yet. Add gear on the full character sheet.'}
-        </div>
+        </p>
       ) : viewMode === 'grid' ? (
         <InventoryGrid groups={groups} addToast={addToast} />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-6">
           {groups.map(group => (
-            <div key={group.key} className={SECTION_CLASS}>
-              <h3 className={HEADING_CLASS}>
-                {group.label} ({group.entries.length})
-              </h3>
-              <div className="space-y-2">
+            <Section
+              key={group.key}
+              level={4}
+              heading={`${group.label} (${group.entries.length})`}
+            >
+              <ul className="divide-divider divide-y">
                 {group.entries.map(entry => (
                   <InventoryEntryRow
                     key={entry.id}
@@ -135,8 +140,8 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
                     addToast={addToast}
                   />
                 ))}
-              </div>
-            </div>
+              </ul>
+            </Section>
           ))}
         </div>
       )}

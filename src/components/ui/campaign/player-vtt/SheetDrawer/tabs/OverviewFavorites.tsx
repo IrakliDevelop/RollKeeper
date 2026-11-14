@@ -5,11 +5,11 @@ import { useMemo } from 'react';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
 import { useCharacterStore } from '@/store/characterStore';
 
 import { useDockSpellCasting } from '../../CharacterDock/DockSpells.hooks';
 import { buildFavoriteRows } from '../SheetTabs.utils';
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import type { SheetSpellCastingProps } from '../SheetDrawer.types';
 import { FavoriteStar } from './FavoriteStar';
 import { FeaturePips } from './FeaturesTab';
@@ -42,35 +42,34 @@ export function OverviewFavorites({
   } = useDockSpellCasting({ addToast, ...spellCasting });
 
   return (
-    <div className={SECTION_CLASS}>
-      <h3 className={HEADING_CLASS}>Favorites</h3>
-      <p className="text-faint -mt-1 mb-2 text-xs">
-        Star anything in other tabs to pin it here
-      </p>
-
+    <Section heading="Favorites" level={4}>
       {rows.length === 0 ? (
-        <p className="text-muted text-sm">
+        <p className="type-body text-muted py-6 text-center">
           Nothing pinned. Tap the star on any item, spell or feature.
         </p>
       ) : (
-        <div className="space-y-2">
+        <ul className="divide-divider divide-y">
           {rows.map(row => (
-            <div
+            <li
               key={row.key}
-              className="border-divider flex items-start justify-between gap-2 rounded-lg border p-2"
+              className="flex items-start justify-between gap-2 py-2"
             >
               <div className="min-w-0 flex-1">
-                <div className="text-heading truncate text-sm font-semibold">
-                  {row.name}
-                </div>
-                <div className="text-muted truncate text-xs">
+                <div className="type-ui text-heading truncate">{row.name}</div>
+                <div className="type-small text-muted truncate">
                   {row.kind === 'item' && row.entry.consumable
                     ? `${row.meta} · ×${row.entry.quantity ?? 0}`
                     : row.meta}
                 </div>
 
+                {row.kind === 'spell' && !row.castable && (
+                  <p className="type-caption text-muted">
+                    Not prepared or no slots left
+                  </p>
+                )}
+
                 {row.kind === 'item' && row.entry.attackText && (
-                  <div className="text-body mt-0.5 text-xs">
+                  <div className="type-small text-body mt-0.5">
                     {row.entry.attackText}
                   </div>
                 )}
@@ -107,18 +106,15 @@ export function OverviewFavorites({
                 {row.kind === 'item' &&
                   !row.entry.consumable &&
                   row.entry.equipped && (
-                    <Badge variant="success">Equipped</Badge>
+                    <Badge variant="neutral">Equipped</Badge>
                   )}
                 {row.kind === 'spell' && (
                   <Button
                     type="button"
-                    variant="primary"
+                    variant="secondary"
                     size="sm"
                     aria-label={`Cast ${row.name}`}
                     disabled={!row.castable}
-                    title={
-                      row.castable ? undefined : 'Not prepared or no slots left'
-                    }
                     onClick={() => handleCastClick(row.spell)}
                   >
                     Cast
@@ -126,9 +122,9 @@ export function OverviewFavorites({
                 )}
                 <FavoriteStar kind={row.kind} id={row.id} name={row.name} />
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       <SpellsTabModals
@@ -141,6 +137,6 @@ export function OverviewFavorites({
         handleCastClick={handleCastClick}
         addToast={addToast}
       />
-    </div>
+    </Section>
   );
 }

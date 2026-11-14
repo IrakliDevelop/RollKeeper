@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { Input } from '@/components/ui/forms/input';
+import { SlotPipsButtons } from '@/components/ui/game/SlotPipsButtons';
 import { useCharacterStore } from '@/store/characterStore';
 import {
   calculateSpellAttackBonus,
@@ -16,9 +17,21 @@ import { SpellcastingStatsRow } from '../../CharacterDock/SpellcastingStatsRow';
 import { MaybeRollElement } from '../MaybeRollElement';
 import { buildSpellGroups } from '../SheetTabs.utils';
 import type { SheetRoll, SheetSpellCastingProps } from '../SheetDrawer.types';
-import { SLOT_ORDINAL, SpellGroupList } from './SpellGroupList';
-import { SpellSlotPipsRow } from './SpellSlotPipsRow';
+import { SpellGroupList } from './SpellGroupList';
 import { SpellsTabModals } from './SpellsTabModals';
+
+const SLOT_ORDINAL = [
+  '0th',
+  '1st',
+  '2nd',
+  '3rd',
+  '4th',
+  '5th',
+  '6th',
+  '7th',
+  '8th',
+  '9th',
+];
 
 export interface SpellsTabProps {
   locked: boolean;
@@ -106,16 +119,19 @@ export function SpellsTab({
       />
 
       {pactMagic && pactMagic.slots.max > 0 && (
-        <SpellSlotPipsRow
-          heading={`Pact slots (${SLOT_ORDINAL[pactMagic.level] ?? pactMagic.level} level)`}
-          groupLabel="Pact slots"
-          max={pactMagic.slots.max}
-          used={pactMagic.slots.used}
-          spendLabel="Spend pact slot"
-          restoreLabel="Restore pact slot"
-          onSpend={() => spendPactMagicSlot(1)}
-          onRestore={() => restorePactMagicSlot(1)}
-        />
+        <div className="flex items-center justify-between py-1">
+          <span className="type-small text-muted">
+            Pact slots ({SLOT_ORDINAL[pactMagic.level] ?? pactMagic.level}{' '}
+            level)
+          </span>
+          <SlotPipsButtons
+            level="pact"
+            total={pactMagic.slots.max}
+            available={pactMagic.slots.max - pactMagic.slots.used}
+            onSpend={() => spendPactMagicSlot(1)}
+            onRestore={() => restorePactMagicSlot(1)}
+          />
+        </div>
       )}
 
       <SpellGroupList

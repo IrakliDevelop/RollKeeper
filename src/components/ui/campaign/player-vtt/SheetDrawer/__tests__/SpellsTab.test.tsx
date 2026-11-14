@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { screen, fireEvent, cleanup } from '@testing-library/react';
 
 import { SpellsTab } from '../tabs/SpellsTab';
+import { renderWithTooltips, stubResizeObserver } from './renderWithTooltips';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState, Spell } from '@/types/character';
 import type { SheetSpellCastingProps } from '../SheetDrawer.types';
@@ -100,51 +101,62 @@ function casting(
 }
 
 beforeEach(() => {
+  stubResizeObserver();
+  useCharacterStore.getState().resetCharacter();
   seedCaster();
 });
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('SpellsTab', () => {
   it('groups spells with cantrips first and shows slot pips', () => {
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(
-      screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
+      screen.getAllByRole('heading', { level: 4 }).map(h => h.textContent)
     ).toEqual(['Cantrips', '1st level']);
     expect(
-      screen.getAllByRole('button', { name: /spend 1st-level slot/i })[0]
+      screen.getAllByRole('button', { name: /spend a level 1 slot/i })[0]
     ).toBeInTheDocument();
   });
 
   it('spends and restores a slot by tapping pips', () => {
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     fireEvent.click(
-      screen.getAllByRole('button', { name: /spend 1st-level slot/i })[0]
+      screen.getAllByRole('button', { name: /spend a level 1 slot/i })[0]
     );
     expect(getChar().spellSlots[1].used).toBe(1);
     fireEvent.click(
-      screen.getAllByRole('button', { name: /restore 1st-level slot/i })[0]
+      screen.getAllByRole('button', { name: /restore a level 1 slot/i })[0]
     );
     expect(getChar().spellSlots[1].used).toBe(0);
   });
 
   it('casts a cantrip immediately', () => {
     const addToast = vi.fn();
-    render(<SpellsTab locked addToast={addToast} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={addToast} spellCasting={casting()} />
+    );
     fireEvent.click(screen.getByRole('button', { name: /cast fire bolt/i }));
     expect(addToast).toHaveBeenCalled();
   });
 
   it('disables Cast for unprepared leveled spells', () => {
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(screen.getByRole('button', { name: /cast shield/i })).toBeDisabled();
   });
 
   it('toggles prepared only when unlocked', () => {
-    const { rerender } = render(
+    const { rerender } = renderWithTooltips(
       <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
     );
     expect(
@@ -160,7 +172,9 @@ describe('SpellsTab', () => {
   });
 
   it('filters by search', () => {
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     fireEvent.change(
       screen.getByRole('searchbox', { name: /search spells/i }),
       {
@@ -173,36 +187,46 @@ describe('SpellsTab', () => {
 
   it('spends and restores a pact slot by tapping pips', () => {
     seedCaster({ pactMagic: { level: 2, slots: { max: 2, used: 0 } } });
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     fireEvent.click(
-      screen.getAllByRole('button', { name: /spend pact slot/i })[0]
+      screen.getAllByRole('button', { name: /spend a pact slot/i })[0]
     );
     expect(getChar().pactMagic!.slots.used).toBe(1);
     fireEvent.click(
-      screen.getAllByRole('button', { name: /restore pact slot/i })[0]
+      screen.getAllByRole('button', { name: /restore a pact slot/i })[0]
     );
     expect(getChar().pactMagic!.slots.used).toBe(0);
   });
 
   it('labels each slot pip set as a group with remaining of max', () => {
     seedCaster({ pactMagic: { level: 2, slots: { max: 2, used: 1 } } });
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(
-      screen.getByRole('group', { name: /^1st-level slots: \d+ of \d+$/ })
+      screen.getByRole('group', { name: /^\d of \d level 1 slots available$/ })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('group', { name: 'Pact slots: 1 of 2' })
+      screen.getByRole('group', { name: '1 of 2 pact slots available' })
     ).toBeInTheDocument();
+    expect(screen.getByText('Pact slots (2nd level)')).toBeInTheDocument();
+    expect(screen.queryByText(/\d of \d slots$/)).toBeNull();
   });
 
   it('shows the no-spells empty state', () => {
     seedCaster({ spells: [] });
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(screen.getByText(/no spells yet/i)).toBeInTheDocument();
   });
 
   it('shows the no-matches empty state', () => {
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     fireEvent.change(
       screen.getByRole('searchbox', { name: /search spells/i }),
       { target: { value: 'nonexistent spell' } }
@@ -213,7 +237,7 @@ describe('SpellsTab', () => {
   });
 
   it('unprepares a prepared leveled spell when unlocked', () => {
-    render(
+    renderWithTooltips(
       <SpellsTab locked={false} addToast={vi.fn()} spellCasting={casting()} />
     );
     fireEvent.click(
@@ -224,15 +248,60 @@ describe('SpellsTab', () => {
     ).toBe(false);
   });
 
-  it('gives the disabled Cast button an explanatory title', () => {
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+  it('disables Cast without a hover title', () => {
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
+    const cast = screen.getByRole('button', { name: /cast shield/i });
+    expect(cast).toBeDisabled();
+    expect(cast).not.toHaveAttribute('title');
+  });
+
+  it('renders Cast as a secondary button', () => {
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     expect(
-      screen.getByRole('button', { name: /cast shield/i })
-    ).toHaveAttribute('title', 'Not prepared or no slots left');
+      screen.getByRole('button', { name: /cast fire bolt/i })
+    ).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('marks the prepare toggle with data-selected, not aria-pressed', () => {
+    renderWithTooltips(
+      <SpellsTab locked={false} addToast={vi.fn()} spellCasting={casting()} />
+    );
+    const prepare = screen.getByRole('button', { name: 'Prepare Shield' });
+    expect(prepare).not.toHaveAttribute('data-selected');
+    expect(prepare).not.toHaveAttribute('aria-pressed');
+    const unprepare = screen.getByRole('button', {
+      name: 'Unprepare Magic Missile',
+    });
+    expect(unprepare).toHaveAttribute('data-selected', 'true');
+    expect(unprepare).not.toHaveAttribute('aria-pressed');
+  });
+
+  it('spells out concentration and ritual instead of C and R badges', () => {
+    const detectMagic = makeSpell({
+      id: 'detectmagic',
+      name: 'Detect Magic',
+      level: 1,
+      concentration: true,
+      ritual: true,
+      isPrepared: true,
+    });
+    seedCaster({ spells: [FIRE_BOLT, MAGIC_MISSILE, SHIELD, detectMagic] });
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
+    expect(screen.getByText('Concentration · Ritual')).toBeInTheDocument();
+    expect(screen.queryByText('C')).toBeNull();
+    expect(screen.queryByText('R')).toBeNull();
   });
 
   it('pins a spell via its star, mirroring the legacy favorite flag', () => {
-    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    renderWithTooltips(
+      <SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Pin Fire Bolt' }));
     expect(getChar().sheetFavorites).toContainEqual({
       kind: 'spell',
@@ -250,7 +319,7 @@ describe('SpellsTab', () => {
       isAlwaysPrepared: true,
     });
     seedCaster({ spells: [FIRE_BOLT, MAGIC_MISSILE, SHIELD, domainSpell] });
-    render(
+    renderWithTooltips(
       <SpellsTab locked={false} addToast={vi.fn()} spellCasting={casting()} />
     );
     expect(screen.queryByRole('button', { name: /prepare bless/i })).toBeNull();
