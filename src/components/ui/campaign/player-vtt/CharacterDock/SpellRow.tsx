@@ -13,7 +13,7 @@ export interface SpellRowProps {
 
 /**
  * Single spell line in the dock's spell list: name and tags, plus a Cast
- * button. Renders no Tooltip: the sheet drawer mounts it without a provider.
+ * button.
  */
 export function SpellRow({ spell, onView, onCast }: SpellRowProps) {
   const tags = [

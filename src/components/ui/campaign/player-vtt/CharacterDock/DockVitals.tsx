@@ -75,7 +75,7 @@ export function DockVitals({ addToast }: DockVitalsProps) {
         onTemp={hpEditor.onTemp}
       />
 
-      <dl className="grid grid-cols-2 gap-x-4">
+      <div className="grid grid-cols-2 gap-x-4">
         <div>
           <Button
             variant="ghost"
@@ -84,20 +84,22 @@ export function DockVitals({ addToast }: DockVitalsProps) {
             onClick={() => setAcOpen(true)}
             className="h-auto w-full flex-col items-start gap-0 px-2 py-1 text-left"
           >
-            <dd className="type-num-lg text-heading tabular-nums">{totalAC}</dd>
-            <dt className="type-small text-muted flex items-center gap-1">
+            <span className="type-num-lg text-heading block tabular-nums">
+              {totalAC}
+            </span>
+            <span className="type-small text-muted flex items-center gap-1">
               AC
               <Pencil size={12} aria-hidden />
-            </dt>
+            </span>
           </Button>
         </div>
         <div className="px-2 py-1">
-          <dd className="type-num-lg text-heading tabular-nums">
+          <span className="type-num-lg text-heading block tabular-nums">
             {formatModifier(initiativeModifier)}
-          </dd>
-          <dt className="type-small text-muted">Init</dt>
+          </span>
+          <span className="type-small text-muted block">Init</span>
         </div>
-      </dl>
+      </div>
       <AcEditDialog open={acOpen} onOpenChange={setAcOpen} />
 
       <QuickCombatStrip

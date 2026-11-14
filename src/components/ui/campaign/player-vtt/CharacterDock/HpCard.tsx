@@ -41,7 +41,7 @@ export function HpCard({
           <span
             className={cn(
               'type-num-xl tabular-nums',
-              getHpNumberColor(hpCurrent, hpMax)
+              hpMax > 0 ? getHpNumberColor(hpCurrent, hpMax) : 'text-heading'
             )}
           >
             {hpCurrent}

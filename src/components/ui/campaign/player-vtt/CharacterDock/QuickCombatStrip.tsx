@@ -59,7 +59,7 @@ export function QuickCombatStrip({
             aria-label="Use heroic inspiration"
             leftIcon={<AppIcon name="inspiration" className="size-4" />}
             onClick={onUse}
-            className="min-w-0 flex-1"
+            className="min-w-0 flex-1 gap-1 px-2"
           >
             {stackable ? `×${count}` : null}
           </Button>

@@ -14,8 +14,8 @@ export interface DockBuffsProps {
  * Quick-toggle tray for the character's temporary buffs (Mage Armor, Shield,
  * Bladesong…). Buffs are authored on the sheet (Features → Defenses); the
  * dock only flips `isActive`. Renders nothing when no buffs are defined.
- * Also mounted by the sheet drawer's Effects tab without a `TooltipProvider`,
- * so it renders no Tooltip.
+ * Also mounted by the sheet drawer's Effects tab, whose tests render it
+ * without a `TooltipProvider`, so it renders no Tooltip.
  */
 export function DockBuffs({ buffs, onToggleBuff }: DockBuffsProps) {
   if (buffs.length === 0) return null;
