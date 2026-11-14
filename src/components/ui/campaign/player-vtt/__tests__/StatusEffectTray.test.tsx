@@ -1,6 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  cleanup,
+  within,
+} from '@testing-library/react';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { StatusEffectTray } from '@/components/ui/campaign/player-vtt/StatusEffectTray';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState, ActiveCondition } from '@/types/character';
@@ -29,31 +37,63 @@ const makeCondition = (
   ...over,
 });
 
+// The tray's Tooltip needs the provider PlayerVttScreen wraps around the
+// floating panels, and Radix measures the trigger with ResizeObserver.
+function render(ui: ReactElement) {
+  const result = rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
+  return {
+    ...result,
+    rerender: (next: ReactElement) =>
+      result.rerender(<TooltipProvider>{next}</TooltipProvider>),
+  };
+}
+
 describe('StatusEffectTray', () => {
   beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
     seedCharacter();
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.documentElement.style.removeProperty('--player-vtt-tray-height');
+  });
 
-  it('does not render a CONC chip while not concentrating', () => {
+  it('shows no concentration button while not concentrating', () => {
     seedCharacter({
       concentration: { isConcentrating: false },
     });
     render(<StatusEffectTray />);
-    expect(screen.queryByText(/🧠 CON/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Concentrating on/)).toBeNull();
   });
 
-  it('renders a CONC chip while concentrating and ends concentration from the dialog', () => {
+  it('names the concentration spell on its button and ends concentration from the dialog', () => {
     seedCharacter({
       concentration: { isConcentrating: true, spellName: 'Bless' },
     });
     render(<StatusEffectTray />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'CON' }));
-    expect(screen.getByText(/Concentrating on Bless/i)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Concentrating on Bless' })
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Concentrating on Bless',
+    });
+    const end = within(dialog).getByRole('button', {
+      name: 'End concentration',
+    });
+    expect(end).toHaveAttribute('data-variant', 'danger');
 
-    fireEvent.click(screen.getByRole('button', { name: /end concentration/i }));
+    fireEvent.click(end);
 
     expect(getChar().concentration.isConcentrating).toBe(false);
   });
@@ -79,8 +119,13 @@ describe('StatusEffectTray', () => {
   it('adds a condition from the quick-add picker', () => {
     render(<StatusEffectTray />);
 
-    fireEvent.click(screen.getByRole('button', { name: /add condition/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Blinded$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
+    expect(
+      screen.getByRole('dialog', { name: 'Add condition or buff' })
+    ).toBeInTheDocument();
+    const quickAdd = screen.getByRole('button', { name: /^Blinded$/ });
+    expect(quickAdd).toHaveAttribute('data-variant', 'secondary');
+    fireEvent.click(quickAdd);
 
     const conditions = getChar().conditionsAndDiseases.activeConditions;
     expect(conditions).toHaveLength(1);
@@ -89,5 +134,29 @@ describe('StatusEffectTray', () => {
       source: 'Self',
       count: 1,
     });
+  });
+
+  it('publishes its own height plus 8px as --player-vtt-tray-height and removes it on unmount', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      height: 50,
+    } as DOMRect);
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: () => void) {}
+        observe() {
+          this.callback();
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    const { unmount } = render(<StatusEffectTray />);
+
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue('--player-vtt-tray-height')).toBe('58px');
+
+    unmount();
+    expect(root.getPropertyValue('--player-vtt-tray-height')).toBe('');
   });
 });
