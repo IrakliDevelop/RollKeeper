@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
 import { CastingBanner } from '@/components/ui/campaign/player-vtt/CastingBanner';
 import type { SpellAoe } from '@/types/spellAoe';
@@ -47,5 +47,28 @@ describe('CastingBanner', () => {
     expect(
       screen.getByText('Tap the map to place the template')
     ).toBeInTheDocument();
+  });
+
+  it('names the spell, size and shape in one line', () => {
+    const aoe: SpellAoe = { shape: 'circle', sizeFeet: 20 };
+    render(<CastingBanner spellName="Fireball" aoe={aoe} onCancel={vi.fn()} />);
+
+    expect(
+      screen.getByText('Placing Fireball · 20 ft circle')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/tap the map to drop/)).not.toBeInTheDocument();
+  });
+
+  it('cancels with a ghost button', () => {
+    const onCancel = vi.fn();
+    const aoe: SpellAoe = { shape: 'circle', sizeFeet: 20 };
+    render(
+      <CastingBanner spellName="Fireball" aoe={aoe} onCancel={onCancel} />
+    );
+
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancel).toHaveAttribute('data-variant', 'ghost');
+    fireEvent.click(cancel);
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });
