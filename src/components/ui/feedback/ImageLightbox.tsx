@@ -22,7 +22,7 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
       }}
     >
       <DialogContent
-        className="w-auto max-w-[95vw] pt-16"
+        className="w-max max-w-[95vw] pt-16"
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">{`${alt} full-size image`}</DialogTitle>
