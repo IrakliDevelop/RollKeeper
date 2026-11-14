@@ -22,6 +22,20 @@ interface JoinCampaignDialogProps {
   preselectedCharacterId?: string;
 }
 
+type JoinError = {
+  field: 'code' | 'character' | 'form';
+  message: string;
+} | null;
+
+const JOIN_COPY = {
+  codeMissing: 'Enter the campaign code.',
+  characterMissing: 'Choose a character to join with.',
+  codeUnknown: 'No campaign with that code. Check it with your DM.',
+  unreachable:
+    "Couldn't reach the campaign. Check your connection and try again.",
+  characterGone: 'That character is no longer on this device.',
+} as const;
+
 export function JoinCampaignDialog({
   open,
   onOpenChange,
@@ -34,40 +48,42 @@ export function JoinCampaignDialog({
     preselectedCharacterId || ''
   );
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<JoinError>(null);
 
   const availableCharacters = characters.filter(
     c => !c.isArchived && !c.campaignCode
   );
 
   const handleJoin = async () => {
+    if (loading) return;
     const trimmedCode = code.trim().toUpperCase();
     if (!trimmedCode) {
-      setError('Campaign code is required');
+      setError({ field: 'code', message: JOIN_COPY.codeMissing });
       return;
     }
     if (!selectedCharacterId) {
-      setError('Please select a character');
+      setError({ field: 'character', message: JOIN_COPY.characterMissing });
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
       const res = await fetch(`/api/campaign/${trimmedCode}`);
       if (!res.ok) {
-        if (res.status === 404) {
-          setError('Campaign not found. Check the code and try again.');
-          return;
-        }
-        throw new Error('Failed to verify campaign');
+        setError(
+          res.status === 404
+            ? { field: 'code', message: JOIN_COPY.codeUnknown }
+            : { field: 'form', message: JOIN_COPY.unreachable }
+        );
+        return;
       }
 
       const data = await res.json();
       const character = characters.find(c => c.id === selectedCharacterId);
       if (!character) {
-        setError('Character not found');
+        setError({ field: 'form', message: JOIN_COPY.characterGone });
         return;
       }
 
@@ -88,13 +104,17 @@ export function JoinCampaignDialog({
 
       if (!joinRes.ok) {
         const joinData = await joinRes.json();
-        throw new Error(joinData.error || 'Failed to join campaign');
+        setError({
+          field: 'form',
+          message: joinData.error || JOIN_COPY.unreachable,
+        });
+        return;
       }
 
       onJoin(trimmedCode, selectedCharacterId, data.campaign.campaignName);
       handleClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join campaign');
+    } catch {
+      setError({ field: 'form', message: JOIN_COPY.unreachable });
     } finally {
       setLoading(false);
     }
@@ -103,7 +123,7 @@ export function JoinCampaignDialog({
   const handleClose = () => {
     setCode('');
     setSelectedCharacterId(preselectedCharacterId || '');
-    setError('');
+    setError(null);
     onOpenChange(false);
   };
 
@@ -111,7 +131,7 @@ export function JoinCampaignDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Join Campaign</DialogTitle>
+          <DialogTitle>Join campaign</DialogTitle>
           <DialogDescription>
             Enter the campaign code from your DM to sync your character.
           </DialogDescription>
@@ -119,13 +139,16 @@ export function JoinCampaignDialog({
 
         <div className="space-y-4 py-4">
           <Input
-            label="Campaign Code"
-            placeholder="e.g. ABC123"
+            label="Campaign code"
+            placeholder="ABC123"
             value={code}
             onChange={e => setCode(e.target.value.toUpperCase())}
-            error={error && !selectedCharacterId ? error : undefined}
+            error={error?.field === 'code' ? error.message : undefined}
             autoFocus
-            className="font-mono tracking-wider uppercase"
+            className="font-mono"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
             onKeyDown={e => {
               if (e.key === 'Enter') handleJoin();
             }}
@@ -136,25 +159,29 @@ export function JoinCampaignDialog({
               label="Character"
               value={selectedCharacterId}
               onValueChange={setSelectedCharacterId}
-              error={error && selectedCharacterId ? undefined : undefined}
+              error={error?.field === 'character' ? error.message : undefined}
             >
               {availableCharacters.map(char => (
                 <SelectItem key={char.id} value={char.id}>
-                  {char.name} — {char.class} Lv.{char.level}
+                  {char.name} — {char.class} level {char.level}
                 </SelectItem>
               ))}
             </SelectField>
           )}
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error?.field === 'form' && (
+            <p role="alert" className="type-small text-blood-text">
+              {error.message}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={handleClose}>
+          <Button variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleJoin} disabled={loading}>
-            {loading ? 'Joining...' : 'Join Campaign'}
+            {loading ? 'Joining…' : 'Join campaign'}
           </Button>
         </DialogFooter>
       </DialogContent>

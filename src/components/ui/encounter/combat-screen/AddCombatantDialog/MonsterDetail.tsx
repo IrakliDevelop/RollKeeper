@@ -10,6 +10,15 @@ import type { PlayerDisposition } from '@/types/encounter';
 import { bestiaryTokenUrl } from '@/utils/bestiaryTokenUrl';
 import { SharedOptions } from './SharedOptions';
 
+const ABILITY_LABELS = [
+  ['str', 'STR'],
+  ['dex', 'DEX'],
+  ['con', 'CON'],
+  ['int', 'INT'],
+  ['wis', 'WIS'],
+  ['cha', 'CHA'],
+] as const;
+
 interface MonsterDetailProps {
   selected: ProcessedMonster;
   hp: string;
@@ -49,6 +58,7 @@ export function MonsterDetail({
 }: MonsterDetailProps) {
   const mType =
     typeof selected.type === 'string' ? selected.type : selected.type.type;
+  const actionCount = selected.actions?.length ?? 0;
 
   return (
     <div className="space-y-3 pb-4">
@@ -77,10 +87,8 @@ export function MonsterDetail({
               />
             )}
             <div className="min-w-0">
-              <h4 className="text-heading text-lg font-semibold">
-                {selected.name}
-              </h4>
-              <p className="text-muted text-[12.5px]">
+              <h4 className="type-subheading text-heading">{selected.name}</h4>
+              <p className="type-small text-muted">
                 {selected.size.join('/')} {mType}
                 {selected.alignment ? `, ${selected.alignment}` : ''}
               </p>
@@ -121,20 +129,20 @@ export function MonsterDetail({
 
         {/* Ability scores */}
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(ab => (
+          {ABILITY_LABELS.map(([ab, label]) => (
             <div key={ab} className="border-divider border-l pl-2">
-              <div className="text-muted block text-xs uppercase">{ab}</div>
-              <div className="text-heading text-sm font-medium tabular-nums">
+              <div className="type-caption text-muted">{label}</div>
+              <div className="type-num-md text-heading tabular-nums">
                 {selected[ab]}
               </div>
             </div>
           ))}
         </div>
 
-        <p className="text-muted text-xs">
+        <p className="type-small text-muted">
           HP formula {selected.hpFormula}
-          {selected.actions && selected.actions.length > 0
-            ? ` · ${selected.actions.length} action(s)`
+          {actionCount > 0
+            ? ` · ${actionCount} ${actionCount === 1 ? 'action' : 'actions'}`
             : ''}
           {selected.legendaryActions && selected.legendaryActions.length > 0
             ? ' · Legendary'
@@ -143,7 +151,7 @@ export function MonsterDetail({
       </div>
 
       <Button
-        variant="outline"
+        variant="secondary"
         fullWidth
         onClick={onEditStatBlock}
         leftIcon={<FilePen size={14} />}

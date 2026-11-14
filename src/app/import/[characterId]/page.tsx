@@ -23,15 +23,16 @@ export default async function ImportPage({
 
   if (!exportData) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-heading mb-2 text-2xl font-bold">Link Expired</h1>
-          <p className="text-muted">
-            This share link has expired or is invalid. Ask the character owner
-            to generate a new one.
+      <main className="bg-surface flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md">
+          <h1 className="type-heading text-heading">Link expired</h1>
+          <p className="type-body text-muted mt-2">
+            {
+              "This share link has expired or doesn't exist. Ask the player who shared it for a new link."
+            }
           </p>
         </div>
-      </div>
+      </main>
     );
   }
 
