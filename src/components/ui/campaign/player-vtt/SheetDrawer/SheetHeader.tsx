@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Coffee, Moon, Star, X, Zap } from 'lucide-react';
+import { Coffee, Moon, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
 import { Badge } from '@/components/ui/layout/badge';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import { useCharacterStore } from '@/store/characterStore';
 
 import { buildHeaderView } from './SheetDrawer.utils';
@@ -32,48 +33,40 @@ export function SheetHeader({
     <div className="border-divider flex gap-3 border-b px-5 pt-4 pb-3">
       <div
         data-testid="sheet-portrait"
-        className="relative h-14 w-14 shrink-0 self-start"
+        className="relative size-12 shrink-0 self-start"
       >
         {view.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={view.avatar}
             alt=""
-            className="h-14 w-14 rounded-xl object-cover"
+            className="size-12 rounded-full object-cover"
           />
         ) : (
-          <div className="bg-accent-emerald-bg text-accent-emerald-text flex h-14 w-14 items-center justify-center rounded-xl text-2xl font-bold">
+          <div className="bg-surface-raised type-subheading text-heading flex size-12 items-center justify-center rounded-full">
             {view.initial}
           </div>
         )}
-        <span
-          title={`Character level ${view.level}`}
-          className="bg-surface-elevated border-divider text-heading absolute -right-1.5 -bottom-1.5 rounded-full border px-1.5 text-xs font-bold"
-        >
+        <span className="border-divider bg-surface-elevated type-caption text-heading absolute -right-1.5 -bottom-1.5 rounded-sm border px-1 tabular-nums">
+          <span className="sr-only">Character level </span>
           {view.level}
         </span>
       </div>
       <div className="min-w-0 flex-1">
-        <h2 className="text-heading truncate text-xl font-bold">{view.name}</h2>
-        <p className="text-muted truncate text-xs">{view.subtitle}</p>
+        <h2 className="type-heading text-heading truncate">{view.name}</h2>
+        <p className="type-small text-muted truncate">{view.subtitle}</p>
         <div className="mt-1.5 flex flex-wrap gap-1">
           {view.concentration && (
-            <Badge variant="info">
-              <Zap className="mr-1 h-3 w-3" />
-              {view.concentration}
-            </Badge>
+            <ConditionChip kind="concentration" name={view.concentration} />
           )}
           {view.conditions.map(name => (
-            <Badge key={name} variant="danger">
-              {name}
-            </Badge>
+            <ConditionChip key={name} name={name} />
           ))}
           {view.exhaustion > 0 && (
-            <Badge variant="warning">Exhaustion {view.exhaustion}</Badge>
+            <ConditionChip name={`Exhaustion ${view.exhaustion}`} />
           )}
           {view.inspired && (
-            <Badge variant="success">
-              <Star className="mr-1 h-3 w-3" />
+            <Badge variant="primary" size="sm">
               Inspired
             </Badge>
           )}
@@ -91,20 +84,28 @@ export function SheetHeader({
           <Button
             variant="ghost"
             size="sm"
+            className="w-9 px-0"
             onClick={onClose}
             aria-label="Close sheet"
-            title="Close (Esc)"
           >
-            <X className="h-4 w-4" />
+            <X size={16} aria-hidden="true" />
           </Button>
         </div>
         <div className="flex gap-1">
-          <Button variant="outline" size="sm" onClick={onShortRest}>
-            <Coffee className="mr-1 h-3.5 w-3.5" />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onShortRest}
+            leftIcon={<Coffee size={16} aria-hidden="true" />}
+          >
             Short rest
           </Button>
-          <Button variant="outline" size="sm" onClick={onLongRest}>
-            <Moon className="mr-1 h-3.5 w-3.5" />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onLongRest}
+            leftIcon={<Moon size={16} aria-hidden="true" />}
+          >
             Long rest
           </Button>
         </div>

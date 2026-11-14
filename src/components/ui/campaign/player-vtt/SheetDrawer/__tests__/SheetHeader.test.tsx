@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  within,
+} from '@testing-library/react';
 
 import { SheetHeader } from '../SheetHeader';
 import { useCharacterStore } from '@/store/characterStore';
@@ -31,7 +37,32 @@ describe('SheetHeader', () => {
     expect(
       screen.getByRole('heading', { name: 'Kaelen Voss' })
     ).toBeInTheDocument();
-    expect(screen.getByText("Hunter's Mark")).toBeInTheDocument();
+    expect(
+      screen.getByText("Concentrating on Hunter's Mark").closest('[data-kind]')
+    ).toHaveAttribute('data-kind', 'concentration');
+  });
+
+  it('shows conditions, exhaustion and inspiration as words only', () => {
+    const base = useCharacterStore.getState().character;
+    useCharacterStore.getState().loadCharacterState({
+      ...base,
+      heroicInspiration: { count: 1 },
+      conditionsAndDiseases: {
+        ...base.conditionsAndDiseases,
+        activeConditions: [
+          { id: 'a', name: 'Prone', source: 'self' },
+          { id: 'b', name: 'Exhaustion', count: 2, source: 'self' },
+        ],
+      },
+    } as unknown as CharacterState);
+    render(<SheetHeader {...props()} />);
+    expect(screen.getByText('Prone').closest('[data-kind]')).toHaveAttribute(
+      'data-kind',
+      'condition'
+    );
+    expect(screen.getByText('Exhaustion 2')).toBeInTheDocument();
+    expect(screen.getByText('Inspired')).toBeInTheDocument();
+    expect(screen.getByText('Inspired').querySelector('svg')).toBeNull();
   });
 
   it('toggles lock, closes, and requests rests', () => {
@@ -51,9 +82,15 @@ describe('SheetHeader', () => {
     render(<SheetHeader {...props()} />);
     const portrait = screen.getByTestId('sheet-portrait');
     expect(portrait).toHaveClass('self-start');
-    expect(portrait).toContainElement(
-      screen.getByTitle(/^Character level \d+$/)
-    );
+    expect(portrait).toHaveTextContent(/Character level \d+/);
+    expect(within(portrait).queryByTitle(/Character level/)).toBeNull();
+  });
+
+  it('gives Close no hover title', () => {
+    render(<SheetHeader {...props()} />);
+    expect(
+      screen.getByRole('button', { name: /close sheet/i })
+    ).not.toHaveAttribute('title');
   });
 
   it('shows the Edit sheet switch off while locked and on while editing', () => {

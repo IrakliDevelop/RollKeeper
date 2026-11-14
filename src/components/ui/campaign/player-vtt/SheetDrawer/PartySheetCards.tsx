@@ -1,18 +1,18 @@
 'use client';
 
-import { Shield, Zap } from 'lucide-react';
-
 import type { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
-import { Badge } from '@/components/ui/layout/badge';
-import { getHpTierBarColor } from '@/utils/hpColor';
+import { HPBar } from '@/components/shared/combat/HPBar';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
+import { Section } from '@/components/ui/layout/section';
+import { cn } from '@/utils/cn';
+import { getHpTierTextColor } from '@/utils/hpColor';
 import { hpPercent, hpTier } from '@/utils/hpState';
 
-import { HEADING_CLASS, SECTION_CLASS } from './sheetSectionStyles';
-
-const TILE_CLASS =
-  'border-divider bg-surface rounded-lg border p-2 text-center';
-const VALUE_CLASS = 'text-heading text-xl font-bold';
-const LABEL_CLASS = 'text-faint text-xs uppercase';
+// dt first keeps the markup a valid definition list; flex-col-reverse shows
+// the value above its label.
+const CELL_CLASS = 'flex flex-col-reverse';
+const LABEL_CLASS = 'type-small text-muted';
+const VALUE_CLASS = 'type-num-lg text-heading tabular-nums';
 
 export function ConditionCard({
   member,
@@ -27,42 +27,48 @@ export function ConditionCard({
 }) {
   const hp = member.hitPoints;
   return (
-    <div className={SECTION_CLASS}>
-      <h3 className={HEADING_CLASS}>Condition</h3>
-      <div className="flex items-baseline gap-2">
-        <span className="text-heading text-lg font-bold">
-          {hpState || 'Unknown'}
-        </span>
-        {hp && (
-          <span className="text-muted text-xs">
-            {hp.current}/{hp.max}
+    <Section heading="Condition" level={4}>
+      <div className="space-y-2">
+        <div className="flex items-baseline gap-2">
+          <span
+            className={cn(
+              'type-ui',
+              hp
+                ? getHpTierTextColor(hpTier(hpPercent(hp.current, hp.max)))
+                : 'text-heading'
+            )}
+          >
+            {hpState || 'Unknown'}
           </span>
+          {hp && (
+            <span className="type-ui text-muted tabular-nums">
+              {hp.current}/{hp.max}
+            </span>
+          )}
+        </div>
+        {hp && (
+          <HPBar
+            current={hp.current}
+            max={hp.max}
+            size="sm"
+            showLabel={false}
+          />
+        )}
+        {(concentration || conditions.length > 0) && (
+          <div className="flex flex-wrap gap-1">
+            {concentration && (
+              <ConditionChip
+                kind="concentration"
+                name={`Concentrating on ${concentration}`}
+              />
+            )}
+            {conditions.map((name, index) => (
+              <ConditionChip key={`${index}-${name}`} name={name} />
+            ))}
+          </div>
         )}
       </div>
-      {hp && (
-        <div className="bg-surface-secondary mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
-          <div
-            className={`h-full rounded-full ${getHpTierBarColor(hpTier(hpPercent(hp.current, hp.max)))}`}
-            style={{ width: `${hpPercent(hp.current, hp.max)}%` }}
-          />
-        </div>
-      )}
-      {(concentration || conditions.length > 0) && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {concentration && (
-            <Badge variant="info">
-              <Zap className="mr-1 h-3 w-3" />
-              {concentration}
-            </Badge>
-          )}
-          {conditions.map((name, index) => (
-            <Badge key={`${index}-${name}`} variant="danger">
-              {name}
-            </Badge>
-          ))}
-        </div>
-      )}
-    </div>
+    </Section>
   );
 }
 
@@ -76,44 +82,37 @@ export function StatsCard({
   passivePerception: number;
 }) {
   return (
-    <div className={SECTION_CLASS}>
-      <h3 className={HEADING_CLASS}>Stats</h3>
-      <div className="grid grid-cols-3 gap-2">
-        <div className={TILE_CLASS}>
-          <div
-            className={`${VALUE_CLASS} flex items-center justify-center gap-1`}
-          >
-            <Shield className="h-4 w-4" />
-            {armorClass}
-          </div>
-          <div className={LABEL_CLASS}>AC</div>
+    <Section heading="Stats" level={4}>
+      <dl className="grid grid-cols-3 gap-x-3">
+        <div className={CELL_CLASS}>
+          <dt className={LABEL_CLASS}>AC</dt>
+          <dd className={VALUE_CLASS}>{armorClass}</dd>
         </div>
-        <div className={TILE_CLASS}>
-          <div className={VALUE_CLASS}>{speed} ft</div>
-          <div className={LABEL_CLASS}>Speed</div>
+        <div className={CELL_CLASS}>
+          <dt className={LABEL_CLASS}>Speed</dt>
+          <dd className={VALUE_CLASS}>{speed} ft</dd>
         </div>
-        <div className={TILE_CLASS}>
-          <div className={VALUE_CLASS}>{passivePerception}</div>
-          <div className={LABEL_CLASS}>Passive Perception</div>
+        <div className={CELL_CLASS}>
+          <dt className={LABEL_CLASS}>Passive Perception</dt>
+          <dd className={VALUE_CLASS}>{passivePerception}</dd>
         </div>
-      </div>
-    </div>
+      </dl>
+    </Section>
   );
 }
 
 export function GearCard({ equippedGear }: { equippedGear: string[] }) {
   return (
-    <div className={SECTION_CLASS}>
-      <h3 className={HEADING_CLASS}>Equipped, visible to the party</h3>
+    <Section heading="Equipped, visible to the party" level={4}>
       {equippedGear.length === 0 ? (
-        <p className="text-muted text-sm">Nothing equipped.</p>
+        <p className="type-body text-muted">Nothing equipped.</p>
       ) : (
-        <ul className="text-body space-y-1 text-sm">
+        <ul className="type-body text-body space-y-1">
           {equippedGear.map(name => (
             <li key={name}>{name}</li>
           ))}
         </ul>
       )}
-    </div>
+    </Section>
   );
 }

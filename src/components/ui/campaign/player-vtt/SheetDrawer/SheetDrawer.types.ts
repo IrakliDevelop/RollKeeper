@@ -7,6 +7,7 @@ import type {
   SpellSlot,
 } from '@/types/character';
 import type { LedgerCell } from '@/components/ui/game/LedgerRow';
+import type { SlotLevel } from '@/components/ui/game/SlotPips';
 import type { SpellAoe } from '@/types/spellAoe';
 
 export type SheetTabId =
@@ -88,6 +89,7 @@ export interface SlotSummaryView {
   label: string;
   remaining: number;
   max: number;
+  level: SlotLevel;
 }
 
 export interface PassiveView {

@@ -59,8 +59,15 @@ describe('buildHeaderView', () => {
     );
     expect(view.level).toBe(7);
     expect(view.initial).toBe('K');
-    expect(view.concentration).toBe("Hunter's Mark");
+    expect(view.concentration).toBe("Concentrating on Hunter's Mark");
     expect(view.inspired).toBe(true);
+  });
+
+  it('falls back to a bare "Concentrating" without a spell name', () => {
+    const view = buildHeaderView(
+      fixture({ concentration: { isConcentrating: true } })
+    );
+    expect(view.concentration).toBe('Concentrating');
   });
 
   it('separates exhaustion from other conditions', () => {
@@ -152,9 +159,9 @@ describe('buildSlotSummary', () => {
       pactMagic: { level: 2, slots: { max: 2, used: 1 } },
     });
     expect(summary).toEqual([
-      { label: '1st', remaining: 3, max: 4 },
-      { label: '2nd', remaining: 2, max: 2 },
-      { label: 'Pact 2nd', remaining: 1, max: 2 },
+      { label: '1st', remaining: 3, max: 4, level: 1 },
+      { label: '2nd', remaining: 2, max: 2, level: 2 },
+      { label: 'Pact 2nd', remaining: 1, max: 2, level: 'pact' },
     ]);
   });
 });
