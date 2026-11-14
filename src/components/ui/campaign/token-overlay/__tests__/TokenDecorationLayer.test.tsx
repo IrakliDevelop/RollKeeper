@@ -677,7 +677,7 @@ describe('TokenDecorationLayer', () => {
     );
     const badge = container.querySelector(
       '[data-testid="reaction-used-glyph"]'
-    ) as HTMLElement;
+    );
     expect(within(container).getByRole('img', { name: 'Reaction used' })).toBe(
       badge
     );

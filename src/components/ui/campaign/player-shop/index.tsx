@@ -17,9 +17,10 @@ import type { PlayerShopDialogProps } from './PlayerShopDialog.types';
 /**
  * Player-facing shop dialog (artboard 1b, VTT merchants Slice 3 Task 10) —
  * the surface where a player actually spends money. Fetches the merchant's
- * public shop, renders one card per item, and drives purchases. Does NOT
- * decide how it gets opened — the token tap that triggers it is a later
- * task; every prop it needs is on `PlayerShopDialogProps`.
+ * public shop, renders one row per item (a divided list), and drives
+ * purchases. Does NOT decide how it gets opened — the token tap that
+ * triggers it is a later task; every prop it needs is on
+ * `PlayerShopDialogProps`.
  *
  * A completed purchase's actual coin debit is applied later, client-side,
  * when the granting transfer merges (`useItemTransferAutoMerge`) — this
@@ -28,7 +29,7 @@ import type { PlayerShopDialogProps } from './PlayerShopDialog.types';
  * `character.currency` itself.
  *
  * Because that debit lands later — this dialog and the debit hook are never
- * co-mounted (Slice 3 final review, Important finding) — every card's
+ * co-mounted (Slice 3 final review, Important finding) — every row's
  * affordability check runs against `deriveEffectivePurse(purse,
  * committedCopper)` (the `purse` prop minus purchases already committed but
  * not yet debited), never the raw `purse` prop directly. `committedCopper`
