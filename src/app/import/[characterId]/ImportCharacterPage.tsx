@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CharacterExport } from '@/types/character';
 import { usePlayerStore } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms/button';
+import { Card } from '@/components/ui/layout/card';
 
 interface ImportCharacterPageProps {
   exportData: CharacterExport;
@@ -31,47 +32,50 @@ export default function ImportCharacterPage({
     character.avatar && !character.avatar.startsWith('data:image/');
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="bg-surface-raised border-divider w-full max-w-md rounded-xl border p-8 text-center shadow-xl">
-        <h1 className="text-heading mb-6 text-2xl font-bold">
-          Import Character
-        </h1>
+    <main className="bg-surface flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+        <h1 className="type-heading text-heading">Import character</h1>
 
-        {/* Avatar */}
-        <div className="mb-4 flex justify-center">
+        <Card className="mt-6 flex min-w-0 items-center gap-4">
           {hasS3Avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={character.avatar}
-              alt={character.name}
-              className="h-24 w-24 rounded-full object-cover"
+              alt=""
+              className="size-16 shrink-0 rounded-full object-cover"
             />
           ) : (
-            <div className="bg-surface-secondary text-heading flex h-24 w-24 items-center justify-center rounded-full text-3xl font-bold">
+            <div
+              aria-hidden
+              className="bg-surface-secondary text-heading type-subheading flex size-16 shrink-0 items-center justify-center rounded-full"
+            >
               {character.name?.[0]?.toUpperCase() ?? '?'}
             </div>
           )}
-        </div>
-
-        <h2 className="text-heading mb-1 text-xl font-bold">
-          {character.name}
-        </h2>
-        <p className="text-muted mb-6">
-          {character.race} {className} · Level {character.level}
-        </p>
+          <div className="min-w-0">
+            <h2 className="type-subheading text-heading break-words">
+              {character.name}
+            </h2>
+            <p className="type-small text-muted mt-1">
+              {[character.race, className, `Level ${character.level}`]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          </div>
+        </Card>
 
         <Button
           onClick={handleImport}
           variant="primary"
           disabled={importing}
-          className="w-full"
+          className="mt-6 w-full"
         >
-          {importing ? 'Importing...' : 'Import Character'}
+          {importing ? 'Importing…' : 'Import character'}
         </Button>
-        <p className="text-faint mt-3 text-sm">
-          This will add the character to your roster
+        <p className="type-small text-muted mt-3">
+          Adds this character to your roster on this device.
         </p>
       </div>
-    </div>
+    </main>
   );
 }
