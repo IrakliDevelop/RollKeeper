@@ -341,9 +341,12 @@ export const AbilitiesOnPhone: Story = {
     const screen = body(canvasElement);
     const dialog = await screen.findByRole('dialog');
     await expect(cellsPerRow(dialog)).toBe(3);
-    await expect(
-      within(dialog).getByRole('switch', { name: 'Scores large' })
-    ).toBeVisible();
+    // The dialog fades in, so wait for it rather than reading opacity once.
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('switch', { name: 'Scores large' })
+      ).toBeVisible()
+    );
   },
 };
 
