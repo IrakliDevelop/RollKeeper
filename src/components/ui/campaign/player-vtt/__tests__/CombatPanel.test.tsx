@@ -1,6 +1,15 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { useState, type ReactElement } from 'react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { CombatPanel } from '@/components/ui/campaign/player-vtt/CombatPanel';
 import type {
   SharedInitiativeState,
@@ -55,12 +64,37 @@ function buildState(
   };
 }
 
+// CombatPanel's Tooltip needs the provider PlayerVttScreen wraps around the
+// floating panels, and Radix measures the trigger with ResizeObserver.
+function render(ui: ReactElement) {
+  const result = rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
+  return {
+    ...result,
+    rerender: (next: ReactElement) =>
+      result.rerender(<TooltipProvider>{next}</TooltipProvider>),
+  };
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
 function noop() {
   // Intentional no-op for props that aren't asserted on in a given test.
 }
 
 describe('CombatPanel', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('renders nothing when combat is inactive or state is null', () => {
     const { container: nullContainer } = render(
@@ -97,8 +131,10 @@ describe('CombatPanel', () => {
       />
     );
 
-    expect(screen.getByText(/ROUND\s*2/)).toBeInTheDocument();
-    expect(screen.getByText(/3 IN ORDER/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Combat' })).toBeInTheDocument();
+    expect(screen.getByText('Round 2')).toBeInTheDocument();
+    expect(screen.queryByText(/ROUND/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/in order/i)).not.toBeInTheDocument();
 
     const rows = screen.getAllByRole('listitem');
     expect(rows).toHaveLength(3);
@@ -107,7 +143,7 @@ describe('CombatPanel', () => {
     expect(rows[2]).toHaveTextContent('Orc');
   });
 
-  it('marks the player row with YOU and shows End my turn only on their active turn', () => {
+  it('marks the player row with (you) and shows End my turn only on their active turn', () => {
     const handleEndTurn = vi.fn();
     render(
       <CombatPanel
@@ -119,11 +155,13 @@ describe('CombatPanel', () => {
       />
     );
 
-    expect(screen.getByText('YOU')).toBeInTheDocument();
+    expect(screen.getByText('(you)')).toBeInTheDocument();
+    expect(screen.queryByText('YOU')).not.toBeInTheDocument();
     const endTurnButton = screen.getByRole('button', {
-      name: /end my turn/i,
+      name: 'End my turn',
     });
     expect(endTurnButton).toBeInTheDocument();
+    expect(endTurnButton).toHaveAttribute('data-variant', 'primary');
 
     fireEvent.click(endTurnButton);
     expect(handleEndTurn).toHaveBeenCalledWith('pc-1');
@@ -192,8 +230,8 @@ describe('CombatPanel', () => {
       />
     );
 
-    // Identity badge still shows on the player's own row...
-    expect(screen.getByText('YOU')).toBeInTheDocument();
+    // Identity marker still shows on the player's own row...
+    expect(screen.getByText('(you)')).toBeInTheDocument();
     // ...but it isn't their turn, so no end-turn control.
     expect(
       screen.queryByRole('button', { name: /end my turn/i })
@@ -252,17 +290,27 @@ describe('CombatPanel', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('gives a neutral-disposition entry the muted avatar bucket, not the enemy red one', () => {
-    const neutralEntry: SharedTurnEntry = {
-      entityId: 'villager-1',
-      displayName: 'Villager',
-      type: 'npc',
-      disposition: 'neutral',
-      hpState: 'Healthy',
-    };
+  it('marks each disposition with a neutral glyph that has an accessible name', () => {
+    const entries: SharedTurnEntry[] = [
+      enemyEntry,
+      {
+        entityId: 'villager-1',
+        displayName: 'Villager',
+        type: 'npc',
+        disposition: 'neutral',
+        hpState: 'Healthy',
+      },
+      {
+        entityId: 'knight-1',
+        displayName: 'Knight',
+        type: 'npc',
+        disposition: 'ally',
+        hpState: 'Healthy',
+      },
+    ];
     render(
       <CombatPanel
-        state={buildState({ turnOrder: [neutralEntry] })}
+        state={buildState({ turnOrder: entries })}
         characterId={CHARACTER_ID}
         onEndTurn={noop}
         collapsed={false}
@@ -270,9 +318,44 @@ describe('CombatPanel', () => {
       />
     );
 
-    const avatar = screen.getByText('V', { selector: 'span[aria-hidden]' });
-    expect(avatar.className).not.toMatch(/text-accent-red-text/);
-    expect(avatar.className).not.toMatch(/bg-accent-red-bg/);
+    expect(screen.getByRole('img', { name: 'Enemy' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Neutral' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Ally' })).toBeInTheDocument();
+  });
+
+  it('marks only the live current row with aria-current and Current turn', () => {
+    render(
+      <CombatPanel
+        state={buildState()}
+        characterId={CHARACTER_ID}
+        onEndTurn={noop}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    const [goblinRow, ariaRow, orcRow] = screen.getAllByRole('listitem');
+    expect(goblinRow).toHaveAttribute('aria-current', 'true');
+    expect(goblinRow).toHaveTextContent('Current turn');
+    expect(ariaRow).not.toHaveAttribute('aria-current');
+    expect(ariaRow).not.toHaveTextContent('Current turn');
+    expect(orcRow).not.toHaveAttribute('aria-current');
+  });
+
+  it('does not mark a defeated current row as the current turn', () => {
+    render(
+      <CombatPanel
+        state={buildState({ currentEntityId: 'orc-1' })}
+        characterId={CHARACTER_ID}
+        onEndTurn={noop}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    const orcRow = screen.getAllByRole('listitem')[2];
+    expect(orcRow).not.toHaveAttribute('aria-current');
+    expect(orcRow).not.toHaveTextContent('Current turn');
   });
 
   it('renders enemy hpPercent as a bar only when enemyHpMode is bar', () => {
@@ -304,7 +387,7 @@ describe('CombatPanel', () => {
     );
   });
 
-  it('applies defeated styling', () => {
+  it('labels a defeated row Defeated', () => {
     render(
       <CombatPanel
         state={buildState()}
@@ -315,14 +398,14 @@ describe('CombatPanel', () => {
       />
     );
 
-    const rows = screen.getAllByRole('listitem');
-    const orcRow = rows.find(row => row.textContent?.includes('Orc'));
+    const orcRow = screen
+      .getAllByRole('listitem')
+      .find(row => row.textContent?.includes('Orc'));
     expect(orcRow).toBeDefined();
-    expect(orcRow?.className).toEqual(expect.stringContaining('opacity-50'));
-    expect(orcRow?.className).toEqual(expect.stringContaining('line-through'));
+    expect(orcRow).toHaveTextContent('Defeated');
   });
 
-  it('collapses to an edge tab and expands back', () => {
+  it('collapses to a Combat pill and expands back', () => {
     const handleToggleCollapsed = vi.fn();
     const { rerender } = render(
       <CombatPanel
@@ -334,12 +417,17 @@ describe('CombatPanel', () => {
       />
     );
 
-    const edgeTab = screen.getByRole('button', { name: /init/i });
-    expect(edgeTab).toBeInTheDocument();
+    const pill = screen.getByRole('button', { name: 'Combat' });
+    expect(pill).toHaveAttribute('aria-expanded', 'false');
+    expect(pill).not.toHaveAttribute('title');
+    expect(screen.queryByText('INIT')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Expand combat panel' })
+    ).not.toBeInTheDocument();
     // The full panel (round header) must not be rendered while collapsed.
-    expect(screen.queryByText(/ROUND/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Round/)).not.toBeInTheDocument();
 
-    fireEvent.click(edgeTab);
+    fireEvent.click(pill);
     expect(handleToggleCollapsed).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -351,7 +439,44 @@ describe('CombatPanel', () => {
         onToggleCollapsed={handleToggleCollapsed}
       />
     );
-    expect(screen.getByText(/ROUND/)).toBeInTheDocument();
+    expect(screen.getByText(/Round/)).toBeInTheDocument();
+    const collapse = screen.getByRole('button', {
+      name: 'Collapse combat panel',
+    });
+    expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(collapse);
+    expect(handleToggleCollapsed).toHaveBeenCalledTimes(2);
+  });
+
+  it('moves focus to the Combat pill after collapsing and back to the collapse button after expanding', async () => {
+    function Harness() {
+      const [collapsed, setCollapsed] = useState(false);
+      return (
+        <CombatPanel
+          state={buildState()}
+          characterId={CHARACTER_ID}
+          onEndTurn={noop}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setCollapsed(c => !c)}
+        />
+      );
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Collapse combat panel' })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Combat' })).toHaveFocus()
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Combat' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Collapse combat panel' })
+      ).toHaveFocus()
+    );
   });
 
   it('renders numeric HP for an enemy the DM toggled visible while the global mode is off', () => {

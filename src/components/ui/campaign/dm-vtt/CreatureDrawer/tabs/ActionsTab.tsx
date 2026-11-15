@@ -2,15 +2,12 @@
 
 import React from 'react';
 
+import { Section } from '@/components/ui/layout/section';
 import { LairActionsSection } from '@/components/ui/encounter/combat-screen/detail/DetailActions';
 import { LegendarySection } from '@/components/ui/encounter/combat-screen/detail/LegendarySection';
 import { DetailResources } from '@/components/ui/encounter/combat-screen/detail/NpcResourceList';
 import { StatBlockTraits } from '@/components/ui/encounter/combat-screen/detail/StatBlockTraits';
 import { statBlockEntryHandlers } from '@/components/ui/encounter/combat-screen/detail/statBlockEntryHandlers';
-import {
-  HEADING_CLASS,
-  SECTION_CLASS,
-} from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 import type { MonsterSpellcasting, MonsterStatBlock } from '@/types/encounter';
 
 import type { CreatureTabProps } from '../CreatureDrawer.utils';
@@ -31,8 +28,8 @@ function hasTraitContent(
 
 /**
  * Actions tab: legendary/lair actions, class resources, and stat block
- * traits/actions. The legendary, lair, and resource cards carry no outer
- * heading — those sections render their own.
+ * traits/actions. The legendary, lair, and resource sections render their
+ * own headings, so they carry no wrapper here.
  */
 export function ActionsTab({ entity, actions }: CreatureTabProps) {
   const sb = entity.monsterStatBlock;
@@ -45,29 +42,18 @@ export function ActionsTab({ entity, actions }: CreatureTabProps) {
   const hasTraits = sb != null && hasTraitContent(sb, entity.spellcasting);
 
   if (!hasLegendary && !hasLairActions && !hasResources && !hasTraits) {
-    return <p className="text-muted text-sm">No actions.</p>;
+    return <p className="type-body text-muted">No actions.</p>;
   }
 
   return (
-    <div className="space-y-3">
-      {hasLegendary && (
-        <div className={SECTION_CLASS}>
-          <LegendarySection entity={entity} actions={actions} />
-        </div>
-      )}
+    <div className="space-y-6">
+      {hasLegendary && <LegendarySection entity={entity} actions={actions} />}
       {hasLairActions && (
-        <div className={SECTION_CLASS}>
-          <LairActionsSection entity={entity} actions={actions} />
-        </div>
+        <LairActionsSection entity={entity} actions={actions} />
       )}
-      {hasResources && (
-        <div className={SECTION_CLASS}>
-          <DetailResources entity={entity} actions={actions} />
-        </div>
-      )}
+      {hasResources && <DetailResources entity={entity} actions={actions} />}
       {hasTraits && sb && (
-        <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Actions &amp; Traits</h3>
+        <Section level={4} heading="Actions & traits">
           <StatBlockTraits
             statBlock={sb}
             spellcasting={entity.spellcasting}
@@ -78,7 +64,7 @@ export function ActionsTab({ entity, actions }: CreatureTabProps) {
             onUseAbilityEntry={onUseAbilityEntry}
             onRestoreAbilityEntry={onRestoreAbilityEntry}
           />
-        </div>
+        </Section>
       )}
     </div>
   );

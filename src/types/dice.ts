@@ -24,15 +24,6 @@ export interface DiceResult {
   value: number;
 }
 
-export type DiceRollResults = DiceResult[];
-
-export interface ParsedDiceNotation {
-  count: number;
-  sides: number;
-  modifier: number;
-  originalNotation: string;
-}
-
 /** Per-character Pollyroll appearance. Omitted characters use the classic set. */
 export interface CharacterDiceSet {
   skin: Skin;

@@ -1,8 +1,7 @@
-import { Check } from 'lucide-react';
+import { Check, Circle } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
-import { Badge } from '@/components/ui/layout/badge';
-import { cn } from '@/utils/cn';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 
 import type { SpellRowView } from '../SheetDrawer.types';
 import { FavoriteStar } from './FavoriteStar';
@@ -15,7 +14,7 @@ export interface SpellListRowProps {
   onView: () => void;
 }
 
-/** One spell line in the sheet drawer's Spells tab: prepared toggle, name/badges, meta, Cast. */
+/** One spell line in the sheet drawer's Spells tab: prepared toggle, name/tags, meta, Cast. */
 export function SpellListRow({
   row,
   locked,
@@ -27,70 +26,69 @@ export function SpellListRow({
   const isCantrip = spell.level === 0;
   const showToggle = !locked && !isCantrip && !alwaysPrepared;
   const showsCheck = prepared || alwaysPrepared || isCantrip;
+  const toggleLabel = `${prepared ? 'Unprepare' : 'Prepare'} ${spell.name}`;
+  const tags = [
+    spell.concentration && 'Concentration',
+    spell.ritual && 'Ritual',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <div className="border-divider bg-surface flex items-center gap-2 rounded-lg border p-2">
+    <li className="flex items-center gap-2 py-1.5">
       {showToggle ? (
-        <button
-          type="button"
-          aria-label={`${prepared ? 'Unprepare' : 'Prepare'} ${spell.name}`}
-          aria-pressed={prepared}
-          onClick={onTogglePrepared}
-          className={cn(
-            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border',
-            prepared
-              ? 'bg-accent-emerald-text-muted border-accent-emerald-border'
-              : 'border-divider'
-          )}
-        >
-          {prepared && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
-        </button>
+        <Tooltip content={toggleLabel}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-9 px-0"
+            selected={prepared}
+            aria-label={toggleLabel}
+            onClick={onTogglePrepared}
+          >
+            {prepared ? (
+              <Check size={16} aria-hidden />
+            ) : (
+              <Circle size={16} aria-hidden className="text-muted" />
+            )}
+          </Button>
+        </Tooltip>
       ) : (
         <span
-          className="text-muted flex h-6 w-6 shrink-0 items-center justify-center text-xs"
+          className="type-small text-muted flex size-9 shrink-0 items-center justify-center pointer-coarse:size-11"
           aria-hidden="true"
         >
-          {showsCheck ? <Check className="h-3.5 w-3.5" /> : '—'}
+          {showsCheck ? <Check size={16} /> : '—'}
         </span>
       )}
 
       <button
         type="button"
         onClick={onView}
-        className="min-w-0 flex-1 text-left"
+        className="focus-visible:outline-ring min-w-0 flex-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
       >
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="text-body truncate text-sm font-medium">
-            {spell.name}
-          </span>
-          {spell.concentration && (
-            <Badge variant="warning" size="sm">
-              C
-            </Badge>
-          )}
-          {spell.ritual && (
-            <Badge variant="info" size="sm">
-              R
-            </Badge>
-          )}
-        </div>
-        <div className="text-faint truncate text-xs">
+        <span className="type-ui text-heading block truncate">
+          {spell.name}
+        </span>
+        {tags && <span className="type-caption text-muted block">{tags}</span>}
+        <span className="type-caption text-muted block truncate">
           {spell.school} · {spell.castingTime} · {spell.range}
-        </div>
+        </span>
       </button>
 
       <Button
-        variant="primary"
+        variant="secondary"
         size="sm"
+        className="shrink-0"
         aria-label={`Cast ${spell.name}`}
         disabled={!castable}
-        title={castable ? undefined : 'Not prepared or no slots left'}
         onClick={onCast}
       >
         Cast
       </Button>
 
       <FavoriteStar kind="spell" id={spell.id} name={spell.name} />
-    </div>
+    </li>
   );
 }

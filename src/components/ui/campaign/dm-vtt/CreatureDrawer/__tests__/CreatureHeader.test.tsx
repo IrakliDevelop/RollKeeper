@@ -1,7 +1,13 @@
-import type { ComponentProps } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import type { ComponentProps, ReactElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  render as rtlRender,
+  screen,
+} from '@testing-library/react';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { CreatureHeader } from '../CreatureHeader';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
@@ -11,7 +17,32 @@ import {
   renderConfirmDialogHost,
 } from '@/test/confirmDialog';
 
-afterEach(() => cleanup());
+// The header's Tooltips need the provider CreatureSheet wraps around it, and
+// Radix measures the trigger with ResizeObserver.
+function render(ui: ReactElement) {
+  const result = rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
+  return {
+    ...result,
+    rerender: (next: ReactElement) =>
+      result.rerender(<TooltipProvider>{next}</TooltipProvider>),
+  };
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function makeEntity(overrides: Partial<EncounterEntity> = {}): EncounterEntity {
   return {
@@ -234,16 +265,87 @@ describe('CreatureHeader', () => {
     expect(actions.onViewNPC).toHaveBeenCalledWith('npc-1', 'e1');
   });
 
-  it('shows "Their turn" badge and the concentration chip when applicable', () => {
+  it('shows kind, CR and current turn as badges', () => {
     render(
       <CreatureHeader
         {...baseProps({
           isTurn: true,
-          entity: makeEntity({ concentrationSpell: 'Bane' }),
+          entity: makeEntity({ monsterStatBlock: { cr: '1/4' } as never }),
         })}
       />
     );
-    expect(screen.getByText('Their turn')).toBeInTheDocument();
-    expect(screen.getByText('Bane')).toBeInTheDocument();
+    expect(screen.getByText('Monster')).toBeInTheDocument();
+    expect(screen.getByText('CR 1/4')).toBeInTheDocument();
+    expect(screen.getByText('Current turn')).toBeInTheDocument();
+    expect(screen.queryByText('Their turn')).toBeNull();
+  });
+
+  it('shows concentration as a concentration chip', () => {
+    render(
+      <CreatureHeader
+        {...baseProps({ entity: makeEntity({ concentrationSpell: 'Bane' }) })}
+      />
+    );
+    expect(
+      screen
+        .getByText('Concentrating on Bane')
+        .closest('[data-kind="concentration"]')
+    ).not.toBeNull();
+  });
+
+  it('renames via a labelled button', () => {
+    const actions = makeActions();
+    render(<CreatureHeader {...baseProps({ actions })} />);
+    const rename = screen.getByRole('button', { name: 'Rename Goblin Boss' });
+    expect(rename).toHaveAttribute('data-variant', 'ghost');
+    fireEvent.click(rename);
+    const input = screen.getByRole('textbox', { name: 'Combatant name' });
+    fireEvent.change(input, { target: { value: 'Goblin Chief' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
+      name: 'Goblin Chief',
+    });
+  });
+
+  it('remove is a danger button and asks first', async () => {
+    const actions = makeActions({ onViewNPC: vi.fn() });
+    renderConfirmDialogHost();
+    const { container } = render(
+      <CreatureHeader
+        {...baseProps({
+          actions,
+          entity: makeEntity({ npcSourceId: 'npc-1' }),
+        })}
+      />
+    );
+    const remove = screen.getByRole('button', {
+      name: 'Remove Goblin Boss from combat',
+    });
+    expect(remove).toHaveAttribute('data-variant', 'danger');
+    for (const name of [
+      'Short rest',
+      'Long rest',
+      'View Goblin Boss in NPC library',
+    ]) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'data-variant',
+        'ghost'
+      );
+    }
+
+    // Only the rename trigger keeps a `title` (SideDrawer focuses it on open,
+    // so a Radix Tooltip there would open every time).
+    const titled = container.querySelectorAll('[title]');
+    expect(titled).toHaveLength(1);
+    expect(titled[0]).toBe(
+      screen.getByRole('button', { name: 'Rename Goblin Boss' })
+    );
+
+    fireEvent.click(remove);
+    expect(await findConfirmDialog()).toHaveAccessibleName(
+      'Remove Goblin Boss from combat?'
+    );
+    await clickConfirmDialogButton('Cancel');
+    expect(actions.onRemove).not.toHaveBeenCalled();
   });
 });

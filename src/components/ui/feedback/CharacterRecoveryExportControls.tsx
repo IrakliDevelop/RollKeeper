@@ -88,23 +88,25 @@ export function CharacterRecoveryExportControls({
     <div className="mt-4">
       <div className="flex flex-wrap gap-2">
         <Button
-          variant="outline"
-          leftIcon={<Download size={18} />}
+          leftIcon={<Download size={16} />}
           onClick={exportCurrent}
           disabled={busy}
         >
           Download current character data
         </Button>
         <Button
-          variant="outline"
-          leftIcon={<Download size={18} />}
+          leftIcon={<Download size={16} />}
           onClick={exportCapture}
           disabled={busy || !runId}
         >
           Download immutable raw capture
         </Button>
       </div>
-      {error && <p className="text-accent-red-text mt-2 text-sm">{error}</p>}
+      {error && (
+        <p role="alert" className="type-small text-blood-text mt-2">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

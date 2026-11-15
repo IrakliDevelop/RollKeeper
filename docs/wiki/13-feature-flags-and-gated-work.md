@@ -17,9 +17,6 @@ own reasoning about what a change will do), check the relevant flag.
 - Fog-of-war preset **campaign persistence** was merged explicitly "(gate
   off)" per its commit message — confirm current state before assuming it's
   live. See [07](07-battlemap-fog-fieldnotes.md).
-- `src/components/ui/layout/ExperimentalFeaturesSection.tsx` — a user-facing
-  toggle surface for experimental features; if a feature has a flag, this may
-  be where a user can opt in/out.
 
 ## Why this matters for an agent
 

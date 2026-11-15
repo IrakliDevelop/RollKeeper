@@ -318,9 +318,7 @@ export function createTabbedSheetConfig(
       label: 'Actions',
       icon: <AppIcon name="attack" className="h-4 w-4" />,
       badge: character.concentration?.isConcentrating ? (
-        <span className="border-lapis-border text-lapis-text rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-          Conc.
-        </span>
+        <span className="type-caption text-lapis-text">Conc.</span>
       ) : undefined,
       content: (
         <div className="space-y-6">
@@ -454,7 +452,7 @@ export function createTabbedSheetConfig(
       icon: <AppIcon name="armor" className="h-4 w-4" />,
       badge:
         (character.summons?.length || 0) > 0 ? (
-          <span className="bg-accent-emerald-bg text-accent-emerald-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="type-caption text-muted tabular-nums">
             {character.summons!.length}
           </span>
         ) : undefined,
@@ -476,7 +474,7 @@ export function createTabbedSheetConfig(
       hidden: !characterHasSpells && character.spells.length === 0,
       badge:
         character.spells.length > 0 ? (
-          <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="type-caption text-muted tabular-nums">
             {character.spells.length}
           </span>
         ) : undefined,
@@ -1003,14 +1001,9 @@ function CombatTabContent({
                   {hasHydrated ? (
                     <ConditionsDiseasesManager />
                   ) : (
-                    <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
-                      <div className="py-4 text-center">
-                        <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
-                        <p className="text-body mt-2">
-                          Loading conditions and diseases…
-                        </p>
-                      </div>
-                    </div>
+                    <p className="type-body text-muted py-8 text-center">
+                      Loading conditions and diseases…
+                    </p>
                   )}
                 </ErrorBoundary>
               </div>

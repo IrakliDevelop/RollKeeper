@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { captureCameraView, type CameraView } from '@fieldnotes/core';
 
 /** The minimum viewport surface `captureCameraView` needs. */
@@ -18,10 +18,11 @@ export interface UseBattleMapViewsControlArgs {
 }
 
 /**
- * State machinery for the views popover: open/close plus outside-click and
- * Escape handling, the inline save-name field, per-row rename, and the
- * two-click delete-confirm arm. Kept separate from rendering so the
- * component file stays presentational.
+ * State machinery for the views popover: open state, the inline save-name
+ * field, per-row rename, and the two-click delete-confirm arm. Radix owns
+ * outside-click and Escape; the component calls `resetTransientState` when
+ * Escape cancels an edit or the popover closes. Kept separate from rendering
+ * so the component file stays presentational.
  */
 export function useBattleMapViewsControl({
   getViewport,
@@ -38,52 +39,14 @@ export function useBattleMapViewsControl({
   const [savingView, setSavingView] = useState<CameraView | null>(null);
   const [saveName, setSaveName] = useState('');
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
 
+  /** Clears the save field, an open rename and an armed delete. */
   const resetTransientState = () => {
     setRenamingId(null);
     setSavingView(null);
     setSaveName('');
     setArmedDeleteId(null);
   };
-
-  const closePopover = () => {
-    setOpen(false);
-    resetTransientState();
-  };
-
-  const toggleOpen = () => {
-    setOpen(o => {
-      const next = !o;
-      if (!next) resetTransientState();
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as Node;
-      if (
-        rootRef.current &&
-        !rootRef.current.contains(target) &&
-        !popoverRef.current?.contains(target)
-      ) {
-        closePopover();
-      }
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closePopover();
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
 
   const captureCurrentView = (): CameraView | null => {
     const vp = getViewport();
@@ -137,11 +100,9 @@ export function useBattleMapViewsControl({
   const cancelDelete = () => setArmedDeleteId(null);
 
   return {
-    rootRef,
-    popoverRef,
     open,
-    toggleOpen,
-    closePopover,
+    setOpen,
+    resetTransientState,
     renamingId,
     renameValue,
     setRenameValue,

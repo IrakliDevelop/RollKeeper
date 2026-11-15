@@ -1,11 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import {
+  useEditor,
+  useEditorState,
+  EditorContent,
+  type ChainedCommands,
+  type Editor,
+} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import Underline from '@tiptap/extension-underline';
 import { TableKit } from '@tiptap/extension-table';
 import {
   Bold,
@@ -29,7 +34,21 @@ import {
   Columns2,
   Rows2,
   Trash2,
+  type LucideIcon,
 } from 'lucide-react';
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
+import { ToolbarButton } from './richText/ToolbarButton';
+import { useToolbarRoving } from './richText/useToolbarRoving';
+import {
+  RICH_TEXT_DIVIDER_CLASS,
+  RICH_TEXT_FRAME_CLASS,
+  RICH_TEXT_LOADING_CLASS,
+  RICH_TEXT_PLACEHOLDER_CLASS,
+  RICH_TEXT_TOOLBAR_CLASS,
+  RICH_TEXT_WELL_CLASS,
+  richTextEditorCss,
+  richTextProseCss,
+} from './richText/prose';
 
 interface RichTextEditorProps {
   ariaLabel: string;
@@ -40,15 +59,197 @@ interface RichTextEditorProps {
   minHeight?: string;
 }
 
+const selectToolbarState = (e: Editor) => {
+  // The cell tools only render inside a table; skip their dry runs elsewhere.
+  const inTable = e.isActive('table');
+  return {
+    isBold: e.isActive('bold'),
+    isItalic: e.isActive('italic'),
+    isUnderline: e.isActive('underline'),
+    isStrike: e.isActive('strike'),
+    isCode: e.isActive('code'),
+    isH1: e.isActive('heading', { level: 1 }),
+    isH2: e.isActive('heading', { level: 2 }),
+    isH3: e.isActive('heading', { level: 3 }),
+    isBulletList: e.isActive('bulletList'),
+    isOrderedList: e.isActive('orderedList'),
+    isQuote: e.isActive('blockquote'),
+    canBold: e.can().toggleBold(),
+    canItalic: e.can().toggleItalic(),
+    canUnderline: e.can().toggleUnderline(),
+    canStrike: e.can().toggleStrike(),
+    canCode: e.can().toggleCode(),
+    canUndo: e.can().undo(),
+    canRedo: e.can().redo(),
+    inTable,
+    canAddColumn: inTable && e.can().addColumnAfter(),
+    canAddRow: inTable && e.can().addRowAfter(),
+    canMerge: inTable && e.can().mergeCells(),
+    canSplit: inTable && e.can().splitCell(),
+    canDeleteTable: inTable && e.can().deleteTable(),
+    isEmpty: e.isEmpty,
+  };
+};
+
+type StateKey = keyof ReturnType<typeof selectToolbarState>;
+
+interface ToolbarItem {
+  label: string;
+  icon: LucideIcon;
+  run: (chain: ChainedCommands) => ChainedCommands;
+  active?: StateKey;
+  enabled?: StateKey;
+  inTableOnly?: true;
+}
+
+const TOOL_GROUPS: ToolbarItem[][] = [
+  [
+    {
+      label: 'Bold',
+      icon: Bold,
+      run: c => c.toggleBold(),
+      active: 'isBold',
+      enabled: 'canBold',
+    },
+    {
+      label: 'Italic',
+      icon: Italic,
+      run: c => c.toggleItalic(),
+      active: 'isItalic',
+      enabled: 'canItalic',
+    },
+    {
+      label: 'Underline',
+      icon: UnderlineIcon,
+      run: c => c.toggleUnderline(),
+      active: 'isUnderline',
+      enabled: 'canUnderline',
+    },
+    {
+      label: 'Strikethrough',
+      icon: Strikethrough,
+      run: c => c.toggleStrike(),
+      active: 'isStrike',
+      enabled: 'canStrike',
+    },
+    {
+      label: 'Inline code',
+      icon: Code,
+      run: c => c.toggleCode(),
+      active: 'isCode',
+      enabled: 'canCode',
+    },
+  ],
+  [
+    {
+      label: 'Heading 1',
+      icon: Heading1,
+      run: c => c.toggleHeading({ level: 1 }),
+      active: 'isH1',
+    },
+    {
+      label: 'Heading 2',
+      icon: Heading2,
+      run: c => c.toggleHeading({ level: 2 }),
+      active: 'isH2',
+    },
+    {
+      label: 'Heading 3',
+      icon: Heading3,
+      run: c => c.toggleHeading({ level: 3 }),
+      active: 'isH3',
+    },
+  ],
+  [
+    {
+      label: 'Bullet list',
+      icon: List,
+      run: c => c.toggleBulletList(),
+      active: 'isBulletList',
+    },
+    {
+      label: 'Numbered list',
+      icon: ListOrdered,
+      run: c => c.toggleOrderedList(),
+      active: 'isOrderedList',
+    },
+    {
+      label: 'Quote',
+      icon: Quote,
+      run: c => c.toggleBlockquote(),
+      active: 'isQuote',
+    },
+    { label: 'Horizontal line', icon: Minus, run: c => c.setHorizontalRule() },
+  ],
+  [
+    {
+      label: 'Insert table',
+      icon: Table,
+      run: c => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
+    },
+    {
+      label: 'Add column',
+      icon: Columns2,
+      run: c => c.addColumnAfter(),
+      enabled: 'canAddColumn',
+      inTableOnly: true,
+    },
+    {
+      label: 'Add row',
+      icon: Rows2,
+      run: c => c.addRowAfter(),
+      enabled: 'canAddRow',
+      inTableOnly: true,
+    },
+    {
+      label: 'Merge cells',
+      icon: TableCellsMerge,
+      run: c => c.mergeCells(),
+      enabled: 'canMerge',
+      inTableOnly: true,
+    },
+    {
+      label: 'Split cell',
+      icon: TableCellsSplit,
+      run: c => c.splitCell(),
+      enabled: 'canSplit',
+      inTableOnly: true,
+    },
+    {
+      label: 'Delete table',
+      icon: Trash2,
+      run: c => c.deleteTable(),
+      enabled: 'canDeleteTable',
+      inTableOnly: true,
+    },
+  ],
+  [
+    {
+      label: 'Clear formatting',
+      icon: Type,
+      run: c => c.clearNodes().unsetAllMarks(),
+    },
+  ],
+];
+
+const HISTORY_TOOLS: ToolbarItem[] = [
+  { label: 'Undo', icon: Undo, run: c => c.undo(), enabled: 'canUndo' },
+  { label: 'Redo', icon: Redo, run: c => c.redo(), enabled: 'canRedo' },
+];
+
+const EDITOR_CSS =
+  richTextProseCss('.rk-rte .ProseMirror') + richTextEditorCss('.rk-rte');
+
 export default function RichTextEditor({
   ariaLabel,
   content,
   onChange,
-  placeholder = 'Start writing...',
+  placeholder = '',
   className = '',
   minHeight = '200px',
 }: RichTextEditorProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const roving = useToolbarRoving<HTMLDivElement>();
 
   useEffect(() => {
     setIsMounted(true);
@@ -59,7 +260,6 @@ export default function RichTextEditor({
       StarterKit,
       TextStyle,
       Color,
-      Underline,
       TableKit.configure({
         table: {
           resizable: true,
@@ -82,556 +282,86 @@ export default function RichTextEditor({
     },
   });
 
+  // The hook's snapshot stays null until the first transaction, so read the
+  // editor directly until then.
+  const liveState = useEditorState({
+    editor,
+    selector: ({ editor: e }) => (e ? selectToolbarState(e) : null),
+  });
+  const state = liveState ?? (editor ? selectToolbarState(editor) : null);
+
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content);
     }
   }, [editor, content]);
 
-  if (!isMounted || !editor) {
+  if (!isMounted || !editor || !state) {
     return (
       <div
-        className={`border-divider bg-surface-secondary rounded-lg border ${className}`}
+        className={`${RICH_TEXT_LOADING_CLASS} ${className}`}
         style={{ minHeight }}
-      >
-        <div className="text-muted flex h-full items-center justify-center">
-          Loading editor...
-        </div>
-      </div>
+      />
     );
   }
 
+  const renderTool = (item: ToolbarItem) => (
+    <ToolbarButton
+      key={item.label}
+      label={item.label}
+      icon={item.icon}
+      onClick={() => item.run(editor.chain().focus()).run()}
+      active={item.active ? state[item.active] : undefined}
+      disabled={item.enabled ? !state[item.enabled] : undefined}
+    />
+  );
+
   return (
-    <div
-      className={`border-divider bg-surface-raised overflow-hidden rounded-lg border shadow-sm ${className}`}
-    >
-      {/* Fixed Toolbar */}
-      <div className="border-divider bg-surface-secondary flex flex-wrap items-center gap-1 border-b p-3">
-        {/* Text Formatting */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            disabled={!editor.can().chain().focus().toggleBold().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('bold')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Bold"
-          >
-            <Bold size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            disabled={!editor.can().chain().focus().toggleItalic().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('italic')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Italic"
-          >
-            <Italic size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            disabled={!editor.can().chain().focus().toggleUnderline().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('underline')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Underline"
-          >
-            <UnderlineIcon size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            disabled={!editor.can().chain().focus().toggleStrike().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('strike')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Strikethrough"
-          >
-            <Strikethrough size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            disabled={!editor.can().chain().focus().toggleCode().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('code')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Inline Code"
-          >
-            <Code size={16} />
-          </button>
-        </div>
-
-        <div className="bg-divider mx-2 h-6 w-px" />
-
-        {/* Headings */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 1 }).run()
-            }
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
-              editor.isActive('heading', { level: 1 })
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Heading 1"
-          >
-            <Heading1 size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 2 }).run()
-            }
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
-              editor.isActive('heading', { level: 2 })
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Heading 2"
-          >
-            <Heading2 size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 3 }).run()
-            }
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
-              editor.isActive('heading', { level: 3 })
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Heading 3"
-          >
-            <Heading3 size={16} />
-          </button>
-        </div>
-
-        <div className="bg-divider mx-2 h-6 w-px" />
-
-        {/* Lists and Blocks */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
-              editor.isActive('bulletList')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Bullet List"
-          >
-            <List size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
-              editor.isActive('orderedList')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Numbered List"
-          >
-            <ListOrdered size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
-              editor.isActive('blockquote')
-                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
-                : ''
-            }`}
-            title="Blockquote"
-          >
-            <Quote size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors"
-            title="Horizontal Rule"
-          >
-            <Minus size={16} />
-          </button>
-        </div>
-
-        <div className="bg-divider mx-2 h-6 w-px" />
-
-        {/* Table */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() =>
-              editor
-                .chain()
-                .focus()
-                .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-                .run()
-            }
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors"
-            title="Insert Table"
-          >
-            <Table size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().addColumnAfter().run()}
-            disabled={!editor.can().addColumnAfter()}
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="Add Column"
-          >
-            <Columns2 size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().addRowAfter().run()}
-            disabled={!editor.can().addRowAfter()}
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="Add Row"
-          >
-            <Rows2 size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().mergeCells().run()}
-            disabled={!editor.can().mergeCells()}
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="Merge Cells"
-          >
-            <TableCellsMerge size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().splitCell().run()}
-            disabled={!editor.can().splitCell()}
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="Split Cell"
-          >
-            <TableCellsSplit size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().deleteTable().run()}
-            disabled={!editor.can().deleteTable()}
-            className="text-body hover:text-accent-red-text hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="Delete Table"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-
-        <div className="bg-divider mx-2 h-6 w-px" />
-
-        {/* Utility */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() =>
-              editor.chain().focus().clearNodes().unsetAllMarks().run()
-            }
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors"
-            title="Clear Formatting"
-          >
-            <Type size={16} />
-          </button>
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Undo/Redo */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().undo().run()}
-            disabled={!editor.can().chain().focus().undo().run()}
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="Undo"
-          >
-            <Undo size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().redo().run()}
-            disabled={!editor.can().chain().focus().redo().run()}
-            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            title="Redo"
-          >
-            <Redo size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Editor Container */}
-      <div className="bg-surface-raised relative" style={{ minHeight }}>
-        <EditorContent editor={editor} className="rich-text-editor-content" />
-
-        {/* Placeholder when empty */}
-        {editor.isEmpty && (
-          <div className="text-faint pointer-events-none absolute top-4 left-4">
-            {placeholder}
+    <TooltipProvider>
+      <div className={`${RICH_TEXT_FRAME_CLASS} ${className}`}>
+        <div
+          role="toolbar"
+          aria-label={`${ariaLabel} formatting`}
+          ref={roving.ref}
+          onKeyDown={roving.onKeyDown}
+          onFocus={roving.onFocus}
+          className={`${RICH_TEXT_TOOLBAR_CLASS} p-1`}
+        >
+          {TOOL_GROUPS.map((group, index) => (
+            <React.Fragment key={group[0].label}>
+              {index > 0 && (
+                <span aria-hidden className={RICH_TEXT_DIVIDER_CLASS} />
+              )}
+              <div className="flex items-center gap-1">
+                {group
+                  .filter(item => !item.inTableOnly || state.inTable)
+                  .map(renderTool)}
+              </div>
+            </React.Fragment>
+          ))}
+          <div className="flex-1" />
+          <div className="flex items-center gap-1">
+            {HISTORY_TOOLS.map(renderTool)}
           </div>
-        )}
+        </div>
+        <div
+          className={`rk-rte ${RICH_TEXT_WELL_CLASS} type-body`}
+          style={{ minHeight }}
+        >
+          <EditorContent editor={editor} />
+          {placeholder && state.isEmpty && (
+            <div
+              aria-hidden
+              className={`${RICH_TEXT_PLACEHOLDER_CLASS} top-4 left-4`}
+            >
+              {placeholder}
+            </div>
+          )}
+        </div>
+        <style href="rk-rte" precedence="rk-rich-text">
+          {EDITOR_CSS}
+        </style>
       </div>
-
-      {/* Editor Styles */}
-      <style jsx global>{`
-        .rich-text-editor-content .ProseMirror {
-          outline: none !important;
-          color: var(--heading);
-          font-family: var(--font-body-family);
-          background-color: var(--surface-raised, white) !important;
-          min-height: inherit !important;
-          height: 100% !important;
-        }
-
-        /* Ensure editor content container fills available space */
-        .rich-text-editor-content {
-          background-color: var(--surface-raised, white) !important;
-          min-height: inherit !important;
-          height: 100% !important;
-        }
-
-        /* Reset conflicting styles but preserve necessary ones */
-        .rich-text-editor-content .ProseMirror > * {
-          color: inherit;
-        }
-
-        /* Headings */
-        .rich-text-editor-content .ProseMirror h1 {
-          font-size: 2.25rem !important;
-          font-weight: 800 !important;
-          line-height: 1.2 !important;
-          margin: 2rem 0 1rem 0 !important;
-          color: var(--heading) !important;
-          display: block !important;
-        }
-
-        .rich-text-editor-content .ProseMirror h2 {
-          font-size: 1.875rem !important;
-          font-weight: 700 !important;
-          line-height: 1.3 !important;
-          margin: 1.5rem 0 0.75rem 0 !important;
-          color: var(--heading) !important;
-          display: block !important;
-        }
-
-        .rich-text-editor-content .ProseMirror h3 {
-          font-size: 1.5rem !important;
-          font-weight: 600 !important;
-          line-height: 1.4 !important;
-          margin: 1.25rem 0 0.5rem 0 !important;
-          color: var(--heading) !important;
-          display: block !important;
-        }
-
-        /* Paragraphs */
-        .rich-text-editor-content .ProseMirror p {
-          margin: 0.75rem 0 !important;
-          line-height: 1.7 !important;
-          display: block !important;
-        }
-
-        /* Lists */
-        .rich-text-editor-content .ProseMirror ul {
-          list-style-type: disc !important;
-          margin: 1rem 0 !important;
-          padding-left: 1.5rem !important;
-          display: block !important;
-        }
-
-        .rich-text-editor-content .ProseMirror ol {
-          list-style-type: decimal !important;
-          margin: 1rem 0 !important;
-          padding-left: 1.5rem !important;
-          display: block !important;
-        }
-
-        .rich-text-editor-content .ProseMirror li {
-          margin: 0.25rem 0 !important;
-          line-height: 1.6 !important;
-          display: list-item !important;
-          list-style-position: outside !important;
-        }
-
-        .rich-text-editor-content .ProseMirror li p {
-          margin: 0.25rem 0 !important;
-          display: inline !important;
-        }
-
-        /* Text formatting */
-        .rich-text-editor-content .ProseMirror strong {
-          font-weight: 700 !important;
-        }
-
-        .rich-text-editor-content .ProseMirror em {
-          font-style: italic !important;
-        }
-
-        .rich-text-editor-content .ProseMirror s {
-          text-decoration: line-through !important;
-        }
-
-        .rich-text-editor-content .ProseMirror u {
-          text-decoration: underline !important;
-        }
-
-        /* Code */
-        .rich-text-editor-content .ProseMirror code {
-          background-color: var(--surface-secondary) !important;
-          color: var(--accent-red-text) !important;
-          padding: 0.25rem 0.375rem !important;
-          border-radius: 0.25rem !important;
-          font-size: 0.875em !important;
-          font-family:
-            'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New',
-            monospace !important;
-          border: 1px solid var(--divider) !important;
-        }
-
-        .rich-text-editor-content .ProseMirror pre {
-          background: #1e1e1e !important;
-          color: #fff !important;
-          font-family:
-            'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New',
-            monospace !important;
-          padding: 1rem !important;
-          border-radius: 0.5rem !important;
-          margin: 1rem 0 !important;
-          overflow-x: auto !important;
-          display: block !important;
-        }
-
-        .rich-text-editor-content .ProseMirror pre code {
-          color: inherit !important;
-          padding: 0 !important;
-          background: none !important;
-          font-size: inherit !important;
-          border: none !important;
-        }
-
-        /* Blockquote */
-        .rich-text-editor-content .ProseMirror blockquote {
-          padding: 1rem !important;
-          border-left: 4px solid var(--accent-blue-border-strong) !important;
-          margin: 1rem 0 !important;
-          font-style: italic !important;
-          color: var(--muted) !important;
-          display: block !important;
-          background-color: var(--surface-secondary) !important;
-          border-radius: 0.5rem !important;
-        }
-
-        /* Horizontal Rule */
-        .rich-text-editor-content .ProseMirror hr {
-          border: none !important;
-          border-top: 2px solid var(--divider) !important;
-          margin: 2rem 0 !important;
-          display: block !important;
-          width: 100% !important;
-        }
-
-        /* Tables */
-        .rich-text-editor-content .ProseMirror table {
-          border-collapse: collapse !important;
-          table-layout: fixed !important;
-          width: 100% !important;
-          margin: 1rem 0 !important;
-          overflow: hidden !important;
-          border: 1px solid var(--divider) !important;
-          border-radius: 0.5rem !important;
-        }
-
-        .rich-text-editor-content .ProseMirror td,
-        .rich-text-editor-content .ProseMirror th {
-          min-width: 1em !important;
-          border: 1px solid var(--divider) !important;
-          padding: 0.5rem 0.75rem !important;
-          vertical-align: top !important;
-          box-sizing: border-box !important;
-          position: relative !important;
-        }
-
-        .rich-text-editor-content .ProseMirror th {
-          font-weight: 600 !important;
-          text-align: left !important;
-          background-color: var(--surface-secondary) !important;
-          color: var(--heading) !important;
-        }
-
-        .rich-text-editor-content .ProseMirror td {
-          background-color: var(--surface-raised, white) !important;
-        }
-
-        .rich-text-editor-content .ProseMirror .selectedCell::after {
-          z-index: 2 !important;
-          position: absolute !important;
-          content: '' !important;
-          left: 0 !important;
-          right: 0 !important;
-          top: 0 !important;
-          bottom: 0 !important;
-          background: var(--accent-blue-bg-strong) !important;
-          opacity: 0.3 !important;
-          pointer-events: none !important;
-        }
-
-        .rich-text-editor-content .ProseMirror .column-resize-handle {
-          position: absolute !important;
-          right: -2px !important;
-          top: 0 !important;
-          bottom: -2px !important;
-          width: 4px !important;
-          background-color: var(--accent-blue-border-strong) !important;
-          pointer-events: none !important;
-        }
-
-        .rich-text-editor-content .ProseMirror.resize-cursor {
-          cursor: col-resize !important;
-        }
-
-        /* First and last child margin reset */
-        .rich-text-editor-content .ProseMirror > *:first-child {
-          margin-top: 0 !important;
-        }
-
-        .rich-text-editor-content .ProseMirror > *:last-child {
-          margin-bottom: 0 !important;
-        }
-      `}</style>
-    </div>
+    </TooltipProvider>
   );
 }

@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Swords } from 'lucide-react';
 
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+
+import { cn } from '@/utils/cn';
+
 interface CombatStartBannerProps {
   isVisible: boolean;
   onDone?: () => void;
@@ -11,7 +15,7 @@ interface CombatStartBannerProps {
 }
 
 /**
- * A non-blocking "Combat Begins" banner that sweeps into the center of the
+ * A non-blocking "Combat begins" banner that sweeps into the center of the
  * screen, holds, then fades. `pointer-events-none` so it never blocks the sheet.
  * Rendered via portal at document.body. Self-dismisses after `durationMs`.
  */
@@ -41,86 +45,53 @@ export function CombatStartBanner({
   if (!render) return null;
 
   const banner = (
-    <>
-      {/* Background blur — sits below the sidebars (z-55) so they stay sharp */}
+    <div className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center">
       <div
-        className={`pointer-events-none fixed inset-0 z-[50] backdrop-blur-sm ${
-          phase === 'enter' ? 'combat-blur-enter' : 'combat-blur-exit'
-        }`}
-      />
-      <div
-        className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center"
-        aria-live="polite"
+        className={cn(
+          OVERLAY_SURFACE,
+          'text-heading flex items-center gap-3 px-6 py-4',
+          phase === 'enter' ? 'combat-banner-enter' : 'combat-banner-exit'
+        )}
       >
-        <div
-          className={`border-accent-red-border bg-surface-raised text-accent-red-text flex items-center gap-3 rounded-xl border-2 px-8 py-4 shadow-2xl ${
-            phase === 'enter' ? 'combat-banner-enter' : 'combat-banner-exit'
-          }`}
-          style={{ fontFamily: 'var(--font-heading-family)' }}
-        >
-          <Swords size={28} />
-          <span className="text-2xl font-bold tracking-widest uppercase sm:text-3xl">
-            Combat Begins
-          </span>
-          <Swords size={28} className="-scale-x-100" />
-        </div>
-
-        <style jsx>{`
-          .combat-banner-enter {
-            animation: combatBannerIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)
-              forwards;
-          }
-          .combat-banner-exit {
-            animation: combatBannerOut 0.7s ease-in forwards;
-          }
-          .combat-blur-enter {
-            animation: combatBlurIn 0.5s ease-out forwards;
-          }
-          .combat-blur-exit {
-            animation: combatBlurOut 0.7s ease-in forwards;
-          }
-          @keyframes combatBlurIn {
-            0% {
-              opacity: 0;
-            }
-            100% {
-              opacity: 1;
-            }
-          }
-          @keyframes combatBlurOut {
-            0% {
-              opacity: 1;
-            }
-            100% {
-              opacity: 0;
-            }
-          }
-          @keyframes combatBannerIn {
-            0% {
-              opacity: 0;
-              transform: translateY(-32px) scale(0.92);
-            }
-            60% {
-              transform: translateY(4px) scale(1.02);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-          @keyframes combatBannerOut {
-            0% {
-              opacity: 1;
-              transform: scale(1);
-            }
-            100% {
-              opacity: 0;
-              transform: scale(1.06);
-            }
-          }
-        `}</style>
+        <Swords size={24} aria-hidden className="text-muted" />
+        <span role="status" className="type-title text-heading">
+          Combat begins
+        </span>
+        <Swords size={24} aria-hidden className="text-muted -scale-x-100" />
       </div>
-    </>
+
+      <style jsx>{`
+        .combat-banner-enter {
+          animation: combatBannerIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        .combat-banner-exit {
+          animation: combatBannerOut 0.7s ease-in forwards;
+        }
+        @keyframes combatBannerIn {
+          0% {
+            opacity: 0;
+            transform: translateY(-32px) scale(0.92);
+          }
+          60% {
+            transform: translateY(4px) scale(1.02);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes combatBannerOut {
+          0% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1.06);
+          }
+        }
+      `}</style>
+    </div>
   );
 
   if (typeof window === 'undefined') return null;

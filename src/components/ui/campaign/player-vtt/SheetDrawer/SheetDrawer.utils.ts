@@ -1,3 +1,4 @@
+import type { SlotLevel } from '@/components/ui/game/SlotPips';
 import type {
   AbilityName,
   CharacterState,
@@ -56,7 +57,9 @@ export function buildHeaderView(c: CharacterState): SheetHeaderView {
     level: totalLevel(c),
     subtitle: characterSubtitle(c),
     concentration: c.concentration?.isConcentrating
-      ? (c.concentration.spellName ?? 'Concentrating')
+      ? c.concentration.spellName
+        ? `Concentrating on ${c.concentration.spellName}`
+        : 'Concentrating'
       : null,
     conditions: active.filter(x => x !== exhaustion).map(x => x.name),
     exhaustion: exhaustion?.count ?? 0,
@@ -109,12 +112,14 @@ export function buildSlotSummary(c: CharacterState): SlotSummaryView[] {
       label: ORDINAL[l],
       remaining: Math.max(0, slot!.max - slot!.used),
       max: slot!.max,
+      level: l as SlotLevel,
     }));
   if (c.pactMagic && c.pactMagic.slots.max > 0) {
     out.push({
       label: `Pact ${ORDINAL[c.pactMagic.level]}`,
       remaining: Math.max(0, c.pactMagic.slots.max - c.pactMagic.slots.used),
       max: c.pactMagic.slots.max,
+      level: 'pact',
     });
   }
   return out;

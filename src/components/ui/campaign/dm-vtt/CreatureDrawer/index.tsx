@@ -26,7 +26,9 @@ export interface CreatureDrawerProps {
 
 /**
  * Escape inside an editable field belongs to that field (cancel rename,
- * leave an input) — keep the drawer open instead of letting Radix close it.
+ * leave an input, close an open Select) — keep the drawer open instead of
+ * letting Radix close it. The combobox/listbox check mirrors the Radix Select
+ * guard in `location-map/pingSync.ts`.
  */
 function keepOpenWhileEditing(event: KeyboardEvent) {
   const target = event.target;
@@ -34,7 +36,9 @@ function keepOpenWhileEditing(event: KeyboardEvent) {
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
+    (target instanceof HTMLElement && target.isContentEditable) ||
+    (target instanceof Element &&
+      target.closest('[role="combobox"], [role="listbox"]'))
   ) {
     event.preventDefault();
   }

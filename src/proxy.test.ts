@@ -23,21 +23,21 @@ describe('proxy auth refresh and dev-route gating', () => {
 
   it('returns 404 for a dev-only route in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    const res = await proxy(new NextRequest('http://localhost/dice-test'));
+    const res = await proxy(new NextRequest('http://localhost/test-error'));
     expect(res.status).toBe(404);
   });
 
   it('returns 404 for a nested dev-only path in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     const res = await proxy(
-      new NextRequest('http://localhost/dice-components-demo/rolls')
+      new NextRequest('http://localhost/test-error/nested')
     );
     expect(res.status).toBe(404);
   });
 
   it('allows dev-only routes outside production', async () => {
     vi.stubEnv('NODE_ENV', 'development');
-    const res = await proxy(new NextRequest('http://localhost/dice-test'));
+    const res = await proxy(new NextRequest('http://localhost/test-error'));
     expect(res.status).toBe(200);
   });
 

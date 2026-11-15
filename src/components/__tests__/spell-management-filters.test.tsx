@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import { SpellManagement } from '@/components/SpellManagement';
 import { useCharacterStore } from '@/store/characterStore';
 import { makeWizard } from '@/utils/__tests__/test-utils';
@@ -59,5 +65,41 @@ describe('SpellManagement filters', () => {
     expect(
       screen.getByRole('button', { name: 'Clear All Filters' })
     ).not.toHaveAttribute('data-variant', 'primary');
+  });
+
+  it('names the favourites filter Favorites only', () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    const spell: Spell = {
+      id: 'shield',
+      name: 'Shield',
+      level: 1,
+      school: 'Abjuration',
+      castingTime: '1 reaction',
+      range: 'Self',
+      components: { verbal: true, somatic: true, material: false },
+      duration: '1 round',
+      description: 'A protective barrier.',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    };
+    useCharacterStore.setState({ character: makeWizard({ spells: [spell] }) });
+    render(<SpellManagement />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = screen.getByRole('dialog', { name: 'Advanced Filters' });
+    const favorites = within(dialog).getByRole('checkbox', {
+      name: 'Favorites only',
+    });
+    fireEvent.click(screen.getByText('Favorites only'));
+    expect(favorites).toHaveAttribute('aria-checked', 'true');
   });
 });

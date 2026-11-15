@@ -2,7 +2,7 @@
  * NumberInput Component
  *
  * A numeric wrapper around the design-system `Input`. Unlike a raw controlled
- * `<Input type="number" onChange={e => set(parseInt(e.target.value) || 0)} />`,
+ * number `Input` parsed with `parseInt(e.target.value) || 0`,
  * this keeps a string buffer while editing so the field can be cleared without
  * snapping back to 0, and it clamps to min/max on blur.
  *
@@ -103,7 +103,7 @@ NumberInput.displayName = 'NumberInput';
 
 /**
  * Bare numeric input — a plain `<input>` (no design-system chrome) with the same
- * clear-safe numeric behavior. Use this to migrate raw `<input type="number">`
+ * clear-safe numeric behavior. Use this to migrate raw number `<input>`
  * elements that carry bespoke styling: pass their existing `className` and props
  * through unchanged. Safe to render inside loops (it's a component, not a hook).
  */

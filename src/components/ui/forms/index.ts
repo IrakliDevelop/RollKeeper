@@ -24,8 +24,3 @@ export {
 } from './Autocomplete';
 export { InPlaceField, type InPlaceFieldProps } from './InPlaceField';
 export { AnchoredEditor, type AnchoredEditorProps } from './AnchoredEditor';
-
-// Legacy components (will be deprecated)
-export { default as CustomCheckbox } from './CustomCheckbox';
-export { CustomSwitcher } from './CustomSwitcher';
-export { FancySelect } from './FancySelect';

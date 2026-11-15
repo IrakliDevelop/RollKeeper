@@ -522,7 +522,7 @@ describe('TokenDecorationLayer', () => {
       name: 'View all 4 conditions',
     });
     await user.click(overflow);
-    const dialog = screen.getByRole('dialog', { name: 'Ogre — Conditions' });
+    const dialog = screen.getByRole('dialog', { name: 'Conditions on Ogre' });
     expect(
       within(dialog).getByText('Visible in silver light.')
     ).toBeInTheDocument();
@@ -598,12 +598,13 @@ describe('TokenDecorationLayer', () => {
       name: 'View conditions for Ally',
     });
     expect(parseFloat(trigger.style.minHeight) * mockCamera.zoom).toBe(44);
+    expect(trigger).toHaveAttribute('data-variant', 'secondary');
     await user.pointer([
       { keys: '[TouchA>]', target: trigger },
       { keys: '[/TouchA]' },
     ]);
     expect(
-      screen.getByRole('dialog', { name: 'Ally — Conditions' })
+      screen.getByRole('dialog', { name: 'Conditions on Ally' })
     ).toHaveTextContent('A shared blessing.');
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -665,6 +666,22 @@ describe('TokenDecorationLayer', () => {
       />
     );
     expect(dead.container.querySelector(badgeSelector)).not.toBeInTheDocument();
+  });
+
+  it('names the reaction badge with an accessible label instead of a hover title', () => {
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({ hasUsedReaction: true })}
+        mode="full"
+      />
+    );
+    const badge = container.querySelector(
+      '[data-testid="reaction-used-glyph"]'
+    );
+    expect(within(container).getByRole('img', { name: 'Reaction used' })).toBe(
+      badge
+    );
+    expect(badge).not.toHaveAttribute('title');
   });
 
   it('paints the reaction badge above a full condition strip (badge after strip in DOM order)', () => {

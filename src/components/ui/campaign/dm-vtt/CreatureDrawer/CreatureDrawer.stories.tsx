@@ -101,7 +101,7 @@ export const Monster: Story = {
   args: { entity: LEGENDARY_MONSTER, isTurn: true },
   play: async () => {
     await expectDrawer(/young red dragon sheet/i);
-    await expect(body().getByText('Their turn')).toBeInTheDocument();
+    await expect(body().getByText('Current turn')).toBeInTheDocument();
 
     // Touch: the tabs reach 44px and the strip does not scroll.
     const drawer = body().getByRole('dialog');

@@ -4,29 +4,15 @@ import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 
-import type {
-  OtherConditionView,
-  OtherEffectsView,
-} from '../SheetDrawer.types';
-
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
+import type { OtherEffectsView } from '../SheetDrawer.types';
 
 export interface EffectsOtherListProps {
   effects: OtherEffectsView;
   onRemove: (id: string) => void;
 }
-
-const KIND_VARIANT: Record<
-  OtherConditionView['kind'],
-  'success' | 'danger' | 'neutral'
-> = {
-  buff: 'success',
-  debuff: 'danger',
-  neutral: 'neutral',
-};
-
-const HEADING_ID = 'sheet-other-effects-heading';
 
 /** Buffs, custom/DM-library conditions and diseases not covered by the toggles. */
 export function EffectsOtherList({ effects, onRemove }: EffectsOtherListProps) {
@@ -34,45 +20,43 @@ export function EffectsOtherList({ effects, onRemove }: EffectsOtherListProps) {
   if (conditions.length === 0 && diseases.length === 0) return null;
 
   return (
-    <section aria-labelledby={HEADING_ID} className={SECTION_CLASS}>
-      <h3 id={HEADING_ID} className={HEADING_CLASS}>
-        Other active effects
-      </h3>
+    <Section heading="Other active effects" level={4}>
       {conditions.length > 0 && (
-        <ul className="space-y-1.5">
+        <ul className="divide-divider divide-y">
           {conditions.map(effect => (
-            <li key={effect.id} className="flex items-center gap-2 text-sm">
-              <span className="text-heading font-semibold">{effect.name}</span>
-              <Badge variant={KIND_VARIANT[effect.kind]}>{effect.kind}</Badge>
+            <li key={effect.id} className="flex items-center gap-2 py-1.5">
+              <span className="type-ui text-heading">{effect.name}</span>
+              <Badge variant="neutral">{effect.kind}</Badge>
               {effect.count > 1 && (
-                <span className="text-muted text-xs">×{effect.count}</span>
+                <span className="type-small text-muted">×{effect.count}</span>
               )}
-              <span className="text-faint flex-1 truncate text-xs">
+              <span className="type-caption text-muted flex-1 truncate">
                 {effect.source}
               </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label={`Remove ${effect.name}`}
-                onClick={() => onRemove(effect.id)}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip content={`Remove ${effect.name}`}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-9 px-0"
+                  aria-label={`Remove ${effect.name}`}
+                  onClick={() => onRemove(effect.id)}
+                >
+                  <X size={16} aria-hidden />
+                </Button>
+              </Tooltip>
             </li>
           ))}
         </ul>
       )}
       {diseases.length > 0 && (
         <div className={conditions.length > 0 ? 'mt-3' : undefined}>
-          <h4 className="text-muted mb-1 text-xs font-semibold">Diseases</h4>
-          <ul className="space-y-1">
+          <h5 className="type-small text-muted mb-1">Diseases</h5>
+          <ul className="divide-divider divide-y">
             {diseases.map(disease => (
-              <li key={disease.id} className="flex items-center gap-2 text-sm">
-                <span className="text-heading font-semibold">
-                  {disease.name}
-                </span>
-                <span className="text-faint truncate text-xs">
+              <li key={disease.id} className="flex items-center gap-2 py-1.5">
+                <span className="type-ui text-heading">{disease.name}</span>
+                <span className="type-caption text-muted truncate">
                   {disease.source}
                 </span>
               </li>
@@ -80,6 +64,6 @@ export function EffectsOtherList({ effects, onRemove }: EffectsOtherListProps) {
           </ul>
         </div>
       )}
-    </section>
+    </Section>
   );
 }

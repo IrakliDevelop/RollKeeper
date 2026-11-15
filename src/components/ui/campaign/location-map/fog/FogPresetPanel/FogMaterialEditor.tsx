@@ -55,7 +55,6 @@ export function FogMaterialEditor({
               onCheckedChange={checked =>
                 controls.setDraftKind(checked ? 'procedural' : 'solid')
               }
-              wrapperClassName="min-h-[44px] items-center"
             />
             {draft.kind === 'solid' ? (
               <ColorField
@@ -71,52 +70,38 @@ export function FogMaterialEditor({
           <FogMaterialPreview material={draft} />
           <Input
             label="Preset name"
-            aria-label="Preset name"
             value={name}
             onChange={event => setName(event.target.value)}
             error={error ?? undefined}
-            className="min-h-[44px]"
             wrapperClassName="sm:col-span-2"
           />
         </DialogBody>
         <DialogFooter className="flex flex-wrap gap-2">
-          <Button
-            variant="ghost"
-            onClick={controls.resetDraft}
-            className="min-h-[44px] px-3 text-xs"
-          >
+          <Button variant="ghost" size="sm" onClick={controls.resetDraft}>
             Reset
           </Button>
-          <Button
-            variant="ghost"
-            onClick={controls.cancelEditor}
-            className="min-h-[44px] px-3 text-xs"
-          >
+          <Button variant="ghost" size="sm" onClick={controls.cancelEditor}>
             Cancel
           </Button>
           <Button
             variant="secondary"
+            size="sm"
             onClick={() => {
               if (controls.saveDraftAsPreset(name) === null) setName('');
             }}
-            className="min-h-[44px] px-3 text-xs"
           >
             Save as new preset
           </Button>
           {sourcePresetId && (
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => controls.updateSourcePreset()}
-              className="min-h-[44px] px-3 text-xs"
             >
               Update preset
             </Button>
           )}
-          <Button
-            variant="primary"
-            onClick={controls.applyDraft}
-            className="min-h-[44px] px-3 text-xs"
-          >
+          <Button variant="primary" size="sm" onClick={controls.applyDraft}>
             Apply to map
           </Button>
         </DialogFooter>

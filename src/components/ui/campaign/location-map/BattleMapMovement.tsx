@@ -20,7 +20,7 @@ export function BattleMapMovement(props: BattleMapMovementProps) {
       <span className="text-body">
         {movement?.feet ?? 0} ft moved · {movement?.remaining ?? 0} ft remaining
       </span>
-      <Button variant="ghost" onClick={() => tracker.reset(token.id)}>
+      <Button variant="ghost" size="sm" onClick={() => tracker.reset(token.id)}>
         Reset movement
       </Button>
       <NumberInput
@@ -29,10 +29,11 @@ export function BattleMapMovement(props: BattleMapMovementProps) {
         value={range}
         onChange={setRange}
         allowEmpty
+        size="sm"
         className="w-20"
       />
       <Button
-        variant="outline"
+        size="sm"
         disabled={range === undefined || !Number.isFinite(range) || range < 0}
         onClick={() =>
           setPlacing(
@@ -52,7 +53,11 @@ export function BattleMapMovement(props: BattleMapMovementProps) {
         Teleport
       </Button>
       {placing && (
-        <Button variant="ghost" onClick={() => tracker.cancelPlacement()}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => tracker.cancelPlacement()}
+        >
           Cancel teleport
         </Button>
       )}

@@ -2,11 +2,16 @@
 
 import { useMemo } from 'react';
 
+import { Section } from '@/components/ui/layout/section';
+import {
+  ProficiencyDot,
+  ProficiencyDotButton,
+  saveDotLabel,
+} from '@/components/ui/game/ProficiencyDot';
 import { useCharacterStore } from '@/store/characterStore';
 import { formatModifier } from '@/utils/calculations';
 
 import { MaybeRollElement } from '../MaybeRollElement';
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import { buildProficiencyGroups, buildSaveRows } from '../SheetTabs.utils';
 import { SkillsTable } from './SkillsTable';
 import type {
@@ -32,10 +37,9 @@ export function AbilitiesTab({ locked, roll }: AbilitiesTabProps) {
   );
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Saving Throws</h3>
+    <div className="space-y-6">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Section heading="Saving throws" level={4}>
           <div className="space-y-1.5">
             {saveRows.map(row => (
               <SaveRow
@@ -49,12 +53,11 @@ export function AbilitiesTab({ locked, roll }: AbilitiesTabProps) {
               />
             ))}
           </div>
-        </div>
+        </Section>
 
-        <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Proficiencies & Languages</h3>
+        <Section heading="Proficiencies & languages" level={4}>
           {proficiencyGroups.length === 0 ? (
-            <div className="text-muted text-sm">None recorded</div>
+            <div className="type-body text-muted">None recorded</div>
           ) : (
             <div className="space-y-2">
               {proficiencyGroups.map(group => (
@@ -62,7 +65,7 @@ export function AbilitiesTab({ locked, roll }: AbilitiesTabProps) {
               ))}
             </div>
           )}
-        </div>
+        </Section>
       </div>
 
       <SkillsTable locked={locked} roll={roll} />
@@ -81,33 +84,26 @@ function SaveRow({
   roll?: SheetRoll;
   onToggle: () => void;
 }) {
-  const dotClass = `h-2.5 w-2.5 rounded-full ${
-    row.proficient ? 'bg-accent-emerald-text-muted' : 'border border-divider'
-  }`;
+  const level = row.proficient ? 'proficient' : 'none';
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex items-center gap-2 pointer-coarse:min-h-11">
       {locked ? (
-        <span
-          role="img"
-          className={dotClass}
-          aria-label={`${row.name} save proficiency: ${row.proficient ? 'proficient' : 'none'}`}
-          title={`${row.proficient ? 'Proficient' : 'Not proficient'} · unlock to change`}
+        <ProficiencyDot
+          level={level}
+          label={`${row.name} save proficiency: ${level}`}
         />
       ) : (
-        <button
-          type="button"
-          aria-label={`${row.name} save proficiency`}
-          aria-pressed={row.proficient}
+        <ProficiencyDotButton
+          level={level}
+          pressed={row.proficient}
+          aria-label={saveDotLabel(row.name)}
           onClick={onToggle}
-          className="flex h-5 w-5 items-center justify-center"
-        >
-          <span className={dotClass} />
-        </button>
+        />
       )}
-      <span className="text-body flex-1">{row.name}</span>
+      <span className="type-ui text-body flex-1">{row.name}</span>
       <MaybeRollElement
         ariaLabel={`Roll ${row.name} save`}
-        className="text-heading font-semibold"
+        className="type-ui text-heading tabular-nums"
         onRoll={roll ? () => roll(`${row.name} Save`, row.modifier) : undefined}
       >
         {formatModifier(row.modifier)}
@@ -119,8 +115,8 @@ function SaveRow({
 function ProficiencyGroup({ group }: { group: ProficiencyGroupView }) {
   return (
     <div>
-      <div className="text-muted text-xs font-semibold">{group.label}</div>
-      <div className="text-body text-sm">{group.items.join(', ')}</div>
+      <div className="type-small text-muted">{group.label}</div>
+      <div className="type-body text-body">{group.items.join(', ')}</div>
     </div>
   );
 }

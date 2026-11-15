@@ -112,6 +112,33 @@ describe('BattleMapMinimap', () => {
     expect(wrapper?.className).not.toContain('left-1/2');
   });
 
+  it('uses the overlay surface on the SDK root, expanded and collapsed', () => {
+    const expanded = render(
+      <FieldNotesCanvas>
+        <BattleMapMinimap />
+      </FieldNotesCanvas>
+    );
+    const expandedRoot = screen
+      .getByRole('button', { name: 'Collapse minimap' })
+      .closest('[data-minimap-placement]')!.firstElementChild!;
+    expect(expandedRoot.className).toContain('shadow-overlay');
+    expect(expandedRoot.className).toContain('overflow-hidden');
+    expect(expandedRoot.className).not.toContain('shadow-lg');
+    expanded.unmount();
+
+    render(
+      <FieldNotesCanvas>
+        <BattleMapMinimap defaultCollapsed />
+      </FieldNotesCanvas>
+    );
+    const collapsedRoot = screen
+      .getByRole('button', { name: 'Expand minimap' })
+      .closest('[data-minimap-placement]')!.firstElementChild!;
+    expect(collapsedRoot.className).toContain('shadow-overlay');
+    expect(collapsedRoot.className).toContain('overflow-hidden');
+    expect(collapsedRoot.className).not.toContain('shadow-lg');
+  });
+
   it('prevents browser zoom for wheel gestures over the minimap', () => {
     render(
       <FieldNotesCanvas>

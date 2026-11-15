@@ -1,11 +1,25 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BattleMapLiveBanner } from './BattleMapLiveBanner';
 import { InitiativeRollPrompt } from './InitiativeRollPrompt';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 import { SheetFloatingStack } from './SheetFloatingStack';
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('sheet floating surfaces', () => {
   it('shows a campaign landmark only for notices and keeps the stack in flow order', () => {
@@ -61,7 +75,6 @@ describe('sheet floating surfaces', () => {
           onDismiss={vi.fn()}
         />
         <BattleMapLiveBanner
-          embedded
           compact
           campaignCode="camp"
           battleMapId="map"
@@ -83,7 +96,7 @@ describe('sheet floating surfaces', () => {
     );
     const stack = screen.getByTestId('floating-stack');
     const prompt = within(stack)
-      .getByText('Ruins: roll for initiative!')
+      .getByText('Roll initiative for Ruins')
       .closest('div.fixed, div.pointer-events-auto');
     const map = within(stack).getByRole('link', { name: 'Open battle map' });
     expect(prompt).not.toHaveClass('fixed');

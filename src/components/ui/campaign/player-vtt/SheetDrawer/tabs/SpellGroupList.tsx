@@ -1,21 +1,9 @@
+import { Section } from '@/components/ui/layout/section';
+import { SlotPipsButtons } from '@/components/ui/game/SlotPipsButtons';
 import type { Spell, SpellSlots } from '@/types/character';
 
 import type { SpellGroupView } from '../SheetDrawer.types';
 import { SpellListRow } from './SpellListRow';
-import { SpellSlotPipsRow } from './SpellSlotPipsRow';
-
-export const SLOT_ORDINAL = [
-  '0th',
-  '1st',
-  '2nd',
-  '3rd',
-  '4th',
-  '5th',
-  '6th',
-  '7th',
-  '8th',
-  '9th',
-];
 
 export interface SpellGroupListProps {
   spellsCount: number;
@@ -43,34 +31,39 @@ export function SpellGroupList({
 }: SpellGroupListProps) {
   if (spellsCount === 0) {
     return (
-      <p className="text-muted text-sm">
+      <p className="type-body text-muted py-6 text-center">
         No spells yet. Add spells on the full character sheet.
       </p>
     );
   }
   if (groups.length === 0) {
-    return <p className="text-muted text-sm">No spells match “{search}”.</p>;
+    return (
+      <p className="type-body text-muted py-6 text-center">
+        No spells match “{search}”.
+      </p>
+    );
   }
 
   return (
-    <>
+    <div className="space-y-6">
       {groups.map(group => (
-        <div key={group.level}>
-          <h3 className="text-faint mb-1 text-xs font-bold uppercase">
-            {group.label}
-          </h3>
-          {group.slot && (
-            <SpellSlotPipsRow
-              groupLabel={`${SLOT_ORDINAL[group.level] ?? group.level}-level slots`}
-              max={group.slot.max}
-              used={group.slot.used}
-              spendLabel={`Spend ${SLOT_ORDINAL[group.level] ?? group.level}-level slot`}
-              restoreLabel={`Restore ${SLOT_ORDINAL[group.level] ?? group.level}-level slot`}
-              onSpend={() => onSpendSlot(group.level as keyof SpellSlots)}
-              onRestore={() => onRestoreSlot(group.level as keyof SpellSlots)}
-            />
-          )}
-          <div className="space-y-1.5">
+        <Section
+          key={group.level}
+          level={4}
+          heading={group.label}
+          trailing={
+            group.slot && (
+              <SlotPipsButtons
+                level={group.level}
+                total={group.slot.max}
+                available={group.slot.max - group.slot.used}
+                onSpend={() => onSpendSlot(group.level as keyof SpellSlots)}
+                onRestore={() => onRestoreSlot(group.level as keyof SpellSlots)}
+              />
+            )
+          }
+        >
+          <ul className="divide-divider divide-y">
             {group.spells.map(row => (
               <SpellListRow
                 key={row.spell.id}
@@ -81,9 +74,9 @@ export function SpellGroupList({
                 onView={() => onView(row.spell)}
               />
             ))}
-          </div>
-        </div>
+          </ul>
+        </Section>
       ))}
-    </>
+    </div>
   );
 }

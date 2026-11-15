@@ -102,18 +102,18 @@ export function BattleMapPickerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Battle Map</DialogTitle>
+          <DialogTitle>Battle map</DialogTitle>
           <DialogDescription>
             Link this encounter to a battle map and jump straight to it.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4">
           {battleMaps.length === 0 ? (
-            <p className="text-muted text-sm">
-              No battle maps in this campaign yet — create one below.
+            <p className="type-body text-muted">
+              No battle maps yet. Name one below to create it.
             </p>
           ) : (
-            <div className="space-y-2">
+            <ul className="divide-divider divide-y">
               {battleMaps.map(bm => (
                 <BattleMapPickerRow
                   key={bm.id}
@@ -126,7 +126,7 @@ export function BattleMapPickerDialog({
                   onOpen={() => applyAndGo(bm.id)}
                 />
               ))}
-            </div>
+            </ul>
           )}
           <div className="border-divider flex items-center gap-2 border-t pt-4">
             <Input
@@ -135,7 +135,7 @@ export function BattleMapPickerDialog({
               onKeyDown={e => {
                 if (e.key === 'Enter') handleCreate();
               }}
-              placeholder="New map name..."
+              placeholder="Goblin ambush"
               wrapperClassName="flex-1"
               aria-label="New battle map name"
             />

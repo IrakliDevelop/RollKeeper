@@ -69,10 +69,10 @@ test('only the Felt and Brass font files ship', async () => {
   assert.deepEqual(files, FONT_FILES);
 });
 
-test('the root layout loads every shipped font file', async () => {
-  const layout = await readFile(path.join(appDir, 'layout.tsx'), 'utf8');
+test('the shared font module loads every shipped font file', async () => {
+  const fonts = await readFile(path.join(appDir, 'fonts.ts'), 'utf8');
   for (const file of FONT_FILES) {
-    assert.ok(layout.includes(`./fonts/${file}`), `layout misses ${file}`);
+    assert.ok(fonts.includes(`./fonts/${file}`), `fonts.ts misses ${file}`);
   }
 });
 
@@ -117,23 +117,30 @@ test('Storybook declares every shipped font file', async () => {
 });
 
 test('Vollkorn falls back to serif metrics while it loads', async () => {
-  const layout = await readFile(path.join(appDir, 'layout.tsx'), 'utf8');
-  const vollkorn = layout.match(/const vollkorn = localFont\(\{[\s\S]*?\}\);/);
-  assert.ok(vollkorn, 'layout declares vollkorn with localFont');
+  const fonts = await readFile(path.join(appDir, 'fonts.ts'), 'utf8');
+  const vollkorn = fonts.match(/const vollkorn = localFont\(\{[\s\S]*?\}\);/);
+  assert.ok(vollkorn, 'fonts.ts declares vollkorn with localFont');
   assert.match(vollkorn[0], /adjustFontFallback: 'Times New Roman'/);
 });
 
 test('font variables are set on <html>, where :root tokens can read them', async () => {
-  const layout = await readFile(path.join(appDir, 'layout.tsx'), 'utf8');
-  assert.match(layout, /<html[^>]*className=\{FONT_VARIABLES\}/);
+  for (const file of ['layout.tsx', 'global-error.tsx']) {
+    const source = await readFile(path.join(appDir, file), 'utf8');
+    assert.match(
+      source,
+      /<html[^>]*className=\{FONT_VARIABLES\}/,
+      `${file} sets FONT_VARIABLES on <html>`
+    );
+    assert.doesNotMatch(source, /<body[^>]*\.variable/);
+  }
+  const fonts = await readFile(path.join(appDir, 'fonts.ts'), 'utf8');
   for (const name of ['vollkorn', 'barlow', 'barlowCondensed']) {
     assert.match(
-      layout,
+      fonts,
       new RegExp(`\\$\\{${name}\\.variable\\}`),
       `FONT_VARIABLES misses ${name}`
     );
   }
-  assert.doesNotMatch(layout, /<body[^>]*\.variable/);
 });
 
 test('font tokens point at the new families with safe fallbacks', async () => {

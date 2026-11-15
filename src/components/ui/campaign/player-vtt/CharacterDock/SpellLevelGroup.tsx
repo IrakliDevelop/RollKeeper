@@ -1,9 +1,12 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+
+import { SlotPips } from '@/components/ui/game/SlotPips';
+
+import { cn } from '@/utils/cn';
 
 import type { Spell, SpellSlot } from '@/types/character';
 
 import { SpellRow } from './SpellRow';
-import { SpellSlotPips } from './SpellSlotPips';
 
 export interface SpellLevelGroupProps {
   level: number;
@@ -29,21 +32,28 @@ export function SpellLevelGroup({
     <div>
       <button
         type="button"
+        aria-expanded={!collapsed}
         onClick={onToggle}
-        className="flex w-full items-center justify-between py-1"
+        className="focus-visible:outline-ring flex w-full items-center justify-between gap-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
       >
-        <span className="text-faint flex items-center gap-1 text-xs font-bold tracking-wider uppercase">
-          {collapsed ? (
-            <ChevronRight className="h-3 w-3" />
-          ) : (
-            <ChevronDown className="h-3 w-3" />
-          )}
+        <span className="type-small text-muted flex items-center gap-1">
+          <ChevronDown
+            size={14}
+            aria-hidden
+            className={cn('shrink-0', collapsed && '-rotate-90')}
+          />
           {level === 0 ? 'Cantrips' : `Level ${level}`}
         </span>
-        {slot && <SpellSlotPips slot={slot} />}
+        {slot && (
+          <SlotPips
+            total={slot.max}
+            available={slot.max - slot.used}
+            level={level}
+          />
+        )}
       </button>
       {!collapsed && (
-        <div className="space-y-1.5">
+        <ul className="divide-divider divide-y">
           {spells.map(spell => (
             <SpellRow
               key={spell.id}
@@ -52,7 +62,7 @@ export function SpellLevelGroup({
               onCast={() => onCast(spell)}
             />
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

@@ -39,6 +39,16 @@ export const MARKER_KINDS = [
 ] as const;
 export type MarkerKind = (typeof MARKER_KINDS)[number];
 
+/** Display names for each marker kind, used where the kind is shown as text. */
+export const MARKER_KIND_LABELS: Readonly<Record<MarkerKind, string>> = {
+  door: 'Door',
+  trap: 'Trap',
+  loot: 'Loot',
+  npc: 'NPC',
+  secret: 'Secret',
+  note: 'Note',
+};
+
 /** Palette KEYS, not CSS colour strings — resolved to CSS at paint time
  * (spec §6.2: an invalid `fillStyle` string is silently ignored by canvas
  * and would otherwise inherit the previous element's colour). These names

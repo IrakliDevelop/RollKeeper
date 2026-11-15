@@ -5,8 +5,6 @@ import { useState } from 'react';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 
-import { parseHpAmount } from './DockVitals.utils';
-
 /** Shared damage/heal/temp editor for the dock and the map sheet drawer. */
 export function useHpAmountEditor(
   addToast: (toast: Omit<ToastData, 'id'>) => void
@@ -20,16 +18,16 @@ export function useHpAmountEditor(
   const addTemporaryHPToCharacter = useCharacterStore(
     s => s.addTemporaryHPToCharacter
   );
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState<number | undefined>();
 
   const applyAmount = (
     apply: (n: number) => void,
     toastTitle: (n: number) => string
   ) => {
-    const n = parseHpAmount(amount);
-    if (n === null) return;
+    const n = amount;
+    if (n == null || !Number.isFinite(n) || n <= 0) return;
     apply(n);
-    setAmount('');
+    setAmount(undefined);
     // Read the post-apply state back so the toast reflects the actual
     // result (temp-first damage, heal capping at max, etc.).
     const { current, max, temporary } =

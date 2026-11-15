@@ -1,18 +1,18 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, Users } from 'lucide-react';
 import type { PeerRoster } from '@fieldnotes/core';
 
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 
 import { summarizePeers } from '../awarenessPeers';
 import { useAwarenessPeers } from '../useAwarenessPeers';
 import { usePlayerDirectory } from '../usePlayerDirectory';
 import { PeerRow } from './PeerRow';
-import { usePresencePopover } from './PresenceControl.hooks';
 
 export interface PresenceControlProps {
   campaignCode: string;
@@ -48,61 +48,63 @@ export function PresenceControl({
   useEffect(() => {
     ensureKnown(rows.filter(r => r.role === 'player').map(r => r.id));
   }, [rows, ensureKnown]);
-  const { open, toggleOpen, rootRef, popoverRef, position } =
-    usePresencePopover();
+  const [open, setOpen] = useState(false);
 
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant={open ? 'primary' : 'ghost'}
-        onClick={toggleOpen}
-        aria-expanded={open}
-        className="flex h-11 items-center gap-1.5 px-3 text-xs"
-      >
-        <Users size={14} />
-        {`Viewers · ${rows.length}`}
-        <ChevronDown size={14} />
-      </Button>
-      {open &&
-        createPortal(
-          <div
-            ref={popoverRef}
-            data-testid="presence-popover"
-            className="bg-surface-raised border-divider fixed z-50 w-72 rounded-xl border p-3 shadow-xl"
-            style={position}
-          >
-            {rows.length === 0 ? (
-              <p className="text-muted px-1 text-sm">
-                No one else is viewing this map.
-              </p>
-            ) : (
-              <ul className="flex flex-col">
-                {rows.map(peer => (
-                  <PeerRow key={peer.id} peer={peer} />
-                ))}
-              </ul>
-            )}
-            <div className="border-divider my-2 border-t" />
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          selected={open}
+          leftIcon={<Users size={16} aria-hidden />}
+          rightIcon={<ChevronDown size={14} aria-hidden />}
+        >
+          {`Viewers · ${rows.length}`}
+        </Button>
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          aria-label="Viewers"
+          data-testid="presence-popover"
+          align="end"
+          sideOffset={8}
+          collisionPadding={8}
+          className={`${OVERLAY_SURFACE} z-[60] w-72 max-w-[calc(100vw-1rem)] p-3`}
+        >
+          {rows.length === 0 ? (
+            <p className="text-muted px-1 text-sm">
+              No one else is viewing this map.
+            </p>
+          ) : (
+            <ul className="flex flex-col">
+              {rows.map(peer => (
+                <PeerRow key={peer.id} peer={peer} />
+              ))}
+            </ul>
+          )}
+          <div className="border-divider my-2 border-t" />
+          <Switch
+            checked={cursorSharing}
+            onCheckedChange={onCursorSharingChange}
+            aria-label="Share my cursor"
+            label="Share my cursor"
+            description="Players and the TV display see your pointer. Off by default each session."
+          />
+          <div className="mt-2">
             <Switch
-              checked={cursorSharing}
-              onCheckedChange={onCursorSharingChange}
-              aria-label="Share my cursor"
-              label="Share my cursor"
-              description="Players and the TV display see your pointer. Off by default each session."
+              checked={showPlayerCursors}
+              onCheckedChange={onShowPlayerCursorsChange}
+              aria-label="Show player cursors"
+              label="Show player cursors"
+              description="Draw players' pointers on this map. Other DMs' pointers always show."
             />
-            <div className="mt-2">
-              <Switch
-                checked={showPlayerCursors}
-                onCheckedChange={onShowPlayerCursorsChange}
-                aria-label="Show player cursors"
-                label="Show player cursors"
-                description="Draw players' pointers on this map. Other DMs' pointers always show."
-              />
-            </div>
-          </div>,
-          document.body
-        )}
-    </div>
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

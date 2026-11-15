@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Brain } from 'lucide-react';
 
+import { AppIcon } from '@/components/ui/icons/AppIcon';
 import {
   abilitySaveValue,
   computeSaveProficiencies,
@@ -36,19 +36,22 @@ export function CreatureConcentrationBanner({
     <div
       role="status"
       aria-label="Concentration"
-      className="bg-accent-purple-bg border-accent-purple-border text-accent-purple-text flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs"
+      className="flex items-start gap-2"
     >
-      <Brain size={13} className="mt-0.5 shrink-0" aria-hidden />
+      <AppIcon
+        name="concentration"
+        className="text-lapis-text mt-0.5 size-4 shrink-0"
+      />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">
+        <p className="type-ui text-heading">
           Concentrating on {entity.concentrationSpell}
         </p>
-        <p className="text-muted text-[11px]">
+        <p className="type-small text-muted">
           On damage: CON save, DC 10 or half the damage, whichever is higher.
         </p>
       </div>
       {save && (
-        <span className="shrink-0 font-semibold tabular-nums">
+        <span className="type-ui text-heading shrink-0 tabular-nums">
           CON save {save}
         </span>
       )}

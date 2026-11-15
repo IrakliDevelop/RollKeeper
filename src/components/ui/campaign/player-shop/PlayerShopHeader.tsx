@@ -27,7 +27,7 @@ export function PlayerShopHeader({
 }) {
   return (
     <DialogHeader className="flex-row items-center gap-4 space-y-0">
-      <div className="border-divider bg-surface-secondary text-muted flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 text-xl font-bold">
+      <div className="border-divider bg-surface-secondary type-subheading text-heading flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border">
         {merchantAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { ArrowLeft, Monitor } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
+import { LiveSyncChip } from '@/components/ui/campaign/location-map/LiveSyncChip';
+import { SegmentedGroup } from '@/components/ui/campaign/location-map/ToolOptionControls';
 import { openTvDisplay } from '@/lib/openTvDisplay';
 
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
@@ -23,23 +26,24 @@ interface DmVttTopBarProps {
   onModeChange: (mode: DmVttMode) => void;
 }
 
-const GRID_OPTIONS: { key: DmVttGridMode; label: string }[] = [
-  { key: 'hex', label: 'Hex' },
-  { key: 'square', label: 'Square' },
-  { key: 'off', label: 'Off' },
+const GRID_OPTIONS: readonly { value: DmVttGridMode; label: string }[] = [
+  { value: 'hex', label: 'Hex' },
+  { value: 'square', label: 'Square' },
+  { value: 'off', label: 'Off' },
 ];
 
-const MODE_OPTIONS: { key: DmVttMode; label: string }[] = [
-  { key: 'setup', label: 'Setup' },
-  { key: 'play', label: 'Play' },
+const MODE_OPTIONS: readonly { value: DmVttMode; label: string }[] = [
+  { value: 'setup', label: 'Setup' },
+  { value: 'play', label: 'Play' },
 ];
 
 /**
  * Session-controls row for the DM VTT command dock: back link, map name, grid
  * segmented control (mirrors `useDmVttGrid`'s `setGridMode`), TV display
- * launcher (Task 1's `openTvDisplay` helper), a live-status chip (the
- * chip's single home — the Play toolbar no longer duplicates it), and the
- * Setup|Play mode switch (state + persistence owned by the page).
+ * launcher (Task 1's `openTvDisplay` helper), the setup toolbar's shared
+ * `LiveSyncChip` (the play dock's single home for it), and the Setup|Play
+ * mode switch (state + persistence owned by the page). Its tooltips sit
+ * under `DmVttToolbar`'s `TooltipProvider`.
  */
 export function DmVttTopBar({
   campaignCode,
@@ -54,67 +58,54 @@ export function DmVttTopBar({
 }: DmVttTopBarProps) {
   return (
     <div className="scrollbar-thin flex min-h-[52px] min-w-0 items-center justify-start gap-2 overflow-x-auto overscroll-x-contain px-2 py-1 sm:gap-3 sm:px-3">
-      <Link
-        href={`/dm/campaign/${campaignCode}/battlemaps`}
-        className="shrink-0"
-      >
-        <Button variant="ghost" size="lg" aria-label="Back to battle maps">
-          <ArrowLeft size={18} />
+      <Tooltip content="Back to battle maps">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="w-9 shrink-0 px-0"
+          aria-label="Back to battle maps"
+        >
+          <Link href={`/dm/campaign/${campaignCode}/battlemaps`}>
+            <ArrowLeft size={16} aria-hidden />
+          </Link>
         </Button>
-      </Link>
-      <span className="text-heading min-w-[5rem] flex-1 truncate text-sm font-semibold sm:max-w-[160px] sm:flex-none">
+      </Tooltip>
+      <span className="type-ui text-heading min-w-[5rem] flex-1 truncate sm:max-w-[160px] sm:flex-none">
         {mapName}
       </span>
-      <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
-        {GRID_OPTIONS.map(({ key, label }) => (
-          <Button
-            key={key}
-            variant={gridMode === key ? 'primary' : 'ghost'}
-            onClick={() => onSetGridMode(key)}
-            className="min-h-[44px] px-2 text-xs"
-          >
-            {label}
-          </Button>
-        ))}
+      <div className="shrink-0">
+        <SegmentedGroup
+          label="Grid type"
+          size="sm"
+          options={GRID_OPTIONS}
+          value={gridMode}
+          onChange={onSetGridMode}
+        />
       </div>
-      <Button
-        variant="ghost"
-        size="lg"
-        leftIcon={<Monitor size={16} />}
-        onClick={() => openTvDisplay(campaignCode, battleMapId, dmId)}
-        className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
-        aria-label="Open display"
-      >
-        <span className="hidden lg:inline">Open Display</span>
-      </Button>
-      <span
-        className={`h-2.5 w-2.5 shrink-0 rounded-full sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:text-xs ${
-          status === 'live'
-            ? 'bg-accent-emerald-bg text-accent-emerald-text'
-            : status === 'denied'
-              ? 'bg-accent-red-bg text-accent-red-text'
-              : 'bg-accent-amber-bg text-accent-amber-text'
-        }`}
-      >
-        <span className="sr-only sm:not-sr-only">
-          {status === 'live'
-            ? 'Live'
-            : status === 'denied'
-              ? 'Access denied'
-              : 'Connecting…'}
-        </span>
-      </span>
-      <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
-        {MODE_OPTIONS.map(({ key, label }) => (
-          <Button
-            key={key}
-            variant={mode === key ? 'primary' : 'ghost'}
-            onClick={() => onModeChange(key)}
-            className="min-h-[44px] px-2 text-xs"
-          >
-            {label}
-          </Button>
-        ))}
+      <Tooltip content="Open TV display">
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Monitor size={16} />}
+          onClick={() => openTvDisplay(campaignCode, battleMapId, dmId)}
+          className="shrink-0 px-2 lg:px-3"
+          aria-label="Open TV display"
+        >
+          <span className="hidden lg:inline">Open TV display</span>
+        </Button>
+      </Tooltip>
+      <div className="shrink-0">
+        <LiveSyncChip status={status} />
+      </div>
+      <div className="shrink-0">
+        <SegmentedGroup
+          label="Mode"
+          size="sm"
+          options={MODE_OPTIONS}
+          value={mode}
+          onChange={onModeChange}
+        />
       </div>
     </div>
   );

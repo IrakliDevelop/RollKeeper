@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render, screen, cleanup, within } from '@testing-library/react';
 import { InitiativePanel } from '../InitiativePanel';
 import type { SharedInitiativeState } from '@/types/sharedState';
 
@@ -27,9 +27,21 @@ const base: SharedInitiativeState = {
 const noop = () => {};
 
 describe('InitiativePanel', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+
   afterEach(() => {
     cleanup();
     localStorage.removeItem('rollkeeper-initiative-panel-y');
+    localStorage.removeItem('rollkeeper-initiative-panel-open');
     vi.unstubAllGlobals();
   });
 
@@ -245,5 +257,130 @@ describe('InitiativePanel', () => {
     expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
     // Tier-coloured, like an enemy's label row — not the neutral player shade.
     expect(screen.getByText('Bloodied')).toHaveClass('text-ember-text');
+  });
+
+  it('marks the current combatant with aria-current and Current turn text', () => {
+    render(
+      <InitiativePanel
+        state={{ ...base, currentEntityId: 'm' }}
+        characterId="char-b"
+        onEndTurn={noop}
+      />
+    );
+    const current = screen.getByText('Enemy').closest('li')!;
+    expect(current).toHaveAttribute('aria-current', 'true');
+    expect(within(current).getByText('Current turn')).toBeInTheDocument();
+    expect(screen.getAllByText('Current turn')).toHaveLength(1);
+    const other = screen.getByText('Aragorn').closest('li')!;
+    expect(other).not.toHaveAttribute('aria-current');
+  });
+
+  it('moves Current turn to the next combatant on End my turn before the sync catches up', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(
+      <InitiativePanel state={base} characterId="char-a" onEndTurn={noop} />
+    );
+    const mine = screen.getByText('Aragorn').closest('li')!;
+    expect(mine).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.click(screen.getByRole('button', { name: /end my turn/i }));
+
+    const next = screen.getByText('Enemy').closest('li')!;
+    expect(next).toHaveAttribute('aria-current', 'true');
+    expect(within(next).getByText('Current turn')).toBeInTheDocument();
+    expect(mine).not.toHaveAttribute('aria-current');
+    expect(within(mine).queryByText('Current turn')).not.toBeInTheDocument();
+  });
+
+  it('does not mark a dead current combatant', () => {
+    const makeState = (isDead: boolean) => ({
+      ...base,
+      currentEntityId: 'm',
+      turnOrder: [
+        base.turnOrder[0],
+        {
+          entityId: 'm',
+          displayName: 'Enemy',
+          type: 'monster' as const,
+          isDead,
+        },
+      ],
+    });
+    const { rerender } = render(
+      <InitiativePanel
+        state={makeState(true)}
+        characterId="char-b"
+        onEndTurn={noop}
+      />
+    );
+    const deadRow = screen.getByText('Enemy').closest('li')!;
+    expect(deadRow).not.toHaveAttribute('aria-current');
+    expect(screen.queryByText('Current turn')).not.toBeInTheDocument();
+
+    rerender(
+      <InitiativePanel
+        state={makeState(false)}
+        characterId="char-b"
+        onEndTurn={noop}
+      />
+    );
+    const aliveRow = screen.getByText('Enemy').closest('li')!;
+    expect(aliveRow).toHaveAttribute('aria-current', 'true');
+    expect(within(aliveRow).getByText('Current turn')).toBeInTheDocument();
+  });
+
+  it('names the side glyphs', () => {
+    render(
+      <InitiativePanel
+        state={{
+          ...base,
+          turnOrder: [
+            {
+              entityId: 'x',
+              displayName: 'Ally NPC',
+              type: 'monster',
+              disposition: 'ally',
+            },
+            {
+              entityId: 'y',
+              displayName: 'Neutral NPC',
+              type: 'monster',
+              disposition: 'neutral',
+            },
+            {
+              entityId: 'z',
+              displayName: 'Enemy NPC',
+              type: 'monster',
+              disposition: 'enemy',
+            },
+          ],
+        }}
+        characterId="char-b"
+        onEndTurn={noop}
+      />
+    );
+    expect(screen.getByRole('img', { name: 'Ally' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Neutral' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Enemy' })).toBeInTheDocument();
+  });
+
+  it('collapsed handle shows the round and reports aria-expanded', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(
+      <InitiativePanel state={base} characterId="char-b" onEndTurn={noop} />
+    );
+    // Combat activation auto-opens the panel on mount.
+    const hide = screen.getByRole('button', { name: 'Hide initiative' });
+    expect(hide).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.click(hide);
+    const show = screen.getByRole('button', { name: 'Show initiative' });
+    expect(show).toHaveAttribute('aria-expanded', 'false');
+    expect(show).toHaveTextContent('3');
+
+    await userEvent.click(show);
+    expect(
+      screen.getByRole('button', { name: 'Hide initiative' })
+    ).toHaveAttribute('aria-expanded', 'true');
   });
 });

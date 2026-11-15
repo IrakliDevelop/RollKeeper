@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Minimap, useViewport } from '@fieldnotes/react';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 
 const ZOOM_SENSITIVITY = 1e-3;
 
@@ -75,7 +76,7 @@ export function BattleMapMinimap({
     >
       <Minimap
         defaultCollapsed={defaultCollapsed}
-        className="border-divider bg-surface-raised overflow-hidden rounded-lg border shadow-lg"
+        className={`${OVERLAY_SURFACE} overflow-hidden`}
       />
     </div>
   );
