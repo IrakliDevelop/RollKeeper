@@ -173,7 +173,7 @@ export function CampaignPlayersSection({
             Refresh
           </Button>
         </div>
-        <ul className="divide-divider divide-y">
+        <ul className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {players.map(player => (
             <PlayerRosterRow
               key={player.playerId}

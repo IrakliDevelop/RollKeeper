@@ -77,146 +77,107 @@ function renderRow(
 afterEach(cleanup);
 
 describe('NpcLibraryRow', () => {
-  it('names the row with a heading', () => {
-    const { onView, onEdit, onDuplicate, onMove, onDelete, unmount } =
-      renderRow();
-    const heading = screen.getByRole('heading', {
-      level: 3,
-      name: 'Brenn Ironhand',
-    });
-    expect(heading).toHaveClass(
-      'type-label-heading',
-      'text-heading',
-      'break-words'
-    );
-    fireEvent.click(screen.getByText('Runs the Rusty Anchor.'));
-    for (const fn of [onView, onEdit, onDuplicate, onMove, onDelete]) {
-      expect(fn).not.toHaveBeenCalled();
-    }
+  it('names the card with a heading at the section level', () => {
+    const { unmount } = renderRow();
+    expect(
+      screen.getByRole('heading', { level: 3, name: brenn.name })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'View' })
+    ).toHaveAccessibleDescription(brenn.name);
     unmount();
     renderRow(brenn, { headingLevel: 4 });
     expect(
-      screen.getByRole('heading', { level: 4, name: 'Brenn Ironhand' })
+      screen.getByRole('heading', { level: 4, name: brenn.name })
     ).toBeInTheDocument();
   });
 
-  it('shows the meta, description, vitals and passives as text', () => {
-    const { unmount } = renderRow();
-    const meta = screen.getByText('Medium humanoid · CR 2 · Caster level 5');
-    expect(meta).toHaveClass('type-small', 'text-muted');
-    const description = screen.getByText('Runs the Rusty Anchor.');
-    expect(description).toHaveClass('line-clamp-2');
-    expect(description).not.toHaveAttribute('title');
-    const vitals = screen.getByText('AC 15 (+2) · 44 HP · Speed 30 ft.');
-    expect(vitals).toHaveClass('type-ui', 'text-heading', 'tabular-nums');
-    const passives = screen.getByText(/^Passive Perception/).closest('p');
-    expect(passives).toHaveClass('type-small', 'text-muted');
-    expect(passives?.textContent).toBe(
-      'Passive Perception 14 · Insight 12 · Investigation 11'
-    );
-    const later = passives?.querySelectorAll('.hidden.md\\:inline');
-    expect(later).toHaveLength(2);
-    expect(later?.[0].textContent).toBe(' · Insight 12');
-    expect(later?.[1].textContent).toBe(' · Investigation 11');
-    unmount();
-
-    renderRow({
-      ...brenn,
-      passivePerception: undefined,
-      passiveInvestigation: undefined,
-    });
-    const single = screen.getByText(/^Passive Insight/).closest('p');
-    expect(single?.textContent).toBe('Passive Insight 12');
-    expect(single?.querySelector('.hidden')).toBeNull();
+  it('opens the sheet when the card body is clicked', () => {
+    const { onView } = renderRow();
+    fireEvent.click(screen.getByText('Runs the Rusty Anchor.'));
+    expect(onView).toHaveBeenCalledTimes(1);
   });
 
-  it('prints nothing dangling when optional parts are missing', () => {
+  it('opens the card with Enter or Space without handling keys from nested controls', () => {
+    const { onView } = renderRow();
+    const card = screen.getByRole('button', { name: 'View' });
+    fireEvent.keyDown(card, { key: 'Enter' });
+    fireEvent.keyDown(card, { key: ' ' });
+    expect(onView).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `Edit ${brenn.name}` }),
+      { key: 'Enter' }
+    );
+    expect(onView).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows the stored creature details and all three passive scores', () => {
+    renderRow();
+    expect(screen.getByText('Medium humanoid')).toBeInTheDocument();
+    expect(screen.getByText('Runs the Rusty Anchor.')).toBeInTheDocument();
+    expect(screen.getByText('CR 2')).toBeInTheDocument();
+    expect(screen.getByText('Caster Lv5')).toBeInTheDocument();
+    expect(screen.getByText('44 HP')).toBeInTheDocument();
+    expect(screen.getByText('AC 15 (+2)')).toBeInTheDocument();
+    expect(screen.getByText('30 ft.')).toBeInTheDocument();
+    for (const [label, value] of [
+      ['Passive Perception', '14'],
+      ['Passive Insight', '12'],
+      ['Passive Investigation', '11'],
+    ]) {
+      expect(screen.getByTitle(label)).toHaveTextContent(value);
+    }
+  });
+
+  it('handles missing optional details and blank portraits', () => {
     const { container } = renderRow({
       ...brenn,
+      avatarUrl: '  ',
       monsterStatBlock: undefined,
       description: undefined,
       spellcasting: undefined,
       tempAc: undefined,
-      speed: '',
       passivePerception: undefined,
       passiveInsight: undefined,
       passiveInvestigation: undefined,
       tags: undefined,
     });
-    expect(screen.getByText('AC 15 · 44 HP')).toBeInTheDocument();
-    expect(screen.queryByText(/·\s*$/)).toBeNull();
-    expect(screen.queryByText(/^Passive/)).toBeNull();
+    expect(container.querySelector('img')).toBeNull();
     expect(screen.queryByText('Runs the Rusty Anchor.')).toBeNull();
-    expect(container.querySelector('p.text-muted')).toBeNull();
-    expect(screen.getAllByRole('button')).toHaveLength(5);
+    expect(screen.queryByTitle('Passive Perception')).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Tags' })).toBeNull();
+    expect(screen.getByText('AC 15')).toBeInTheDocument();
   });
 
-  it('lists tags only when there are some', () => {
-    const { unmount } = renderRow();
-    const list = screen.getByRole('list', { name: 'Tags' });
-    const items = within(list).getAllByRole('listitem');
-    expect(items).toHaveLength(2);
-    for (const item of items) {
-      expect(item.firstElementChild).toHaveAttribute('data-variant', 'neutral');
+  it('names each action and keeps action clicks from opening the sheet', () => {
+    const h = renderRow();
+    for (const [name, handler] of [
+      [`Duplicate ${brenn.name}`, h.onDuplicate],
+      [`Move ${brenn.name} to custom monsters`, h.onMove],
+      [`Edit ${brenn.name}`, h.onEdit],
+      [`Delete ${brenn.name}`, h.onDelete],
+    ] as const) {
+      fireEvent.click(screen.getByRole('button', { name }));
+      expect(handler).toHaveBeenCalledTimes(1);
     }
+    expect(h.onView).not.toHaveBeenCalled();
+  });
+
+  it('lists repeated tags once and omits an empty tag list', () => {
+    const { unmount } = renderRow({
+      ...brenn,
+      tags: ['merchant', 'quest', 'merchant'],
+    });
+    const tags = within(
+      screen.getByRole('list', { name: 'Tags' })
+    ).getAllByRole('listitem');
+    expect(tags.map(tag => tag.textContent)).toEqual(['merchant', 'quest']);
     unmount();
     renderRow({ ...brenn, tags: [] });
     expect(screen.queryByRole('list', { name: 'Tags' })).toBeNull();
   });
 
-  it('opens the creature from View, described by the name', () => {
-    const { onView } = renderRow();
-    const view = screen.getByRole('button', { name: 'View' });
-    expect(view).toHaveAttribute('data-variant', 'secondary');
-    expect(view).toHaveAccessibleDescription('Brenn Ironhand');
-    fireEvent.click(view);
-    expect(onView).toHaveBeenCalledTimes(1);
-  });
-
-  it('names each row action', () => {
-    const h = renderRow();
-    const buttons = screen.getAllByRole('button');
-    expect(
-      buttons.map(b => b.getAttribute('aria-label') ?? b.textContent)
-    ).toEqual([
-      'View',
-      'Edit Brenn Ironhand',
-      'Duplicate Brenn Ironhand',
-      'Move Brenn Ironhand to custom monsters',
-      'Delete Brenn Ironhand',
-    ]);
-    expect(buttons.map(b => b.getAttribute('data-variant'))).toEqual([
-      'secondary',
-      'ghost',
-      'ghost',
-      'ghost',
-      'danger',
-    ]);
-    for (const b of buttons) expect(b).not.toHaveAttribute('title');
-    const pairs: Array<[string, () => void]> = [
-      ['Edit Brenn Ironhand', h.onEdit],
-      ['Duplicate Brenn Ironhand', h.onDuplicate],
-      ['Move Brenn Ironhand to custom monsters', h.onMove],
-      ['Delete Brenn Ironhand', h.onDelete],
-    ];
-    for (const [name, fn] of pairs) {
-      fireEvent.click(screen.getByRole('button', { name }));
-      expect(fn).toHaveBeenCalledTimes(1);
-    }
-  });
-
-  it('lists a repeated tag once', () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    renderRow({ ...brenn, tags: ['merchant', 'quest', 'merchant'] });
-    const items = within(
-      screen.getByRole('list', { name: 'Tags' })
-    ).getAllByRole('listitem');
-    expect(items.map(item => item.textContent)).toEqual(['merchant', 'quest']);
-    expect(error).not.toHaveBeenCalled();
-    error.mockRestore();
-  });
-
-  it('hands the View button to viewRef', () => {
+  it('registers and releases the card as the focus target', () => {
     const viewRef = vi.fn();
     const { unmount } = renderRow(brenn, { viewRef });
     expect(viewRef.mock.calls[0]?.[0]).toBe(
@@ -226,45 +187,23 @@ describe('NpcLibraryRow', () => {
     expect(viewRef.mock.lastCall?.[0]).toBeNull();
   });
 
-  it('keeps a blank portrait out of the row', () => {
-    const { container } = renderRow({ ...brenn, avatarUrl: '   ' });
-    expect(container.querySelector('img')).toBeNull();
-    expect(
-      screen.queryByRole('button', { name: /image full size/ })
-    ).toBeNull();
-    expect(screen.getAllByRole('button')).toHaveLength(5);
-  });
-
-  it('opens the portrait full size from the row', () => {
-    const { onView, container } = renderRow({
+  it('opens the sheet from the original full-height portrait', () => {
+    const { onView } = renderRow({
       ...brenn,
       avatarUrl: 'data:image/png;base64,cG9ydHJhaXQ=',
     });
-    expect(container.querySelector('img')).toHaveAttribute('alt', '');
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'View Brenn Ironhand image full size',
-      })
-    );
-    expect(
-      screen.getByRole('dialog', { name: /brenn ironhand full-size image/i })
-    ).toBeInTheDocument();
-    expect(onView).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('img', { name: brenn.name }));
+    expect(onView).toHaveBeenCalledTimes(1);
   });
 
-  it('shows Move up and Move down under the row while reordering', () => {
+  it('keeps keyboard reordering outside the clickable card', () => {
     const onMove = vi.fn();
-    const { unmount } = renderRow(brenn, {
+    const { onView } = renderRow(brenn, {
       reorder: { index: 0, count: 2, onMove },
     });
     expect(screen.getByRole('button', { name: 'Move up' })).toBeDisabled();
-    const down = screen.getByRole('button', { name: 'Move down' });
-    expect(down).toHaveAccessibleDescription('Brenn Ironhand');
-    fireEvent.click(down);
+    fireEvent.click(screen.getByRole('button', { name: 'Move down' }));
     expect(onMove).toHaveBeenCalledWith(1);
-    expect(screen.getAllByRole('button')).toHaveLength(7);
-    unmount();
-    renderRow();
-    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
+    expect(onView).not.toHaveBeenCalled();
   });
 });

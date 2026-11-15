@@ -1,18 +1,22 @@
 'use client';
-
 import { useId } from 'react';
-import { ArrowLeftRight, Copy, Edit3, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/forms/button';
+import Image from 'next/image';
+import {
+  Copy,
+  ArrowLeftRight,
+  Edit3,
+  Trash2,
+  Heart,
+  Shield,
+  Footprints,
+  Eye,
+  Lightbulb,
+  Search,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { EquipmentReorderControls } from '@/components/ui/character/equipment/EquipmentReorderControls';
-import { RowAvatar } from '../RowAvatar';
-import {
-  creatureMetaLine,
-  creaturePassives,
-  creatureVitals,
-} from './NpcLibrary.utils';
+import { parseAcBonus } from '@/utils/calculations';
 import type { CampaignNPC } from '@/types/encounter';
-
 export interface NpcLibraryRowProps {
   npc: CampaignNPC;
   headingLevel: 3 | 4;
@@ -22,7 +26,7 @@ export interface NpcLibraryRowProps {
   onDuplicate: () => void;
   onMove: () => void;
   onDelete: () => void;
-  viewRef?: (el: HTMLButtonElement | null) => void;
+  viewRef?: (el: HTMLElement | null) => void;
   reorder?: {
     index: number;
     count: number;
@@ -30,134 +34,496 @@ export interface NpcLibraryRowProps {
   };
 }
 
-/** The content of one library entry's `li`; the list supplies the `li`. */
-export function NpcLibraryRow({
+export function NpcLibraryRow(props: NpcLibraryRowProps) {
+  return (
+    <>
+      <NPCCard {...props} />
+      {props.reorder && (
+        <EquipmentReorderControls
+          name={props.npc.name}
+          index={props.reorder.index}
+          count={props.reorder.count}
+          onMove={props.reorder.onMove}
+        />
+      )}
+    </>
+  );
+}
+function NPCCard({
   npc,
   headingLevel,
   moveLabel,
-  onView,
   onEdit,
   onDuplicate,
   onMove,
   onDelete,
+  onView,
   viewRef,
-  reorder,
 }: NpcLibraryRowProps) {
   const headingId = useId();
   const Heading = headingLevel === 3 ? 'h3' : 'h4';
-  const meta = creatureMetaLine(npc);
-  const description = npc.description?.trim();
-  const passives = creaturePassives(npc);
-  // A repeated tag would print twice, so show each once.
-  const tags = [...new Set(npc.tags)];
+  const stats = npc.monsterStatBlock;
+  const hasPortrait = !!npc.avatarUrl?.trim();
 
   return (
-    <>
-      <div className="flex gap-3 [@media(hover:hover)]:pr-7">
-        <RowAvatar src={npc.avatarUrl?.trim()} name={npc.name} />
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-            <div className="min-w-0 flex-[1_1_14rem]">
+    <div
+      className="border-accent-purple-border bg-surface-raised h-[210px] cursor-pointer overflow-hidden rounded-lg border-2 shadow-sm transition-shadow hover:shadow-md"
+      ref={viewRef}
+      role="button"
+      tabIndex={0}
+      aria-label="View"
+      aria-describedby={headingId}
+      onClick={onView}
+      onKeyDown={event => {
+        if (
+          event.target === event.currentTarget &&
+          (event.key === 'Enter' || event.key === ' ')
+        ) {
+          event.preventDefault();
+          onView();
+        }
+      }}
+    >
+      {hasPortrait ? (
+        /* Horizontal layout with tall portrait on the left */
+        <div className="flex h-full">
+          {/* Portrait column */}
+          <div className="border-divider relative w-28 shrink-0 self-stretch border-r-2 sm:w-32">
+            <Image
+              src={npc.avatarUrl!.trim()}
+              alt={npc.name}
+              fill
+              className="object-cover object-top"
+            />
+          </div>
+
+          {/* Content column */}
+          <div className="flex min-w-0 flex-1 flex-col p-3">
+            {/* Header row */}
+            <div className="mb-2 flex items-start justify-between gap-1">
+              <div className="min-w-0">
+                <Heading
+                  id={headingId}
+                  className="text-heading truncate text-sm leading-tight font-semibold"
+                >
+                  {npc.name}
+                </Heading>
+                {stats && (
+                  <p className="text-faint truncate text-[10px]">
+                    {stats.size} {stats.type}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onDuplicate();
+                  }}
+                  className="text-muted hover:text-body rounded p-1 transition-colors"
+                  aria-label={`Duplicate ${npc.name}`}
+                >
+                  <Copy size={13} />
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onMove();
+                  }}
+                  className="text-muted hover:text-accent-purple-text rounded p-1 transition-colors"
+                  aria-label={moveLabel}
+                >
+                  <ArrowLeftRight size={13} />
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  className="text-muted hover:text-body rounded p-1 transition-colors"
+                  aria-label={`Edit ${npc.name}`}
+                >
+                  <Edit3 size={13} />
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
+                  aria-label={`Delete ${npc.name}`}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+
+            <p
+              className="text-muted mb-2 line-clamp-2 min-h-[28px] text-xs leading-snug"
+              title={npc.description?.trim() || undefined}
+            >
+              {npc.description?.trim() || '\u00A0'}
+            </p>
+
+            {/* CR + Prof badges */}
+            <div className="mb-2 flex flex-wrap gap-1">
+              {stats?.cr != null && (
+                <Badge
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full text-[10px]"
+                >
+                  CR {stats.cr}
+                </Badge>
+              )}
+              {npc.proficiencyBonus != null && (
+                <Badge
+                  variant="neutral"
+                  size="sm"
+                  className="rounded-full text-[10px]"
+                >
+                  Prof +{npc.proficiencyBonus}
+                </Badge>
+              )}
+              {npc.spellcasting && (
+                <Badge
+                  variant="info"
+                  size="sm"
+                  className="rounded-full text-[10px]"
+                >
+                  Caster Lv{npc.spellcasting.casterLevel}
+                </Badge>
+              )}
+            </div>
+
+            {/* HP / AC / Speed / PP */}
+            <div className="text-body mb-1 flex flex-wrap gap-2 text-xs">
+              <span className="flex items-center gap-0.5">
+                <Heart size={11} className="text-accent-red-text shrink-0" />
+                {npc.maxHp}
+              </span>
+              {npc.hitDice && (
+                <span className="text-faint text-[10px]">
+                  HD {npc.hitDice.max}
+                  {npc.hitDice.dieType}
+                </span>
+              )}
+              <span className="flex items-center gap-0.5">
+                <Shield size={11} className="text-accent-blue-text shrink-0" />
+                {npc.armorClass}
+                {parseAcBonus(npc.tempAc) !== 0
+                  ? ` (+${parseAcBonus(npc.tempAc)})`
+                  : ''}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Footprints size={11} className="text-muted shrink-0" />
+                {npc.speed}
+              </span>
+            </div>
+
+            {/* Passive scores */}
+            {(npc.passivePerception != null ||
+              npc.passiveInsight != null ||
+              npc.passiveInvestigation != null) && (
+              <div className="bg-surface-secondary mb-1 flex items-center justify-between rounded-md px-2 py-1.5">
+                {npc.passivePerception != null && (
+                  <div
+                    className="flex items-center gap-1"
+                    title="Passive Perception"
+                  >
+                    <Eye size={11} className="text-accent-emerald-text" />
+                    <span className="text-muted text-[9px] tracking-wide uppercase">
+                      PP
+                    </span>
+                    <span className="text-heading text-xs font-bold">
+                      {npc.passivePerception}
+                    </span>
+                  </div>
+                )}
+                {npc.passivePerception != null &&
+                  npc.passiveInsight != null && (
+                    <div className="bg-divider mx-1 h-3 w-px" />
+                  )}
+                {npc.passiveInsight != null && (
+                  <div
+                    className="flex items-center gap-1"
+                    title="Passive Insight"
+                  >
+                    <Lightbulb size={11} className="text-accent-amber-text" />
+                    <span className="text-muted text-[9px] tracking-wide uppercase">
+                      PI
+                    </span>
+                    <span className="text-heading text-xs font-bold">
+                      {npc.passiveInsight}
+                    </span>
+                  </div>
+                )}
+                {(npc.passivePerception != null ||
+                  npc.passiveInsight != null) &&
+                  npc.passiveInvestigation != null && (
+                    <div className="bg-divider mx-1 h-3 w-px" />
+                  )}
+                {npc.passiveInvestigation != null && (
+                  <div
+                    className="flex items-center gap-1"
+                    title="Passive Investigation"
+                  >
+                    <Search size={11} className="text-accent-blue-text" />
+                    <span className="text-muted text-[9px] tracking-wide uppercase">
+                      PIv
+                    </span>
+                    <span className="text-heading text-xs font-bold">
+                      {npc.passiveInvestigation}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tags */}
+            <div className="mt-auto min-h-[18px]">
+              {npc.tags && npc.tags.length > 0 && (
+                <div
+                  role="list"
+                  aria-label="Tags"
+                  className="flex flex-wrap gap-1"
+                >
+                  {[...new Set(npc.tags)].map(tag => (
+                    <span
+                      key={tag}
+                      role="listitem"
+                      className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Vertical layout (no portrait) */
+        <div className="flex h-full flex-col p-4">
+          {/* Header */}
+          <div className="mb-2 flex items-start justify-between">
+            <div className="min-w-0">
               <Heading
                 id={headingId}
-                className="type-label-heading text-heading break-words"
+                className="text-heading truncate text-base font-semibold"
               >
                 {npc.name}
               </Heading>
-              {meta && <p className="type-small text-muted">{meta}</p>}
+              {stats && (
+                <p className="text-faint truncate text-xs">
+                  {stats.size} {stats.type}
+                </p>
+              )}
             </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                ref={viewRef}
-                aria-describedby={headingId}
-                onClick={onView}
-              >
-                View
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="px-2"
-                aria-label={`Edit ${npc.name}`}
-                onClick={onEdit}
-              >
-                <Edit3 size={16} aria-hidden="true" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="px-2"
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onDuplicate();
+                }}
+                className="text-muted hover:text-body rounded p-1 transition-colors"
                 aria-label={`Duplicate ${npc.name}`}
-                onClick={onDuplicate}
               >
-                <Copy size={16} aria-hidden="true" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="px-2"
+                <Copy size={14} />
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onMove();
+                }}
+                className="text-muted hover:text-accent-purple-text rounded p-1 transition-colors"
                 aria-label={moveLabel}
-                onClick={onMove}
               >
-                <ArrowLeftRight size={16} aria-hidden="true" />
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                className="px-2"
+                <ArrowLeftRight size={14} />
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="text-muted hover:text-body rounded p-1 transition-colors"
+                aria-label={`Edit ${npc.name}`}
+              >
+                <Edit3 size={14} />
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
                 aria-label={`Delete ${npc.name}`}
-                onClick={onDelete}
               >
-                <Trash2 size={16} aria-hidden="true" />
-              </Button>
+                <Trash2 size={14} />
+              </button>
             </div>
           </div>
-          {description && (
-            <p className="type-small text-body line-clamp-2">{description}</p>
-          )}
-          <p className="type-ui text-heading tabular-nums">
-            {creatureVitals(npc).join(' · ')}
+
+          <p
+            className="text-muted mb-2 line-clamp-2 min-h-[34px] text-sm leading-snug"
+            title={npc.description?.trim() || undefined}
+          >
+            {npc.description?.trim() || '\u00A0'}
           </p>
-          {passives.length > 0 && (
-            <p className="type-small text-muted">
-              {passives.map(({ label, value }, i) =>
-                i === 0 ? (
-                  <span key={label}>
-                    Passive {label}{' '}
-                    <span className="text-heading tabular-nums">{value}</span>
+
+          {/* CR + Prof badges */}
+          <div className="mb-2 flex flex-wrap gap-1">
+            {stats?.cr != null && (
+              <Badge
+                variant="outline"
+                size="sm"
+                className="rounded-full text-[10px]"
+              >
+                CR {stats.cr}
+              </Badge>
+            )}
+            {npc.proficiencyBonus != null && (
+              <Badge
+                variant="neutral"
+                size="sm"
+                className="rounded-full text-[10px]"
+              >
+                Prof +{npc.proficiencyBonus}
+              </Badge>
+            )}
+            {npc.spellcasting && (
+              <Badge
+                variant="info"
+                size="sm"
+                className="rounded-full text-[10px]"
+              >
+                Caster Lv{npc.spellcasting.casterLevel}
+              </Badge>
+            )}
+          </div>
+
+          {/* HP / AC / Speed */}
+          <div className="text-body flex flex-wrap gap-3 text-sm">
+            <span className="flex items-center gap-1">
+              <Heart size={12} className="text-accent-red-text" />
+              {npc.maxHp} HP
+            </span>
+            {npc.hitDice && (
+              <span className="text-faint text-xs">
+                HD {npc.hitDice.max}
+                {npc.hitDice.dieType}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Shield size={12} className="text-accent-blue-text" />
+              AC {npc.armorClass}
+              {parseAcBonus(npc.tempAc) !== 0
+                ? ` (+${parseAcBonus(npc.tempAc)})`
+                : ''}
+            </span>
+            <span className="flex items-center gap-1">
+              <Footprints size={12} className="text-muted" />
+              {npc.speed}
+            </span>
+          </div>
+
+          {/* Passive scores */}
+          {(npc.passivePerception != null ||
+            npc.passiveInsight != null ||
+            npc.passiveInvestigation != null) && (
+            <div className="bg-surface-secondary mt-2 flex items-center justify-between rounded-lg px-3 py-2">
+              {npc.passivePerception != null && (
+                <div
+                  className="flex items-center gap-1.5"
+                  title="Passive Perception"
+                >
+                  <Eye size={13} className="text-accent-emerald-text" />
+                  <span className="text-muted text-[10px] tracking-wide uppercase">
+                    Perception
                   </span>
-                ) : (
-                  <span key={label} className="hidden md:inline">
-                    {' · '}
-                    {label}{' '}
-                    <span className="text-heading tabular-nums">{value}</span>
+                  <span className="text-heading text-sm font-bold">
+                    {npc.passivePerception}
                   </span>
+                </div>
+              )}
+              {npc.passivePerception != null && npc.passiveInsight != null && (
+                <div className="bg-divider h-4 w-px" />
+              )}
+              {npc.passiveInsight != null && (
+                <div
+                  className="flex items-center gap-1.5"
+                  title="Passive Insight"
+                >
+                  <Lightbulb size={13} className="text-accent-amber-text" />
+                  <span className="text-muted text-[10px] tracking-wide uppercase">
+                    Insight
+                  </span>
+                  <span className="text-heading text-sm font-bold">
+                    {npc.passiveInsight}
+                  </span>
+                </div>
+              )}
+              {(npc.passivePerception != null || npc.passiveInsight != null) &&
+                npc.passiveInvestigation != null && (
+                  <div className="bg-divider h-4 w-px" />
+                )}
+              {npc.passiveInvestigation != null && (
+                <div
+                  className="flex items-center gap-1.5"
+                  title="Passive Investigation"
+                >
+                  <Search size={13} className="text-accent-blue-text" />
+                  <span className="text-muted text-[10px] tracking-wide uppercase">
+                    Investigation
+                  </span>
+                  <span className="text-heading text-sm font-bold">
+                    {npc.passiveInvestigation}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Ability scores */}
+          {npc.abilityScores && (
+            <div className="mt-3 grid grid-cols-6 gap-1">
+              {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(
+                ability => (
+                  <div key={ability} className="text-center">
+                    <span className="text-faint block text-[9px] font-medium uppercase">
+                      {ability}
+                    </span>
+                    <span className="text-body text-xs font-medium">
+                      {npc.abilityScores![ability]}
+                    </span>
+                  </div>
                 )
               )}
-            </p>
+            </div>
           )}
-          {tags.length > 0 && (
-            <ul aria-label="Tags" className="flex flex-wrap gap-1">
-              {tags.map(tag => (
-                <li key={tag}>
-                  <Badge variant="neutral" size="sm">
+
+          {/* Tags */}
+          <div className="mt-auto min-h-[18px]">
+            {npc.tags && npc.tags.length > 0 && (
+              <div
+                role="list"
+                aria-label="Tags"
+                className="flex flex-wrap gap-1"
+              >
+                {[...new Set(npc.tags)].map(tag => (
+                  <span
+                    key={tag}
+                    role="listitem"
+                    className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                  >
                     {tag}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      {reorder && (
-        <EquipmentReorderControls
-          name={npc.name}
-          index={reorder.index}
-          count={reorder.count}
-          onMove={reorder.onMove}
-        />
       )}
-    </>
+    </div>
   );
 }

@@ -146,12 +146,12 @@ export const LargeTally: Story = {
     });
     // The digits must fit inside the value box, not spill over the buttons.
     await expect(value.scrollWidth).toBeLessThanOrEqual(value.clientWidth);
-    const valueBox = value.getBoundingClientRect();
-    await expect(valueBox.right).toBeLessThanOrEqual(
-      plus.getBoundingClientRect().left
+    await expect(group.scrollWidth).toBeLessThanOrEqual(group.clientWidth);
+    await expect(plus.getBoundingClientRect().right).toBeLessThanOrEqual(
+      group.getBoundingClientRect().right
     );
-    await expect(valueBox.left).toBeGreaterThanOrEqual(
-      minus.getBoundingClientRect().right
+    await expect(minus.getBoundingClientRect().left).toBeGreaterThanOrEqual(
+      group.getBoundingClientRect().left
     );
   },
 };

@@ -291,12 +291,14 @@ describe('NpcLibrarySection', () => {
       .getByRole('heading', { level: 3, name: 'Brenn Ironhand' })
       .closest('li');
     expect(row).not.toBeNull();
-    expect(row!.closest('ul')).toHaveClass('divide-y');
+    expect(row!.closest('ul')).toHaveClass('grid');
 
     const section = screen
       .getByRole('heading', { level: 2, name: 'NPCs (2)' })
       .closest('section')!;
-    expect(section.querySelector('[class*="accent-"]')).toBeNull();
+    expect(
+      section.querySelector('.border-accent-purple-border')
+    ).toBeInTheDocument();
     expect(section.querySelector('[data-variant="primary"]')).toBeNull();
   });
 
@@ -309,9 +311,6 @@ describe('NpcLibrarySection', () => {
     render(<NpcLibrarySection campaignCode={CODE} />);
 
     fireEvent.click(screen.getByText('Runs the Rusty Anchor.'));
-    expect(screen.queryByRole('dialog')).toBeNull();
-
-    fireEvent.click(viewButton('Brenn Ironhand'));
     expect(
       screen.getByRole('dialog', { name: 'Brenn Ironhand' })
     ).toBeInTheDocument();

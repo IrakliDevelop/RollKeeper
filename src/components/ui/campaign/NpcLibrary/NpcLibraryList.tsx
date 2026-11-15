@@ -18,7 +18,7 @@ export interface NpcLibraryListProps {
   ) => Omit<NpcLibraryRowProps, 'npc' | 'headingLevel' | 'reorder'>;
 }
 
-/** The library's rows: one list, or one level-3 section per group. */
+/** Cards in one grid, or a level-3 section per group. */
 export function NpcLibraryList({
   flat,
   groups,
@@ -37,8 +37,8 @@ export function NpcLibraryList({
         items={npcs}
         keyExtractor={npc => npc.id}
         onReorder={(from, to) => onReorder(subsetIds, from, to)}
-        className="divide-divider divide-y"
-        itemClassName="group py-4 pointer-coarse:min-h-11"
+        className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+        itemClassName="group min-w-0 pointer-coarse:min-h-11"
         dragHandlePosition="right"
         renderItem={(npc, index) => (
           <NpcLibraryRow

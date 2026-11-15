@@ -253,7 +253,7 @@ export default function CampaignViewPage() {
       />
 
       {pageLayout === 'banner' && (
-        <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[100rem] px-4 pt-6 sm:px-6 lg:px-8">
           <CampaignBannerHero
             code={code}
             bannerUrl={bannerUrl}
@@ -273,7 +273,7 @@ export default function CampaignViewPage() {
 
       <main
         className={cn(
-          'mx-auto grid max-w-7xl gap-8 px-4 py-6 sm:px-6 lg:px-8',
+          'mx-auto grid max-w-[100rem] gap-8 px-4 py-6 sm:px-6 lg:px-8',
           'lg:grid-cols-[minmax(0,1fr)_17rem]',
           showRail && 'lg:grid-rows-[auto_1fr]'
         )}
