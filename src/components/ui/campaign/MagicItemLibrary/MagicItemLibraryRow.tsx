@@ -3,6 +3,7 @@
 import { useId } from 'react';
 import { Copy, Edit3, Gift, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { Card } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
 import { formatRarity } from '@/utils/formatRarity';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
@@ -43,68 +44,99 @@ export function MagicItemLibraryRow({
   }`;
 
   return (
-    <li className="py-4 pointer-coarse:min-h-11">
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-        <div className="min-w-0 flex-[1_1_14rem]">
-          <h3
-            id={headingId}
-            className="type-label-heading text-heading break-words"
-          >
-            {item.name}
-          </h3>
-          <p className="type-small text-muted">{meta}</p>
+    <li className="min-w-0 pointer-coarse:min-h-11">
+      <Card
+        padding="none"
+        className="flex h-full flex-col gap-3 p-4"
+        aria-labelledby={headingId}
+      >
+        <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-[1_1_14rem]">
+            <h3
+              id={headingId}
+              className="type-label-heading text-heading break-words"
+            >
+              {item.name}
+            </h3>
+            <p className="type-small text-muted">{meta}</p>
+          </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            ref={giveRef}
-            aria-describedby={headingId}
-            leftIcon={<Gift size={16} aria-hidden="true" />}
-            onClick={onGive}
-          >
-            Give copy
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="px-2"
-            aria-label={`Edit ${item.name}`}
-            onClick={onEdit}
-          >
-            <Edit3 size={16} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="px-2"
-            aria-label={`Duplicate ${item.name}`}
-            onClick={onDuplicate}
-          >
-            <Copy size={16} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            className="px-2"
-            aria-label={`Delete ${item.name}`}
-            onClick={onDelete}
-          >
-            <Trash2 size={16} aria-hidden="true" />
-          </Button>
+        {item.description.trim() && (
+          <p className="type-small text-body line-clamp-3 break-words whitespace-pre-line">
+            {item.description}
+          </p>
+        )}
+        {item.requiresAttunement && (
+          <p className="type-small text-muted">Requires attunement</p>
+        )}
+        {item.properties.length > 0 && (
+          <p className="type-small text-body break-words">
+            {item.properties.join(' · ')}
+          </p>
+        )}
+        {item.chargePool && (
+          <p className="type-small text-muted">
+            {item.chargePool.maxCharges} charges
+          </p>
+        )}
+        {item.charges?.map(charge => (
+          <p key={charge.id} className="type-small text-muted break-words">
+            {charge.name} · {charge.maxCharges} charges
+          </p>
+        ))}
+        {item.tags.length > 0 && (
+          <ul aria-label="Tags" className="mt-1 flex flex-wrap gap-1">
+            {item.tags.map(tag => (
+              <li key={tag}>
+                <Badge variant="neutral" size="sm">
+                  {tag}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="border-divider mt-auto border-t pt-3">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              ref={giveRef}
+              aria-describedby={headingId}
+              leftIcon={<Gift size={16} aria-hidden="true" />}
+              onClick={onGive}
+            >
+              Give copy
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-2"
+              aria-label={`Edit ${item.name}`}
+              onClick={onEdit}
+            >
+              <Edit3 size={16} aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-2"
+              aria-label={`Duplicate ${item.name}`}
+              onClick={onDuplicate}
+            >
+              <Copy size={16} aria-hidden="true" />
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="px-2"
+              aria-label={`Delete ${item.name}`}
+              onClick={onDelete}
+            >
+              <Trash2 size={16} aria-hidden="true" />
+            </Button>
+          </div>
         </div>
-      </div>
-      {item.tags.length > 0 && (
-        <ul aria-label="Tags" className="mt-1 flex flex-wrap gap-1">
-          {item.tags.map(tag => (
-            <li key={tag}>
-              <Badge variant="neutral" size="sm">
-                {tag}
-              </Badge>
-            </li>
-          ))}
-        </ul>
-      )}
+      </Card>
     </li>
   );
 }

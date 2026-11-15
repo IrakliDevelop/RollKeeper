@@ -117,7 +117,7 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
   /** Put on the Create button that is rendered. */
   fallbackRef: RefObject<HTMLButtonElement | null>;
   /** The same callback for the same id. */
-  registerTarget: (id: string) => (el: HTMLButtonElement | null) => void;
+  registerTarget: (id: string) => (el: HTMLElement | null) => void;
   removeThenFocus: (
     id: string,
     visibleIds: readonly string[],
@@ -127,10 +127,8 @@ export function useFocusAfterRemove(presentIds: readonly string[]): {
   focusWhenPresent: (id: string) => void;
 } {
   const fallbackRef = useRef<HTMLButtonElement | null>(null);
-  const targets = useRef(new Map<string, HTMLButtonElement>());
-  const callbacks = useRef(
-    new Map<string, (el: HTMLButtonElement | null) => void>()
-  );
+  const targets = useRef(new Map<string, HTMLElement>());
+  const callbacks = useRef(new Map<string, (el: HTMLElement | null) => void>());
   const recheckTimer = useRef<number | undefined>(undefined);
   const [pending, setPending] = useState<{
     removedId: string;

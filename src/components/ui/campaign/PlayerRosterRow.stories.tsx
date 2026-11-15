@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, within, userEvent } from 'storybook/test';
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { CampaignPlayerData } from '@/types/campaign';
@@ -75,7 +75,24 @@ const meta: Meta<typeof PlayerRosterRow> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Healthy: Story = {};
+export const Healthy: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const view = canvas.getByRole('button', { name: 'Thorin' });
+    const hp = canvas.getByText(/44 \/ 44 HP/);
+    const box = hp.getBoundingClientRect();
+    await expect(
+      document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2
+      )
+    ).toBe(view);
+    await expect(view.querySelector('button')).toBeNull();
+    view.focus();
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onView).toHaveBeenCalled();
+  },
+};
 
 export const Bloodied: Story = {
   args: {
@@ -146,12 +163,12 @@ export const LargeTally: Story = {
     });
     // The digits must fit inside the value box, not spill over the buttons.
     await expect(value.scrollWidth).toBeLessThanOrEqual(value.clientWidth);
-    const valueBox = value.getBoundingClientRect();
-    await expect(valueBox.right).toBeLessThanOrEqual(
-      plus.getBoundingClientRect().left
+    await expect(group.scrollWidth).toBeLessThanOrEqual(group.clientWidth);
+    await expect(plus.getBoundingClientRect().right).toBeLessThanOrEqual(
+      group.getBoundingClientRect().right
     );
-    await expect(valueBox.left).toBeGreaterThanOrEqual(
-      minus.getBoundingClientRect().right
+    await expect(minus.getBoundingClientRect().left).toBeGreaterThanOrEqual(
+      group.getBoundingClientRect().left
     );
   },
 };

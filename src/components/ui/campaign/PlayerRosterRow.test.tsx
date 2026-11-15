@@ -19,6 +19,7 @@ vi.mock('next/image', () => ({
     const rest = { ...props };
     delete rest.fill;
     delete rest.priority;
+    delete rest.unoptimized;
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...rest} />;
   },
@@ -81,19 +82,21 @@ describe('PlayerRosterRow', () => {
   });
   afterEach(cleanup);
 
-  it('is a plain list row', () => {
+  it('keeps the character card in a list item', () => {
     renderRow();
     const row = screen.getByTestId('player-row-player-1');
     expect(row.tagName).toBe('LI');
     expect(row).not.toHaveAttribute('role');
     expect(
       screen.getByRole('heading', { level: 3, name: 'Thorin' })
-    ).toHaveClass('break-words');
+    ).toHaveClass('truncate');
   });
 
   it('shows race, class, level and the player', () => {
     renderRow();
-    expect(screen.getByText('Dwarf Fighter 5 · Alice')).toBeInTheDocument();
+    for (const text of ['Dwarf', 'Fighter', 'Lv. 5', 'Alice']) {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
   });
 
   it('falls back to Level {n} and drops an unknown race', () => {
@@ -103,27 +106,27 @@ describe('PlayerRosterRow', () => {
         class: { ...mockPlayer.characterData.class, name: '' },
       })
     );
-    expect(screen.getByText('Level 5 · Alice')).toBeInTheDocument();
+    expect(screen.getByText('Lv. 5')).toBeInTheDocument();
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.queryByText('Dwarf')).toBeNull();
   });
 
   it('displays HP as a readout with the status word', () => {
     renderRow();
-    expect(screen.getByText('30')).toBeInTheDocument();
-    expect(screen.getByText('/ 44 HP')).toBeInTheDocument();
+    expect(screen.getByText(/30 \/ 44 HP/)).toBeInTheDocument();
     expect(screen.getByText('Bloodied')).toBeInTheDocument();
   });
 
   it('shows AC and passive scores as words', () => {
     renderRow();
-    expect(screen.getByText(/^AC/)).toHaveTextContent('AC 16');
-    const passives = screen.getByText(/^Passive Perception/);
-    expect(passives).toHaveTextContent(
-      /^Passive Perception \d+ · Insight \d+ · Investigation \d+$/
-    );
-    expect(within(passives).getByText(/Insight/)).toHaveClass(
-      'hidden',
-      'md:inline'
-    );
+    expect(screen.getByText('16 AC')).toBeInTheDocument();
+    for (const label of [
+      'Passive Perception',
+      'Passive Insight',
+      'Passive Investigation',
+    ]) {
+      expect(screen.getByTitle(label)).toHaveTextContent(/\d+/);
+    }
   });
 
   it('shows inspiration only when held', () => {
@@ -172,8 +175,8 @@ describe('PlayerRosterRow', () => {
     expect(
       screen.getByText('Exhaustion').closest('[data-kind]')
     ).toHaveTextContent('Exhaustionx2');
-    expect(screen.getByText('Exhaustion').closest('li')).not.toBe(
-      screen.getByTestId('player-row-player-1')
+    expect(screen.getByTestId('player-row-player-1')).toContainElement(
+      screen.getByText('Exhaustion').closest<HTMLElement>('[data-kind]')
     );
   });
 

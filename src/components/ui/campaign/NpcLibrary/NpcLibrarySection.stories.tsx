@@ -156,14 +156,10 @@ export const Flat: Story = {
     await expect(canvas.getAllByRole('button', { name: 'View' })).toHaveLength(
       3
     );
+    await expect(canvas.getByText('CR 2')).toBeInTheDocument();
     await expect(
-      canvas.getByText('AC 15 (+2) · 44 HP · Speed 30 ft.')
-    ).toBeInTheDocument();
-    await expect(
-      canvasElement.querySelectorAll(
-        '[class*="accent-"], [data-variant="primary"]'
-      )
-    ).toHaveLength(0);
+      canvasElement.querySelectorAll('.border-accent-purple-border')
+    ).toHaveLength(3);
   },
 };
 
@@ -209,10 +205,19 @@ export const Portraits: Story = {
   globals: { viewport: { value: 'landscape', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const portrait = canvas.getByRole('button', {
-      name: 'View Brenn Ironhand image full size',
+    const image = canvas.getByRole('img', { name: 'Brenn Ironhand' });
+    const view = canvas.getByRole('button', {
+      name: 'View',
+      description: 'Brenn Ironhand',
     });
-    await expect(portrait.querySelector('img')).toHaveAttribute('alt', '');
+    const imageBox = image.getBoundingClientRect();
+    await expect(
+      document.elementFromPoint(
+        imageBox.left + imageBox.width / 2,
+        imageBox.top + imageBox.height / 2
+      )
+    ).toBe(view);
+    await expect(view.querySelector('button')).toBeNull();
   },
 };
 
@@ -283,7 +288,7 @@ export const Phone: Story = {
       level: 3,
       name: BARTHOLOMEW_NAME,
     });
-    await expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
+    await expect(name).toHaveClass('truncate');
     for (const button of canvas.getAllByRole('button')) {
       await expect(button.getBoundingClientRect().right).toBeLessThanOrEqual(
         window.innerWidth
