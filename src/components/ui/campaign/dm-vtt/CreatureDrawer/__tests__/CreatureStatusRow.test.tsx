@@ -64,6 +64,36 @@ function baseProps(
 }
 
 describe('CreatureStatusRow', () => {
+  it('renders a "Status" level-4 heading', () => {
+    render(<CreatureStatusRow {...baseProps()} />);
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Status' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the concentration row with the spell and CON save', () => {
+    render(
+      <CreatureStatusRow
+        {...baseProps({
+          entity: makeEntity({
+            concentrationSpell: 'Bless',
+            monsterStatBlock: {
+              str: 10,
+              dex: 10,
+              con: 14,
+              int: 10,
+              wis: 10,
+              cha: 10,
+            } as never,
+          }),
+        })}
+      />
+    );
+    const row = screen.getByRole('status', { name: 'Concentration' });
+    expect(row).toHaveTextContent('Concentrating on Bless');
+    expect(row).toHaveTextContent('CON save +2');
+  });
+
   it('shows no concentration banner when not concentrating', () => {
     render(<CreatureStatusRow {...baseProps()} />);
     expect(screen.queryByText(/concentrating on/i)).not.toBeInTheDocument();
@@ -160,7 +190,7 @@ describe('CreatureStatusRow', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows Spend Hit Die and heals + updates hit dice on click', () => {
+  it('shows Spend hit die and heals + updates hit dice on click', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const actions = makeActions();
     render(
@@ -175,14 +205,16 @@ describe('CreatureStatusRow', () => {
         })}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /spend hit die/i }));
+    const spend = screen.getByRole('button', { name: 'Spend hit die (d8)' });
+    expect(spend).toHaveAttribute('data-variant', 'secondary');
+    fireEvent.click(spend);
     expect(actions.onHeal).toHaveBeenCalledWith('e1', 5);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
       hitDice: { current: 1, max: 4, dieType: 'd8' },
     });
   });
 
-  it('hides Spend Hit Die when no hit dice remain', () => {
+  it('hides Spend hit die when no hit dice remain', () => {
     render(
       <CreatureStatusRow
         {...baseProps({

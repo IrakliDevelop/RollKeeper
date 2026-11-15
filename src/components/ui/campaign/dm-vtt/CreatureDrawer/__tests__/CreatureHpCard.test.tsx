@@ -62,6 +62,26 @@ function baseProps(
 }
 
 describe('CreatureHpCard', () => {
+  it('renders a "Hit points" level-4 heading', () => {
+    render(<CreatureHpCard {...baseProps()} />);
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Hit points' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps current, slash and max HP alone in one element (e2e 13/13)', () => {
+    render(
+      <CreatureHpCard
+        {...baseProps({
+          entity: makeEntity({ currentHp: 13, maxHp: 13, tempHp: 5 }),
+        })}
+      />
+    );
+    expect(screen.getAllByText('13')[0].parentElement).toHaveTextContent(
+      /^13\/13$/
+    );
+  });
+
   it('shows current/max HP', () => {
     render(<CreatureHpCard {...baseProps()} />);
     expect(screen.getByText('10')).toBeInTheDocument();
@@ -129,19 +149,19 @@ describe('CreatureHpCard', () => {
     const user = userEvent.setup();
     const actions = makeActions();
     render(<CreatureHpCard {...baseProps({ actions, editing: true })} />);
-    const input = screen.getByLabelText('Max HP');
+    const input = screen.getByRole('textbox', { name: 'Max HP' });
     await user.clear(input);
-    await user.type(input, '25{Enter}');
-    expect(actions.onSetMaxHp).toHaveBeenCalledExactlyOnceWith('e1', 25);
+    await user.type(input, '50{Enter}');
+    expect(actions.onSetMaxHp).toHaveBeenCalledExactlyOnceWith('e1', 50);
   });
 
   it('reverts max HP on Escape without committing', async () => {
     const user = userEvent.setup();
     const actions = makeActions();
     render(<CreatureHpCard {...baseProps({ actions, editing: true })} />);
-    const input = screen.getByLabelText('Max HP');
+    const input = screen.getByRole('textbox', { name: 'Max HP' });
     await user.clear(input);
-    await user.type(input, '99{Escape}');
+    await user.type(input, '50{Escape}');
     expect(input).toHaveValue('20');
     await user.tab();
     expect(actions.onSetMaxHp).not.toHaveBeenCalled();
@@ -167,14 +187,17 @@ describe('CreatureHpCard', () => {
     expect(screen.getByLabelText('Max HP')).toHaveValue('30');
   });
 
-  it('clears temp HP via the pill button', () => {
+  it('shows temp HP with a ghost clear button', () => {
     const actions = makeActions();
     render(
       <CreatureHpCard
         {...baseProps({ actions, entity: makeEntity({ tempHp: 5 }) })}
       />
     );
-    fireEvent.click(screen.getByLabelText('Clear temp HP'));
+    expect(screen.getByText('+5 temp')).toBeInTheDocument();
+    const clear = screen.getByRole('button', { name: 'Clear temp HP' });
+    expect(clear).toHaveAttribute('data-variant', 'ghost');
+    fireEvent.click(clear);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', { tempHp: 0 });
   });
 });

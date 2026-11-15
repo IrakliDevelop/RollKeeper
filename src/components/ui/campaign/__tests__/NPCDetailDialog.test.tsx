@@ -931,3 +931,38 @@ describe('NPCDetailDialog — Inventory tab', () => {
     });
   });
 });
+
+describe('NPCDetailDialog — portrait lightbox', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('Escape closes only the portrait lightbox', async () => {
+    const { onOpenChange } = setup(
+      makeNpc({ avatarUrl: 'data:image/png;base64,cG9ydHJhaXQ=' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View Merchant Mo image full size' })
+    );
+    expect(
+      screen.getByRole('dialog', { name: /merchant mo full-size image/i })
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: 'Escape',
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: /full-size image/i })
+      ).toBeNull()
+    );
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('dialog', { name: 'Merchant Mo' })
+    ).toBeInTheDocument();
+  });
+});

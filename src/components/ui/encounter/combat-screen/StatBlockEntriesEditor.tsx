@@ -3,7 +3,11 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { NumberField } from '@/components/ui/forms/NumberInput';
+import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Textarea } from '@/components/ui/forms/textarea';
+import { Section } from '@/components/ui/layout/section';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import {
   parseAttackTokens,
   replaceDamage,
@@ -19,9 +23,6 @@ interface StatBlockEntriesEditorProps {
   entries: StatBlockEntry[];
   onChange: (entries: StatBlockEntry[]) => void;
 }
-
-const FIELD_BASE =
-  'border-divider bg-surface-secondary rounded-[10px] border-[1.5px] px-3 py-2 text-sm focus:outline-none';
 
 const TO_HIT_PATTERN = /^[+-]?\d+$/;
 const DAMAGE_PATTERN = /^\d+d\d+(\s*[+-]\s*\d+)?$/;
@@ -88,23 +89,25 @@ function AttackQuickFields({
   return (
     <div className="flex items-center gap-2">
       {toHit !== null && (
-        <input
+        <Input
           key={toHit}
+          size="sm"
           aria-label={`${title} entry to hit`}
           defaultValue={toHit}
           onBlur={handleToHitBlur}
           placeholder="+0"
-          className={`${FIELD_BASE} w-20 shrink-0`}
+          wrapperClassName="w-20 shrink-0"
         />
       )}
       {damage !== null && (
-        <input
+        <Input
           key={damage}
+          size="sm"
           aria-label={`${title} entry damage`}
           defaultValue={damage}
           onBlur={handleDamageBlur}
           placeholder="1d6"
-          className={`${FIELD_BASE} min-w-0 flex-1`}
+          wrapperClassName="min-w-0 flex-1"
         />
       )}
     </div>
@@ -134,68 +137,77 @@ export function StatBlockEntriesEditor({
   };
 
   return (
-    <div className="space-y-2">
-      <h5 className="text-muted text-[11px] font-extrabold tracking-wider uppercase">
-        {title}
-      </h5>
-      {/* Controlled list, never reordered — index key is safe here. */}
-      {entries.map((entry, i) => {
-        const plainText = statBlockHtmlToPlainText(entry.text);
+    <TooltipProvider>
+      <Section heading={title} level={4} contentClassName="space-y-2">
+        <ul className="divide-divider divide-y">
+          {entries.map((entry, i) => {
+            const plainText = statBlockHtmlToPlainText(entry.text);
+            const trimmedName = entry.name.trim();
+            const deleteLabel = trimmedName
+              ? `Delete ${trimmedName}`
+              : `Delete unnamed ${title} entry`;
 
-        return (
-          <div
-            key={i}
-            className="border-divider bg-surface-raised space-y-2 rounded-[12px] border-[1.5px] p-3"
-          >
-            <div className="flex items-center gap-2">
-              <input
-                aria-label={`${title} entry name`}
-                value={entry.name}
-                onChange={e => update(i, { name: e.target.value })}
-                placeholder="Name"
-                className={`${FIELD_BASE} min-w-0 flex-1 font-semibold`}
-              />
-              <NumberField
-                aria-label={`${title} entry uses`}
-                value={entry.uses}
-                onChange={v => update(i, { uses: v })}
-                allowEmpty
-                min={0}
-                placeholder="Uses"
-                className={`${FIELD_BASE} w-20 shrink-0`}
-              />
-              <button
-                aria-label="Delete entry"
-                onClick={() => remove(i)}
-                className="text-muted hover:text-accent-red-text shrink-0 p-1.5 transition-colors"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-            <AttackQuickFields
-              title={title}
-              plainText={plainText}
-              onTextChange={text => update(i, { text })}
-            />
-            <textarea
-              aria-label={`${title} entry text`}
-              value={plainText}
-              onChange={e => update(i, { text: e.target.value })}
-              placeholder="Description"
-              rows={3}
-              className={`${FIELD_BASE} w-full resize-y`}
-            />
-          </div>
-        );
-      })}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onChange([...entries, { name: '', text: '' }])}
-        leftIcon={<Plus size={14} />}
-      >
-        Add {title} entry
-      </Button>
-    </div>
+            return (
+              // `id` is optional and unset on rows added here until the store
+              // normalises them; keying by it would remount a row mid-edit, so
+              // the index is the key.
+              <li key={i} className="space-y-2 py-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    size="sm"
+                    aria-label={`${title} entry name`}
+                    value={entry.name}
+                    onChange={e => update(i, { name: e.target.value })}
+                    placeholder="Name"
+                    wrapperClassName="min-w-0 flex-1"
+                  />
+                  <NumberInput
+                    size="sm"
+                    aria-label={`${title} entry uses`}
+                    value={entry.uses}
+                    onChange={v => update(i, { uses: v })}
+                    allowEmpty
+                    min={0}
+                    placeholder="Uses"
+                    wrapperClassName="w-20 shrink-0"
+                  />
+                  <Tooltip content={deleteLabel}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-9 shrink-0 px-0"
+                      aria-label={deleteLabel}
+                      onClick={() => remove(i)}
+                    >
+                      <Trash2 size={16} aria-hidden />
+                    </Button>
+                  </Tooltip>
+                </div>
+                <AttackQuickFields
+                  title={title}
+                  plainText={plainText}
+                  onTextChange={text => update(i, { text })}
+                />
+                <Textarea
+                  aria-label={`${title} entry text`}
+                  value={plainText}
+                  onChange={e => update(i, { text: e.target.value })}
+                  placeholder="Description"
+                  rows={3}
+                />
+              </li>
+            );
+          })}
+        </ul>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onChange([...entries, { name: '', text: '' }])}
+          leftIcon={<Plus size={14} />}
+        >
+          Add {title} entry
+        </Button>
+      </Section>
+    </TooltipProvider>
   );
 }

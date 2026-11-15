@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
+
 import { QuickCombatStrip } from './QuickCombatStrip';
 
 const meta: Meta<typeof QuickCombatStrip> = {
@@ -16,6 +18,15 @@ const meta: Meta<typeof QuickCombatStrip> = {
     onIncrement: fn(),
     onDecrement: fn(),
   },
+  // The strip's Tooltips need the provider PlayerVttScreen wraps around the
+  // floating panels.
+  decorators: [
+    Story => (
+      <TooltipProvider>
+        <Story />
+      </TooltipProvider>
+    ),
+  ],
 };
 export default meta;
 
@@ -24,7 +35,7 @@ type Story = StoryObj<typeof QuickCombatStrip>;
 export const ReactionAvailable: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const reaction = canvas.getByRole('button', { name: /use reaction/i });
+    const reaction = canvas.getByRole('button', { name: /reaction used/i });
     await expect(reaction).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(reaction);
     await expect(args.onToggleReaction).toHaveBeenCalledTimes(1);
@@ -35,11 +46,8 @@ export const ReactionUsed: Story = {
   args: { hasUsedReaction: true },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const reaction = canvas.getByRole('button', {
-      name: /reaction used — tap to reset/i,
-    });
+    const reaction = canvas.getByRole('button', { name: /reaction used/i });
     await expect(reaction).toHaveAttribute('aria-pressed', 'true');
-    await expect(reaction).toHaveTextContent(/used/i);
     await userEvent.click(reaction);
     await expect(args.onToggleReaction).toHaveBeenCalledTimes(1);
   },

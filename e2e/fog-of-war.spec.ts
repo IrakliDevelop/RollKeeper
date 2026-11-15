@@ -109,8 +109,9 @@ test('DM opts in, authors fog, previews players, and reloads persisted fog', asy
   const fogAppearance = options.getByRole('combobox', {
     name: 'Fog appearance',
   });
-  await fogAppearance.selectOption('cloudy');
-  await expect(fogAppearance).toHaveValue('cloudy');
+  await fogAppearance.click();
+  await page.getByRole('option', { name: 'Cloudy' }).click();
+  await expect(fogAppearance).toHaveText('Cloudy');
   await expect
     .poll(async () =>
       page.evaluate(
@@ -163,7 +164,7 @@ test('DM opts in, authors fog, previews players, and reloads persisted fog', asy
   ).toHaveAttribute('aria-checked', 'false');
   await expect(
     page.getByRole('combobox', { name: 'Fog appearance' })
-  ).toHaveValue('cloudy');
+  ).toHaveText('Cloudy');
 });
 
 test('fog controls meet the touch target and a touch brush gesture persists', async ({

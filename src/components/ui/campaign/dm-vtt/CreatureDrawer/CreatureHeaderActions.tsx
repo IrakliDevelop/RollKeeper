@@ -5,6 +5,7 @@ import { Coffee, Eye, Moon, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
@@ -28,6 +29,8 @@ export function CreatureHeaderActions({
   const isLair = entity.type === 'lair';
   const npcSourceId = entity.npcSourceId;
   const onViewNPC = actions.onViewNPC;
+  const removeLabel = `Remove ${entity.name} from combat`;
+  const viewLabel = `View ${entity.name} in NPC library`;
 
   const handleRemove = async () => {
     const confirmed = await confirmDialog({
@@ -53,55 +56,64 @@ export function CreatureHeaderActions({
         <Button
           variant="ghost"
           size="sm"
+          className="w-9 shrink-0 px-0"
           onClick={onClose}
           aria-label="Close sheet"
         >
-          <X className="h-4 w-4" />
+          <X size={16} aria-hidden />
         </Button>
       </div>
 
       <div className="flex items-center gap-1">
         {!isLair && (
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => actions.onShortRest(entity.id)}
-              aria-label="Short rest"
-              title="Short rest"
-            >
-              <Coffee className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => actions.onLongRest(entity.id)}
-              aria-label="Long rest"
-              title="Long rest"
-            >
-              <Moon className="h-3.5 w-3.5" />
-            </Button>
+            <Tooltip content="Short rest">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-9 shrink-0 px-0"
+                onClick={() => actions.onShortRest(entity.id)}
+                aria-label="Short rest"
+              >
+                <Coffee size={16} aria-hidden />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Long rest">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-9 shrink-0 px-0"
+                onClick={() => actions.onLongRest(entity.id)}
+                aria-label="Long rest"
+              >
+                <Moon size={16} aria-hidden />
+              </Button>
+            </Tooltip>
           </>
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRemove}
-          aria-label={`Remove ${entity.name} from combat`}
-          title={`Remove ${entity.name} from combat`}
-        >
-          <Trash2 className="text-accent-red-text h-3.5 w-3.5" />
-        </Button>
-        {npcSourceId && onViewNPC && (
+        <Tooltip content={removeLabel}>
           <Button
-            variant="ghost"
+            variant="danger"
             size="sm"
-            onClick={() => onViewNPC(npcSourceId, entity.id)}
-            aria-label={`View ${entity.name} in NPC library`}
-            title={`View ${entity.name} in NPC library`}
+            className="w-9 shrink-0 px-0"
+            onClick={handleRemove}
+            aria-label={removeLabel}
           >
-            <Eye className="h-3.5 w-3.5" />
+            <Trash2 size={16} aria-hidden />
           </Button>
+        </Tooltip>
+        {npcSourceId && onViewNPC && (
+          <Tooltip content={viewLabel}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-9 shrink-0 px-0"
+              onClick={() => onViewNPC(npcSourceId, entity.id)}
+              aria-label={viewLabel}
+            >
+              <Eye size={16} aria-hidden />
+            </Button>
+          </Tooltip>
         )}
       </div>
     </div>

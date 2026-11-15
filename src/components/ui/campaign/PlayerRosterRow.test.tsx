@@ -265,7 +265,7 @@ describe('PlayerRosterRow', () => {
     expect(
       screen.getByRole('dialog', { name: /thorin full-size image/i })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /close image/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(onView).not.toHaveBeenCalled();
   });

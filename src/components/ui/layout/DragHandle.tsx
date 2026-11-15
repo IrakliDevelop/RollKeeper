@@ -6,18 +6,15 @@ import { GripVertical } from 'lucide-react';
 interface DragHandleProps {
   isDragEnabled?: boolean;
   className?: string;
-  size?: number;
-  color?: string;
 }
 
 /**
- * Reusable drag handle component with consistent styling
+ * Grip icon for a draggable row. It is a mouse-only affordance (the row is the
+ * drag source), so it is hidden from assistive tech and carries no tooltip.
  */
 export default function DragHandle({
   isDragEnabled = true,
   className = '',
-  size = 16,
-  color = 'text-gray-400',
 }: DragHandleProps) {
   if (!isDragEnabled) {
     return null;
@@ -25,12 +22,12 @@ export default function DragHandle({
 
   return (
     <div
-      className={`flex cursor-grab items-center justify-center transition-colors duration-200 active:cursor-grabbing ${className}`}
-      title="Drag to reorder"
+      aria-hidden
+      className={`flex cursor-grab items-center justify-center active:cursor-grabbing ${className}`}
     >
       <GripVertical
-        size={size}
-        className={`${color} transition-colors duration-200 hover:text-gray-600`}
+        size={16}
+        className="text-muted hover:text-heading transition-colors duration-120"
       />
     </div>
   );

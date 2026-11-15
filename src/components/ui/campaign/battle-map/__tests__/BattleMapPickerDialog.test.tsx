@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  within,
+} from '@testing-library/react';
 
 import { BattleMapPickerDialog } from '../BattleMapPickerDialog';
 import { useBattleMapStore } from '@/store/battleMapStore';
@@ -161,9 +167,29 @@ describe('BattleMapPickerDialog', () => {
   it('shows an empty-state message when the campaign has no battle maps', () => {
     renderDialog();
     expect(
-      screen.getByText(
-        'No battle maps in this campaign yet — create one below.'
-      )
+      screen.getByText('No battle maps yet. Name one below to create it.')
     ).toBeInTheDocument();
+  });
+
+  it('titles the dialog "Battle map"', () => {
+    renderDialog();
+    expect(
+      screen.getByRole('heading', { name: 'Battle map' })
+    ).toBeInTheDocument();
+  });
+
+  it('uses the Goblin ambush placeholder in the name field', () => {
+    renderDialog();
+    expect(screen.getByLabelText('New battle map name')).toHaveAttribute(
+      'placeholder',
+      'Goblin ambush'
+    );
+  });
+
+  it('renders the maps as listitems of one list', () => {
+    seed([map('m1'), map('m2', ['e1'])]);
+    renderDialog();
+    const list = screen.getByRole('list');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
   });
 });

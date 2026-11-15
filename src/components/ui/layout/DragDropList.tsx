@@ -53,6 +53,7 @@ export default function DragDropList<T>({
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    draggedIndex,
     getDragOverStyles,
     getDraggedStyles,
   } = useDragAndDrop({ onReorder, disabled: !canDrag });
@@ -70,12 +71,12 @@ export default function DragDropList<T>({
         const key = keyExtractor(item, index);
         const dragOverStyles = getDragOverStyles(index);
         const draggedStyles = getDraggedStyles(index);
-        const isDragging = draggedStyles.includes('opacity-50');
+        const isDragging = draggedIndex === index;
 
         return (
           <Item
             key={key}
-            className={` ${itemClassName} ${dragOverStyles} ${draggedStyles} transition-all duration-200`}
+            className={`${itemClassName} ${dragOverStyles} ${draggedStyles} transition-colors duration-120`}
             draggable={canDrag}
             onDragStart={canDrag ? e => handleDragStart(e, index) : undefined}
             onDragEnd={canDrag ? handleDragEnd : undefined}
@@ -87,7 +88,7 @@ export default function DragDropList<T>({
               <div className="relative h-full">
                 {renderItem(item, index, isDragging)}
                 <div
-                  className={`absolute z-10 opacity-40 transition-opacity group-hover:opacity-80 hover:!opacity-100 ${
+                  className={`absolute z-10 ${
                     dragHandlePosition === 'right'
                       ? 'right-1.5 bottom-1.5'
                       : 'bottom-1.5 left-1.5'

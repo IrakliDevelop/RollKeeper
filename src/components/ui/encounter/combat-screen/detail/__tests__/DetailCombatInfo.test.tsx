@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { DetailCombatInfo } from '../DetailCombatInfo';
 import type { EncounterEntity, MonsterStatBlock } from '@/types/encounter';
@@ -108,5 +109,41 @@ describe('DetailCombatInfo', () => {
     expect(screen.getByText('Str +5')).toBeInTheDocument();
     // Empty values (e.g. blank Skills) are hidden entirely, label included.
     expect(screen.queryByText('Skills')).not.toBeInTheDocument();
+  });
+
+  it('commits passive perception on Enter or blur, never per keystroke', async () => {
+    const user = userEvent.setup();
+    const entity = makeEntity({ monsterStatBlock: makeStatBlock() });
+    const actions = makeActions();
+    render(<DetailCombatInfo entity={entity} actions={actions} />);
+
+    const field = screen.getByLabelText('Passive perception');
+    await user.clear(field);
+    await user.type(field, '17');
+    expect(actions.onUpdate).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
+    expect(actions.onUpdate).toHaveBeenCalledTimes(1);
+    expect(actions.onUpdate).toHaveBeenCalledWith(
+      'e1',
+      expect.objectContaining({
+        monsterStatBlock: expect.objectContaining({ passivePerception: 17 }),
+      })
+    );
+
+    cleanup();
+    const blurActions = makeActions();
+    render(<DetailCombatInfo entity={entity} actions={blurActions} />);
+    const second = screen.getByLabelText('Passive perception');
+    await user.clear(second);
+    await user.type(second, '9');
+    expect(blurActions.onUpdate).not.toHaveBeenCalled();
+    await user.tab();
+    expect(blurActions.onUpdate).toHaveBeenCalledTimes(1);
+    expect(blurActions.onUpdate).toHaveBeenCalledWith(
+      'e1',
+      expect.objectContaining({
+        monsterStatBlock: expect.objectContaining({ passivePerception: 9 }),
+      })
+    );
   });
 });

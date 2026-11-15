@@ -7,6 +7,7 @@ import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import type { DmLocationEditorState } from '@/components/ui/campaign/location-map/DmLocationEditor.hooks';
 import type { LocationMap } from '@/types/location';
+import type { BattleMap } from '@/types/battlemap';
 
 const setViewportFogStyle = vi.hoisted(() => vi.fn());
 
@@ -45,6 +46,12 @@ vi.mock('../DmLocationToolbar', () => ({
 
 vi.mock('../DmLocationToolOptions', () => ({
   default: vi.fn(() => null),
+}));
+
+// The real bar runs useBattleMapMovement against the viewport, which the
+// fake viewport here cannot back.
+vi.mock('../BattleMapMovement', () => ({
+  BattleMapMovement: () => <div data-testid="movement-bar" />,
 }));
 
 vi.mock('@/components/ui/forms/CompactRichTextEditor', () => ({
@@ -293,4 +300,96 @@ describe('DmLocationEditor wiring', () => {
     );
     expect(screen.getByRole('status')).toHaveTextContent('Marker saved');
   });
+  it('sync error is one alert line', () => {
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({ syncError: 'Sync failed with status 500' })
+    );
+    renderEditor();
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(
+      "Couldn't sync to players. They still see the last synced map. Try Sync to players again."
+    );
+    expect(alert).not.toHaveTextContent('500');
+  });
+
+  it('Show layers opener', async () => {
+    const user = userEvent.setup();
+    const setLayersPanelOpen = vi.fn();
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({ layersPanelOpen: false, setLayersPanelOpen })
+    );
+    renderEditor();
+
+    const opener = screen.getByRole('button', { name: 'Show layers' });
+    expect(opener).toHaveAttribute('data-variant', 'secondary');
+    expect(opener).not.toHaveAttribute('title');
+    await user.click(opener);
+    expect(setLayersPanelOpen).toHaveBeenCalledWith(true);
+  });
+
+  it('upload status', () => {
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({ imageUploading: true })
+    );
+    renderEditor();
+
+    // ToastContainer renders its own status region, so anchor on the text.
+    expect(
+      screen.getByText('Uploading image…').closest('[role="status"]')
+    ).not.toBeNull();
+  });
+
+  it('arranging notice', () => {
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({ arrangeMapsActive: true })
+    );
+    renderEditor();
+
+    const notice = screen.getByText('Arranging maps — other layers are locked');
+    expect(notice).not.toHaveAttribute('role');
+
+    // Same anchor as the movement bar: the notice lives in the canvas
+    // column, so it centres over the map and never covers the open layers
+    // panel that shares the outer container.
+    const canvasColumn = notice.parentElement!;
+    const sharedContainer = screen.getByRole('button', {
+      name: 'Show layers',
+    }).parentElement!;
+    expect(canvasColumn).not.toBe(sharedContainer);
+    expect(canvasColumn.parentElement).toBe(sharedContainer);
+  });
+
+  it('movement bar floats over the canvas', () => {
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({ mode: 'battlemap' })
+    );
+    const { container } = renderEditor({
+      ...baseLocation,
+      linkedEncounterIds: [],
+    } as unknown as BattleMap);
+
+    // The bar sits in the canvas column, not in the shared container that
+    // also holds the in-flow layers panel — so it never paints over the panel.
+    const wrapper = screen.getByTestId('movement-bar').parentElement!;
+    const canvasColumn = wrapper.parentElement!;
+    const sharedContainer = screen.getByRole('button', {
+      name: 'Show layers',
+    }).parentElement!;
+    expect(canvasColumn).not.toBe(sharedContainer);
+    expect(canvasColumn.parentElement).toBe(sharedContainer);
+    expect(canvasColumn).not.toBe(container.firstElementChild);
+  });
 });
+
+function renderEditor(location: LocationMap | BattleMap = baseLocation) {
+  return render(
+    <DmLocationEditor
+      location={location}
+      campaignCode="TEST01"
+      dmId="dm-1"
+      onSave={vi.fn()}
+      onSyncToPlayers={vi.fn()}
+    />
+  );
+}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import DmLocationAlignMenu from '@/components/ui/campaign/location-map/DmLocationAlignMenu';
 
@@ -36,66 +37,145 @@ const ALIGN_CASES: Array<[title: string, edge: string]> = [
   ['Align bottom', 'bottom'],
 ];
 
+const getTrigger = () => screen.getByRole('button', { name: 'Align' });
+
+async function openMenu() {
+  const user = userEvent.setup();
+  const view = render(<DmLocationAlignMenu />);
+  await user.click(getTrigger());
+  return { user, ...view };
+}
+
 describe('DmLocationAlignMenu', () => {
   beforeEach(() => {
     mockCanAlign = true;
     mockCanDistribute = true;
     align.mockClear();
     distribute.mockClear();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('disables the trigger when alignment is not possible', () => {
     mockCanAlign = false;
     render(<DmLocationAlignMenu />);
-    expect(screen.getByTitle('Align & distribute')).toBeDisabled();
+    expect(getTrigger()).toBeDisabled();
+    expect(getTrigger()).not.toHaveAttribute('title');
   });
 
-  it('forwards each align edge exactly', () => {
-    render(<DmLocationAlignMenu />);
-    fireEvent.click(screen.getByTitle('Align & distribute'));
-    for (const [title, edge] of ALIGN_CASES) {
-      fireEvent.click(screen.getByTitle(title));
+  it('opens a portalled panel and marks the trigger expanded and selected', async () => {
+    const { container } = await openMenu();
+    expect(getTrigger()).toHaveAttribute('aria-expanded', 'true');
+    expect(getTrigger()).toHaveAttribute('data-selected');
+    const dialog = screen.getByRole('dialog', { name: 'Align' });
+    expect(document.body).toContainElement(dialog);
+    expect(container).not.toContainElement(dialog);
+  });
+
+  it('forwards each align edge exactly', async () => {
+    const { user } = await openMenu();
+    for (const [name, edge] of ALIGN_CASES) {
+      await user.click(screen.getByRole('button', { name }));
       expect(align).toHaveBeenLastCalledWith(edge);
     }
     expect(align).toHaveBeenCalledTimes(6);
   });
 
-  it('keeps the panel open after an align action', () => {
-    render(<DmLocationAlignMenu />);
-    fireEvent.click(screen.getByTitle('Align & distribute'));
-    fireEvent.click(screen.getByTitle('Align left'));
-    expect(screen.getByTitle('Align top')).toBeInTheDocument();
+  it('keeps the panel open after an align action', async () => {
+    const { user } = await openMenu();
+    await user.click(screen.getByRole('button', { name: 'Align left' }));
+    expect(
+      screen.getByRole('button', { name: 'Align top' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('disables distribute (but not align) below three movable elements', () => {
+  it('disables distribute (but not align) below three movable elements', async () => {
     mockCanDistribute = false;
-    render(<DmLocationAlignMenu />);
-    fireEvent.click(screen.getByTitle('Align & distribute'));
-    expect(screen.getByTitle('Distribute horizontally')).toBeDisabled();
-    expect(screen.getByTitle('Align left')).toBeEnabled();
+    await openMenu();
+    expect(
+      screen.getByRole('button', { name: 'Distribute horizontally' })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Distribute vertically' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Align left' })).toBeEnabled();
   });
 
-  it('forwards distribute axes when possible', () => {
-    render(<DmLocationAlignMenu />);
-    fireEvent.click(screen.getByTitle('Align & distribute'));
-    fireEvent.click(screen.getByTitle('Distribute horizontally'));
-    fireEvent.click(screen.getByTitle('Distribute vertically'));
+  it('forwards distribute axes when possible', async () => {
+    const { user } = await openMenu();
+    await user.click(
+      screen.getByRole('button', { name: 'Distribute horizontally' })
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Distribute vertically' })
+    );
     expect(distribute).toHaveBeenNthCalledWith(1, 'horizontal');
     expect(distribute).toHaveBeenNthCalledWith(2, 'vertical');
   });
 
-  it('closes on Escape and when alignment becomes impossible', () => {
-    const { rerender } = render(<DmLocationAlignMenu />);
-    fireEvent.click(screen.getByTitle('Align & distribute'));
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByTitle('Align left')).not.toBeInTheDocument();
+  // Stacking has no role-level signal, so this is the one class assertion in
+  // the file: the popover content is z-[60] and the shared Tooltip is z-50, so
+  // a tooltip inside the panel must carry a higher z class or it renders
+  // underneath the panel and is invisible.
+  it('lifts its tooltips above the popover panel', async () => {
+    mockCanDistribute = false;
+    const { user } = await openMenu();
 
-    fireEvent.click(screen.getByTitle('Align & distribute'));
-    expect(screen.getByTitle('Align left')).toBeInTheDocument();
+    // Radix wraps the hidden `role="tooltip"` copy in the visible content box.
+    const tooltipBox = () =>
+      screen.getByRole('tooltip').closest('[data-side]') as HTMLElement;
+
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Align left' })).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip')).toHaveTextContent('Align left')
+    );
+    expect(tooltipBox().className).toContain('z-[70]');
+    expect(tooltipBox().className).not.toContain('z-50');
+
+    // The disabled-distribute hint hangs on the wrapper span. It only repeats
+    // the button's name, so the span is no tab stop; hover still shows it.
+    const distributeWrapper = screen.getByRole('button', {
+      name: 'Distribute horizontally',
+    }).parentElement as HTMLElement;
+    expect(distributeWrapper).not.toHaveAttribute('tabindex');
+    await user.hover(distributeWrapper);
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        'Distribute horizontally'
+      )
+    );
+    expect(tooltipBox().className).toContain('z-[70]');
+  });
+
+  it('closes on Escape and returns focus to the trigger', async () => {
+    const { user } = await openMenu();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(getTrigger()).toHaveFocus());
+  });
+
+  it('closes when alignment becomes impossible', async () => {
+    const { rerender } = await openMenu();
+    expect(
+      screen.getByRole('button', { name: 'Align left' })
+    ).toBeInTheDocument();
     mockCanAlign = false;
     rerender(<DmLocationAlignMenu />);
-    expect(screen.queryByTitle('Align left')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Align left' })
+    ).not.toBeInTheDocument();
   });
 });

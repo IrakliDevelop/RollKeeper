@@ -1,6 +1,6 @@
 /**
  * The pure state resolver for the marker detail panel, plus the class-name
- * constants the panel's containment and touch-target rules are pinned to.
+ * constant the panel's containment rule is pinned to.
  *
  * `resolveMarkerPanelState` is where spec §6.2's "re-validated before every
  * use — paint, activation, publication, detail lookup" is honoured for the
@@ -26,13 +26,6 @@ import type {
  */
 export const MARKER_PANEL_CONTAINMENT_CLASS =
   'max-h-48 overflow-y-auto break-words [overflow-wrap:anywhere]';
-
-/**
- * Minimum touch target (44x44 CSS px) for every interactive control in the
- * panel. Exported so tests assert against this exact string rather than a
- * retyped copy.
- */
-export const MARKER_PANEL_TOUCH_TARGET_CLASS = 'min-h-[44px] min-w-[44px]';
 
 /**
  * Resolves which of the five panel states applies to `element` for the given

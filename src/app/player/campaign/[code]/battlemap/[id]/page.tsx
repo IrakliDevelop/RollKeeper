@@ -32,7 +32,7 @@ function PlayerBattleMapPage() {
   if (!characterId || !character) {
     return (
       <div className="bg-surface flex min-h-screen items-center justify-center">
-        <p className="text-body">
+        <p className="type-body text-body">
           Open the battle map from your character sheet&apos;s “Join map”
           banner.
         </p>

@@ -1,19 +1,20 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 
+import { CLASS_RESOURCE_STYLE } from '@/components/ui/character/classResourceStyles';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
 import { useCharacterStore } from '@/store/characterStore';
 import { cn } from '@/utils/cn';
 
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import { buildFeatureGroups } from '../SheetTabs.utils';
+import { PIP_BUTTON_CLASS } from './ChargePipsRow';
 import { FavoriteStar } from './FavoriteStar';
 import { useFeatureUses } from './useFeatureUses';
 
 import type { FeatureRowView } from '../SheetDrawer.types';
-
-const PIP_BUTTON_CLASS = 'inline-flex h-6 w-6 items-center justify-center';
 
 /** Use/restore pips for a feature's remaining uses, shared with the Overview tab's pinned favorites. */
 export function FeaturePips({
@@ -41,7 +42,13 @@ export function FeaturePips({
             onClick={onSpend}
             className={PIP_BUTTON_CLASS}
           >
-            <span className="bg-accent-emerald-text-muted border-accent-emerald-border h-3 w-3 rounded-full border" />
+            <span
+              aria-hidden="true"
+              className={cn(
+                'size-3 rounded-full border',
+                CLASS_RESOURCE_STYLE.pipOn
+              )}
+            />
           </button>
         ) : (
           <button
@@ -51,7 +58,13 @@ export function FeaturePips({
             onClick={onRestore}
             className={PIP_BUTTON_CLASS}
           >
-            <span className="border-divider h-3 w-3 rounded-full border" />
+            <span
+              aria-hidden="true"
+              className={cn(
+                'size-3 rounded-full border',
+                CLASS_RESOURCE_STYLE.pipOff
+              )}
+            />
           </button>
         )
       )}
@@ -69,35 +82,36 @@ export function FeaturesTab() {
 
   if (groups.length === 0) {
     return (
-      <div className={cn(SECTION_CLASS, 'text-muted text-sm')}>
+      <p className="type-body text-muted py-6 text-center">
         No features yet. Add features on the full character sheet.
-      </div>
+      </p>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {groups.map(group => (
-        <div key={group.key} className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>{group.label}</h3>
-          <div className="space-y-2">
+        <Section key={group.key} level={4} heading={group.label}>
+          <ul className="divide-divider divide-y">
             {group.features.map(feature => {
               const isOpen = expanded === feature.id;
               const descId = `feature-desc-${feature.id}`;
               return (
-                <div
-                  key={feature.id}
-                  className="border-divider rounded-lg border p-2"
-                >
-                  <div className="flex items-start gap-2">
+                <li key={feature.id} className="py-2">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       aria-expanded={isOpen}
                       aria-controls={descId}
                       onClick={() => setExpanded(isOpen ? null : feature.id)}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                      className="focus-visible:outline-ring flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
                     >
-                      <span className="text-heading text-sm font-semibold">
+                      <ChevronDown
+                        size={16}
+                        aria-hidden
+                        className={cn('shrink-0', !isOpen && '-rotate-90')}
+                      />
+                      <span className="type-ui text-heading">
                         {feature.name}
                       </span>
                       {feature.tag && (
@@ -124,7 +138,7 @@ export function FeaturesTab() {
                   )}
 
                   {isOpen && (
-                    <div id={descId} className="text-body mt-2 text-sm">
+                    <div id={descId} className="mt-2">
                       {feature.description ? (
                         <div
                           className="prose prose-sm text-body max-w-none"
@@ -133,15 +147,17 @@ export function FeaturesTab() {
                           }}
                         />
                       ) : (
-                        <span className="text-muted">No description.</span>
+                        <span className="type-small text-muted">
+                          No description.
+                        </span>
                       )}
                     </div>
                   )}
-                </div>
+                </li>
               );
             })}
-          </div>
-        </div>
+          </ul>
+        </Section>
       ))}
     </div>
   );

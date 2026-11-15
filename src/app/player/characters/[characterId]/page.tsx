@@ -1095,7 +1095,6 @@ export default function CharacterSheet() {
                   playerSync.campaignCode && activeBattleMapId ? (
                     !joinedBattleMap ? (
                       <BattleMapLiveBanner
-                        embedded
                         campaignCode={playerSync.campaignCode}
                         battleMapId={activeBattleMapId}
                         mapName={sharedState?.battleMap?.name}
@@ -1104,7 +1103,6 @@ export default function CharacterSheet() {
                       />
                     ) : !initiativeActive ? (
                       <BattleMapLiveBanner
-                        embedded
                         compact
                         campaignCode={playerSync.campaignCode}
                         battleMapId={activeBattleMapId}

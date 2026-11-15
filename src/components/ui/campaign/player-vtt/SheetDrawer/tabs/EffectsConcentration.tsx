@@ -1,8 +1,8 @@
 'use client';
 
-import { Zap } from 'lucide-react';
-
 import { Button } from '@/components/ui/forms/button';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
+import { Section } from '@/components/ui/layout/section';
 
 import { MaybeRollElement } from '../MaybeRollElement';
 
@@ -14,15 +14,13 @@ import {
 import type { CharacterState } from '@/types/character';
 import type { SheetRoll } from '../SheetDrawer.types';
 
-import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
-
 export interface EffectsConcentrationProps {
   character: CharacterState;
   roll?: SheetRoll;
   onEndConcentration: () => void;
 }
 
-/** Concentration card: current spell + CON save hint, or the empty state. */
+/** Concentration: current spell + CON save, or the empty state. */
 export function EffectsConcentration({
   character,
   roll,
@@ -32,52 +30,53 @@ export function EffectsConcentration({
 
   if (!concentration.isConcentrating) {
     return (
-      <div className={SECTION_CLASS}>
-        <h3 className={HEADING_CLASS}>Concentration</h3>
-        <p className="text-muted text-sm">
+      <Section heading="Concentration" level={4}>
+        <p className="type-body text-muted">
           Not concentrating. Casting a concentration spell shows it here and on
           your token.
         </p>
-      </div>
+      </Section>
     );
   }
 
   const conMod = calculateSavingThrowModifier(character, 'constitution');
 
   return (
-    <div className={SECTION_CLASS}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2">
-          <Zap className="text-accent-amber-text mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <h3 className="text-heading text-sm font-semibold">
-              Concentrating on {concentration.spellName}
-            </h3>
-            <p className="text-faint text-xs">
-              Taking damage? Make a Constitution save, DC 10 or half the damage
-              (higher).
-            </p>
-            <MaybeRollElement
-              ariaLabel="Roll concentration save"
-              className="text-muted mt-1 text-xs font-semibold"
-              onRoll={
-                roll ? () => roll('Concentration Save', conMod) : undefined
-              }
-            >
-              CON save {formatModifier(conMod)}
-            </MaybeRollElement>
-          </div>
-        </div>
+    <Section
+      heading="Concentration"
+      level={4}
+      trailing={
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           aria-label="End concentration"
           onClick={onEndConcentration}
         >
           End
         </Button>
+      }
+    >
+      <div className="space-y-2">
+        <ConditionChip
+          kind="concentration"
+          name={
+            concentration.spellName
+              ? `Concentrating on ${concentration.spellName}`
+              : 'Concentrating'
+          }
+        />
+        <p className="type-small text-muted">
+          On damage: CON save, DC 10 or half the damage, whichever is higher.
+        </p>
+        <MaybeRollElement
+          ariaLabel="Roll concentration save"
+          className="type-ui text-heading tabular-nums"
+          onRoll={roll ? () => roll('Concentration Save', conMod) : undefined}
+        >
+          CON save {formatModifier(conMod)}
+        </MaybeRollElement>
       </div>
-    </div>
+    </Section>
   );
 }

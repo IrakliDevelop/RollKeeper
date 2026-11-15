@@ -6,31 +6,31 @@ export interface SpellcastingStatsRowProps {
   abilityLabel: string;
 }
 
-/** Three stat chips (Attack / Save DC / Ability) at the top of the dock's spell list. */
+/** Attack / Save DC / Ability readouts at the top of the dock's spell list. */
 export function SpellcastingStatsRow({
   spellAttackBonus,
   spellSaveDC,
   abilityLabel,
 }: SpellcastingStatsRowProps) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <StatChip
+    <dl className="grid grid-cols-3 gap-x-3">
+      <Stat
         label="Attack"
         value={
           spellAttackBonus === null ? '—' : formatModifier(spellAttackBonus)
         }
       />
-      <StatChip label="Save DC" value={spellSaveDC ?? '—'} />
-      <StatChip label="Ability" value={abilityLabel} />
-    </div>
+      <Stat label="Save DC" value={spellSaveDC ?? '—'} />
+      <Stat label="Ability" value={abilityLabel} />
+    </dl>
   );
 }
 
-function StatChip({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="border-divider rounded-lg border p-2 text-center">
-      <div className="text-heading text-sm font-bold">{value}</div>
-      <div className="text-faint text-[10px] uppercase">{label}</div>
+    <div>
+      <dd className="type-ui text-heading tabular-nums">{value}</dd>
+      <dt className="type-small text-muted">{label}</dt>
     </div>
   );
 }

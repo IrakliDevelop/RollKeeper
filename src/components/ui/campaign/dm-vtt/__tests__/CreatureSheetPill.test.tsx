@@ -6,13 +6,11 @@ import { CreatureSheetPill } from '../CreatureSheetPill';
 afterEach(() => cleanup());
 
 describe('CreatureSheetPill', () => {
-  it('renders the creature name and an accessible label', () => {
+  it('names the button from its visible text', () => {
     render(<CreatureSheetPill name="Goblin" onOpen={vi.fn()} />);
 
-    expect(screen.getByText('Sheet · Goblin')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Open Goblin sheet' })
-    ).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Open Goblin sheet' });
+    expect(button).toHaveTextContent('Open Goblin sheet');
   });
 
   it('calls onOpen when clicked', () => {

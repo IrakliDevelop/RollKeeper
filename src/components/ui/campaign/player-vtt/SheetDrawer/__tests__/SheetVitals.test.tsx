@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  within,
+} from '@testing-library/react';
 
 import { SheetVitals } from '../SheetVitals';
 import { useCharacterStore } from '@/store/characterStore';
@@ -39,5 +45,15 @@ describe('SheetVitals', () => {
       screen.queryByRole('button', { name: /roll initiative/i })
     ).toBeNull();
     expect(screen.getByText('+4')).toBeInTheDocument();
+  });
+
+  it('lists AC, Init, Speed and Prof as one definition list', () => {
+    render(<SheetVitals addToast={vi.fn()} roll={vi.fn()} />);
+    const ac = screen.getByText('AC');
+    expect(ac.tagName).toBe('DT');
+    const list = within(ac.closest('dl') as HTMLElement);
+    expect(list.getByText('Init')).toBeInTheDocument();
+    expect(list.getByText('Speed')).toBeInTheDocument();
+    expect(list.getByText('Prof')).toBeInTheDocument();
   });
 });

@@ -43,10 +43,41 @@ export const MixedActiveStates: Story = {
     const shield = canvas.getByRole('button', { name: /shield/i });
     await expect(mageArmor).toHaveAttribute('aria-pressed', 'true');
     await expect(shield).toHaveAttribute('aria-pressed', 'false');
-    await expect(shield).toHaveAttribute('title', '+5 AC');
+    await expect(shield).not.toHaveAttribute('title');
     await expect(shield).toHaveTextContent('+5 AC');
     await userEvent.click(shield);
     await expect(args.onToggleBuff).toHaveBeenCalledWith('b2');
+  },
+};
+
+export const LongSummaryWraps: Story = {
+  args: {
+    buffs: [
+      buff({
+        id: 'b3',
+        name: 'Warding Bond',
+        isActive: true,
+        effects: [
+          { id: 'e1', targetStat: 'ac', mode: 'add', value: 5 },
+          {
+            id: 'e2',
+            targetStat: 'damageResistance',
+            mode: 'grant',
+            value: 0,
+            targetDamageType: 'fire, cold, lightning',
+          },
+        ],
+      }),
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText('+5 AC · resistance: fire, cold, lightning')
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: /warding bond/i })
+    ).not.toHaveAttribute('title');
   },
 };
 

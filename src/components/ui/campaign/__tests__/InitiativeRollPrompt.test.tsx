@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { InitiativeRollPrompt } from '../InitiativeRollPrompt';
 import type { InitiativeRollRequest } from '@/types/sharedState';
@@ -11,7 +11,21 @@ const req: InitiativeRollRequest = {
 };
 
 describe('InitiativeRollPrompt', () => {
-  afterEach(() => cleanup());
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('shows the encounter name in the heading', () => {
     render(
@@ -23,7 +37,7 @@ describe('InitiativeRollPrompt', () => {
       />
     );
     expect(
-      screen.getByText('Dragon Lair: roll for initiative!')
+      screen.getByText('Roll initiative for Dragon Lair')
     ).toBeInTheDocument();
   });
 
@@ -120,14 +134,14 @@ describe('InitiativeRollPrompt', () => {
     await userEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Couldn't send — try again.")
-      ).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        "Couldn't send your roll. Try again."
+      );
     });
 
     // Prompt is still mounted
     expect(
-      screen.getByText('Dragon Lair: roll for initiative!')
+      screen.getByText('Roll initiative for Dragon Lair')
     ).toBeInTheDocument();
   });
 
@@ -142,7 +156,9 @@ describe('InitiativeRollPrompt', () => {
       />
     );
 
-    const dismissButton = screen.getByRole('button', { name: /Dismiss/i });
+    const dismissButton = screen.getByRole('button', {
+      name: 'Dismiss initiative prompt',
+    });
     const { default: userEvent } = await import('@testing-library/user-event');
     await userEvent.click(dismissButton);
 

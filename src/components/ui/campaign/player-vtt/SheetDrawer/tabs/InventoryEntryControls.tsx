@@ -1,6 +1,9 @@
 'use client';
 
+import { Minus, Plus } from 'lucide-react';
+
 import { Button } from '@/components/ui/forms/button';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
 import { useCharacterStore } from '@/store/characterStore';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
@@ -9,7 +12,7 @@ import type {
   InventoryEntryView,
   InventorySummaryView,
 } from '../SheetDrawer.types';
-import { SpellSlotPipsRow } from './SpellSlotPipsRow';
+import { ChargePipsRow } from './ChargePipsRow';
 import { useConsumableUse } from './useConsumableUse';
 
 export interface InventoryEntryControlsProps {
@@ -68,28 +71,34 @@ export function InventoryEntryControls({
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {kind === 'item' && (
           <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label={`Decrease ${name}`}
-              disabled={quantity <= 0}
-              onClick={() => adjustItemQuantity(id, -1)}
-            >
-              −
-            </Button>
-            <span className="text-body min-w-[1.5rem] text-center text-sm">
+            <Tooltip content={`Decrease ${name}`}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-9 px-0"
+                aria-label={`Decrease ${name}`}
+                disabled={quantity <= 0}
+                onClick={() => adjustItemQuantity(id, -1)}
+              >
+                <Minus size={16} aria-hidden />
+              </Button>
+            </Tooltip>
+            <span className="type-ui text-body min-w-6 text-center tabular-nums">
               {quantity}
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label={`Increase ${name}`}
-              onClick={() => adjustItemQuantity(id, 1)}
-            >
-              +
-            </Button>
+            <Tooltip content={`Increase ${name}`}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-9 px-0"
+                aria-label={`Increase ${name}`}
+                onClick={() => adjustItemQuantity(id, 1)}
+              >
+                <Plus size={16} aria-hidden />
+              </Button>
+            </Tooltip>
           </div>
         )}
 
@@ -129,9 +138,6 @@ export function InventoryEntryControls({
             aria-label={`${entry.attuned ? 'End attunement' : 'Attune'} ${name}`}
             aria-pressed={entry.attuned}
             disabled={attuneDisabled}
-            title={
-              attuneDisabled ? 'All attunement slots are in use' : undefined
-            }
             onClick={handleAttuneToggle}
           >
             {entry.attuned ? 'Attuned' : 'Attune'}
@@ -140,14 +146,13 @@ export function InventoryEntryControls({
       </div>
 
       {entry.charges.map(charge => (
-        <SpellSlotPipsRow
+        <ChargePipsRow
           key={charge.chargeId}
           groupLabel={`${charge.name} charges`}
           max={charge.max}
           used={charge.used}
           spendLabel={`Use charge of ${charge.name}`}
           restoreLabel={`Restore charge of ${charge.name}`}
-          unit="charges"
           onSpend={() =>
             kind === 'weapon'
               ? expendWeaponCharge(id, charge.chargeId)

@@ -53,6 +53,15 @@ beforeEach(() => {
       removeEventListener: () => {},
     }))
   );
+  // Radix Tooltip measures its trigger with ResizeObserver.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
   useCharacterStore.getState().loadCharacterState({
     ...INITIAL_CHARACTER,
     name: 'Kaelen Voss',
@@ -64,6 +73,33 @@ afterEach(() => {
 });
 
 describe('SheetDrawer', () => {
+  it('renders a pinned favourite with no outer tooltip provider', () => {
+    useCharacterStore.getState().loadCharacterState({
+      ...INITIAL_CHARACTER,
+      name: 'Kaelen Voss',
+      inventoryItems: [
+        {
+          id: 'rope1',
+          name: 'Rope',
+          category: 'gear',
+          quantity: 1,
+          tags: [],
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      sheetFavorites: [{ kind: 'item', id: 'rope1' }],
+    } as unknown as CharacterState);
+    render(<SheetDrawer {...props()} />);
+    expect(
+      screen.getByRole('button', { name: 'Unpin Rope' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'data-state',
+      'active'
+    );
+  });
+
   it('opens as a dialog named after the character, locked', () => {
     render(<SheetDrawer {...props()} />);
     expect(

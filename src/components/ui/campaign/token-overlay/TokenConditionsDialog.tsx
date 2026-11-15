@@ -36,12 +36,12 @@ export function TokenConditionsDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {name ? `${name} — Conditions` : 'Conditions'}
+            {name ? `Conditions on ${name}` : 'Conditions'}
           </DialogTitle>
           <DialogDescription>Active conditions and effects.</DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <ul className="space-y-4">
+          <ul className="divide-divider divide-y">
             {conditions.map((condition, index) => {
               const Icon = getConditionIcon(
                 condition.name,
@@ -49,20 +49,23 @@ export function TokenConditionsDialog({
                 condition.icon
               );
               return (
-                <li key={`${condition.name}-${index}`} className="flex gap-3">
+                <li
+                  key={`${condition.name}-${index}`}
+                  className="flex gap-3 py-3 first:pt-0 last:pb-0"
+                >
                   <Icon
                     aria-hidden="true"
-                    className="text-body mt-1 h-5 w-5 shrink-0"
+                    className="text-muted mt-0.5 size-5 shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="text-heading font-semibold">
+                    <p className="type-ui text-heading">
                       {condition.name}
                       {condition.stackCount !== undefined &&
                       condition.stackCount > 1
                         ? ` ×${condition.stackCount}`
                         : ''}
                     </p>
-                    <p className="text-body text-sm break-words whitespace-pre-wrap">
+                    <p className="type-small text-body break-words whitespace-pre-wrap">
                       {condition.description?.trim() ||
                         'No description shared.'}
                     </p>

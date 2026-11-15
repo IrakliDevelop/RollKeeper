@@ -45,7 +45,7 @@ export function ChipRow({
     >
       {deco.name && (
         <span
-          className="bg-surface-raised/90 border-divider text-heading overflow-hidden rounded-full border font-semibold text-ellipsis whitespace-nowrap"
+          className="bg-surface-raised/90 border-divider text-heading overflow-hidden rounded-sm border font-semibold text-ellipsis whitespace-nowrap"
           style={{
             fontSize: cell * 0.24,
             padding: `0 ${cell * 0.15}px`,
@@ -57,7 +57,7 @@ export function ChipRow({
       )}
       {showHpChip && deco.hp?.kind === 'exact' && (
         <span
-          className="bg-surface-raised/90 text-heading rounded-full font-semibold whitespace-nowrap"
+          className="bg-surface-raised/90 text-heading rounded-sm font-semibold whitespace-nowrap"
           style={{ fontSize: cell * 0.2, padding: `0 ${cell * 0.12}px` }}
         >
           {deco.hp.current}/{deco.hp.max}
@@ -65,7 +65,7 @@ export function ChipRow({
       )}
       {showHpChip && deco.hp?.kind === 'label' && (
         <span
-          className={`bg-surface-raised/90 border-divider rounded-full border font-semibold whitespace-nowrap ${getHpTierTextColor(deco.hp.tier)}`}
+          className={`bg-surface-raised/90 border-divider rounded-sm border font-semibold whitespace-nowrap ${getHpTierTextColor(deco.hp.tier)}`}
           style={{ fontSize: cell * 0.22, padding: `0 ${cell * 0.15}px` }}
         >
           {deco.hp.text}
@@ -73,7 +73,7 @@ export function ChipRow({
       )}
       {conditionNames && conditionNames.length > 0 && (
         <span
-          className="bg-surface-raised/90 border-divider text-body overflow-hidden rounded-full border text-ellipsis whitespace-nowrap"
+          className="bg-surface-raised/90 border-divider text-body overflow-hidden rounded-sm border text-ellipsis whitespace-nowrap"
           style={{
             fontSize: cell * 0.2,
             padding: `0 ${cell * 0.12}px`,
@@ -85,8 +85,8 @@ export function ChipRow({
       )}
       {onInspectConditions && (
         <Button
-          variant="outline"
-          className="pointer-events-auto h-auto rounded-full px-2 py-1"
+          variant="secondary"
+          className="bg-surface-raised/90 pointer-events-auto h-auto px-2 py-1"
           style={{ minHeight: 44 / zoom, fontSize: 14 / zoom }}
           aria-label={`View conditions for ${deco.name || 'token'}`}
           aria-haspopup="dialog"

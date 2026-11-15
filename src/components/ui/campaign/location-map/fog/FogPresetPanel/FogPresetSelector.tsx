@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/forms/button';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { OptionLabel } from '../../ToolOptionControls';
 import type { FogPresetControls } from '../useFogPresetControls';
 
 export function FogPresetSelector({
@@ -11,38 +13,32 @@ export function FogPresetSelector({
   const { library, selectedValue, appliedLabel } = controls;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className="text-muted flex items-center gap-2 text-xs font-semibold">
-        Appearance
-        <select
-          aria-label="Fog appearance"
-          value={selectedValue}
-          onChange={event => controls.select(event.target.value)}
-          className="border-divider bg-surface text-body min-h-[44px] rounded-md border px-2 text-xs"
-        >
-          <option value="solid">Solid (classic)</option>
-          <option value="cloudy">Cloudy</option>
-          {library.map(preset => (
-            <option key={preset.id} value={preset.id}>
-              {preset.name}
-            </option>
-          ))}
-          {selectedValue === 'custom' && (
-            <option value="custom">{appliedLabel ?? 'Custom'}</option>
-          )}
-        </select>
-      </label>
-      <Button
-        variant="ghost"
-        onClick={controls.openEditor}
-        className="min-h-[44px] px-3 text-xs"
+      <OptionLabel>Appearance</OptionLabel>
+      <SelectField
+        wrapperClassName="w-auto"
+        value={selectedValue}
+        onValueChange={controls.select}
+        triggerProps={{
+          'aria-label': 'Fog appearance',
+          size: 'sm',
+          className: 'min-w-44',
+        }}
       >
+        <SelectItem value="solid">Solid (classic)</SelectItem>
+        <SelectItem value="cloudy">Cloudy</SelectItem>
+        {library.map(preset => (
+          <SelectItem key={preset.id} value={preset.id}>
+            {preset.name}
+          </SelectItem>
+        ))}
+        {selectedValue === 'custom' && (
+          <SelectItem value="custom">{appliedLabel ?? 'Custom'}</SelectItem>
+        )}
+      </SelectField>
+      <Button variant="ghost" size="sm" onClick={controls.openEditor}>
         Customize fog
       </Button>
-      <Button
-        variant="ghost"
-        onClick={controls.openManager}
-        className="min-h-[44px] px-3 text-xs"
-      >
+      <Button variant="ghost" size="sm" onClick={controls.openManager}>
         Manage fog presets
       </Button>
     </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Pencil } from 'lucide-react';
 
+import { Button } from '@/components/ui/forms/button';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 import {
@@ -55,13 +56,13 @@ export function DockVitals({ addToast }: DockVitalsProps) {
     const r2 = 1 + Math.floor(Math.random() * 20);
     addToast({
       type: 'info',
-      title: `Heroic Inspiration: ${Math.max(r1, r2)}`,
+      title: `Heroic inspiration: ${Math.max(r1, r2)}`,
       message: `(rolled ${r1} & ${r2}, advantage)`,
     });
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <HpCard
         hpCurrent={hpCurrent}
         hpMax={hpMax}
@@ -74,23 +75,29 @@ export function DockVitals({ addToast }: DockVitalsProps) {
         onTemp={hpEditor.onTemp}
       />
 
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={() => setAcOpen(true)}
-          title="Edit armor class"
-          aria-label="Edit armor class"
-          className="border-divider hover:bg-surface-secondary min-h-[44px] rounded-lg border p-2 text-center"
-        >
-          <div className="text-heading text-xl font-bold">{totalAC}</div>
-          <div className="text-faint flex items-center justify-center gap-1 text-xs uppercase">
-            AC <Pencil className="h-3 w-3" />
-          </div>
-        </button>
-        <div className="border-divider rounded-lg border p-2 text-center">
-          <div className="text-heading text-xl font-bold">
+      <div className="grid grid-cols-2 gap-x-4">
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Edit armor class"
+            onClick={() => setAcOpen(true)}
+            className="h-auto w-full flex-col items-start gap-0 px-2 py-1 text-left"
+          >
+            <span className="type-num-lg text-heading block tabular-nums">
+              {totalAC}
+            </span>
+            <span className="type-small text-muted flex items-center gap-1">
+              AC
+              <Pencil size={12} aria-hidden />
+            </span>
+          </Button>
+        </div>
+        <div className="px-2 py-1">
+          <span className="type-num-lg text-heading block tabular-nums">
             {formatModifier(initiativeModifier)}
-          </div>
-          <div className="text-faint text-xs uppercase">Init</div>
+          </span>
+          <span className="type-small text-muted block">Init</span>
         </div>
       </div>
       <AcEditDialog open={acOpen} onOpenChange={setAcOpen} />

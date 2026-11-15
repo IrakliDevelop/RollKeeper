@@ -1253,7 +1253,7 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
 
               {/* Favorites Toggle */}
               <div className="flex items-end">
-                <label className="flex cursor-pointer items-center gap-2">
+                <label className="flex cursor-pointer items-center gap-2 pointer-coarse:min-h-11">
                   <Checkbox
                     checked={filters.favorites}
                     onCheckedChange={checked =>
@@ -1264,8 +1264,8 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
                     }
                   />
                   <span className="text-body flex items-center gap-1 text-sm font-medium">
-                    Favorites Only
-                    <Star size={16} className="text-accent-yellow-text" />
+                    Favorites only
+                    <Star size={16} className="text-muted" aria-hidden />
                   </span>
                 </label>
               </div>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   render,
   screen,
@@ -17,8 +17,20 @@ import {
   renderConfirmDialogHost,
 } from '@/test/confirmDialog';
 
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 function baseProps() {
@@ -46,19 +58,15 @@ async function openMenu() {
   return user;
 }
 
-const SHARE_SHEET_TITLE =
-  'Let party members open a limited view of this character on the battle map';
-
 function getShareSheetToggle() {
-  const container = screen.getByTitle(SHARE_SHEET_TITLE);
-  return within(container).getByRole('switch');
+  return screen.getByRole('switch', { name: 'Share sheet with party' });
 }
 
 describe('SyncIndicator — Share sheet toggle', () => {
-  it('shows the "Share sheet" label', async () => {
+  it('shows the "Share sheet with party" label', async () => {
     render(<SyncIndicator {...baseProps()} sharePartyView={true} />);
     await openMenu();
-    expect(screen.getByText('Share sheet')).toBeTruthy();
+    expect(screen.getByText('Share sheet with party')).toBeTruthy();
   });
 
   it('reflects sharePartyView=true as checked', async () => {
@@ -88,26 +96,79 @@ describe('SyncIndicator — Share sheet toggle', () => {
   });
 });
 
-describe('SyncIndicator — share toggles accessibility', () => {
-  it('gives both share switches accessible names', async () => {
+describe('SyncIndicator — switches', () => {
+  it('labels the three switches and describes Share sheet', async () => {
     render(<SyncIndicator {...baseProps()} />);
     await openMenu();
-    expect(screen.getByRole('switch', { name: 'Share sheet with party' })).toBe(
-      getShareSheetToggle()
-    );
+    expect(
+      screen.getByRole('switch', { name: 'Auto-sync' })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('switch', { name: 'Share HP with party' })
     ).toHaveAttribute('aria-checked', 'true');
+    expect(getShareSheetToggle()).toHaveAccessibleDescription(
+      'Let party members open a limited view of this character on the battle map'
+    );
   });
 
-  it('uses semantic accent tokens for the enabled share icons', async () => {
-    const { container } = render(<SyncIndicator {...baseProps()} />);
+  it('shows Sync now only when auto-sync is off', async () => {
+    const { unmount } = render(
+      <SyncIndicator {...baseProps()} autoSync={false} />
+    );
     await openMenu();
-    const root = container.ownerDocument.body;
-    expect(root.querySelector('.text-blue-500')).toBeNull();
-    expect(root.querySelector('svg.text-red-500')).toBeNull();
-    expect(root.querySelector('svg.text-accent-blue-text')).not.toBeNull();
-    expect(root.querySelector('svg.text-accent-red-text')).not.toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Sync now' })
+    ).toBeInTheDocument();
+    unmount();
+
+    render(<SyncIndicator {...baseProps()} autoSync={true} />);
+    await openMenu();
+    expect(screen.queryByRole('button', { name: 'Sync now' })).toBeNull();
+  });
+});
+
+describe('SyncIndicator — popover', () => {
+  it('opens a Campaign sync popover and closes it on Escape, returning focus', async () => {
+    render(<SyncIndicator {...baseProps()} />);
+    const user = await openMenu();
+    const trigger = screen.getByRole('button', { name: /test campaign/i });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger).toHaveAttribute('data-selected', 'true');
+    expect(
+      screen.getByRole('dialog', { name: 'Campaign sync' })
+    ).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(
+      screen.queryByRole('dialog', { name: 'Campaign sync' })
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+});
+
+describe('SyncIndicator — state word', () => {
+  it.each([
+    [
+      'synced',
+      '2026-11-13T10:00:00.000Z',
+      'Synced',
+      /^Synced (just now|\d+[smh] ago)$/,
+    ],
+    ['idle', null, 'Not synced', /^Not synced$/],
+    ['syncing', null, 'Syncing…', /^Syncing…$/],
+    ['error', '2026-11-13T10:00:00.000Z', 'Sync failed', /^Sync failed$/],
+  ])('shows the %s state word in the trigger', (status, last, short, full) => {
+    render(
+      <SyncIndicator
+        {...baseProps()}
+        syncStatus={status as never}
+        lastSyncedAt={last}
+      />
+    );
+    const trigger = screen.getByRole('button', { name: /test campaign/i });
+    expect(
+      within(trigger).getAllByText(short, { exact: true }).length
+    ).toBeGreaterThan(0);
+    expect(within(trigger).getAllByText(full).length).toBeGreaterThan(0);
   });
 });
 
@@ -118,15 +179,21 @@ describe('SyncIndicator — Leave campaign', () => {
     render(<SyncIndicator {...props} />);
 
     let user = await openMenu();
-    await user.click(screen.getByRole('button', { name: /leave campaign/i }));
+    await user.click(screen.getByRole('button', { name: 'Leave campaign' }));
     expect(await findConfirmDialog()).toHaveAccessibleName(
       'Leave this campaign?'
     );
     // The menu closed before the dialog opened.
-    expect(screen.queryByTitle(SHARE_SHEET_TITLE)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Campaign sync' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(await findConfirmDialog()).getByRole('button', {
+        name: 'Leave campaign',
+      })
+    ).toHaveAttribute('data-variant', 'danger-solid');
     await clickConfirmDialogButton('Cancel');
     expect(props.onLeaveCampaign).not.toHaveBeenCalled();
-    expect(screen.queryByTitle(SHARE_SHEET_TITLE)).not.toBeInTheDocument();
     // Focus returns to the button that opened the menu, not to the page body.
     await waitFor(() =>
       expect(
@@ -135,7 +202,7 @@ describe('SyncIndicator — Leave campaign', () => {
     );
 
     user = await openMenu();
-    await user.click(screen.getByRole('button', { name: /leave campaign/i }));
+    await user.click(screen.getByRole('button', { name: 'Leave campaign' }));
     await clickConfirmDialogButton('Leave campaign');
     expect(props.onLeaveCampaign).toHaveBeenCalledTimes(1);
     expect(queryConfirmDialog()).toBeNull();

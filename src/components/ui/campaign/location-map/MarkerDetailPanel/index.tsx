@@ -24,23 +24,22 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
 import { cn } from '@/utils/cn';
 
-import {
-  MARKER_PANEL_CONTAINMENT_CLASS,
-  MARKER_PANEL_TOUCH_TARGET_CLASS,
-} from './MarkerDetailPanel.utils';
+import { MARKER_PANEL_CONTAINMENT_CLASS } from './MarkerDetailPanel.utils';
 import type {
   MarkerDetailPanelProps,
   MarkerPanelMode,
   MarkerPanelState,
   ResolvedPortalState,
 } from './MarkerDetailPanel.types';
-import type { MarkerKind } from '../markerData';
+import { MARKER_KIND_LABELS, type MarkerKind } from '../markerData';
 import { MARKER_KIND_ICONS } from '../markerIcons';
 import { buildMarkerPortalTarget } from '../markerPortal';
 import { LootEditor } from './LootEditor';
@@ -154,14 +153,14 @@ function EditForm({
   const [status, setStatus] = useState<MarkerStatus>(
     initialStatus ?? defaultStatus(kind)
   );
-  const [discoveryDc, setDiscoveryDc] = useState(
-    initialDiscovery?.dc?.toString() ?? ''
+  const [discoveryDc, setDiscoveryDc] = useState<number | undefined>(
+    initialDiscovery?.dc
   );
   const [discoverySkill, setDiscoverySkill] = useState<MarkerDiscoverySkill>(
     initialDiscovery?.skill ?? 'perception'
   );
-  const [disarmDc, setDisarmDc] = useState(
-    initialTrap?.disarmDc?.toString() ?? ''
+  const [disarmDc, setDisarmDc] = useState<number | undefined>(
+    initialTrap?.disarmDc
   );
   const [disarmMethod, setDisarmMethod] = useState<MarkerDisarmMethod>(
     initialTrap?.disarmMethod ?? 'thieves-tools'
@@ -182,12 +181,10 @@ function EditForm({
     portalState?.target?.id ?? ''
   );
 
-  const parseDc = (value: string): number | undefined => {
-    if (value.trim() === '') return undefined;
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return undefined;
-    return Math.min(40, Math.max(0, Math.round(parsed)));
-  };
+  const parseDc = (value: number | undefined): number | undefined =>
+    value === undefined
+      ? undefined
+      : Math.min(40, Math.max(0, Math.round(value)));
 
   function buildPortalPatch(): { portal?: MarkerPortalTargetV1 | null } {
     if (!portalTouched) return {};
@@ -231,72 +228,101 @@ function EditForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <label className="text-body flex flex-col gap-1 text-sm font-medium">
-        Status
-        <select
-          value={status}
-          onChange={event => setStatus(event.target.value as MarkerStatus)}
-          className="border-divider bg-surface text-body min-h-10 rounded-md border px-3"
-        >
-          {STATUS_OPTIONS[kind].map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <SelectField
+        label="Status"
+        value={status}
+        onValueChange={(value: string) => setStatus(value as MarkerStatus)}
+      >
+        {STATUS_OPTIONS[kind].map(option => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectField>
+      <div className="space-y-1.5">
+        <p className="type-ui text-heading">Title</p>
+        <CompactRichTextEditor
+          content={title}
+          onChange={setTitle}
+          placeholder="Marker title…"
+          minHeight="44px"
+          ariaLabel="Title"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <p className="type-ui text-heading">Body</p>
+        <CompactRichTextEditor
+          content={body}
+          onChange={setBody}
+          placeholder="What players can learn…"
+          ariaLabel="Body"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <p className="type-ui text-heading">
+          DM notes — never shown to players
+        </p>
+        <CompactRichTextEditor
+          content={dmNotes}
+          onChange={setDmNotes}
+          placeholder="Private notes…"
+          ariaLabel="DM notes — never shown to players"
+        />
+      </div>
       {(kind === 'trap' || kind === 'secret') && (
-        <div className="border-divider bg-surface-secondary grid gap-3 rounded-md border p-3 sm:grid-cols-2">
-          <Input
+        <Section
+          heading="Discovery"
+          level={4}
+          contentClassName="grid gap-3 sm:grid-cols-2"
+        >
+          <NumberInput
             id="marker-discovery-dc"
             label="Discovery DC"
-            type="number"
             min={0}
             max={40}
+            allowEmpty
             value={discoveryDc}
-            onChange={event => setDiscoveryDc(event.target.value)}
+            onChange={setDiscoveryDc}
           />
-          <label className="text-body flex flex-col gap-1 text-sm font-medium">
-            Discovery skill
-            <select
-              value={discoverySkill}
-              onChange={event =>
-                setDiscoverySkill(event.target.value as MarkerDiscoverySkill)
-              }
-              className="border-divider bg-surface text-body min-h-10 rounded-md border px-3"
-            >
-              <option value="perception">Perception</option>
-              <option value="investigation">Investigation</option>
-            </select>
-          </label>
-        </div>
+          <SelectField
+            label="Discovery skill"
+            value={discoverySkill}
+            onValueChange={(value: string) =>
+              setDiscoverySkill(value as MarkerDiscoverySkill)
+            }
+          >
+            <SelectItem value="perception">Perception</SelectItem>
+            <SelectItem value="investigation">Investigation</SelectItem>
+          </SelectField>
+        </Section>
       )}
       {kind === 'trap' && (
-        <div className="border-divider bg-surface-secondary grid gap-3 rounded-md border p-3 sm:grid-cols-2">
-          <Input
+        <Section
+          heading="Trap mechanics"
+          level={4}
+          contentClassName="grid gap-3 sm:grid-cols-2"
+        >
+          <NumberInput
             id="marker-disarm-dc"
             label="Disarm DC"
-            type="number"
             min={0}
             max={40}
+            allowEmpty
             value={disarmDc}
-            onChange={event => setDisarmDc(event.target.value)}
+            onChange={setDisarmDc}
           />
-          <label className="text-body flex flex-col gap-1 text-sm font-medium">
-            Disarm method
-            <select
-              value={disarmMethod}
-              onChange={event =>
-                setDisarmMethod(event.target.value as MarkerDisarmMethod)
-              }
-              className="border-divider bg-surface text-body min-h-10 rounded-md border px-3"
-            >
-              <option value="thieves-tools">Thieves&apos; Tools</option>
-              <option value="sleight-of-hand">Sleight of Hand</option>
-              <option value="arcana">Arcana</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
+          <SelectField
+            label="Disarm method"
+            value={disarmMethod}
+            onValueChange={(value: string) =>
+              setDisarmMethod(value as MarkerDisarmMethod)
+            }
+          >
+            <SelectItem value="thieves-tools">Thieves&apos; Tools</SelectItem>
+            <SelectItem value="sleight-of-hand">Sleight of Hand</SelectItem>
+            <SelectItem value="arcana">Arcana</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectField>
           <Input
             id="marker-trigger"
             label="Trigger"
@@ -319,7 +345,7 @@ function EditForm({
               onChange={event => setEffect(event.target.value)}
             />
           </div>
-        </div>
+        </Section>
       )}
       {kind === 'loot' && campaignCode && (
         <LootEditor
@@ -338,147 +364,104 @@ function EditForm({
           }}
         />
       )}
-      <div className="text-heading space-y-1.5 text-sm font-medium">
-        <p>Title</p>
-        <CompactRichTextEditor
-          content={title}
-          onChange={setTitle}
-          placeholder="Marker title…"
-          minHeight="44px"
-          ariaLabel="Title"
-        />
-      </div>
-      <div className="text-heading space-y-1.5 text-sm font-medium">
-        <p>Body</p>
-        <CompactRichTextEditor
-          content={body}
-          onChange={setBody}
-          placeholder="What players can learn…"
-          ariaLabel="Body"
-        />
-      </div>
-      <div className="text-heading space-y-1.5 text-sm font-medium">
-        <p>DM notes — never shown to players</p>
-        <CompactRichTextEditor
-          content={dmNotes}
-          onChange={setDmNotes}
-          placeholder="Private notes…"
-          ariaLabel="DM notes — never shown to players"
-        />
-      </div>
       {portalState && (
-        <div data-testid="portal-destination-section">
-          <h4 className="text-heading mb-2 text-sm font-medium">Destination</h4>
-          <div className="space-y-3">
+        <Section
+          heading="Destination"
+          level={4}
+          contentClassName="space-y-3"
+          data-testid="portal-destination-section"
+        >
+          <SelectField
+            label="Destination type"
+            value={portalDraftKind}
+            onValueChange={(value: string) => {
+              setPortalTouched(true);
+              setPortalDraftKind(value as 'none' | 'battlemap' | 'location');
+              setPortalDraftId('');
+            }}
+            triggerProps={{ 'aria-label': 'Destination type' }}
+          >
+            <SelectItem value="none">No destination</SelectItem>
+            <SelectItem value="battlemap">Battle map</SelectItem>
+            <SelectItem value="location">Campaign location</SelectItem>
+          </SelectField>
+
+          {portalDraftKind !== 'none' && (
             <SelectField
-              label="Destination type"
-              value={portalDraftKind}
+              label={
+                portalDraftKind === 'battlemap'
+                  ? 'Target battle map'
+                  : 'Target location'
+              }
+              value={portalDraftId}
               onValueChange={(value: string) => {
                 setPortalTouched(true);
-                setPortalDraftKind(value as 'none' | 'battlemap' | 'location');
-                setPortalDraftId('');
+                setPortalDraftId(value);
               }}
               triggerProps={{
-                'aria-label': 'Destination type',
-                className: MARKER_PANEL_TOUCH_TARGET_CLASS,
-              }}
-            >
-              <SelectItem value="none">No destination</SelectItem>
-              <SelectItem value="battlemap">Battle map</SelectItem>
-              <SelectItem value="location">Campaign location</SelectItem>
-            </SelectField>
-
-            {portalDraftKind !== 'none' && (
-              <SelectField
-                label={
+                'aria-label':
                   portalDraftKind === 'battlemap'
                     ? 'Target battle map'
-                    : 'Target location'
-                }
-                value={portalDraftId}
-                onValueChange={(value: string) => {
-                  setPortalTouched(true);
-                  setPortalDraftId(value);
-                }}
-                triggerProps={{
-                  'aria-label':
-                    portalDraftKind === 'battlemap'
-                      ? 'Target battle map'
-                      : 'Target location',
-                  className: MARKER_PANEL_TOUCH_TARGET_CLASS,
-                }}
-              >
-                {(portalDraftKind === 'battlemap'
-                  ? portalState.battleMapChoices
-                  : portalState.locationChoices
-                ).map(choice => (
-                  <SelectItem key={choice.id} value={choice.id}>
-                    {choice.name}
-                  </SelectItem>
-                ))}
-              </SelectField>
-            )}
+                    : 'Target location',
+              }}
+            >
+              {(portalDraftKind === 'battlemap'
+                ? portalState.battleMapChoices
+                : portalState.locationChoices
+              ).map(choice => (
+                <SelectItem key={choice.id} value={choice.id}>
+                  {choice.name}
+                </SelectItem>
+              ))}
+            </SelectField>
+          )}
 
-            {portalState.resolved?.status === 'ready' && (
-              <div className="flex items-center gap-2">
-                {portalState.target?.kind === 'battlemap' ? (
-                  <Map className="text-muted h-4 w-4 flex-shrink-0" />
-                ) : (
-                  <MapPin className="text-muted h-4 w-4 flex-shrink-0" />
-                )}
-                <span className="text-body text-sm">
-                  {portalState.resolved.name}
-                </span>
-              </div>
-            )}
-
-            {portalState.resolved?.status === 'ready' && (
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-                className={cn('mt-1', MARKER_PANEL_TOUCH_TARGET_CLASS)}
-              >
-                <Link href={portalState.resolved.href}>
-                  Open destination
-                  <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            )}
-
-            {portalState.resolved?.status === 'missing' && (
-              <p className="text-muted text-sm">Destination unavailable</p>
-            )}
-
-            {portalState.resolved &&
-              (portalState.resolved.status === 'invalid' ||
-                portalState.resolved.status === 'unsupported') && (
-                <p className="text-accent-amber-text text-sm">
-                  Destination cannot be resolved. Edit to replace or remove it.
-                </p>
+          {portalState.resolved?.status === 'ready' && (
+            <div className="flex items-center gap-2">
+              {portalState.target?.kind === 'battlemap' ? (
+                <Map className="text-muted size-4 shrink-0" />
+              ) : (
+                <MapPin className="text-muted size-4 shrink-0" />
               )}
+              <span className="type-ui text-body">
+                {portalState.resolved.name}
+              </span>
+            </div>
+          )}
 
-            {portalState.resolved?.status === 'self' && (
-              <p className="text-muted text-sm">
-                Points to this map (self-link)
+          {portalState.resolved?.status === 'ready' && (
+            <Button variant="secondary" size="sm" asChild>
+              <Link href={portalState.resolved.href}>
+                Open destination
+                <ExternalLink className="size-3.5" />
+              </Link>
+            </Button>
+          )}
+
+          {portalState.resolved?.status === 'missing' && (
+            <p className="type-small text-muted">Destination unavailable</p>
+          )}
+
+          {portalState.resolved &&
+            (portalState.resolved.status === 'invalid' ||
+              portalState.resolved.status === 'unsupported') && (
+              <p className="type-small text-ember-text">
+                Destination cannot be resolved. Edit to replace or remove it.
               </p>
             )}
-          </div>
-        </div>
+
+          {portalState.resolved?.status === 'self' && (
+            <p className="type-small text-muted">
+              Points to this map (self-link)
+            </p>
+          )}
+        </Section>
       )}
       <DialogFooter>
-        <Button
-          variant="danger"
-          onClick={onDelete}
-          className={MARKER_PANEL_TOUCH_TARGET_CLASS}
-        >
+        <Button variant="danger" onClick={onDelete}>
           Delete
         </Button>
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          className={MARKER_PANEL_TOUCH_TARGET_CLASS}
-        >
+        <Button variant="primary" onClick={handleSave}>
           Save
         </Button>
       </DialogFooter>
@@ -533,132 +516,122 @@ function ReadOnlyView({
     <div className="flex flex-col gap-3">
       <div
         className={cn(
-          'text-heading text-lg font-semibold',
+          'type-subheading text-heading',
           MARKER_PANEL_CONTAINMENT_CLASS
         )}
       >
         <MarkerRichText content={title} />
       </div>
       {status && (
-        <p className="text-accent-blue-text text-sm font-semibold">
-          Status: {statusLabel(status)}
-        </p>
+        <p className="type-ui text-body">Status: {statusLabel(status)}</p>
       )}
       <div
         data-testid="marker-panel-body"
-        className={cn('text-body text-sm', MARKER_PANEL_CONTAINMENT_CLASS)}
+        className={cn('type-ui text-body', MARKER_PANEL_CONTAINMENT_CLASS)}
       >
         <MarkerRichText content={body} />
       </div>
       {lootLocked && (
-        <div className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-3.5">
-          <span className="bg-surface-secondary text-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-            <Lock size={20} />
-          </span>
+        <div className="flex items-center gap-3">
+          <Lock size={20} aria-hidden className="text-muted shrink-0" />
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-heading text-base font-bold">Locked</span>
-            <span className="text-body text-sm">
+            <span className="type-ui text-heading">Locked</span>
+            <span className="type-small text-body">
               You&apos;d need to get it open first.
             </span>
           </span>
         </div>
       )}
       {!lootLocked && loot && loot.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-heading text-sm font-semibold">Loot</span>
-            <Badge variant="success">Open</Badge>
-          </div>
-          {loot.map(entry => {
-            const max = Math.max(1, entry.remainingQuantity);
-            const requested = Math.min(max, quantities[entry.id] ?? max);
-            const soldOut = entry.remainingQuantity <= 0;
-            return (
-              <div
-                key={entry.id}
-                className="border-divider bg-surface-raised flex flex-col gap-2.5 rounded-lg border p-3"
-              >
-                <span className="flex flex-col gap-0.5">
-                  <span className="flex items-center gap-2">
-                    <span className="text-heading text-base font-bold">
-                      {entry.name}
+        <Section
+          heading="Loot"
+          level={4}
+          trailing={<Badge variant="success">Open</Badge>}
+        >
+          <ul className="divide-divider divide-y">
+            {loot.map(entry => {
+              const max = Math.max(1, entry.remainingQuantity);
+              const requested = Math.min(max, quantities[entry.id] ?? max);
+              const soldOut = entry.remainingQuantity <= 0;
+              return (
+                <li
+                  key={entry.id}
+                  className="flex flex-col gap-2 py-2 pointer-coarse:min-h-11"
+                >
+                  <span className="flex flex-col gap-0.5">
+                    <span className="flex items-center gap-2">
+                      <span className="type-ui text-heading">{entry.name}</span>
+                      {entry.rarity && (
+                        <Badge variant="neutral">{entry.rarity}</Badge>
+                      )}
                     </span>
-                    {entry.rarity && (
-                      <Badge variant="neutral">{entry.rarity}</Badge>
-                    )}
+                    <span className="type-small text-body">
+                      {entry.remainingQuantity} available
+                    </span>
                   </span>
-                  <span className="text-body text-sm">
-                    {entry.remainingQuantity} available
-                  </span>
-                </span>
-                {onClaimLoot && (
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        aria-label={`Take fewer ${entry.name}`}
-                        className={cn(
-                          MARKER_PANEL_TOUCH_TARGET_CLASS,
-                          'h-11 w-11 p-0'
-                        )}
-                        disabled={soldOut || requested <= 1}
-                        onClick={() =>
-                          setQuantities(prev => ({
-                            ...prev,
-                            [entry.id]: Math.max(1, requested - 1),
-                          }))
-                        }
-                      >
-                        <Minus size={19} />
-                      </Button>
-                      <span className="text-heading min-w-8.5 text-center text-lg font-bold tabular-nums">
-                        {soldOut ? 0 : requested}
+                  {onClaimLoot && (
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex items-center gap-1.5">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-label={`Take fewer ${entry.name}`}
+                          className="w-9 shrink-0 px-0"
+                          disabled={soldOut || requested <= 1}
+                          onClick={() =>
+                            setQuantities(prev => ({
+                              ...prev,
+                              [entry.id]: Math.max(1, requested - 1),
+                            }))
+                          }
+                        >
+                          <Minus size={16} />
+                        </Button>
+                        <span className="type-num-md text-heading min-w-8.5 text-center tabular-nums">
+                          {soldOut ? 0 : requested}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-label={`Take more ${entry.name}`}
+                          className="w-9 shrink-0 px-0"
+                          disabled={soldOut || requested >= max}
+                          onClick={() =>
+                            setQuantities(prev => ({
+                              ...prev,
+                              [entry.id]: Math.min(max, requested + 1),
+                            }))
+                          }
+                        >
+                          <Plus size={16} />
+                        </Button>
                       </span>
                       <Button
-                        variant="outline"
-                        aria-label={`Take more ${entry.name}`}
-                        className={cn(
-                          MARKER_PANEL_TOUCH_TARGET_CLASS,
-                          'h-11 w-11 p-0'
-                        )}
-                        disabled={soldOut || requested >= max}
-                        onClick={() =>
-                          setQuantities(prev => ({
-                            ...prev,
-                            [entry.id]: Math.min(max, requested + 1),
-                          }))
-                        }
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                        disabled={soldOut || claimingEntryId !== null}
+                        onClick={() => void handleClaim(entry.id, requested)}
                       >
-                        <Plus size={19} />
+                        {claimingEntryId === entry.id
+                          ? 'Claiming…'
+                          : soldOut
+                            ? 'Taken'
+                            : `Claim ${requested}`}
                       </Button>
-                    </span>
-                    <Button
-                      variant="primary"
-                      className={cn(
-                        MARKER_PANEL_TOUCH_TARGET_CLASS,
-                        'h-11 flex-1'
-                      )}
-                      disabled={soldOut || claimingEntryId !== null}
-                      onClick={() => void handleClaim(entry.id, requested)}
-                    >
-                      {claimingEntryId === entry.id
-                        ? 'Claiming…'
-                        : soldOut
-                          ? 'Taken'
-                          : `Claim ${requested}`}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <p className="text-muted text-sm">
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="type-small text-muted mt-2">
             Claimed items arrive on your character sheet a moment later.
           </p>
-        </div>
+        </Section>
       )}
       {claimMessage && (
-        <p role="status" className="text-body text-sm">
+        <p role="status" className="type-ui text-body">
           {claimMessage}
         </p>
       )}
@@ -676,7 +649,7 @@ function panelTitle(state: MarkerPanelState): string {
     state.kind === 'missing-detail' ||
     state.kind === 'unpublished'
   ) {
-    return state.data.label ?? state.data.kind;
+    return state.data.label ?? MARKER_KIND_LABELS[state.data.kind];
   }
   return 'Marker';
 }
@@ -712,28 +685,24 @@ function renderPanelBody(
         <>
           {(state.data.kind === 'trap' || state.data.kind === 'secret') &&
             isDmOnly !== undefined && (
-              <div className="border-divider bg-surface-secondary mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-heading text-sm font-semibold">
+                  <p className="type-ui text-heading">
                     {isDmOnly ? 'Hidden from players' : 'Discovered'}
                   </p>
-                  <p className="text-muted text-xs">
+                  <p className="type-small text-muted">
                     Visibility applies to every pin linked to this marker.
                   </p>
                 </div>
                 <Button
-                  variant={isDmOnly ? 'primary' : 'warning'}
+                  variant="secondary"
                   onClick={() => onAudienceChange?.(!isDmOnly)}
                   leftIcon={isDmOnly ? <Eye size={16} /> : <EyeOff size={16} />}
-                  className={MARKER_PANEL_TOUCH_TARGET_CLASS}
                 >
                   {isDmOnly ? 'Reveal to players' : 'Hide from players'}
                 </Button>
                 {audienceNotice && (
-                  <p
-                    role="alert"
-                    className="text-accent-amber-text w-full text-xs"
-                  >
+                  <p role="alert" className="type-small text-ember-text w-full">
                     {audienceNotice}
                   </p>
                 )}
@@ -794,11 +763,11 @@ function renderPanelBody(
     // callers upholding that — a `missing-detail` state paired with
     // `mode === 'player'` must never surface the DM edit form or DM notes.
     if (mode !== 'dm') {
-      const name = state.data.label ?? state.data.kind;
+      const name = state.data.label ?? MARKER_KIND_LABELS[state.data.kind];
       return (
         <p
           data-testid="marker-panel-state-missing-detail"
-          className="text-body text-sm"
+          className="type-ui text-body"
         >
           Not published yet — the DM hasn&apos;t shared details for this &quot;
           {name}&quot; marker.
@@ -807,7 +776,7 @@ function renderPanelBody(
     }
     return (
       <div data-testid="marker-panel-state-missing-detail">
-        <p className="text-body mb-3 text-sm">
+        <p className="type-ui text-body mb-3">
           This pin doesn&apos;t have details yet — add them below.
         </p>
         <EditForm
@@ -828,11 +797,11 @@ function renderPanelBody(
   }
 
   if (state.kind === 'unpublished') {
-    const name = state.data.label ?? state.data.kind;
+    const name = state.data.label ?? MARKER_KIND_LABELS[state.data.kind];
     return (
       <p
         data-testid="marker-panel-state-unpublished"
-        className="text-body text-sm"
+        className="type-ui text-body"
       >
         Not published yet — the DM hasn&apos;t shared details for this &quot;
         {name}&quot; marker.
@@ -844,7 +813,7 @@ function renderPanelBody(
     return (
       <p
         data-testid="marker-panel-state-invalid-data"
-        className="text-body text-sm"
+        className="type-ui text-body"
       >
         This marker&apos;s data could not be read and cannot be displayed.
       </p>
@@ -854,7 +823,7 @@ function renderPanelBody(
   return (
     <p
       data-testid="marker-panel-state-unsupported-version"
-      className="text-body text-sm"
+      className="type-ui text-body"
     >
       This marker was created by a newer version of RollKeeper and can&apos;t be
       displayed here.
@@ -896,8 +865,13 @@ export default function MarkerDetailPanel({
       <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>
-            <span className="inline-flex items-center gap-2 capitalize">
-              {KindIcon && <KindIcon aria-hidden="true" size={20} />}
+            <span className="inline-flex items-center gap-2">
+              {KindIcon && (
+                <KindIcon
+                  aria-hidden="true"
+                  className="text-muted size-5 shrink-0"
+                />
+              )}
               {panelTitle(state)}
             </span>
           </DialogTitle>

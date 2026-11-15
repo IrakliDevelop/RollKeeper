@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
+import { TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { DockResources } from './DockResources';
 import { getResourceDefinitionById } from '@/utils/classResources';
 import type { CharacterAbilities } from '@/types/character';
@@ -33,6 +34,14 @@ const meta: Meta<typeof DockResources> = {
   title: 'Campaign/PlayerVtt/DockResources',
   component: DockResources,
   args: { onSpend: fn(), onRestore: fn() },
+  // The dock's Tooltips need the provider PlayerVttScreen wraps around it.
+  decorators: [
+    Story => (
+      <TooltipProvider>
+        <Story />
+      </TooltipProvider>
+    ),
+  ],
 };
 export default meta;
 

@@ -3,11 +3,11 @@
 import React from 'react';
 import { Eye, EyeOff, HeartPulse } from 'lucide-react';
 
+import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import {
-  HEADING_CLASS,
-  SECTION_CLASS,
-} from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
+import { Section } from '@/components/ui/layout/section';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
+import { SegmentedGroup } from '@/components/ui/campaign/location-map/ToolOptionControls';
 import {
   playersSeeLabel,
   playersSeeSuffix,
@@ -21,29 +21,13 @@ export interface CreaturePlayersRowProps {
   actions: EntityActions;
 }
 
-const DISPOSITIONS: Array<{
-  value: PlayerDisposition;
-  label: string;
-  activeClass: string;
-}> = [
-  {
-    value: 'ally',
-    label: 'Ally',
-    activeClass: 'bg-surface-raised text-accent-emerald-text shadow-sm',
-  },
-  {
-    value: 'enemy',
-    label: 'Enemy',
-    activeClass: 'bg-surface-raised text-accent-red-text shadow-sm',
-  },
-  {
-    value: 'neutral',
-    label: 'Neutral',
-    activeClass: 'bg-surface-raised text-muted shadow-sm',
-  },
+const DISPOSITIONS: Array<{ value: PlayerDisposition; label: string }> = [
+  { value: 'ally', label: 'Ally' },
+  { value: 'enemy', label: 'Enemy' },
+  { value: 'neutral', label: 'Neutral' },
 ];
 
-/** Dashed "what the players see" card: disposition, hidden/HP toggles, alias, and a live preview. */
+/** "Players" section: disposition, hidden/HP toggles, alias, and a live preview of what players see. */
 export function CreaturePlayersRow({
   entity,
   actions,
@@ -52,10 +36,9 @@ export function CreaturePlayersRow({
   const hpToggleLabel = hpVisible
     ? 'Hide HP from players'
     : 'Show exact HP to players';
-
   const hiddenLabel = entity.isHidden
-    ? 'Name hidden from players — click to reveal'
-    : 'Name visible to players — click to hide';
+    ? 'Show name to players'
+    : 'Hide name from players';
   const [alias, setAlias] = useDraftValue(entity.playerAlias ?? '');
 
   const commitAlias = () => {
@@ -65,67 +48,55 @@ export function CreaturePlayersRow({
   };
 
   return (
-    <div className={`${SECTION_CLASS} border-dashed`}>
-      <p className={HEADING_CLASS}>Players</p>
+    <Section level={4} heading="Players">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="bg-surface-secondary flex items-center rounded-md p-0.5">
-          {DISPOSITIONS.map(({ value, label, activeClass }) => {
-            const active = (entity.playerDisposition ?? 'enemy') === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() =>
-                  actions.onUpdate(entity.id, { playerDisposition: value })
-                }
-                aria-pressed={active}
-                className={`rounded px-2 py-1 text-xs font-semibold transition-colors ${
-                  active ? activeClass : 'text-faint hover:text-muted'
-                }`}
-                title={label}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            actions.onUpdate(entity.id, { isHidden: !entity.isHidden })
+        <SegmentedGroup
+          label="Player disposition"
+          size="sm"
+          options={DISPOSITIONS}
+          value={entity.playerDisposition ?? 'enemy'}
+          onChange={value =>
+            actions.onUpdate(entity.id, { playerDisposition: value })
           }
-          className={`rounded p-1 transition-colors ${
-            entity.isHidden
-              ? 'text-accent-amber-text hover:bg-accent-amber-bg'
-              : 'text-faint hover:text-muted hover:bg-surface-raised'
-          }`}
-          aria-pressed={!!entity.isHidden}
-          aria-label={hiddenLabel}
-          title={hiddenLabel}
-        >
-          {entity.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-        </button>
+        />
 
-        <button
-          type="button"
-          onClick={() =>
-            actions.onUpdate(entity.id, { hpVisibleToPlayers: !hpVisible })
-          }
-          aria-pressed={hpVisible}
-          aria-label={hpToggleLabel}
-          className={`rounded p-1 transition-colors ${
-            hpVisible
-              ? 'text-accent-red-text hover:bg-accent-red-bg'
-              : 'text-faint hover:text-muted hover:bg-surface-raised'
-          }`}
-          title={hpToggleLabel}
-        >
-          <HeartPulse size={14} />
-        </button>
+        <Tooltip content={hiddenLabel}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-9 shrink-0 px-0"
+            selected={!!entity.isHidden}
+            onClick={() =>
+              actions.onUpdate(entity.id, { isHidden: !entity.isHidden })
+            }
+            aria-label={hiddenLabel}
+          >
+            {entity.isHidden ? (
+              <EyeOff size={16} aria-hidden />
+            ) : (
+              <Eye size={16} aria-hidden />
+            )}
+          </Button>
+        </Tooltip>
+
+        <Tooltip content={hpToggleLabel}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-9 shrink-0 px-0"
+            selected={hpVisible}
+            onClick={() =>
+              actions.onUpdate(entity.id, { hpVisibleToPlayers: !hpVisible })
+            }
+            aria-label={hpToggleLabel}
+          >
+            <HeartPulse size={16} aria-hidden />
+          </Button>
+        </Tooltip>
 
         <Input
           type="text"
+          size="sm"
           value={alias}
           onChange={e => setAlias(e.target.value)}
           onBlur={commitAlias}
@@ -138,10 +109,11 @@ export function CreaturePlayersRow({
         />
       </div>
 
-      <p className="text-faint mt-2 text-[11px]">
-        Players see: <b className="font-semibold">{playersSeeLabel(entity)}</b>
+      <p className="type-small text-muted mt-2">
+        Players see:{' '}
+        <b className="text-body font-semibold">{playersSeeLabel(entity)}</b>
         {playersSeeSuffix(entity)}
       </p>
-    </div>
+    </Section>
   );
 }

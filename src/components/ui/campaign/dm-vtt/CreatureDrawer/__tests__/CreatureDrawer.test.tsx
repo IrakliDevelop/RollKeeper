@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanup,
   fireEvent,
@@ -24,7 +24,22 @@ vi.mock('@/hooks/usePaletteSpellEffects', () => ({
   usePaletteSpellEffects: () => ({ effects: [], loading: false }),
 }));
 
-afterEach(() => cleanup());
+// CreatureSheet's Tooltips: Radix measures the trigger with ResizeObserver.
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function makeActions(): EntityActions {
   return {
@@ -84,9 +99,9 @@ describe('CreatureDrawer', () => {
     expect(screen.getByRole('tab', { name: /effects/i })).toBeInTheDocument();
   });
 
-  it('shows the Their turn badge when isTurn', () => {
+  it('shows the Current turn badge when isTurn', () => {
     render(<CreatureDrawer {...props({ isTurn: true })} />);
-    expect(screen.getByText('Their turn')).toBeInTheDocument();
+    expect(screen.getByText('Current turn')).toBeInTheDocument();
   });
 
   it('counts active effects on the Effects tab', () => {
@@ -111,6 +126,19 @@ describe('CreatureDrawer', () => {
     const input = screen.getByLabelText('Combatant name');
     await user.type(input, '{Escape}');
     expect(screen.queryByLabelText('Combatant name')).not.toBeInTheDocument();
+    expect(p.onClose).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('dialog', { name: 'Goblin sheet' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the drawer open on Escape from a combobox', () => {
+    const p = props();
+    render(<CreatureDrawer {...p} />);
+    const combobox = document.createElement('button');
+    combobox.setAttribute('role', 'combobox');
+    screen.getByRole('dialog').appendChild(combobox);
+    fireEvent.keyDown(combobox, { key: 'Escape' });
     expect(p.onClose).not.toHaveBeenCalled();
     expect(
       screen.getByRole('dialog', { name: 'Goblin sheet' })
@@ -143,7 +171,12 @@ describe('CreatureDrawer', () => {
         'Editing this combatant. Changes stay on this combatant.'
       )
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(
+      screen.getByRole('button', { name: 'Full stat block editor' })
+    ).toHaveAttribute('data-variant', 'secondary');
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(done).toHaveAttribute('data-variant', 'ghost');
+    await user.click(done);
     expect(
       screen.queryByText(/editing this combatant/i)
     ).not.toBeInTheDocument();

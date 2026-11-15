@@ -22,24 +22,24 @@ export function PlayerShopFooter({
   after: Currency | null;
 }) {
   return (
-    <div className="border-divider bg-surface-secondary flex flex-col gap-2.5 rounded-lg border-2 p-3.5">
+    <dl className="border-divider flex flex-col gap-2 border-t pt-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <span className="text-heading text-base font-semibold">Your purse</span>
-        <span className="text-heading text-base font-bold tabular-nums">
+        <dt className="type-ui text-heading">Your purse</dt>
+        <dd className="type-ui text-heading tabular-nums">
           {formatPurseLine(purse)}
-        </span>
+        </dd>
       </div>
       {previewLabel && after && (
-        <div className="border-divider flex flex-wrap items-center justify-between gap-4 border-t pt-2.5">
-          <span className="text-body text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <dt className="type-small text-body">
             After buying {previewLabel} —{' '}
             {formatCurrencyFromCopper(previewCostCopper)}
-          </span>
-          <span className="text-accent-emerald-text text-base font-bold tabular-nums">
+          </dt>
+          <dd className="type-ui text-heading tabular-nums">
             {formatPurseLine(after)}
-          </span>
+          </dd>
         </div>
       )}
-    </div>
+    </dl>
   );
 }

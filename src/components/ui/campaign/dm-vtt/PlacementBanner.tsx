@@ -2,6 +2,9 @@
 
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+
+import { cn } from '@/utils/cn';
 
 interface PlacementBannerProps {
   entityName: string;
@@ -16,12 +19,14 @@ export function PlacementBanner({
 }: PlacementBannerProps) {
   return (
     <div className="pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] left-1/2 z-20 -translate-x-1/2">
-      <div className="bg-accent-blue-bg border-accent-blue-border flex min-h-[44px] items-center gap-2 rounded-xl border px-3 py-1.5 shadow-lg">
-        <span className="text-accent-blue-text flex items-center gap-1.5 text-sm font-medium">
-          <AppIcon name="location" className="h-4 w-4" />
-          Click the map to place {entityName}
+      <div
+        className={cn(OVERLAY_SURFACE, 'flex items-center gap-2 px-3 py-1.5')}
+      >
+        <span className="type-ui text-body flex items-center gap-1.5">
+          <AppIcon name="location" className="text-muted size-4" aria-hidden />
+          Choose a spot on the map for {entityName}
         </span>
-        <Button variant="ghost" size="lg" onClick={onCancel}>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancel
         </Button>
       </div>

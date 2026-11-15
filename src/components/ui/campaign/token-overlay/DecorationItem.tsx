@@ -47,7 +47,7 @@ function InTokenBar({
       aria-valuenow={Math.round(hp.percent)}
       aria-valuemin={0}
       aria-valuemax={100}
-      className="bg-surface-secondary/90 border-divider absolute block overflow-hidden rounded-full border"
+      className="bg-surface-secondary/90 border-divider absolute block overflow-hidden rounded-sm border"
       style={{
         left: rect.x + inset,
         top: rect.y + rect.h - barHeight - inset,

@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import type { SpellAoe } from '@/types/spellAoe';
 
 export interface CastingBannerProps {
@@ -10,7 +11,7 @@ export interface CastingBannerProps {
   onCancel: () => void;
 }
 
-/** Fixed banner shown while a spell's AoE template placement is armed on the battle map. */
+/** Neutral strip, mounted under the map tool island, shown while a spell's AoE template placement is armed on the battle map. */
 export function CastingBanner({
   spellName,
   aoe,
@@ -22,18 +23,19 @@ export function CastingBanner({
       : 'Tap the map to place the template';
 
   return (
-    <div className="bg-accent-purple-bg border-accent-purple-border text-accent-purple-text pointer-events-auto fixed top-[64px] left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1 rounded-full border px-4 py-2 shadow-xl">
-      <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5 text-sm font-medium">
-          <AppIcon name="spell" className="h-4 w-4 shrink-0" />
-          Placing {spellName} — tap the map to drop the {aoe.shape} ·{' '}
-          {aoe.sizeFeet} ft
-        </span>
-        <Button variant="ghost" size="lg" onClick={onCancel}>
-          Cancel
-        </Button>
+    <div
+      className={`${OVERLAY_SURFACE} pointer-events-auto flex max-w-full items-center gap-3 px-3 py-2`}
+    >
+      <AppIcon name="spell" className="text-lapis-text size-4 shrink-0" />
+      <div className="min-w-0">
+        <p className="type-ui text-heading">
+          Placing {spellName} · {aoe.sizeFeet} ft {aoe.shape}
+        </p>
+        <p className="type-small text-muted">{instruction}</p>
       </div>
-      <span className="text-muted text-xs">{instruction}</span>
+      <Button variant="ghost" size="sm" className="shrink-0" onClick={onCancel}>
+        Cancel
+      </Button>
     </div>
   );
 }

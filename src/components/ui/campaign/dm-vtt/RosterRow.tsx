@@ -2,9 +2,13 @@
 
 import { Eye } from 'lucide-react';
 
+import { Button } from '@/components/ui/forms/button';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
+
 import { dispositionColor } from './combatantToken';
 
 import { tokenAvatarUrl } from '@/components/ui/campaign/location-map/PlayerTokenTool';
+import { cn } from '@/utils/cn';
 
 import type { PointerEvent } from 'react';
 import type { EncounterEntity } from '@/types/encounter';
@@ -26,6 +30,8 @@ export interface RosterRowProps {
  * threshold — this row just forwards both). Placed rows select the token.
  * Player rows linked to a character get a sibling eye button (never nest
  * buttons) that opens `PlayerDetailDialog` without disturbing placement.
+ * Unplaced rows are toggles (`aria-pressed` = armed); placed rows are plain
+ * select actions.
  */
 export function RosterRow({
   entity,
@@ -49,6 +55,7 @@ export function RosterRow({
     if (!placed) onDragStart(entity, e);
   };
 
+  const viewLabel = `View ${firstName} details`;
   const viewablePcId =
     entity.type === 'player' && entity.playerCharacterId && onViewPlayer
       ? entity.playerCharacterId
@@ -60,13 +67,13 @@ export function RosterRow({
         type="button"
         onClick={handleClick}
         onPointerDown={handlePointerDown}
-        className={`flex min-h-[44px] min-w-0 flex-1 items-center gap-2 rounded-lg border border-transparent px-1.5 py-1 text-left transition-colors ${
-          placed ? 'opacity-60' : ''
-        } ${
+        aria-pressed={placed ? undefined : armed}
+        className={cn(
+          'focus-visible:outline-ring flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border px-1.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11',
           armed
-            ? 'bg-accent-blue-bg border-accent-blue-border'
-            : 'hover:bg-surface-secondary'
-        }`}
+            ? 'bg-brass-bg border-brass-border'
+            : 'hover:bg-surface-hover border-transparent'
+        )}
       >
         <span
           className="flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
@@ -84,24 +91,26 @@ export function RosterRow({
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="text-body block truncate text-xs font-medium">
+          <span className="type-ui text-heading block truncate">
             {firstName}
           </span>
-          <span className="text-faint block text-[10px]">
-            {placed ? 'On map' : 'Tap → place'}
+          <span className="type-small text-muted block">
+            {placed ? 'On map' : 'Place on map'}
           </span>
         </span>
       </button>
       {viewablePcId && (
-        <button
-          type="button"
-          onClick={() => onViewPlayer?.(viewablePcId)}
-          aria-label={`View ${firstName} details`}
-          title="View character details"
-          className="text-muted hover:text-heading hover:bg-surface-secondary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
-        >
-          <Eye size={14} aria-hidden="true" />
-        </button>
+        <Tooltip content={viewLabel}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={viewLabel}
+            onClick={() => onViewPlayer?.(viewablePcId)}
+            className="w-9 shrink-0 px-0"
+          >
+            <Eye size={16} aria-hidden />
+          </Button>
+        </Tooltip>
       )}
     </li>
   );

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import type { BattleMap } from '@/types/battlemap';
 
 interface BattleMapListCardProps {
@@ -18,88 +19,57 @@ export function BattleMapListCard({
   campaignCode,
   onDelete,
 }: BattleMapListCardProps) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const encounterCount = battleMap.linkedEncounterIds.length;
 
-  function handleDeleteClick(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (confirmDelete) {
-      onDelete(battleMap.id);
-    } else {
-      setConfirmDelete(true);
-    }
-  }
-
-  function handleCancelDelete(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setConfirmDelete(false);
+  async function handleDelete() {
+    const confirmed = await confirmDialog({
+      title: `Delete ${battleMap.name}?`,
+      message:
+        'The map and everything on it are removed from this campaign and from your players.',
+      confirmLabel: 'Delete battle map',
+      tone: 'danger',
+    });
+    if (confirmed) onDelete(battleMap.id);
   }
 
   return (
-    <Link
-      href={`/dm/campaign/${campaignCode}/battlemaps/${battleMap.id}`}
-      className="block"
-    >
-      <div className="bg-surface-raised border-divider group relative overflow-hidden rounded-lg border shadow-sm transition-shadow hover:shadow-md">
-        <div className="bg-surface-secondary relative h-40 w-full overflow-hidden">
+    <div className="bg-surface-raised border-divider has-[a:focus-visible]:ring-brass-fill relative overflow-hidden rounded-md border has-[a:focus-visible]:ring-2">
+      <Link
+        href={`/dm/campaign/${campaignCode}/battlemaps/${battleMap.id}`}
+        className="block focus-visible:outline-none"
+      >
+        <div className="bg-surface-secondary h-40 w-full">
           {battleMap.mapImageUrl ? (
             <img
               src={battleMap.mapImageUrl}
-              alt={battleMap.name}
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+              alt=""
+              className="h-full w-full object-cover"
             />
           ) : (
-            <div className="text-muted flex h-full w-full items-center justify-center text-sm">
+            <div className="type-small text-muted flex h-full w-full items-center justify-center">
               No image
             </div>
           )}
-
-          <div className="absolute top-2 right-2 flex items-center gap-1">
-            {confirmDelete ? (
-              <>
-                <Button
-                  variant="danger-solid"
-                  size="sm"
-                  onClick={handleDeleteClick}
-                  className="h-7 px-2 text-xs"
-                >
-                  Delete
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelDelete}
-                  className="h-7 px-2 text-xs"
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <button
-                onClick={handleDeleteClick}
-                title="Delete battle map"
-                className="border-divider bg-surface/80 text-muted hover:text-accent-red-text flex h-7 w-7 items-center justify-center rounded-md border shadow-sm backdrop-blur-sm transition-colors"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
-          </div>
         </div>
-
-        <div className="bg-surface-raised border-divider flex items-center justify-between border-t px-3 py-2">
-          <p className="text-heading truncate text-sm font-semibold">
-            {battleMap.name}
-          </p>
-          {battleMap.linkedEncounterIds.length > 0 && (
-            <Badge variant="info" className="ml-2 shrink-0 text-xs">
-              {battleMap.linkedEncounterIds.length} encounter
-              {battleMap.linkedEncounterIds.length !== 1 ? 's' : ''}
+        <div className="flex min-h-12 items-center gap-2 px-3 py-2 pr-14 pointer-coarse:min-h-14">
+          <p className="type-ui text-heading truncate">{battleMap.name}</p>
+          {encounterCount > 0 && (
+            <Badge variant="neutral" className="shrink-0">
+              {`${encounterCount} encounter${encounterCount !== 1 ? 's' : ''}`}
             </Badge>
           )}
         </div>
-      </div>
-    </Link>
+      </Link>
+      <Button
+        variant="danger"
+        size="sm"
+        aria-label={`Delete ${battleMap.name}`}
+        onClick={handleDelete}
+        className="absolute right-2 bottom-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+      >
+        <Trash2 size={14} aria-hidden="true" />
+      </Button>
+    </div>
   );
 }
 

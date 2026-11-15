@@ -15,7 +15,6 @@ import type {
   Currency,
   InventoryItem,
   MagicItem,
-  MagicItemRarity,
   Weapon,
 } from '@/types/character';
 
@@ -42,18 +41,6 @@ const CURRENCY_ORDER: { key: keyof Currency; label: string }[] = [
   { key: 'silver', label: 'SP' },
   { key: 'copper', label: 'CP' },
 ];
-
-const RARITY_VARIANTS: Record<
-  MagicItemRarity,
-  'neutral' | 'success' | 'info' | 'warning' | 'danger'
-> = {
-  common: 'neutral',
-  uncommon: 'success',
-  rare: 'info',
-  'very rare': 'warning',
-  legendary: 'warning',
-  artifact: 'danger',
-};
 
 function formatWeight(weight: number): string {
   const rounded = Math.round(weight * 10) / 10;
@@ -278,10 +265,4 @@ export function buildInventorySummary(c: CharacterState): InventorySummaryView {
     attuned,
     attunementMax: c.attunementSlots?.max ?? 3,
   };
-}
-
-export function rarityBadgeVariant(
-  rarity: MagicItemRarity
-): 'neutral' | 'success' | 'info' | 'warning' | 'danger' {
-  return RARITY_VARIANTS[rarity] ?? 'neutral';
 }

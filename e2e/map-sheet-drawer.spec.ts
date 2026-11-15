@@ -292,9 +292,9 @@ test.describe('player map sheet drawer', () => {
     await expect(dialog).toHaveAccessibleName(
       `${CHARACTER_NAME} character sheet`
     );
-    // Opening collapses the dock to its CHAR pill.
+    // Opening collapses the dock to its Character pill.
     await expect(
-      playerPage.getByRole('button', { name: /CHAR/ })
+      playerPage.getByRole('button', { name: 'Character', exact: true })
     ).toBeVisible();
 
     expect(await elementWorldPosition(playerPage, tokenId)).toEqual(

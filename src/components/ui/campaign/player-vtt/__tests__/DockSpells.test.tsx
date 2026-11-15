@@ -105,7 +105,7 @@ const getChar = () => useCharacterStore.getState().character;
 
 /** The Cast button that lives in the same row as `spellName`. */
 function castButtonFor(spellName: string): HTMLElement {
-  const row = screen.getByText(spellName).closest('.border-divider');
+  const row = screen.getByText(spellName).closest('li');
   return within(row as HTMLElement).getByRole('button', { name: /^cast$/i });
 }
 
@@ -404,11 +404,68 @@ describe('DockSpells', () => {
 
     expect(screen.getByText('No spells prepared')).toBeInTheDocument();
     expect(
-      screen.getByText(/Prepare spells in the Spellcasting tab/i)
+      screen.getByText(/Prepare spells on your sheet's Spells tab/i)
     ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Spells' })).toBeInTheDocument();
     expect(
       screen.queryByRole('textbox', { name: /search spells/i })
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Sleep')).not.toBeInTheDocument();
+  });
+
+  it('names the section with a Spells heading', () => {
+    renderDock();
+    expect(screen.getByRole('heading', { name: 'Spells' })).toBeInTheDocument();
+  });
+
+  it('level header toggles aria-expanded and hides its rows', () => {
+    renderDock();
+    const header = screen.getByRole('button', { name: /Level 1/ });
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Shield')).toBeInTheDocument();
+
+    fireEvent.click(header);
+
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Shield')).not.toBeInTheDocument();
+  });
+
+  it('shows slots left as one labelled pip row', () => {
+    // loadCharacterState recalculates slot maximums, so set them afterwards.
+    useCharacterStore.setState(state => ({
+      character: {
+        ...state.character,
+        spellSlots: { ...state.character.spellSlots, 1: { max: 3, used: 1 } },
+      },
+    }));
+    renderDock();
+    expect(
+      screen.getByRole('img', { name: '2 of 3 level 1 slots available' })
+    ).toBeInTheDocument();
+  });
+
+  it('spells the concentration and ritual tags out as plain text', () => {
+    seedCharacter({
+      spells: [
+        makeSpell({
+          id: 'ritual-focus',
+          name: 'Ritual Focus',
+          level: 1,
+          concentration: true,
+          ritual: true,
+          isPrepared: true,
+        }),
+      ],
+    });
+    renderDock();
+    expect(screen.getByText('Concentration · Ritual')).toBeInTheDocument();
+    expect(screen.queryByText('Con')).not.toBeInTheDocument();
+  });
+
+  it('labels the casting stats', () => {
+    renderDock();
+    expect(screen.getByText('Save DC')).toBeInTheDocument();
+    expect(screen.getByText('Attack')).toBeInTheDocument();
+    expect(screen.getByText('Ability')).toBeInTheDocument();
   });
 });

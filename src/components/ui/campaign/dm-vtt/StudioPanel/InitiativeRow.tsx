@@ -3,6 +3,9 @@
 import { Badge } from '@/components/ui/layout/badge';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { AppIcon } from '@/components/ui/icons';
+import { Tooltip } from '@/components/ui/primitives/Tooltip';
+
+import { cn } from '@/utils/cn';
 import { effectiveAc } from '@/utils/calculations';
 
 import { dispositionColor } from '../combatantToken';
@@ -18,9 +21,10 @@ export interface InitiativeRowProps {
 
 /**
  * Single initiative-tab row: initiative value, disposition stripe, name
- * (+ concentration/hidden glyphs), HP bar, and AC. Active row (the entity at
- * `sorted[encounter.currentTurn]`) gets an amber pulse; the DM-selected row
- * gets a blue border.
+ * (+ concentration/hidden glyphs), HP bar, and AC. The active row (the
+ * entity at `sorted[encounter.currentTurn]`) gets a static brass fill, left
+ * rule and a visible "Current turn" line; the DM-selected row gets an inset
+ * brass ring (inset so the panel's overflow cannot clip it).
  */
 export function InitiativeRow({
   entity,
@@ -34,43 +38,50 @@ export function InitiativeRow({
     <li>
       <button
         type="button"
+        aria-current={isActive ? 'true' : undefined}
+        aria-pressed={isSelected}
         onClick={() => onSelect(entity.id)}
-        className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${
+        className={cn(
+          'focus-visible:outline-ring flex min-h-9 w-full items-center gap-2 border-l-2 px-2 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11',
           isActive
-            ? 'bg-accent-amber-bg animate-pulse'
-            : 'hover:bg-surface-secondary'
-        } ${
-          isSelected
-            ? 'border-accent-blue-border'
-            : isActive
-              ? 'border-accent-amber-border'
-              : 'border-divider'
-        }`}
+            ? 'bg-brass-bg border-brass-border'
+            : 'hover:bg-surface-hover border-transparent',
+          isSelected && 'ring-brass-border ring-2 ring-inset'
+        )}
       >
         <span
           className="h-8 w-1 shrink-0 rounded-full"
           style={{ backgroundColor: stripeColor }}
           aria-hidden
         />
-        <span className="text-heading w-6 shrink-0 text-center text-sm font-bold tabular-nums">
+        <span className="type-ui text-heading w-6 shrink-0 text-center tabular-nums">
           {entity.initiative ?? '—'}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1">
-            <span className="text-body truncate text-xs font-medium">
-              {entity.name}
-            </span>
+            <span className="type-ui text-heading truncate">{entity.name}</span>
             {entity.concentrationSpell && (
-              <span title={`Concentrating: ${entity.concentrationSpell}`}>
-                <AppIcon name="concentration" className="h-3.5 w-3.5" />
-              </span>
+              <Tooltip
+                content={`Concentrating on ${entity.concentrationSpell}`}
+              >
+                <AppIcon
+                  name="concentration"
+                  label={`Concentrating on ${entity.concentrationSpell}`}
+                  className="text-lapis-text size-3.5 shrink-0"
+                />
+              </Tooltip>
             )}
             {entity.isHidden && (
               <Badge variant="neutral" size="sm">
-                hidden
+                Hidden
               </Badge>
             )}
           </span>
+          {isActive && (
+            <span className="type-small text-brass-text block">
+              Current turn
+            </span>
+          )}
           <HPBar
             current={entity.currentHp}
             max={entity.maxHp}
@@ -78,7 +89,7 @@ export function InitiativeRow({
             size="sm"
           />
         </span>
-        <span className="text-faint shrink-0 text-[10px] font-semibold">
+        <span className="type-small text-muted shrink-0 tabular-nums">
           AC {effectiveAc(entity.armorClass, entity.tempAc)}
         </span>
       </button>

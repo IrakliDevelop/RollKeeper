@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { StatBlockEntriesEditor } from './StatBlockEntriesEditor';
 
 const meta = {
@@ -49,13 +50,92 @@ export const AddEntry: Story = {
 export const DeleteEntry: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const deleteButtons = canvas.getAllByRole('button', {
-      name: /delete entry/i,
-    });
-    await userEvent.click(deleteButtons[0]);
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Delete Scimitar' })
+    );
     await expect(args.onChange).toHaveBeenLastCalledWith([
       { name: 'Fire Breath (Recharge 5-6)', text: 'Cone of fire.', uses: 1 },
     ]);
+  },
+};
+
+/** The title is a level-4 heading naming a region; entries are list items. */
+export const SectionHeading: Story = {
+  parameters: { a11y: { test: 'error' } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      getComputedStyle(
+        canvas.getByRole('heading', { level: 4, name: 'Actions' })
+      ).textTransform
+    ).toBe('none');
+    await expect(
+      within(canvas.getByRole('region', { name: 'Actions' })).getAllByRole(
+        'listitem'
+      )
+    ).toHaveLength(2);
+    await expect(
+      canvas.getByRole('button', { name: 'Delete Scimitar' })
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: 'Delete Fire Breath (Recharge 5-6)' })
+    ).toBeInTheDocument();
+  },
+};
+
+/** A blank or whitespace-only name still gives the delete button a name. */
+export const UnnamedEntry: Story = {
+  args: { entries: [{ name: '   ', text: 'Cone of fire.' }] },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole('button', {
+        name: 'Delete unnamed Actions entry',
+      })
+    ).toBeInTheDocument();
+  },
+};
+
+export const DeleteTooltip: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.hover(
+      canvas.getByRole('button', { name: 'Delete Scimitar' })
+    );
+    const tooltip = await within(document.body).findByRole('tooltip');
+    await expect(tooltip).toHaveTextContent('Delete Scimitar');
+  },
+};
+
+/** On a phone with a coarse pointer the delete target and name field are 44px. */
+export const Touch: Story = {
+  parameters: {
+    viewport: {
+      options: {
+        phone: {
+          name: 'Phone',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const restore = emulateCoarsePointer();
+    try {
+      const del = canvas
+        .getByRole('button', { name: 'Delete Scimitar' })
+        .getBoundingClientRect();
+      await expect(del.height).toBeGreaterThanOrEqual(44);
+      await expect(del.width).toBeGreaterThanOrEqual(44);
+      const name = canvas
+        .getAllByLabelText('Actions entry name')[0]
+        .getBoundingClientRect();
+      await expect(name.height).toBeGreaterThanOrEqual(44);
+    } finally {
+      restore();
+    }
   },
 };
 

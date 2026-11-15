@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect } from 'storybook/test';
+import { expect, within } from 'storybook/test';
 
 import { MonsterDetail } from './MonsterDetail';
 
@@ -90,4 +90,50 @@ export const WithoutToken: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('img')).toBeNull();
   },
+};
+
+const THREE_ACTIONS = [
+  { name: 'Slam', text: 'Melee: +3 to hit.' },
+  { name: 'Bite', text: 'Melee: +3 to hit.' },
+  { name: 'Claw', text: 'Melee: +3 to hit.' },
+];
+
+/** Ability labels read as written, the footer counts actions, the name is a level-4 heading. */
+export const AbilityLabels: Story = {
+  args: {
+    selected: makeMonster({ actions: THREE_ACTIONS }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const label of ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']) {
+      await expect(
+        getComputedStyle(canvas.getByText(label)).textTransform
+      ).toBe('none');
+    }
+    await expect(
+      canvas.getByText('HP formula 2d8+6 · 3 actions')
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('heading', { level: 4, name: 'Zombie' })
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: /edit stat block/i })
+    ).toHaveAttribute('data-variant', 'secondary');
+  },
+};
+
+export const OneAction: Story = {
+  args: {
+    selected: makeMonster({ actions: THREE_ACTIONS.slice(0, 1) }),
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('HP formula 2d8+6 · 1 action')
+    ).toBeInTheDocument();
+  },
+};
+
+export const Dark: Story = {
+  args: AbilityLabels.args,
+  globals: { theme: 'dark' },
 };

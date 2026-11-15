@@ -19,10 +19,10 @@ export function CreatureSheetPill({ name, onOpen }: CreatureSheetPillProps) {
       <Button
         variant="secondary"
         leftIcon={<Swords size={16} />}
-        aria-label={`Open ${name} sheet`}
+        className="bg-surface-elevated"
         onClick={onOpen}
       >
-        Sheet · {name}
+        Open {name} sheet
       </Button>
     </div>
   );

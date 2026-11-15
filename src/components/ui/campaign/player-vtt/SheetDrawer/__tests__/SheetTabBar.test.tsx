@@ -1,6 +1,5 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import { cleanup, render, screen } from '@testing-library/react';
-import { LayoutGrid, Wand2 } from 'lucide-react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { SheetTabBar } from '../SheetTabBar';
@@ -8,36 +7,30 @@ import { SheetTabBar } from '../SheetTabBar';
 describe('SheetTabBar', () => {
   afterEach(cleanup);
 
-  it('underlines the active tab in brass', () => {
+  it('marks the tab matching the Tabs root as selected', () => {
     render(
       <Tabs.Root value="overview">
         <SheetTabBar
-          activeTab="overview"
           tabs={[
-            { id: 'overview', label: 'Overview', icon: LayoutGrid },
-            { id: 'spells', label: 'Spells', icon: Wand2 },
+            { id: 'overview', label: 'Overview' },
+            { id: 'spells', label: 'Spells' },
           ]}
         />
       </Tabs.Root>
     );
 
-    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveClass(
-      'border-brass-fill',
-      'text-heading'
-    );
-    expect(screen.getByRole('tab', { name: 'Spells' })).toHaveClass(
-      'border-transparent'
-    );
-    expect(screen.getByRole('tablist').innerHTML).not.toMatch(/accent-emerald/);
+    const overview = screen.getByRole('tab', { name: 'Overview' });
+    expect(overview).toHaveAttribute('aria-selected', 'true');
+    expect(overview).toHaveAttribute('data-state', 'active');
+    const spells = screen.getByRole('tab', { name: 'Spells' });
+    expect(spells).toHaveAttribute('aria-selected', 'false');
+    expect(spells).toHaveAttribute('data-state', 'inactive');
   });
 
   it('reaches 44px on coarse pointers', () => {
     render(
       <Tabs.Root value="overview">
-        <SheetTabBar
-          activeTab="overview"
-          tabs={[{ id: 'overview', label: 'Overview', icon: LayoutGrid }]}
-        />
+        <SheetTabBar tabs={[{ id: 'overview', label: 'Overview' }]} />
       </Tabs.Root>
     );
 

@@ -214,7 +214,7 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
       'Arrow',
       'Measure',
       'Move',
-      'Spell template',
+      'Template',
     ]);
 
     unmount();

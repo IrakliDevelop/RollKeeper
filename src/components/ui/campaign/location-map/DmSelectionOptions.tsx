@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import {
   RotateCcw,
   RotateCw,
@@ -16,57 +17,69 @@ import {
   useViewport,
 } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import DmLocationAlignMenu from './DmLocationAlignMenu';
-import { COLOR_SWATCHES } from './DmLocationToolOptions';
-
-const ARRANGE_BUTTON = 'h-11 w-11 p-0';
+import { COLOR_SWATCHES, COLOR_SWATCH_NAMES } from './DmLocationToolOptions';
+import { OptionLabel, RangeField, SwatchButton } from './ToolOptionControls';
 
 interface SwatchRowProps {
   label: string;
-  mixedTitle: string;
   active: string | undefined;
   mixed: boolean;
   onSelect: (color: string) => void;
 }
 
-/** One row of `COLOR_SWATCHES` as a radiogroup; shared by the stroke/fill controls below. */
-function SwatchRow({
-  label,
-  mixedTitle,
-  active,
-  mixed,
-  onSelect,
-}: SwatchRowProps) {
+/**
+ * One row of `COLOR_SWATCHES` as a radiogroup; shared by the stroke/fill
+ * controls below. A mixed selection is named in the group, not on a swatch.
+ */
+function SwatchRow({ label, active, mixed, onSelect }: SwatchRowProps) {
   return (
     <div
-      className="flex items-center gap-1"
+      className="flex flex-wrap items-center"
       role="radiogroup"
-      aria-label={label}
+      aria-label={mixed ? `${label} (mixed)` : label}
     >
-      {COLOR_SWATCHES.map(color => {
-        const checked = !mixed && active === color;
-        return (
-          <button
-            key={color}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            title={mixed ? mixedTitle : color}
-            onClick={() => onSelect(color)}
-            className={`h-11 w-11 rounded-full border-2 transition-transform ${
-              checked
-                ? 'border-accent-blue-border scale-110'
-                : 'border-divider hover:scale-105'
-            }`}
-            style={{
-              backgroundColor: color,
-              boxShadow:
-                color === '#ffffff' ? 'inset 0 0 0 1px #e2e8f0' : 'none',
-            }}
-          />
-        );
-      })}
+      {COLOR_SWATCHES.map(color => (
+        <SwatchButton
+          key={color}
+          semantics="radio"
+          color={color}
+          name={COLOR_SWATCH_NAMES[color]}
+          selected={!mixed && active === color}
+          onSelect={() => onSelect(color)}
+        />
+      ))}
     </div>
+  );
+}
+
+interface ArrangeButtonProps {
+  label: string;
+  onClick: () => void;
+  variant?: 'ghost' | 'danger';
+  children: ReactNode;
+}
+
+/** A 36px icon button that names itself by aria-label and tooltip. */
+function ArrangeButton({
+  label,
+  onClick,
+  variant = 'ghost',
+  children,
+}: ArrangeButtonProps) {
+  return (
+    <Tooltip content={label}>
+      <Button
+        variant={variant}
+        size="sm"
+        className="w-9 shrink-0 px-0"
+        aria-label={label}
+        onClick={onClick}
+      >
+        {children}
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -102,112 +115,106 @@ export default function DmSelectionOptions() {
   const isMixed = (field: keyof ElementStyle) =>
     details !== null && details.mixed.includes(field);
 
+  const strokeWidth = isMixed('strokeWidth')
+    ? 4
+    : (details?.common.strokeWidth ?? 4);
+  const fontSize = isMixed('fontSize') ? 16 : (details?.common.fontSize ?? 16);
+
   return (
-    <div
-      className="flex items-center gap-2"
-      role="group"
-      aria-label="Selection options"
-    >
-      <span className="text-muted px-1 text-xs whitespace-nowrap">
-        {selectedCount} selected
-      </span>
-      {has('color') && (
-        <SwatchRow
-          label="Stroke color"
-          mixedTitle="Mixed stroke colors — click to unify"
-          active={details?.common.color}
-          mixed={isMixed('color')}
-          onSelect={color => applyStyle({ color })}
-        />
-      )}
-      {has('fillColor') && (
-        <SwatchRow
-          label="Fill color"
-          mixedTitle="Mixed fill colors — click to unify"
-          active={details?.common.fillColor}
-          mixed={isMixed('fillColor')}
-          onSelect={color => applyStyle({ fillColor: color })}
-        />
-      )}
-      {has('strokeWidth') && (
-        <input
-          type="range"
-          min={1}
-          max={12}
-          value={
-            isMixed('strokeWidth') ? 4 : (details?.common.strokeWidth ?? 4)
-          }
-          aria-label={
-            isMixed('strokeWidth') ? 'Stroke width (mixed)' : 'Stroke width'
-          }
-          className="h-11"
-          onChange={e => applyStyle({ strokeWidth: Number(e.target.value) })}
-        />
-      )}
-      {has('fontSize') && (
-        <input
-          type="range"
-          min={10}
-          max={72}
-          value={isMixed('fontSize') ? 16 : (details?.common.fontSize ?? 16)}
-          aria-label={isMixed('fontSize') ? 'Font size (mixed)' : 'Font size'}
-          className="h-11"
-          onChange={e => applyStyle({ fontSize: Number(e.target.value) })}
-        />
-      )}
-      <DmLocationAlignMenu />
-      <Button
-        variant="ghost"
-        onClick={rotateCCW}
-        title="Rotate 90° counter-clockwise"
-        className={ARRANGE_BUTTON}
+    <TooltipProvider>
+      <div
+        className="flex flex-wrap items-center gap-2"
+        role="group"
+        aria-label="Selection options"
       >
-        <RotateCcw size={15} />
-      </Button>
-      <Button
-        variant="ghost"
-        onClick={rotateCW}
-        title="Rotate 90° clockwise"
-        className={ARRANGE_BUTTON}
-      >
-        <RotateCw size={15} />
-      </Button>
-      {canGroup && (
-        <Button
-          variant="ghost"
-          onClick={group}
-          title="Group"
-          className={ARRANGE_BUTTON}
+        <span className="type-small text-muted px-1 whitespace-nowrap">
+          {selectedCount} selected
+        </span>
+        {has('color') && (
+          <>
+            <OptionLabel>Stroke</OptionLabel>
+            <SwatchRow
+              label="Stroke color"
+              active={details?.common.color}
+              mixed={isMixed('color')}
+              onSelect={color => applyStyle({ color })}
+            />
+          </>
+        )}
+        {has('fillColor') && (
+          <>
+            <OptionLabel>Fill</OptionLabel>
+            <SwatchRow
+              label="Fill color"
+              active={details?.common.fillColor}
+              mixed={isMixed('fillColor')}
+              onSelect={color => applyStyle({ fillColor: color })}
+            />
+          </>
+        )}
+        {has('strokeWidth') && (
+          <>
+            <OptionLabel>Width</OptionLabel>
+            <RangeField
+              ariaLabel={
+                isMixed('strokeWidth') ? 'Stroke width (mixed)' : 'Stroke width'
+              }
+              min={1}
+              max={12}
+              value={strokeWidth}
+              onChange={value => applyStyle({ strokeWidth: value })}
+              // The slider needs a number; the readout must not pass the
+              // fallback off as the selection's real value.
+              format={value => (isMixed('strokeWidth') ? '—' : `${value}px`)}
+            />
+          </>
+        )}
+        {has('fontSize') && (
+          <>
+            <OptionLabel>Size</OptionLabel>
+            <RangeField
+              ariaLabel={
+                isMixed('fontSize') ? 'Font size (mixed)' : 'Font size'
+              }
+              min={10}
+              max={72}
+              value={fontSize}
+              onChange={value => applyStyle({ fontSize: value })}
+              format={value => (isMixed('fontSize') ? '—' : `${value}px`)}
+            />
+          </>
+        )}
+        <DmLocationAlignMenu />
+        <ArrangeButton label="Rotate 90° counter-clockwise" onClick={rotateCCW}>
+          <RotateCcw size={16} />
+        </ArrangeButton>
+        <ArrangeButton label="Rotate 90° clockwise" onClick={rotateCW}>
+          <RotateCw size={16} />
+        </ArrangeButton>
+        {canGroup && (
+          <ArrangeButton label="Group" onClick={group}>
+            <Group size={16} />
+          </ArrangeButton>
+        )}
+        {canUngroup && (
+          <ArrangeButton label="Ungroup" onClick={ungroup}>
+            <Ungroup size={16} />
+          </ArrangeButton>
+        )}
+        <ArrangeButton
+          label={isLocked === true ? 'Unlock' : 'Lock'}
+          onClick={toggleLock}
         >
-          <Group size={15} />
-        </Button>
-      )}
-      {canUngroup && (
-        <Button
-          variant="ghost"
-          onClick={ungroup}
-          title="Ungroup"
-          className={ARRANGE_BUTTON}
+          {isLocked === true ? <LockOpen size={16} /> : <Lock size={16} />}
+        </ArrangeButton>
+        <ArrangeButton
+          label="Delete selected"
+          variant="danger"
+          onClick={() => viewport.removeElements(selectedIds)}
         >
-          <Ungroup size={15} />
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        onClick={toggleLock}
-        title={isLocked === true ? 'Unlock' : 'Lock'}
-        className={ARRANGE_BUTTON}
-      >
-        {isLocked === true ? <LockOpen size={15} /> : <Lock size={15} />}
-      </Button>
-      <Button
-        variant="ghost"
-        onClick={() => viewport.removeElements(selectedIds)}
-        title="Delete selected"
-        className={`text-accent-red-text ${ARRANGE_BUTTON}`}
-      >
-        <Trash2 size={15} />
-      </Button>
-    </div>
+          <Trash2 size={16} />
+        </ArrangeButton>
+      </div>
+    </TooltipProvider>
   );
 }
