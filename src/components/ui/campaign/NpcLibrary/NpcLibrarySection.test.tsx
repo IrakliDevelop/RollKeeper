@@ -310,7 +310,7 @@ describe('NpcLibrarySection', () => {
     ]);
     render(<NpcLibrarySection campaignCode={CODE} />);
 
-    fireEvent.click(screen.getByText('Runs the Rusty Anchor.'));
+    fireEvent.click(viewButton('Brenn Ironhand'));
     expect(
       screen.getByRole('dialog', { name: 'Brenn Ironhand' })
     ).toBeInTheDocument();

@@ -66,24 +66,15 @@ function NPCCard({
   const hasPortrait = !!npc.avatarUrl?.trim();
 
   return (
-    <div
-      className="border-accent-purple-border bg-surface-raised h-[210px] cursor-pointer overflow-hidden rounded-lg border-2 shadow-sm transition-shadow hover:shadow-md"
-      ref={viewRef}
-      role="button"
-      tabIndex={0}
-      aria-label="View"
-      aria-describedby={headingId}
-      onClick={onView}
-      onKeyDown={event => {
-        if (
-          event.target === event.currentTarget &&
-          (event.key === 'Enter' || event.key === ' ')
-        ) {
-          event.preventDefault();
-          onView();
-        }
-      }}
-    >
+    <div className="border-accent-purple-border bg-surface-raised relative h-[210px] cursor-pointer overflow-hidden rounded-lg border-2 shadow-sm transition-shadow hover:shadow-md">
+      <button
+        type="button"
+        ref={viewRef}
+        aria-label="View"
+        aria-describedby={headingId}
+        onClick={onView}
+        className="focus-visible:outline-ring absolute inset-0 z-10 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2"
+      />
       {hasPortrait ? (
         /* Horizontal layout with tall portrait on the left */
         <div className="flex h-full">
@@ -109,12 +100,12 @@ function NPCCard({
                   {npc.name}
                 </Heading>
                 {stats && (
-                  <p className="text-faint truncate text-[10px]">
+                  <p className="text-muted truncate text-[10px]">
                     {stats.size} {stats.type}
                   </p>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-0.5">
+              <div className="relative z-20 flex shrink-0 items-center gap-0.5">
                 <button
                   onClick={e => {
                     e.stopPropagation();
@@ -203,7 +194,7 @@ function NPCCard({
                 {npc.maxHp}
               </span>
               {npc.hitDice && (
-                <span className="text-faint text-[10px]">
+                <span className="text-muted text-[10px]">
                   HD {npc.hitDice.max}
                   {npc.hitDice.dieType}
                 </span>
@@ -292,7 +283,7 @@ function NPCCard({
                     <span
                       key={tag}
                       role="listitem"
-                      className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                      className="bg-surface-secondary border-divider text-muted rounded-full border px-1.5 py-px text-[9px]"
                     >
                       {tag}
                     </span>
@@ -315,12 +306,12 @@ function NPCCard({
                 {npc.name}
               </Heading>
               {stats && (
-                <p className="text-faint truncate text-xs">
+                <p className="text-muted truncate text-xs">
                   {stats.size} {stats.type}
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="relative z-20 flex shrink-0 items-center gap-1">
               <button
                 onClick={e => {
                   e.stopPropagation();
@@ -409,7 +400,7 @@ function NPCCard({
               {npc.maxHp} HP
             </span>
             {npc.hitDice && (
-              <span className="text-faint text-xs">
+              <span className="text-muted text-xs">
                 HD {npc.hitDice.max}
                 {npc.hitDice.dieType}
               </span>
@@ -490,7 +481,7 @@ function NPCCard({
               {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(
                 ability => (
                   <div key={ability} className="text-center">
-                    <span className="text-faint block text-[9px] font-medium uppercase">
+                    <span className="text-muted block text-[9px] font-medium uppercase">
                       {ability}
                     </span>
                     <span className="text-body text-xs font-medium">
@@ -514,7 +505,7 @@ function NPCCard({
                   <span
                     key={tag}
                     role="listitem"
-                    className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                    className="bg-surface-secondary border-divider text-muted rounded-full border px-1.5 py-px text-[9px]"
                   >
                     {tag}
                   </span>

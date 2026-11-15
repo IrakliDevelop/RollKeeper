@@ -205,9 +205,19 @@ export const Portraits: Story = {
   globals: { viewport: { value: 'landscape', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const image = canvas.getByRole('img', { name: 'Brenn Ironhand' });
+    const view = canvas.getByRole('button', {
+      name: 'View',
+      description: 'Brenn Ironhand',
+    });
+    const imageBox = image.getBoundingClientRect();
     await expect(
-      canvas.getByRole('img', { name: 'Brenn Ironhand' })
-    ).toBeInTheDocument();
+      document.elementFromPoint(
+        imageBox.left + imageBox.width / 2,
+        imageBox.top + imageBox.height / 2
+      )
+    ).toBe(view);
+    await expect(view.querySelector('button')).toBeNull();
   },
 };
 

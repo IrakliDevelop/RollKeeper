@@ -142,39 +142,23 @@ export function PlayerSummaryCard({
 
   return (
     <div
-      className={`border-divider bg-surface-raised rounded-lg border-2 shadow-md transition-all hover:shadow-lg ${onClick ? 'cursor-pointer' : ''}`}
-      aria-labelledby={headingId}
-      onClick={event => {
-        if (
-          event.target instanceof Element &&
-          event.target.closest('[role="dialog"]')
-        )
-          return;
-        onClick?.();
-      }}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={
-        onClick
-          ? e => {
-              if (
-                e.target === e.currentTarget &&
-                (e.key === 'Enter' || e.key === ' ')
-              ) {
-                e.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
+      className={`border-divider bg-surface-raised relative rounded-lg border-2 shadow-md transition-all hover:shadow-lg ${onClick ? 'cursor-pointer' : ''}`}
     >
+      {onClick && (
+        <button
+          type="button"
+          aria-labelledby={headingId}
+          onClick={onClick}
+          className="focus-visible:outline-ring absolute inset-0 z-10 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2"
+        />
+      )}
       <div className="p-3">
         {/* Header: optional avatar + name, race, class, level */}
         <div className="mb-3 flex gap-3">
           {avatarSrc ? (
             <button
               type="button"
-              className="border-divider hover:border-accent-blue-border-strong relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 transition-colors"
+              className="border-divider hover:border-accent-blue-border-strong relative z-20 h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 transition-colors"
               onClick={event => {
                 event.stopPropagation();
                 setShowFullImage(true);
@@ -204,20 +188,20 @@ export function PlayerSummaryCard({
                   <span className="text-body text-xs">
                     {char.race || 'Unknown'}
                   </span>
-                  <span className="text-faint">·</span>
+                  <span className="text-muted">·</span>
                   <Badge
                     variant={getClassBadgeVariant(charClass)}
                     className="rounded-full"
                   >
                     {charClass}
                   </Badge>
-                  <span className="text-faint">·</span>
+                  <span className="text-muted">·</span>
                   <span className="text-body text-xs font-medium">
                     Lv. {level}
                   </span>
                 </div>
               </div>
-              <div className="flex shrink-0 items-start gap-1">
+              <div className="relative z-20 flex shrink-0 items-start gap-1">
                 <div className="text-muted max-w-[8rem] truncate text-right text-[10px] leading-tight">
                   {player.playerName}
                 </div>
@@ -367,7 +351,7 @@ export function PlayerSummaryCard({
         {/* DM Custom Counter — mini colored boxes */}
         {customCounterLabel && onAdjustCounter && (
           <div
-            className="border-accent-purple-border bg-accent-purple-bg mb-2 flex items-center justify-between rounded-md border px-2 py-1.5"
+            className="border-accent-purple-border bg-accent-purple-bg relative z-20 mb-2 flex items-center justify-between rounded-md border px-2 py-1.5"
             onClick={e => e.stopPropagation()}
             onKeyDown={e => e.stopPropagation()}
             role="group"
@@ -477,7 +461,7 @@ export function PlayerSummaryCard({
           {onClick && (
             <button
               type="button"
-              className="text-muted text-xs"
+              className="text-muted relative z-20 text-xs"
               aria-label="View sheet"
               aria-describedby={headingId}
               onClick={event => {

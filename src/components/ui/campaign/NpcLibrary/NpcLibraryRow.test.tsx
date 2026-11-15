@@ -6,6 +6,7 @@ import {
   within,
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import type { CampaignNPC, MonsterStatBlock } from '@/types/encounter';
 
 import { NpcLibraryRow, type NpcLibraryRowProps } from './NpcLibraryRow';
@@ -92,17 +93,20 @@ describe('NpcLibraryRow', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the sheet when the card body is clicked', () => {
+  it('opens the sheet from a native card button without nested actions', () => {
     const { onView } = renderRow();
-    fireEvent.click(screen.getByText('Runs the Rusty Anchor.'));
+    const button = screen.getByRole('button', { name: 'View' });
+    expect(button.tagName).toBe('BUTTON');
+    expect(button.querySelector('button')).toBeNull();
+    fireEvent.click(button);
     expect(onView).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the card with Enter or Space without handling keys from nested controls', () => {
+  it('opens the card with Enter or Space without handling keys from nested controls', async () => {
     const { onView } = renderRow();
     const card = screen.getByRole('button', { name: 'View' });
-    fireEvent.keyDown(card, { key: 'Enter' });
-    fireEvent.keyDown(card, { key: ' ' });
+    card.focus();
+    await userEvent.keyboard('{Enter} ');
     expect(onView).toHaveBeenCalledTimes(2);
     fireEvent.keyDown(
       screen.getByRole('button', { name: `Edit ${brenn.name}` }),
@@ -192,7 +196,8 @@ describe('NpcLibraryRow', () => {
       ...brenn,
       avatarUrl: 'data:image/png;base64,cG9ydHJhaXQ=',
     });
-    fireEvent.click(screen.getByRole('img', { name: brenn.name }));
+    expect(screen.getByRole('img', { name: brenn.name })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
     expect(onView).toHaveBeenCalledTimes(1);
   });
 
