@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 
 import { ImageLightbox } from './ImageLightbox';
 
@@ -27,9 +27,12 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async () => {
     const body = within(document.body);
-    await expect(
-      await body.findByRole('dialog', { name: 'Portrait full-size image' })
-    ).toBeInTheDocument();
+    const dialog = await body.findByRole('dialog', {
+      name: 'Portrait full-size image',
+    });
+    // The dialog zooms and fades in; wait until it settles before checking
+    // what is visible.
+    await waitFor(() => expect(dialog.getAnimations()).toHaveLength(0));
     await expect(body.getByRole('button', { name: 'Close' })).toBeVisible();
   },
 };
