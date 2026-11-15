@@ -15,6 +15,7 @@ import {
   Spell,
 } from '@/types/character';
 import { calculateTraitMaxUses } from '@/utils/calculations';
+import { sanitizeRichText } from '@/utils/sanitizeRichText';
 import { FeatureAutocompleteItem, FeatureSourceFilter } from '@/types/features';
 import {
   convertBackgroundFeatureToExtendedFeature,
@@ -441,7 +442,7 @@ export default function UnifiedFeatureModal({
                       <div
                         className="prose prose-sm text-body max-w-none leading-relaxed"
                         dangerouslySetInnerHTML={{
-                          __html: existingFeature.description,
+                          __html: sanitizeRichText(existingFeature.description),
                         }}
                       />
                     </Section>

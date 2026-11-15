@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { sanitizeRichText } from '@/utils/sanitizeRichText';
 
 interface RichTextRendererProps {
   content: string;
@@ -9,7 +10,9 @@ interface RichTextRendererProps {
 
 /**
  * RichTextRenderer - Displays rich text content with the same styling as RichTextEditor
- * Use this component to display HTML content from the RichTextEditor in read-only mode
+ * Use this component to display HTML content from the RichTextEditor in read-only mode.
+ * The HTML is stored and can come from another user, so it goes through
+ * `sanitizeRichText` first.
  */
 export default function RichTextRenderer({
   content,
@@ -27,7 +30,7 @@ export default function RichTextRenderer({
     <div className={`rich-text-renderer ${className}`}>
       <div
         className="rich-text-content"
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: sanitizeRichText(content) }}
       />
 
       {/* Apply the same styles as RichTextEditor for consistency */}
