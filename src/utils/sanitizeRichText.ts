@@ -7,9 +7,10 @@
  * It is a plain string tokenizer, not a DOM parser, so it runs the same on the
  * server render and in the browser. Safety does not rest on matching the
  * browser's parser exactly: the output is rebuilt from scratch, holding only
- * allow-listed tags with validated, double-quoted, escaped attributes and text
- * with every `<` and `>` escaped. A parse that differs from the browser's can
- * drop content, never let markup through.
+ * allow-listed tags with validated, double-quoted, escaped attributes, every
+ * element closed and no stray closing tag, and text with every `<` and `>`
+ * escaped. A parse that differs from the browser's can drop content, never let
+ * markup through.
  *
  * Allowed: what StarterKit, TableKit and TextStyle/Color emit, plus the markup
  * the app's own 5etools converters put into item and feature text that can be
@@ -179,9 +180,13 @@ function linkRel(value: string): string | null {
 function safeHref(value: string): string | null {
   // What the URL parser does first: trim C0 controls and spaces, then
   // remove every tab and newline.
-  const url = value
-    .replace(/^[\u0000- ]+|[\u0000- ]+$/g, '')
-    .replace(/[\t\n\r]/g, '');
+  // Index scans, not a trimming regex, which backtracks quadratically on a
+  // long run of spaces.
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charCodeAt(start) <= 0x20) start++;
+  while (end > start && value.charCodeAt(end - 1) <= 0x20) end--;
+  const url = value.slice(start, end).replace(/[\t\n\r]/g, '');
   if (/[\u0000-\u001f\u007f]/.test(url)) return null;
   const scheme = /^([a-z][a-z\d+.-]*):/i.exec(url);
   if (scheme && !SAFE_SCHEMES.has(asciiLower(scheme[1]))) return null;
@@ -215,11 +220,12 @@ function escapeAttr(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
+/**
+ * A character reference in text only ever decodes to text, so `&` is left as
+ * written and the browser shows exactly what it would have shown before.
+ */
 function escapeText(value: string): string {
-  return value
-    .replace(/&(?!(?:#\d{1,7}|#x[\da-f]{1,6}|[a-z][a-z\d]{0,31});)/gi, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 interface Tag {
@@ -348,6 +354,15 @@ export function sanitizeRichText(html: string): string {
   // While inside a dropped subtree: its tag name and nesting depth.
   let dropping: string | null = null;
   let depth = 0;
+  // Allowed elements left open, so every closing tag matches one of them and
+  // nothing can close the renderer's own wrapper.
+  const open: string[] = [];
+  const openCount = new Map<string, number>();
+  const close = () => {
+    const name = open.pop()!;
+    openCount.set(name, openCount.get(name)! - 1);
+    return `</${name}>`;
+  };
 
   while (pos < n) {
     const lt = html.indexOf('<', pos);
@@ -406,10 +421,20 @@ export function sanitizeRichText(html: string): string {
     }
     if (!own(ALLOWED_TAGS, tag.name)) continue;
     if (tag.closing) {
-      if (!VOID_TAGS.has(tag.name)) out += `</${tag.name}>`;
+      if (!openCount.get(tag.name)) continue;
+      let closed = '';
+      while (closed !== `</${tag.name}>`) {
+        closed = close();
+        out += closed;
+      }
     } else {
       out += serializeStartTag(tag);
+      if (!VOID_TAGS.has(tag.name)) {
+        open.push(tag.name);
+        openCount.set(tag.name, (openCount.get(tag.name) ?? 0) + 1);
+      }
     }
   }
+  while (open.length > 0) out += close();
   return out;
 }

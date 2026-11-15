@@ -148,3 +148,22 @@ describe('sanitizeRichText hostile input', () => {
     }
   });
 });
+
+describe('sanitizeRichText cost', () => {
+  it.each([
+    [
+      'a long run of spaces in an href',
+      `<a href="a${' '.repeat(200_000)}b">x</a>`,
+    ],
+    [
+      'a long run of controls in an href',
+      `<a href="a${'\u0001'.repeat(200_000)}b">x</a>`,
+    ],
+    ['an unclosed tag flood', '<a'.repeat(500_000)],
+    ['a closing tag flood', '<p>'.repeat(5_000) + '</div>'.repeat(200_000)],
+  ])('stays linear on %s', (_name, input) => {
+    const start = performance.now();
+    sanitizeRichText(input);
+    expect(performance.now() - start).toBeLessThan(1_000);
+  });
+});

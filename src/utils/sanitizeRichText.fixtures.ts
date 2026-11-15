@@ -54,6 +54,7 @@ export const UNCHANGED_INPUTS: readonly string[] = [
   COMPACT_FIXTURE_HTML,
   'Legacy plain text with no markup',
   'Two lines\nof legacy text',
+  'Legacy &amp &copy and AT&T text',
   '<p></p>',
   '',
   '<p>You learn <span class="font-medium underline decoration-dotted underline-offset-2" title="Fireball (PHB)">Fireball</span>.</p><div><strong>Variant</strong></div>',
@@ -174,7 +175,7 @@ export const HOSTILE_CASES: ReadonlyArray<{
   {
     name: 'stray angle brackets in text',
     input: 'a < b && c > d <3 </ >',
-    expected: 'a &lt; b &amp;&amp; c &gt; d &lt;3 ',
+    expected: 'a &lt; b && c &gt; d &lt;3 ',
   },
   {
     name: 'attribute quote breakout',
@@ -202,6 +203,18 @@ export const HOSTILE_CASES: ReadonlyArray<{
     input:
       '<constructor>a</constructor><p constructor="x" __proto__="y">b</p><span style="constructor: red; __proto__: red">c</span><a href="&constructor;">d</a>',
     expected: 'a<p>b</p><span>c</span><a href="&amp;constructor;">d</a>',
+  },
+  {
+    name: 'closing tags that would escape the wrapper',
+    input:
+      '</div></div></p></td></table><div><h1>Session expired <a href="https://evil.test/login">sign in</a></h1>',
+    expected:
+      '<div><h1>Session expired <a href="https://evil.test/login">sign in</a></h1></div>',
+  },
+  {
+    name: 'mismatched closing tags',
+    input: '<p><strong>bold<em>both</strong> after</p></em>',
+    expected: '<p><strong>bold<em>both</em></strong> after</p>',
   },
   {
     name: 'base, meta, link and object',
