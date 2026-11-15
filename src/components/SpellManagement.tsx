@@ -17,8 +17,6 @@ import {
   ChevronRight,
   Grid3X3,
   List,
-  SortAsc,
-  SortDesc,
   X,
   Wand2,
   Zap,
@@ -73,6 +71,14 @@ import {
 import { castCostAlertTitle } from '@/utils/spellCastCost';
 import { SlotPipsButtons } from '@/components/ui/game/SlotPipsButtons';
 import { Section } from '@/components/ui/layout/section';
+
+type SpellSort =
+  | 'manual'
+  | 'name-asc'
+  | 'name-desc'
+  | 'prepared'
+  | 'school-asc'
+  | 'school-desc';
 
 interface SpellFilters {
   searchQuery: string;
@@ -463,6 +469,7 @@ const LevelSection: React.FC<{
   onSpellCast: (spell: Spell) => void;
   onReorder: (sourceIndex: number, destinationIndex: number) => void;
   showMoveControls: boolean;
+  manualOrder: boolean;
   slotMax?: number;
   slotUsed?: number;
   onSlotChange?: (delta: number) => void;
@@ -482,6 +489,7 @@ const LevelSection: React.FC<{
   onSpellCast,
   onReorder,
   showMoveControls,
+  manualOrder,
   slotMax,
   slotUsed,
   onSlotChange,
@@ -552,7 +560,8 @@ const LevelSection: React.FC<{
             keyExtractor={spell => spell.id}
             className="divide-divider divide-y"
             itemClassName="pl-6"
-            showDragHandle={true}
+            disabled={!manualOrder}
+            showDragHandle={manualOrder}
             dragHandlePosition="left"
             renderItem={(spell, index) => (
               <div className="flex flex-wrap items-center gap-2">
@@ -640,8 +649,7 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
   const [filters, setFilters] = useState<SpellFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const [compactView, setCompactView] = useState(true);
-  const [sortBy, setSortBy] = useState<'name' | 'level' | 'school'>('level');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<SpellSort>('manual');
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(
     new Set([0, 1, 2])
   );
@@ -732,26 +740,25 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
   // Sort spells
   const sortedSpells = useMemo(() => {
     return [...filteredSpells].sort((a, b) => {
-      let comparison = 0;
-
+      const byName = a.name.localeCompare(b.name);
       switch (sortBy) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'level':
-          comparison = a.level - b.level;
-          break;
-        case 'school':
-          comparison = a.school.localeCompare(b.school);
-          if (comparison === 0) {
-            comparison = a.name.localeCompare(b.name);
-          }
-          break;
+        case 'name-asc':
+          return byName;
+        case 'name-desc':
+          return -byName;
+        case 'prepared':
+          return (
+            Number(isSpellPrepared(b)) - Number(isSpellPrepared(a)) || byName
+          );
+        case 'school-asc':
+          return a.school.localeCompare(b.school) || byName;
+        case 'school-desc':
+          return -(a.school.localeCompare(b.school) || byName);
+        default:
+          return 0;
       }
-
-      return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [filteredSpells, sortBy, sortOrder]);
+  }, [filteredSpells, sortBy]);
 
   // Group spells by level
   const spellsByLevel = useMemo(() => {
@@ -1013,6 +1020,19 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
             leftIcon={<Search className="h-4 w-4" />}
           />
         </div>
+        <SelectField
+          value={sortBy}
+          onValueChange={value => setSortBy(value as SpellSort)}
+          wrapperClassName="w-full sm:w-48"
+          triggerProps={{ 'aria-label': 'Sort spells', size: 'sm' }}
+        >
+          <SelectItem value="manual">Manual order</SelectItem>
+          <SelectItem value="name-asc">Name (A–Z)</SelectItem>
+          <SelectItem value="name-desc">Name (Z–A)</SelectItem>
+          <SelectItem value="prepared">Prepared first</SelectItem>
+          <SelectItem value="school-asc">School (A–Z)</SelectItem>
+          <SelectItem value="school-desc">School (Z–A)</SelectItem>
+        </SelectField>
         <Button
           onClick={() => setCompactView(!compactView)}
           variant="ghost"
@@ -1216,41 +1236,6 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
                 </SelectField>
               </div>
 
-              {/* Sort Options */}
-              <div>
-                <label className="text-body mb-2 block text-sm font-medium">
-                  Sort By
-                </label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <SelectField
-                      value={sortBy}
-                      onValueChange={value =>
-                        setSortBy(value as 'name' | 'level' | 'school')
-                      }
-                    >
-                      <SelectItem value="level">Level</SelectItem>
-                      <SelectItem value="name">Name</SelectItem>
-                      <SelectItem value="school">School</SelectItem>
-                    </SelectField>
-                  </div>
-                  <Button
-                    onClick={() =>
-                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-                    }
-                    variant="outline"
-                    size="md"
-                    title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-                  >
-                    {sortOrder === 'asc' ? (
-                      <SortAsc size={16} />
-                    ) : (
-                      <SortDesc size={16} />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
               {/* Favorites Toggle */}
               <div className="flex items-end">
                 <label className="flex cursor-pointer items-center gap-2 pointer-coarse:min-h-11">
@@ -1320,9 +1305,8 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
               onToggleFavorite={toggleSpellFavorite}
               onSpellCast={handleCastSpell}
               onReorder={handleReorderSpellsInLevel(level)}
-              showMoveControls={
-                editing && sortBy === 'level' && sortOrder === 'asc'
-              }
+              manualOrder={sortBy === 'manual'}
+              showMoveControls={editing && sortBy === 'manual'}
               slotMax={
                 level > 0
                   ? character.spellSlots[
